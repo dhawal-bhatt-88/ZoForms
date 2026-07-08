@@ -8,13 +8,20 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Dependencies / build output (for when real app code lands here)
+# Dependencies / build output
 node_modules/
 dist/
 build/
 .next/
 .turbo/
 coverage/
-*.local
+
+# Prisma generated client
+**/generated/
+
+# Env files — keep the .example templates, ignore the real ones
 .env
-.env.*
+.env.local
+.env.*.local
+apps/*/.env
+apps/*/.env.local

@@ -43,3 +43,15 @@ Claims are labeled **Verified** (grounded in public facts about Tally) vs **Assu
 ## From prototype to production
 
 The prototype's "Ship to production" screen maps each screen/flow onto the real codebase: a Turborepo monorepo with `apps/web` (Next.js), `apps/api` (NestJS), `apps/workers` (BullMQ), and shared `packages/*` (ui, form-schema, form-runtime, db). See that screen and the report's architecture sections for the full path.
+
+## Building the app (monorepo)
+
+The scaffold for that app now lives in this repo:
+
+- **`apps/web`** — Next.js (App Router) + Tailwind — the dashboard / builder UI
+- **`apps/api`** — NestJS REST API + Prisma — health + forms endpoints
+- **`packages/form-schema`** — the shared Zod form contract (the JSONB keystone)
+
+It boots the **walking skeleton**: create a form → it persists to Postgres via Prisma → it appears in the dashboard.
+
+**→ See [`GETTING-STARTED.md`](GETTING-STARTED.md) for prerequisites and first-run commands.**
