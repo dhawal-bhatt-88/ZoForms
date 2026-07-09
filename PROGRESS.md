@@ -70,7 +70,7 @@ Critical path: **Editor → Runtime → Submit → Responses → Billing.**
 - [ ] Observability (Sentry, OpenTelemetry, PostHog), rate limiting, security hardening, SOC 2 / GDPR posture
 
 ## Phase 4 — Future (AI & automation)
-- [ ] AI form generation from a prompt
+- [x] AI form generation from a prompt (POST /v1/ai/generate-form — Claude when ANTHROPIC_API_KEY set, heuristic fallback; "Generate with AI" on dashboard)
 - [ ] AI logic / branching suggestions
 - [ ] Response summarization + analytics copilot
 - [ ] Auto-translation

@@ -116,6 +116,21 @@ export class FormsService {
     });
   }
 
+  async createWithSchema(user: AuthUser, schema: unknown) {
+    const parsed = FormSchema.parse(schema);
+    return this.prisma.form.create({
+      data: {
+        title: parsed.title,
+        slug: this.slugify(parsed.title),
+        status: "DRAFT",
+        workspaceId: user.workspaceId,
+        versions: {
+          create: { version: 1, schema: parsed as unknown as Prisma.InputJsonValue },
+        },
+      },
+    });
+  }
+
   /* ---------- public (form runtime, unauthenticated) ---------- */
 
   async getPublicBySlug(slug: string) {

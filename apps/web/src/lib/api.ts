@@ -129,6 +129,13 @@ export function duplicateForm(id: string) {
   return req<FormListItem>(`/v1/forms/${id}/duplicate`, { method: "POST" });
 }
 
+export function generateForm(prompt: string) {
+  return req<FormListItem>("/v1/ai/generate-form", {
+    method: "POST",
+    body: JSON.stringify({ prompt }),
+  });
+}
+
 export function listResponses(id: string) {
   return req<{ id: string; data: Record<string, unknown>; createdAt: string }[]>(
     `/v1/forms/${id}/responses`,
