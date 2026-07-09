@@ -13,6 +13,7 @@ import {
   Plus,
   Sparkles,
   X,
+  Zap,
 } from "lucide-react";
 import {
   createForm,
@@ -111,6 +112,10 @@ export default function Dashboard() {
         <Link href="/app/templates" className="btn btn-outline btn-sm">
           <LayoutTemplate className="h-4 w-4" />
           <span className="hidden sm:inline">Templates</span>
+        </Link>
+        <Link href="/app/integrations" className="btn btn-outline btn-sm">
+          <Zap className="h-4 w-4" />
+          <span className="hidden sm:inline">Integrations</span>
         </Link>
         <button
           onClick={() => {

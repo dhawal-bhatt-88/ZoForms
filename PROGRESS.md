@@ -74,6 +74,6 @@ Critical path: **Editor → Runtime → Submit → Responses → Billing.**
 - [ ] AI logic / branching suggestions
 - [ ] Response summarization + analytics copilot
 - [ ] Auto-translation
-- [ ] Integration marketplace + visual workflow automation
+- [x] Integration marketplace + visual workflow automation (Automation model; per-form webhooks fire on new response; /app/integrations catalog + per-form Connect page with add/toggle/test/delete)
 
 _Cross-cutting every phase: tests, CI/CD, monitoring, accessibility, security, docs._

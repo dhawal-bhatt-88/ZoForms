@@ -142,6 +142,55 @@ export function listResponses(id: string) {
   );
 }
 
+/* ---------- automations / integrations ---------- */
+
+export type Automation = {
+  id: string;
+  formId: string;
+  name: string;
+  trigger: string;
+  action: string;
+  config: { url?: string };
+  enabled: boolean;
+  createdAt: string;
+  lastFiredAt: string | null;
+  lastStatus: string | null;
+};
+
+export function listAutomations(formId: string) {
+  return req<Automation[]>(`/v1/forms/${formId}/automations`);
+}
+
+export function createAutomation(
+  formId: string,
+  body: { name: string; action?: string; config: { url: string }; enabled?: boolean },
+) {
+  return req<Automation>(`/v1/forms/${formId}/automations`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function updateAutomation(
+  id: string,
+  patch: { name?: string; config?: { url: string }; enabled?: boolean },
+) {
+  return req<Automation>(`/v1/automations/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
+export function deleteAutomation(id: string) {
+  return req<{ ok: boolean }>(`/v1/automations/${id}`, { method: "DELETE" });
+}
+
+export function testAutomation(id: string) {
+  return req<{ ok: boolean; status: string }>(`/v1/automations/${id}/test`, {
+    method: "POST",
+  });
+}
+
 /* ---------- public (form runtime) ---------- */
 
 export type PublicForm = {

@@ -10,11 +10,15 @@ import {
   validateSubmission,
 } from "@formbuilder/form-schema";
 import { PrismaService } from "../prisma/prisma.service";
+import { AutomationsService } from "../automations/automations.service";
 import type { AuthUser } from "../auth/current-user.decorator";
 
 @Injectable()
 export class FormsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly automations: AutomationsService,
+  ) {}
 
   /* ---------- authenticated (scoped to the user's org) ---------- */
 
@@ -171,6 +175,13 @@ export class FormsService {
         formId: form.id,
         data: cleaned as unknown as Prisma.InputJsonValue,
       },
+    });
+    // Fire webhooks/automations without blocking the submitter's response.
+    void this.automations.dispatch(form.id, {
+      formId: form.id,
+      slug: form.slug,
+      responseId: response.id,
+      data: cleaned,
     });
     return { ok: true, id: response.id };
   }

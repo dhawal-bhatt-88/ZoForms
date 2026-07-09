@@ -41,6 +41,7 @@ import {
   Type,
   Upload,
   X,
+  Zap,
 } from "lucide-react";
 import {
   BLOCK_META,
@@ -365,6 +366,9 @@ export default function EditorPage() {
         <div className="ml-auto flex items-center gap-2">
           <Link href={`/app/forms/${id}/responses`} className="btn btn-ghost btn-sm">
             <Inbox className="h-4 w-4" /> Responses
+          </Link>
+          <Link href={`/app/forms/${id}/integrations`} className="btn btn-ghost btn-sm">
+            <Zap className="h-4 w-4" /> Connect
           </Link>
           {status === "PUBLISHED" ? (
             <>
