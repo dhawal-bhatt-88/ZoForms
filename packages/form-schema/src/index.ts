@@ -41,8 +41,11 @@ export type Block = z.infer<typeof Block>;
 export const FormTheme = z.object({
   accent: z.string().optional(),
   background: z.string().optional(),
-  font: z.enum(["sans", "serif", "mono"]).optional(),
-  radius: z.enum(["sm", "md", "lg"]).optional(),
+  text: z.string().optional(),
+  buttonText: z.string().optional(),
+  font: z.enum(["sans", "serif", "mono", "rounded"]).optional(),
+  radius: z.enum(["none", "sm", "md", "lg", "full"]).optional(),
+  width: z.enum(["narrow", "normal", "wide"]).optional(),
 });
 export type FormTheme = z.infer<typeof FormTheme>;
 
@@ -56,23 +59,56 @@ export type FormSettings = z.infer<typeof FormSettings>;
 export type ResolvedTheme = {
   accent: string;
   background: string;
+  text: string;
+  mutedText: string;
+  buttonText: string;
+  surface: string;
+  border: string;
   fontFamily: string;
   radius: string;
+  cardRadius: string;
+  maxWidth: string;
 };
+
+/** Relative luminance (0=black, 1=white) of a #rrggbb / #rgb color. */
+function luminance(hex: string): number {
+  let h = hex.replace("#", "").trim();
+  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  if (h.length !== 6) return 1;
+  const r = parseInt(h.slice(0, 2), 16) / 255;
+  const g = parseInt(h.slice(2, 4), 16) / 255;
+  const b = parseInt(h.slice(4, 6), 16) / 255;
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
 
 /** Turn a (partial) theme into concrete CSS values the runtime + preview can apply. */
 export function resolveTheme(theme?: FormTheme): ResolvedTheme {
   const fonts = {
-    sans: "system-ui, -apple-system, 'Hanken Grotesk', 'Segoe UI', sans-serif",
-    serif: "Georgia, 'Times New Roman', serif",
+    sans: "'Hanken Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif",
+    serif: "'Iowan Old Style', Georgia, 'Times New Roman', serif",
     mono: "ui-monospace, 'SF Mono', 'JetBrains Mono', monospace",
+    rounded: "ui-rounded, 'SF Pro Rounded', 'Hanken Grotesk', system-ui, sans-serif",
   } as const;
-  const radii = { sm: "6px", md: "12px", lg: "20px" } as const;
+  const radii = { none: "0px", sm: "6px", md: "12px", lg: "20px", full: "9999px" } as const;
+  const widths = { narrow: "480px", normal: "640px", wide: "820px" } as const;
+
+  const background = theme?.background || "#F6F7F9";
+  const dark = luminance(background) < 0.45;
+  const radius = radii[theme?.radius || "md"];
   return {
     accent: theme?.accent || "#6D5EFA",
-    background: theme?.background || "#F6F7F9",
+    background,
+    text: theme?.text || (dark ? "#F4F4F5" : "#1B1D22"),
+    mutedText: dark ? "rgba(244,244,245,0.62)" : "#6B7280",
+    buttonText: theme?.buttonText || "#FFFFFF",
+    // Card surface adapts so themed text stays legible on dark backgrounds.
+    surface: dark ? "#1C1F26" : "#FFFFFF",
+    border: dark ? "rgba(255,255,255,0.14)" : "#ECEDF0",
     fontFamily: fonts[theme?.font || "sans"],
-    radius: radii[theme?.radius || "md"],
+    radius,
+    // The big form card must never become a blob at pill radius.
+    cardRadius: radius === "9999px" ? "28px" : radius,
+    maxWidth: widths[theme?.width || "normal"],
   };
 }
 

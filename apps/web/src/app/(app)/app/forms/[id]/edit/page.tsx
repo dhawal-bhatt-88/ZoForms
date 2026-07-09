@@ -77,6 +77,51 @@ const PALETTE: { group: string; types: BlockType[] }[] = [
   { group: "Other", types: ["number", "date", "rating", "file"] },
 ];
 
+function ColorField({
+  label,
+  value,
+  swatches,
+  onPick,
+}: {
+  label: string;
+  value: string;
+  swatches: string[];
+  onPick: (c: string) => void;
+}) {
+  return (
+    <div className="mb-3">
+      <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">{label}</label>
+      <div className="flex items-center gap-1.5">
+        {swatches.map((c) => (
+          <button
+            key={c}
+            onClick={() => onPick(c)}
+            className="h-6 w-6 rounded-md border-2 transition-transform hover:scale-110"
+            style={{
+              background: c,
+              borderColor:
+                value.toLowerCase() === c.toLowerCase() ? "#1B1D22" : "rgba(0,0,0,0.08)",
+            }}
+            aria-label={`${label} ${c}`}
+          />
+        ))}
+        <label
+          className="relative ml-auto h-6 w-9 cursor-pointer overflow-hidden rounded-md border border-line-2"
+          style={{ background: value }}
+          title="Custom color"
+        >
+          <input
+            type="color"
+            value={value}
+            onChange={(e) => onPick(e.target.value)}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          />
+        </label>
+      </div>
+    </div>
+  );
+}
+
 function BlockPreview({ block }: { block: Block }) {
   const box = "rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-faint";
   if (block.type === "long")
@@ -268,8 +313,11 @@ export default function EditorPage() {
   const updateTheme = (p: {
     accent?: string;
     background?: string;
-    font?: "sans" | "serif" | "mono";
-    radius?: "sm" | "md" | "lg";
+    text?: string;
+    buttonText?: string;
+    font?: "sans" | "serif" | "mono" | "rounded";
+    radius?: "none" | "sm" | "md" | "lg" | "full";
+    width?: "narrow" | "normal" | "wide";
   }) =>
     patch((s) => ({
       ...s,
@@ -576,59 +624,85 @@ export default function EditorPage() {
               <h4 className="mb-3 mt-6 border-t border-line pt-4 text-[11px] font-bold uppercase tracking-wider text-faint">
                 Design
               </h4>
-              <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Accent</label>
-              <div className="mb-3 flex gap-2">
-                {["#6D5EFA", "#2F6BE4", "#159C56", "#E1663E", "#D93F87", "#18181B"].map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => updateTheme({ accent: c })}
-                    className="h-7 w-7 rounded-lg border-2 transition-transform hover:scale-110"
-                    style={{
-                      background: c,
-                      borderColor: (schema.settings?.theme?.accent || "#6D5EFA") === c ? "#1B1D22" : "transparent",
-                    }}
-                    aria-label={`Accent ${c}`}
-                  />
-                ))}
-              </div>
-              <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Background</label>
-              <div className="mb-3 flex gap-2">
-                {["#FFFFFF", "#F6F7F9", "#FAF7F2", "#F2F4FF", "#111318"].map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => updateTheme({ background: c })}
-                    className="h-7 w-7 rounded-lg border transition-transform hover:scale-110"
-                    style={{
-                      background: c,
-                      borderColor: (schema.settings?.theme?.background || "#F6F7F9") === c ? "#1B1D22" : "#E2E4E9",
-                    }}
-                    aria-label={`Background ${c}`}
-                  />
-                ))}
-              </div>
+
+              <ColorField
+                label="Accent"
+                value={schema.settings?.theme?.accent || "#6D5EFA"}
+                swatches={["#6D5EFA", "#2F6BE4", "#159C56", "#E1663E", "#D93F87", "#18181B"]}
+                onPick={(c) => updateTheme({ accent: c })}
+              />
+              <ColorField
+                label="Background"
+                value={schema.settings?.theme?.background || "#F6F7F9"}
+                swatches={["#FFFFFF", "#F6F7F9", "#FAF7F2", "#F2F4FF", "#111318"]}
+                onPick={(c) => updateTheme({ background: c })}
+              />
+              <ColorField
+                label="Text"
+                value={schema.settings?.theme?.text || "#1B1D22"}
+                swatches={["#1B1D22", "#37352F", "#0F172A", "#FFFFFF"]}
+                onPick={(c) => updateTheme({ text: c })}
+              />
+              <ColorField
+                label="Button text"
+                value={schema.settings?.theme?.buttonText || "#FFFFFF"}
+                swatches={["#FFFFFF", "#111318"]}
+                onPick={(c) => updateTheme({ buttonText: c })}
+              />
+
               <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Font</label>
               <select
                 value={schema.settings?.theme?.font ?? "sans"}
-                onChange={(e) => updateTheme({ font: e.target.value as "sans" | "serif" | "mono" })}
+                onChange={(e) =>
+                  updateTheme({ font: e.target.value as "sans" | "serif" | "mono" | "rounded" })
+                }
                 className={`${fieldCls} mb-3`}
               >
                 <option value="sans">Sans</option>
                 <option value="serif">Serif</option>
                 <option value="mono">Mono</option>
+                <option value="rounded">Rounded</option>
               </select>
+
               <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Corners</label>
+              <div className="mb-3 grid grid-cols-5 gap-1.5">
+                {(["none", "sm", "md", "lg", "full"] as const).map((r) => {
+                  const px = { none: "0px", sm: "3px", md: "6px", lg: "9px", full: "9999px" }[r];
+                  const active = (schema.settings?.theme?.radius || "md") === r;
+                  return (
+                    <button
+                      key={r}
+                      onClick={() => updateTheme({ radius: r })}
+                      title={r === "none" ? "Square" : r === "full" ? "Pill" : r}
+                      className={`flex h-9 items-center justify-center rounded-lg border ${
+                        active ? "border-accent bg-accent-weak" : "border-line-2"
+                      }`}
+                    >
+                      <span
+                        className="h-4 w-4 border-2"
+                        style={{
+                          borderTopLeftRadius: px,
+                          borderColor: active ? "#6D5EFA" : "#9AA0AA",
+                        }}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+
+              <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Width</label>
               <div className="mb-4 flex gap-1.5">
-                {(["sm", "md", "lg"] as const).map((r) => (
+                {(["narrow", "normal", "wide"] as const).map((w) => (
                   <button
-                    key={r}
-                    onClick={() => updateTheme({ radius: r })}
-                    className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium ${
-                      (schema.settings?.theme?.radius || "md") === r
+                    key={w}
+                    onClick={() => updateTheme({ width: w })}
+                    className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium capitalize ${
+                      (schema.settings?.theme?.width || "normal") === w
                         ? "border-accent bg-accent-weak text-accent-2"
                         : "border-line-2 text-muted"
                     }`}
                   >
-                    {r === "sm" ? "Sharp" : r === "md" ? "Rounded" : "Round"}
+                    {w}
                   </button>
                 ))}
               </div>
@@ -639,14 +713,28 @@ export default function EditorPage() {
                 return (
                   <div
                     className="border border-line p-3"
-                    style={{ background: th.background, borderRadius: th.radius, fontFamily: th.fontFamily }}
+                    style={{
+                      background: th.background,
+                      borderRadius: th.radius === "9999px" ? "20px" : th.radius,
+                      fontFamily: th.fontFamily,
+                      color: th.text,
+                    }}
                   >
-                    <div className="border border-line bg-white p-3" style={{ borderRadius: th.radius }}>
+                    <div
+                      className="border border-line bg-white p-3"
+                      style={{ borderRadius: th.radius === "9999px" ? "16px" : th.radius }}
+                    >
                       <div className="mb-2 text-sm font-bold">{schema.title || "Sample form"}</div>
-                      <div className="mb-2 border border-line-2 px-2 py-1.5 text-xs text-faint" style={{ borderRadius: th.radius }}>
+                      <div
+                        className="mb-2 border border-line-2 px-2 py-1.5 text-xs text-faint"
+                        style={{ borderRadius: th.radius }}
+                      >
                         Your answer…
                       </div>
-                      <button className="w-full py-1.5 text-xs font-semibold text-white" style={{ background: th.accent, borderRadius: th.radius }}>
+                      <button
+                        className="w-full py-1.5 text-xs font-semibold"
+                        style={{ background: th.accent, color: th.buttonText, borderRadius: th.radius }}
+                      >
                         {schema.settings?.submitLabel || "Submit"}
                       </button>
                     </div>

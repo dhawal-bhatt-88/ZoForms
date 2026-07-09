@@ -96,6 +96,7 @@ export default function PublicFormPage() {
     minHeight: embed ? "auto" : "100vh",
     background: embed ? "transparent" : t.background,
     fontFamily: t.fontFamily,
+    color: t.text,
   } as React.CSSProperties;
 
   if (state === "loading")
@@ -119,19 +120,21 @@ export default function PublicFormPage() {
     return (
       <div style={page} className="grid place-items-center px-6">
         <div
-          className="w-full max-w-lg border border-line bg-white p-10 text-center shadow-soft"
-          style={{ borderRadius: t.radius }}
+          className="w-full max-w-lg border p-10 text-center shadow-soft"
+          style={{ borderRadius: t.cardRadius, background: t.surface, borderColor: t.border }}
         >
           <div
-            className="mx-auto grid h-12 w-12 place-items-center rounded-full text-white"
-            style={{ background: t.accent }}
+            className="mx-auto grid h-12 w-12 place-items-center rounded-full"
+            style={{ background: t.accent, color: t.buttonText }}
           >
             <Check className="h-6 w-6" />
           </div>
           <h1 className="mt-5 text-2xl font-bold tracking-tight">Thanks — got it!</h1>
-          <p className="mt-2 text-muted">Your response to “{form?.title}” was submitted.</p>
-          <p className="mt-8 text-xs text-faint">
-            Made with <span className="font-semibold text-ink">Frame</span>
+          <p className="mt-2" style={{ color: t.mutedText }}>
+            Your response to “{form?.title}” was submitted.
+          </p>
+          <p className="mt-8 text-xs" style={{ color: t.mutedText }}>
+            Made with <span className="font-semibold">Frame</span>
           </p>
         </div>
       </div>
@@ -141,11 +144,20 @@ export default function PublicFormPage() {
     <div style={page} className={embed ? "p-2" : "px-6 py-10"}>
       <form
         onSubmit={onSubmit}
-        className="mx-auto w-full max-w-xl border border-line bg-white p-8 shadow-soft sm:p-10"
-        style={{ borderRadius: t.radius }}
+        className="mx-auto w-full border p-8 shadow-soft sm:p-10"
+        style={{
+          borderRadius: t.cardRadius,
+          maxWidth: t.maxWidth,
+          background: t.surface,
+          borderColor: t.border,
+        }}
       >
         <h1 className="text-[26px] font-bold tracking-tight">{form?.title}</h1>
-        {form?.schema.description && <p className="mt-1.5 text-muted">{form.schema.description}</p>}
+        {form?.schema.description && (
+          <p className="mt-1.5" style={{ color: t.mutedText }}>
+            {form.schema.description}
+          </p>
+        )}
 
         <div className="mt-7 flex flex-col gap-6">
           {form?.schema.blocks.map((b) => (
@@ -156,6 +168,8 @@ export default function PublicFormPage() {
               error={errors[b.id]}
               accent={t.accent}
               radius={t.radius}
+              border={t.border}
+              mutedText={t.mutedText}
               onChange={(v) => set(b.id, v)}
             />
           ))}
@@ -168,8 +182,8 @@ export default function PublicFormPage() {
         <button
           type="submit"
           disabled={submitting}
-          className="mt-8 flex h-12 w-full items-center justify-center gap-2 text-[15px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
-          style={{ background: t.accent, borderRadius: t.radius }}
+          className="mt-8 flex h-12 w-full items-center justify-center gap-2 text-[15px] font-semibold transition-opacity hover:opacity-90 disabled:opacity-60"
+          style={{ background: t.accent, color: t.buttonText, borderRadius: t.radius }}
         >
           {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {submitting ? "Submitting…" : form?.schema.settings?.submitLabel || "Submit"}
@@ -189,6 +203,8 @@ function Field({
   error,
   accent,
   radius,
+  border,
+  mutedText,
   onChange,
 }: {
   block: Block;
@@ -196,21 +212,27 @@ function Field({
   error?: string;
   accent: string;
   radius: string;
+  border: string;
+  mutedText: string;
   onChange: (v: unknown) => void;
 }) {
   if (block.type === "heading")
     return <h2 className="mt-2 text-lg font-bold tracking-tight">{block.label}</h2>;
 
-  const inputStyle = { borderRadius: radius } as React.CSSProperties;
-  const inputCls = `w-full border px-3.5 py-2.5 text-[15px] outline-none transition-colors ${
-    error ? "border-red" : "border-line-2 focus:border-ink"
-  }`;
+  const inputStyle = {
+    borderRadius: radius,
+    borderColor: error ? "#E5484D" : border,
+    background: "transparent",
+    color: "inherit",
+  } as React.CSSProperties;
+  const inputCls =
+    "w-full border px-3.5 py-2.5 text-[15px] outline-none transition-colors focus:border-current";
   const tint = `${accent}14`;
   const optStyle = (on: boolean) =>
     ({
       borderRadius: radius,
-      borderColor: on ? accent : undefined,
-      background: on ? tint : undefined,
+      borderColor: on ? accent : border,
+      background: on ? tint : "transparent",
     }) as React.CSSProperties;
 
   return (
@@ -219,7 +241,11 @@ function Field({
         {block.label}
         {block.required && <span className="ml-0.5 text-red">*</span>}
       </label>
-      {block.description && <p className="mb-2 -mt-1 text-sm text-muted">{block.description}</p>}
+      {block.description && (
+        <p className="mb-2 -mt-1 text-sm" style={{ color: mutedText }}>
+          {block.description}
+        </p>
+      )}
 
       {block.type === "long" ? (
         <textarea
