@@ -55,4 +55,9 @@ export class FormsController {
   responses(@CurrentUser() user: AuthUser, @Param("id") id: string) {
     return this.forms.listResponses(user, id);
   }
+
+  @Post(":id/duplicate")
+  duplicate(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.forms.duplicate(user, id);
+  }
 }

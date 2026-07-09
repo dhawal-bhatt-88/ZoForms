@@ -99,6 +99,23 @@ export class FormsService {
     });
   }
 
+  async duplicate(user: AuthUser, id: string) {
+    const form = await this.get(user, id);
+    const schema = form.versions[0]?.schema ?? emptyForm(form.title);
+    const title = `${form.title} (copy)`;
+    return this.prisma.form.create({
+      data: {
+        title,
+        slug: this.slugify(title),
+        status: "DRAFT",
+        workspaceId: user.workspaceId,
+        versions: {
+          create: { version: 1, schema: schema as unknown as Prisma.InputJsonValue },
+        },
+      },
+    });
+  }
+
   /* ---------- public (form runtime, unauthenticated) ---------- */
 
   async getPublicBySlug(slug: string) {

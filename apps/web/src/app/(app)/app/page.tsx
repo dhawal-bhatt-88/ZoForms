@@ -3,9 +3,18 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ExternalLink, Inbox, Loader2, LogOut, Plus } from "lucide-react";
+import {
+  Copy,
+  ExternalLink,
+  Inbox,
+  LayoutTemplate,
+  Loader2,
+  LogOut,
+  Plus,
+} from "lucide-react";
 import {
   createForm,
+  duplicateForm,
   listForms,
   logout,
   me,
@@ -53,6 +62,15 @@ export default function Dashboard() {
     }
   }
 
+  async function onDuplicate(id: string) {
+    try {
+      await duplicateForm(id);
+      refresh();
+    } catch {
+      /* ignore */
+    }
+  }
+
   return (
     <main className="mx-auto max-w-5xl px-6 py-12">
       <header className="mb-8 flex items-center gap-3">
@@ -63,6 +81,10 @@ export default function Dashboard() {
           <h1 className="text-xl font-semibold tracking-tight">My forms</h1>
           <p className="text-sm text-muted">{user ? user.name || user.email : "Your workspace"}</p>
         </div>
+        <Link href="/app/templates" className="btn btn-outline btn-sm">
+          <LayoutTemplate className="h-4 w-4" />
+          <span className="hidden sm:inline">Templates</span>
+        </Link>
         <button
           onClick={() => {
             logout();
@@ -129,17 +151,26 @@ export default function Dashboard() {
                 </div>
               </Link>
               <div className="flex items-center justify-between border-t border-line px-5 py-2.5">
-                <span className="font-mono text-xs text-faint">/{f.slug}</span>
-                {f.status === "PUBLISHED" && (
-                  <a
-                    href={`/r/${f.slug}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1 text-xs font-medium text-accent-2 hover:underline"
+                <span className="truncate font-mono text-xs text-faint">/{f.slug}</span>
+                <div className="flex flex-none items-center gap-3">
+                  <button
+                    onClick={() => onDuplicate(f.id)}
+                    className="flex items-center gap-1 text-xs font-medium text-muted hover:text-ink"
+                    title="Duplicate"
                   >
-                    <ExternalLink className="h-3.5 w-3.5" /> Live
-                  </a>
-                )}
+                    <Copy className="h-3.5 w-3.5" /> Duplicate
+                  </button>
+                  {f.status === "PUBLISHED" && (
+                    <a
+                      href={`/r/${f.slug}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1 text-xs font-medium text-accent-2 hover:underline"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" /> Live
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
           ))}

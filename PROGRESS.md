@@ -52,11 +52,11 @@ Critical path: **Editor → Runtime → Submit → Responses → Billing.**
 ## Phase 2 — V2 (usability & collaboration)
 - [ ] Conditional logic engine (show / hide / jump) + calculations
 - [ ] Advanced blocks: payment (Stripe Connect), signature, matrix, ranking, hidden fields, answer piping, URL pre-fill
-- [ ] Theme / design customization with live preview
+- [x] Theme / design customization with live preview
 - [ ] Analytics: views, starts, completion, drop-off, device & source
 - [ ] Embeds (inline / popup / full-page) + tiny `embed.js` runtime bundle
 - [ ] Integrations: Google Sheets, Slack, webhooks, Zapier / Make
-- [ ] Templates gallery + duplication
+- [x] Templates gallery (6 templates + categories) + one-click use + form duplication
 - [ ] Team roles / permissions + invites
 - [ ] Custom domains (Cloudflare SSL-for-SaaS)
 - [ ] Partial submissions, Turnstile spam protection, email verification, version history

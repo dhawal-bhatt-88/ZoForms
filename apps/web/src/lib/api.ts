@@ -125,6 +125,10 @@ export function updateForm(
   });
 }
 
+export function duplicateForm(id: string) {
+  return req<FormListItem>(`/v1/forms/${id}/duplicate`, { method: "POST" });
+}
+
 export function listResponses(id: string) {
   return req<{ id: string; data: Record<string, unknown>; createdAt: string }[]>(
     `/v1/forms/${id}/responses`,
