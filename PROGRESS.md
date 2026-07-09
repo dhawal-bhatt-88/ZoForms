@@ -54,7 +54,7 @@ Critical path: **Editor → Runtime → Submit → Responses → Billing.**
 - [ ] Advanced blocks: payment (Stripe Connect), signature, matrix, ranking, hidden fields, answer piping, URL pre-fill
 - [x] Theme / design customization with live preview
 - [ ] Analytics: views, starts, completion, drop-off, device & source
-- [ ] Embeds (inline / popup / full-page) + tiny `embed.js` runtime bundle
+- [x] Embeds (inline / popup / full-page) + `embed.js` (auto-resize) + editor Embed modal
 - [ ] Integrations: Google Sheets, Slack, webhooks, Zapier / Make
 - [x] Templates gallery (6 templates + categories) + one-click use + form duplication
 - [ ] Team roles / permissions + invites

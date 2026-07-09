@@ -26,6 +26,7 @@ import {
   ChevronDown,
   ChevronLeft,
   CircleDot,
+  Code2,
   Copy,
   ExternalLink,
   GripVertical,
@@ -203,6 +204,8 @@ export default function EditorPage() {
   const [save, setSave] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [publishing, setPublishing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [embedOpen, setEmbedOpen] = useState(false);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const loaded = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -305,6 +308,25 @@ export default function EditorPage() {
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  function copySnippet(key: string, text: string) {
+    navigator.clipboard?.writeText(text).catch(() => {});
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 1500);
+  }
+  const embeds = [
+    {
+      key: "inline",
+      label: "Inline (auto-resizes)",
+      code: `<script src="${origin}/embed.js"></script>\n<div data-frame-form="${slug}"></div>`,
+    },
+    {
+      key: "popup",
+      label: "Popup button",
+      code: `<script src="${origin}/embed.js"></script>\n<button data-frame-popup="${slug}">Open form</button>`,
+    },
+    { key: "full", label: "Full-page link", code: `${origin}/r/${slug}` },
+  ];
 
   if (!schema)
     return (
@@ -352,6 +374,9 @@ export default function EditorPage() {
               <button onClick={copyLink} className="btn btn-outline btn-sm">
                 {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                 {copied ? "Copied" : "Copy link"}
+              </button>
+              <button onClick={() => setEmbedOpen(true)} className="btn btn-outline btn-sm">
+                <Code2 className="h-4 w-4" /> Embed
               </button>
               <a href={`/r/${slug}`} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm">
                 <ExternalLink className="h-4 w-4" /> View live
@@ -632,6 +657,41 @@ export default function EditorPage() {
           )}
         </aside>
       </div>
+
+      {embedOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setEmbedOpen(false)} />
+          <div className="relative w-full max-w-lg rounded-2xl bg-surface p-6 shadow-2xl">
+            <div className="mb-1 flex items-center justify-between">
+              <h3 className="text-lg font-semibold tracking-tight">Embed this form</h3>
+              <button
+                onClick={() => setEmbedOpen(false)}
+                className="grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-surface-3 hover:text-ink"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <p className="mb-4 text-sm text-muted">Paste into any site, CMS, or docs page.</p>
+            {embeds.map((s) => (
+              <div key={s.key} className="mb-4">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="text-[12.5px] font-semibold text-ink-2">{s.label}</span>
+                  <button
+                    onClick={() => copySnippet(s.key, s.code)}
+                    className="text-xs font-semibold text-accent-2 hover:underline"
+                  >
+                    {copiedKey === s.key ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+                <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-[#17161c] p-3 text-[12px] leading-relaxed text-[#e7e5ee]">
+                  {s.code}
+                </pre>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

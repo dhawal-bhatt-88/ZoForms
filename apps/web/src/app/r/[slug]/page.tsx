@@ -25,6 +25,11 @@ export default function PublicFormPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+  const [embed, setEmbed] = useState(false);
+
+  useEffect(() => {
+    setEmbed(new URLSearchParams(window.location.search).get("embed") === "1");
+  }, []);
 
   useEffect(() => {
     getPublicForm(slug)
@@ -34,6 +39,19 @@ export default function PublicFormPage() {
       })
       .catch(() => setState("notfound"));
   }, [slug]);
+
+  useEffect(() => {
+    if (!embed) return;
+    const post = () =>
+      window.parent?.postMessage(
+        { frameHeight: document.documentElement.scrollHeight, frameSlug: slug },
+        "*",
+      );
+    post();
+    const ro = new ResizeObserver(post);
+    ro.observe(document.documentElement);
+    return () => ro.disconnect();
+  }, [embed, slug]);
 
   function set(id: string, v: unknown) {
     setValues((p) => ({ ...p, [id]: v }));
@@ -75,8 +93,8 @@ export default function PublicFormPage() {
 
   const t = form ? resolveTheme(form.schema.settings?.theme) : DEFAULT_THEME;
   const page = {
-    minHeight: "100vh",
-    background: t.background,
+    minHeight: embed ? "auto" : "100vh",
+    background: embed ? "transparent" : t.background,
     fontFamily: t.fontFamily,
   } as React.CSSProperties;
 
@@ -120,7 +138,7 @@ export default function PublicFormPage() {
     );
 
   return (
-    <div style={page} className="px-6 py-10">
+    <div style={page} className={embed ? "p-2" : "px-6 py-10"}>
       <form
         onSubmit={onSubmit}
         className="mx-auto w-full max-w-xl border border-line bg-white p-8 shadow-soft sm:p-10"
