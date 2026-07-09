@@ -15,6 +15,7 @@ import {
   Copy,
   ExternalLink,
   Hash,
+  Inbox,
   Loader2,
   Mail,
   Phone,
@@ -255,6 +256,9 @@ export default function EditorPage() {
         </span>
 
         <div className="ml-auto flex items-center gap-2">
+          <Link href={`/app/forms/${id}/responses`} className="btn btn-ghost btn-sm">
+            <Inbox className="h-4 w-4" /> Responses
+          </Link>
           {status === "PUBLISHED" ? (
             <>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E7F6ED] px-2.5 py-1 text-xs font-semibold text-green">

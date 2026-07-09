@@ -44,7 +44,7 @@ Critical path: **Editor → Runtime → Submit → Responses → Billing.**
 - [x] Submit endpoint: unauth → validate (required) → store Response  _(files = filename for now)_
 - [x] Dashboard on real data: create → opens editor; status + live link
 - [ ] Drag-drop reorder (dnd-kit) · file uploads to S3/R2 · redirect-on-completion
-- [ ] Responses dashboard: table + detail drawer + CSV export
+- [x] Responses dashboard: table (labels as columns) + detail drawer + CSV export
 - [ ] Email notification on new response (Resend)
 - [ ] Billing: Stripe subscriptions (Free / Pro / Business) + plan gating
 - [ ] Deploy MVP: Vercel (web) + API host (Fly/Render) + Neon Postgres + staging
