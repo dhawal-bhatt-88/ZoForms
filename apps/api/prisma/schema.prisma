@@ -33,12 +33,14 @@ model User {
 }
 
 model Organization {
-  id          String       @id @default(uuid())
-  name        String
-  slug        String       @unique
-  createdAt   DateTime     @default(now())
-  workspaces  Workspace[]
-  memberships Membership[]
+  id              String       @id @default(uuid())
+  name            String
+  slug            String       @unique
+  createdAt       DateTime     @default(now())
+  anthropicApiKey String?
+  aiModel         String?
+  workspaces      Workspace[]
+  memberships     Membership[]
 }
 
 model Membership {

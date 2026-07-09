@@ -11,12 +11,16 @@ import {
 export class AiService {
   /** Generate a form schema from a natural-language prompt. Uses Claude when a
    * key is configured, otherwise a heuristic so the feature works out of the box. */
-  async generateSchema(prompt: string): Promise<TFormSchema> {
+  async generateSchema(
+    prompt: string,
+    opts?: { apiKey?: string; model?: string },
+  ): Promise<TFormSchema> {
     const p = (prompt || "").trim();
     if (!p) throw new BadRequestException("Describe the form you want to build.");
-    if (process.env.ANTHROPIC_API_KEY) {
+    const apiKey = opts?.apiKey || process.env.ANTHROPIC_API_KEY;
+    if (apiKey) {
       try {
-        return await this.viaClaude(p);
+        return await this.viaClaude(p, apiKey, opts?.model);
       } catch {
         /* fall back to heuristic on any API failure */
       }
@@ -24,10 +28,14 @@ export class AiService {
     return this.heuristic(p);
   }
 
-  private async viaClaude(prompt: string): Promise<TFormSchema> {
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  private async viaClaude(
+    prompt: string,
+    apiKey: string,
+    model?: string,
+  ): Promise<TFormSchema> {
+    const client = new Anthropic({ apiKey });
     const msg = await client.messages.create({
-      model: process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001",
+      model: model || process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001",
       max_tokens: 1500,
       tools: [
         {

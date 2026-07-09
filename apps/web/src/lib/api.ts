@@ -72,6 +72,36 @@ export function me() {
   return req<User>("/v1/auth/me");
 }
 
+/* ---------- settings ---------- */
+
+export type Settings = {
+  hasAnthropicKey: boolean;
+  keyHint: string | null;
+  aiModel: string;
+  envKeyPresent: boolean;
+};
+
+export function getSettings() {
+  return req<Settings>("/v1/settings");
+}
+
+export function updateSettings(patch: {
+  anthropicApiKey?: string | null;
+  aiModel?: string | null;
+}) {
+  return req<Settings>("/v1/settings", {
+    method: "PUT",
+    body: JSON.stringify(patch),
+  });
+}
+
+export function testAiConnection() {
+  return req<{ ok: boolean; model?: string; sample?: string; reason?: string }>(
+    "/v1/settings/test-ai",
+    { method: "POST" },
+  );
+}
+
 /* ---------- forms (authenticated) ---------- */
 
 export type FormListItem = {

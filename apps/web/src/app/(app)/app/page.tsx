@@ -11,6 +11,7 @@ import {
   Loader2,
   LogOut,
   Plus,
+  Settings,
   Sparkles,
   X,
   Zap,
@@ -116,6 +117,10 @@ export default function Dashboard() {
         <Link href="/app/integrations" className="btn btn-outline btn-sm">
           <Zap className="h-4 w-4" />
           <span className="hidden sm:inline">Integrations</span>
+        </Link>
+        <Link href="/app/settings" className="btn btn-outline btn-sm" title="Settings">
+          <Settings className="h-4 w-4" />
+          <span className="hidden sm:inline">Settings</span>
         </Link>
         <button
           onClick={() => {
