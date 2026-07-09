@@ -13,6 +13,10 @@ jobs:
   build:
     name: Lint · typecheck · build
     runs-on: ubuntu-latest
+    # prisma validate / generate resolve env("DATABASE_URL") at parse time.
+    # No DB is contacted during CI — this is just a placeholder to satisfy it.
+    env:
+      DATABASE_URL: "postgresql://user:password@localhost:5432/db?schema=public"
     steps:
       - uses: actions/checkout@v4
 
