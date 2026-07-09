@@ -29,8 +29,8 @@ Building the real Frame product. `[x]` = done, `[~]` = partial. Phase 1 is the l
 - [x] Turborepo monorepo (web + api + form-schema)
 - [x] Prisma schema — 6 core tables; local Postgres; walking skeleton verified
 - [~] `packages/ui` — port design tokens + shadcn components from the mockup
-- [ ] Auth: Auth.js (email magic-link + Google) + sessions
-- [ ] Multi-tenancy: org / workspace / membership + org-scoped query guards
+- [x] Auth: email + password — JWT + bcrypt in the API; login/signup/logout + auth-gate in web _(SSO/magic-link later)_
+- [x] Multi-tenancy: org / workspace / membership + org-scoped queries on every form route (tenant isolation verified)
 - [ ] Baseline: env/secrets, error handling, logging, CI (lint · typecheck · test · build), Vitest + Playwright
 - [ ] Align marketing site typography to Hanken (web ↔ mockup consistency)
 

@@ -21,10 +21,10 @@ export function MarketingNav() {
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-2">
-          <Link href="/app" className="btn btn-ghost btn-sm">
+          <Link href="/login" className="btn btn-ghost btn-sm">
             Log in
           </Link>
-          <Link href="/app" className="btn btn-primary btn-sm">
+          <Link href="/signup" className="btn btn-primary btn-sm">
             Start for free
           </Link>
         </div>

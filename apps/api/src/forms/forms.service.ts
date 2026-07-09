@@ -3,22 +3,26 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { FormStatus, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import {
   emptyForm,
   FormSchema,
   validateSubmission,
 } from "@formbuilder/form-schema";
 import { PrismaService } from "../prisma/prisma.service";
+import type { AuthUser } from "../auth/current-user.decorator";
 
 @Injectable()
 export class FormsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  list() {
+  /* ---------- authenticated (scoped to the user's org) ---------- */
+
+  list(user: AuthUser) {
     return this.prisma.form.findMany({
+      where: { workspace: { orgId: user.orgId } },
       orderBy: { createdAt: "desc" },
-      take: 50,
+      take: 100,
       select: {
         id: true,
         title: true,
@@ -30,24 +34,22 @@ export class FormsService {
     });
   }
 
-  async get(id: string) {
-    const form = await this.prisma.form.findUnique({
-      where: { id },
+  async get(user: AuthUser, id: string) {
+    const form = await this.prisma.form.findFirst({
+      where: { id, workspace: { orgId: user.orgId } },
       include: { versions: { orderBy: { version: "desc" }, take: 1 } },
     });
     if (!form) throw new NotFoundException("Form not found");
     return form;
   }
 
-  async create(title: string) {
-    const workspace = await this.ensureWorkspace();
-    const slug = this.slugify(title);
+  create(user: AuthUser, title: string) {
     return this.prisma.form.create({
       data: {
         title,
-        slug,
+        slug: this.slugify(title),
         status: "DRAFT",
-        workspaceId: workspace.id,
+        workspaceId: user.workspaceId,
         versions: {
           create: {
             version: 1,
@@ -59,23 +61,21 @@ export class FormsService {
   }
 
   async update(
+    user: AuthUser,
     id: string,
-    patch: { title?: string; status?: FormStatus },
+    patch: { title?: string; status?: Prisma.FormUpdateInput["status"] },
   ) {
-    await this.assertExists(id);
+    await this.assertOwned(user, id);
     return this.prisma.form.update({
       where: { id },
       data: { title: patch.title, status: patch.status },
     });
   }
 
-  /** Persist the editor's working schema onto the latest version, syncing the title. */
-  async saveSchema(id: string, raw: unknown) {
+  async saveSchema(user: AuthUser, id: string, raw: unknown) {
     const parsed = FormSchema.safeParse(raw);
-    if (!parsed.success) {
-      throw new BadRequestException("Invalid form schema");
-    }
-    const form = await this.get(id);
+    if (!parsed.success) throw new BadRequestException("Invalid form schema");
+    const form = await this.get(user, id);
     const latest = form.versions[0];
     await this.prisma.$transaction([
       this.prisma.formVersion.update({
@@ -90,7 +90,8 @@ export class FormsService {
     return { ok: true };
   }
 
-  listResponses(id: string) {
+  async listResponses(user: AuthUser, id: string) {
+    await this.assertOwned(user, id);
     return this.prisma.response.findMany({
       where: { formId: id },
       orderBy: { createdAt: "desc" },
@@ -98,7 +99,8 @@ export class FormsService {
     });
   }
 
-  /** Public: fetch a published form's schema by slug (for the runtime). */
+  /* ---------- public (form runtime, unauthenticated) ---------- */
+
   async getPublicBySlug(slug: string) {
     const form = await this.prisma.form.findUnique({
       where: { slug },
@@ -115,7 +117,6 @@ export class FormsService {
     };
   }
 
-  /** Public: accept a submission for a published form. */
   async submit(slug: string, data: Record<string, unknown>) {
     const form = await this.prisma.form.findUnique({
       where: { slug },
@@ -142,6 +143,16 @@ export class FormsService {
     return { ok: true, id: response.id };
   }
 
+  /* ---------- helpers ---------- */
+
+  private async assertOwned(user: AuthUser, id: string) {
+    const f = await this.prisma.form.findFirst({
+      where: { id, workspace: { orgId: user.orgId } },
+      select: { id: true },
+    });
+    if (!f) throw new NotFoundException("Form not found");
+  }
+
   private slugify(title: string) {
     return (
       title
@@ -152,28 +163,5 @@ export class FormsService {
       "-" +
       Math.random().toString(36).slice(2, 7)
     );
-  }
-
-  private async assertExists(id: string) {
-    const f = await this.prisma.form.findUnique({
-      where: { id },
-      select: { id: true },
-    });
-    if (!f) throw new NotFoundException("Form not found");
-  }
-
-  /** Scaffold convenience: guarantee a demo org + workspace exist so "New form" just works. */
-  private async ensureWorkspace() {
-    const existing = await this.prisma.workspace.findFirst();
-    if (existing) return existing;
-    const org = await this.prisma.organization.create({
-      data: {
-        name: "Demo Org",
-        slug: "demo-" + Math.random().toString(36).slice(2, 8),
-        workspaces: { create: { name: "My Workspace" } },
-      },
-      include: { workspaces: true },
-    });
-    return org.workspaces[0];
   }
 }

@@ -4,6 +4,75 @@ export const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 export type FormStatus = "DRAFT" | "PUBLISHED" | "CLOSED";
+export type User = { id: string; email: string; name: string | null };
+
+/* ---------- token ---------- */
+
+const TOKEN_KEY = "frame_token";
+export function getToken() {
+  return typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
+}
+function setToken(t: string) {
+  localStorage.setItem(TOKEN_KEY, t);
+}
+export function logout() {
+  if (typeof window !== "undefined") localStorage.removeItem(TOKEN_KEY);
+}
+
+async function req<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getToken();
+  const res = await fetch(`${API_URL}${path}`, {
+    cache: "no-store",
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(init?.headers ?? {}),
+    },
+  });
+  if (res.status === 401 && typeof window !== "undefined") {
+    logout();
+    const p = window.location.pathname;
+    if (p.startsWith("/app")) window.location.href = "/login";
+  }
+  if (!res.ok) {
+    let message = `Request failed (${res.status})`;
+    try {
+      const body = await res.json();
+      if (body?.message) message = String(body.message);
+    } catch {
+      /* ignore */
+    }
+    throw new Error(message);
+  }
+  return res.json() as Promise<T>;
+}
+
+/* ---------- auth ---------- */
+
+export async function signup(email: string, password: string, name?: string) {
+  const r = await req<{ token: string; user: User }>("/v1/auth/signup", {
+    method: "POST",
+    body: JSON.stringify({ email, password, name }),
+  });
+  setToken(r.token);
+  return r.user;
+}
+
+export async function login(email: string, password: string) {
+  const r = await req<{ token: string; user: User }>("/v1/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+  setToken(r.token);
+  return r.user;
+}
+
+export function me() {
+  return req<User>("/v1/auth/me");
+}
+
+/* ---------- forms (authenticated) ---------- */
 
 export type FormListItem = {
   id: string;
@@ -23,34 +92,6 @@ export type FormDetail = {
   updatedAt: string;
   versions: { id: string; version: number; schema: FormSchema }[];
 };
-
-export type PublicForm = {
-  id: string;
-  title: string;
-  slug: string;
-  schema: FormSchema;
-};
-
-async function req<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    cache: "no-store",
-    headers: { "Content-Type": "application/json" },
-    ...init,
-  });
-  if (!res.ok) {
-    let message = `Request failed (${res.status})`;
-    try {
-      const body = await res.json();
-      if (body?.message) message = String(body.message);
-    } catch {
-      /* ignore */
-    }
-    throw new Error(message);
-  }
-  return res.json() as Promise<T>;
-}
-
-/* ---------- authenticated (app) ---------- */
 
 export function listForms() {
   return req<FormListItem[]>("/v1/forms");
@@ -91,6 +132,13 @@ export function listResponses(id: string) {
 }
 
 /* ---------- public (form runtime) ---------- */
+
+export type PublicForm = {
+  id: string;
+  title: string;
+  slug: string;
+  schema: FormSchema;
+};
 
 export function getPublicForm(slug: string) {
   return req<PublicForm>(`/v1/public/forms/${slug}`);

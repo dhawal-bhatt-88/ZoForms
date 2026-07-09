@@ -1,0 +1,119 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { Loader2 } from "lucide-react";
+import { login, signup } from "@/lib/api";
+import { Logo } from "@/components/marketing/logo";
+
+export function AuthForm({ mode }: { mode: "login" | "signup" }) {
+  const isSignup = mode === "signup";
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setErr(null);
+    try {
+      if (isSignup) await signup(email, password, name);
+      else await login(email, password);
+      window.location.href = "/app";
+    } catch (e) {
+      setErr((e as Error).message);
+      setBusy(false);
+    }
+  }
+
+  const input =
+    "w-full rounded-lg border border-line-2 px-3.5 py-2.5 text-[15px] outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent-weak";
+
+  return (
+    <div className="grid min-h-screen place-items-center px-6 py-12">
+      <div className="w-full max-w-sm">
+        <div className="mb-8 flex justify-center">
+          <Logo />
+        </div>
+        <div className="rounded-2xl border border-line bg-surface p-8 shadow-soft">
+          <h1 className="text-xl font-semibold tracking-tight">
+            {isSignup ? "Create your account" : "Welcome back"}
+          </h1>
+          <p className="mt-1 text-sm text-muted">
+            {isSignup
+              ? "Start building forms in seconds — no card required."
+              : "Log in to your Frame workspace."}
+          </p>
+
+          <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
+            {isSignup && (
+              <div>
+                <label className="mb-1.5 block text-[13px] font-semibold text-ink-2">Name</label>
+                <input
+                  className={input}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ada Lovelace"
+                  autoComplete="name"
+                />
+              </div>
+            )}
+            <div>
+              <label className="mb-1.5 block text-[13px] font-semibold text-ink-2">Email</label>
+              <input
+                type="email"
+                required
+                className={input}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@company.com"
+                autoComplete="email"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-[13px] font-semibold text-ink-2">Password</label>
+              <input
+                type="password"
+                required
+                className={input}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={isSignup ? "At least 6 characters" : "••••••••"}
+                autoComplete={isSignup ? "new-password" : "current-password"}
+              />
+            </div>
+
+            {err && (
+              <p className="rounded-lg bg-[#FCECEC] px-3.5 py-2.5 text-sm text-red">{err}</p>
+            )}
+
+            <button type="submit" disabled={busy} className="btn btn-primary h-11 w-full">
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {busy ? "Please wait…" : isSignup ? "Create account" : "Log in"}
+            </button>
+          </form>
+        </div>
+
+        <p className="mt-5 text-center text-sm text-muted">
+          {isSignup ? (
+            <>
+              Already have an account?{" "}
+              <Link href="/login" className="font-semibold text-accent-2 hover:underline">
+                Log in
+              </Link>
+            </>
+          ) : (
+            <>
+              New to Frame?{" "}
+              <Link href="/signup" className="font-semibold text-accent-2 hover:underline">
+                Create an account
+              </Link>
+            </>
+          )}
+        </p>
+      </div>
+    </div>
+  );
+}

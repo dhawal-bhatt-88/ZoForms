@@ -3,8 +3,15 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ExternalLink, Inbox, Loader2, Plus } from "lucide-react";
-import { createForm, listForms, type FormListItem } from "@/lib/api";
+import { ExternalLink, Inbox, Loader2, LogOut, Plus } from "lucide-react";
+import {
+  createForm,
+  listForms,
+  logout,
+  me,
+  type FormListItem,
+  type User,
+} from "@/lib/api";
 
 type Status = "loading" | "ok" | "error";
 
@@ -19,6 +26,7 @@ export default function Dashboard() {
   const [forms, setForms] = useState<FormListItem[]>([]);
   const [status, setStatus] = useState<Status>("loading");
   const [creating, setCreating] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
 
   async function refresh() {
     try {
@@ -31,6 +39,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     refresh();
+    me().then(setUser).catch(() => {});
   }, []);
 
   async function onCreate() {
@@ -52,8 +61,19 @@ export default function Dashboard() {
         </span>
         <div className="flex-1">
           <h1 className="text-xl font-semibold tracking-tight">My forms</h1>
-          <p className="text-sm text-muted">Acme Studio · Pro workspace</p>
+          <p className="text-sm text-muted">{user ? user.name || user.email : "Your workspace"}</p>
         </div>
+        <button
+          onClick={() => {
+            logout();
+            router.push("/login");
+          }}
+          className="btn btn-outline btn-sm"
+          title="Log out"
+        >
+          <LogOut className="h-4 w-4" />
+          <span className="hidden sm:inline">Log out</span>
+        </button>
         <button onClick={onCreate} disabled={creating} className="btn btn-primary">
           {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
           {creating ? "Creating…" : "New form"}

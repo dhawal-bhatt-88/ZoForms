@@ -1,0 +1,25 @@
+import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
+import { AuthService } from "./auth.service";
+import { AuthGuard } from "./auth.guard";
+import { CurrentUser, type AuthUser } from "./current-user.decorator";
+
+@Controller("v1/auth")
+export class AuthController {
+  constructor(private readonly auth: AuthService) {}
+
+  @Post("signup")
+  signup(@Body() body: { email: string; password: string; name?: string }) {
+    return this.auth.signup(body?.email, body?.password, body?.name);
+  }
+
+  @Post("login")
+  login(@Body() body: { email: string; password: string }) {
+    return this.auth.login(body?.email, body?.password);
+  }
+
+  @Get("me")
+  @UseGuards(AuthGuard)
+  me(@CurrentUser() user: AuthUser) {
+    return this.auth.me(user.sub);
+  }
+}
