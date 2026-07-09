@@ -144,7 +144,7 @@ export default function PublicFormPage() {
     <div style={page} className={embed ? "p-2" : "px-6 py-10"}>
       <form
         onSubmit={onSubmit}
-        className="mx-auto w-full border p-8 shadow-soft sm:p-10"
+        className="frame-form mx-auto w-full border p-8 shadow-soft sm:p-10"
         style={{
           borderRadius: t.cardRadius,
           maxWidth: t.maxWidth,
@@ -152,6 +152,25 @@ export default function PublicFormPage() {
           borderColor: t.border,
         }}
       >
+        {t.customCss && <style dangerouslySetInnerHTML={{ __html: t.customCss }} />}
+        {t.cover && (
+          <div
+            className="-mx-8 -mt-8 mb-6 overflow-hidden sm:-mx-10 sm:-mt-10"
+            style={{ borderTopLeftRadius: t.cardRadius, borderTopRightRadius: t.cardRadius }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={t.cover} alt="" className="h-40 w-full object-cover" />
+          </div>
+        )}
+        {t.logo && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={t.logo}
+            alt=""
+            className="mb-4 h-14 w-14 rounded-xl border object-cover"
+            style={{ borderColor: t.border }}
+          />
+        )}
         <h1 className="text-[26px] font-bold tracking-tight">{form?.title}</h1>
         {form?.schema.description && (
           <p className="mt-1.5" style={{ color: t.mutedText }}>
@@ -169,6 +188,8 @@ export default function PublicFormPage() {
               accent={t.accent}
               radius={t.radius}
               border={t.border}
+              inputBg={t.inputBg}
+              inputBorder={t.inputBorder}
               mutedText={t.mutedText}
               onChange={(v) => set(b.id, v)}
             />
@@ -227,6 +248,8 @@ function Field({
   accent,
   radius,
   border,
+  inputBg,
+  inputBorder,
   mutedText,
   onChange,
 }: {
@@ -236,6 +259,8 @@ function Field({
   accent: string;
   radius: string;
   border: string;
+  inputBg: string;
+  inputBorder: string;
   mutedText: string;
   onChange: (v: unknown) => void;
 }) {
@@ -292,8 +317,8 @@ function Field({
 
   const inputStyle = {
     borderRadius: radius,
-    borderColor: error ? "#E5484D" : border,
-    background: "transparent",
+    borderColor: error ? "#E5484D" : inputBorder,
+    background: inputBg,
     color: "inherit",
   } as React.CSSProperties;
   const inputCls =
@@ -302,8 +327,8 @@ function Field({
   const optStyle = (on: boolean) =>
     ({
       borderRadius: radius,
-      borderColor: on ? accent : border,
-      background: on ? tint : "transparent",
+      borderColor: on ? accent : inputBorder,
+      background: on ? tint : inputBg,
     }) as React.CSSProperties;
 
   return (

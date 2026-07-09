@@ -651,6 +651,11 @@ export default function EditorPage() {
     font?: "sans" | "serif" | "mono" | "rounded";
     radius?: "none" | "sm" | "md" | "lg" | "full";
     width?: "narrow" | "normal" | "wide";
+    logo?: string;
+    cover?: string;
+    inputBg?: string;
+    inputBorder?: string;
+    customCss?: string;
   }) =>
     patch((s) => ({
       ...s,
@@ -1200,8 +1205,54 @@ export default function EditorPage() {
                 );
               })()}
 
+              <h4 className="mb-3 mt-6 border-t border-line pt-4 text-[11px] font-bold uppercase tracking-wider text-faint">
+                Advanced
+              </h4>
+
+              <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Logo URL</label>
+              <input
+                value={schema.settings?.theme?.logo ?? ""}
+                onChange={(e) => updateTheme({ logo: e.target.value })}
+                placeholder="https://…/logo.png"
+                className={`${fieldCls} mb-3 font-mono text-xs`}
+              />
+
+              <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Cover image URL</label>
+              <input
+                value={schema.settings?.theme?.cover ?? ""}
+                onChange={(e) => updateTheme({ cover: e.target.value })}
+                placeholder="https://…/cover.jpg"
+                className={`${fieldCls} mb-3 font-mono text-xs`}
+              />
+
+              <ColorField
+                label="Input background"
+                value={schema.settings?.theme?.inputBg || "#FFFFFF"}
+                swatches={["#FFFFFF", "#F6F7F9", "#F2F4FF", "#1C1F26"]}
+                onPick={(c) => updateTheme({ inputBg: c })}
+              />
+              <ColorField
+                label="Input border"
+                value={schema.settings?.theme?.inputBorder || "#ECEDF0"}
+                swatches={["#ECEDF0", "#D1D5DB", "#6D5EFA", "#333844"]}
+                onPick={(c) => updateTheme({ inputBorder: c })}
+              />
+
+              <label className="mb-1.5 mt-1 block text-[12.5px] font-semibold text-ink-2">Custom CSS</label>
+              <textarea
+                value={schema.settings?.theme?.customCss ?? ""}
+                onChange={(e) => updateTheme({ customCss: e.target.value })}
+                placeholder={".frame-form h1 { letter-spacing: -0.02em; }"}
+                rows={4}
+                className={`${fieldCls} resize-none font-mono text-xs`}
+                spellCheck={false}
+              />
+              <p className="mt-1.5 text-xs text-faint">
+                Scoped tip: target <code className="font-mono">.frame-form</code> to style the form.
+              </p>
+
               <p className="mt-6 border-t border-line pt-4 text-center text-sm text-muted">
-                Select a question to edit it, or add one from the left.
+                Select a question to edit it, or add one from the canvas.
               </p>
             </div>
           )}

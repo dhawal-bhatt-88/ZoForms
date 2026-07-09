@@ -76,6 +76,12 @@ export const FormTheme = z.object({
   font: z.enum(["sans", "serif", "mono", "rounded"]).optional(),
   radius: z.enum(["none", "sm", "md", "lg", "full"]).optional(),
   width: z.enum(["narrow", "normal", "wide"]).optional(),
+  /** advanced customization */
+  logo: z.string().optional(),
+  cover: z.string().optional(),
+  inputBg: z.string().optional(),
+  inputBorder: z.string().optional(),
+  customCss: z.string().optional(),
 });
 export type FormTheme = z.infer<typeof FormTheme>;
 
@@ -94,10 +100,15 @@ export type ResolvedTheme = {
   buttonText: string;
   surface: string;
   border: string;
+  inputBg: string;
+  inputBorder: string;
   fontFamily: string;
   radius: string;
   cardRadius: string;
   maxWidth: string;
+  logo: string;
+  cover: string;
+  customCss: string;
 };
 
 /** Relative luminance (0=black, 1=white) of a #rrggbb / #rgb color. */
@@ -125,6 +136,7 @@ export function resolveTheme(theme?: FormTheme): ResolvedTheme {
   const background = theme?.background || "#F6F7F9";
   const dark = luminance(background) < 0.45;
   const radius = radii[theme?.radius || "md"];
+  const border = dark ? "rgba(255,255,255,0.14)" : "#ECEDF0";
   return {
     accent: theme?.accent || "#6D5EFA",
     background,
@@ -133,12 +145,17 @@ export function resolveTheme(theme?: FormTheme): ResolvedTheme {
     buttonText: theme?.buttonText || "#FFFFFF",
     // Card surface adapts so themed text stays legible on dark backgrounds.
     surface: dark ? "#1C1F26" : "#FFFFFF",
-    border: dark ? "rgba(255,255,255,0.14)" : "#ECEDF0",
+    border,
+    inputBg: theme?.inputBg || (dark ? "rgba(255,255,255,0.04)" : "#FFFFFF"),
+    inputBorder: theme?.inputBorder || border,
     fontFamily: fonts[theme?.font || "sans"],
     radius,
     // The big form card must never become a blob at pill radius.
     cardRadius: radius === "9999px" ? "28px" : radius,
     maxWidth: widths[theme?.width || "normal"],
+    logo: theme?.logo || "",
+    cover: theme?.cover || "",
+    customCss: theme?.customCss || "",
   };
 }
 
