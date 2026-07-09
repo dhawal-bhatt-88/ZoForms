@@ -19,9 +19,61 @@ _Last updated: 2026-07-09_
 ## 🚧 In progress
 - _(nothing in flight)_
 
-## ⏭️ Next / backlog
-- [ ] Builder UI wired to persist blocks into `FormVersion.schema` (real)
-- [ ] Public form runtime `/r/[slug]` + submit endpoint
-- [ ] Auth (Auth.js) + org scoping on every query
+---
+
+# Development Plan (phases)
+
+Building the real Frame product. `[x]` = done, `[~]` = partial. Phase 1 is the launchable MVP.
+
+## Phase 0 — Foundations  _(mostly done)_
+- [x] Turborepo monorepo (web + api + form-schema)
+- [x] Prisma schema — 6 core tables; local Postgres; walking skeleton verified
+- [~] `packages/ui` — port design tokens + shadcn components from the mockup
+- [ ] Auth: Auth.js (email magic-link + Google) + sessions
+- [ ] Multi-tenancy: org / workspace / membership + org-scoped query guards
+- [ ] Baseline: env/secrets, error handling, logging, CI (lint · typecheck · test · build), Vitest + Playwright
 - [ ] Align marketing site typography to Hanken (web ↔ mockup consistency)
-- [ ] Deploy: Vercel (web) + API host + Neon Postgres
+
+## Phase 1 — MVP (the core loop, launchable)
+Critical path: **Editor → Runtime → Submit → Responses → Billing.**
+- [ ] Form editor (React): palette, canvas, dnd-kit reorder, inspector → writes blocks to `FormVersion.schema`
+- [ ] Core blocks: short/long text, choice, checkbox, dropdown, number, email, date, rating, file upload
+- [ ] Autosave + form versioning
+- [ ] Publish flow: status, slug, share link
+- [ ] Public runtime `/r/[slug]`: render from JSONB, React-Hook-Form + Zod validation, mobile
+- [ ] Submit endpoint: unauth, spam-guarded, idempotent → validate → store Response (+ file uploads to S3/R2)
+- [ ] Thank-you page + redirect on completion
+- [ ] Responses dashboard: table + detail drawer + CSV export
+- [ ] Email notification on new response (Resend)
+- [ ] Dashboard on real data: create / duplicate / rename / delete, folders
+- [ ] Billing: Stripe subscriptions (Free / Pro / Business) + plan gating
+- [ ] Deploy MVP: Vercel (web) + API host (Fly/Render) + Neon Postgres + staging
+
+## Phase 2 — V2 (usability & collaboration)
+- [ ] Conditional logic engine (show / hide / jump) + calculations
+- [ ] Advanced blocks: payment (Stripe Connect), signature, matrix, ranking, hidden fields, answer piping, URL pre-fill
+- [ ] Theme / design customization with live preview
+- [ ] Analytics: views, starts, completion, drop-off, device & source
+- [ ] Embeds (inline / popup / full-page) + tiny `embed.js` runtime bundle
+- [ ] Integrations: Google Sheets, Slack, webhooks, Zapier / Make
+- [ ] Templates gallery + duplication
+- [ ] Team roles / permissions + invites
+- [ ] Custom domains (Cloudflare SSL-for-SaaS)
+- [ ] Partial submissions, Turnstile spam protection, email verification, version history
+
+## Phase 3 — V3 (enterprise & scale)
+- [ ] SSO / SAML + SCIM (WorkOS); granular RBAC + audit logs
+- [ ] Data residency + retention controls; white-label
+- [ ] Response search (Typesense / Meilisearch)
+- [ ] Async fabric: BullMQ workers (webhooks, exports, emails, integrations)
+- [ ] Scale: read replicas, response-table partitioning, edge-cached form delivery
+- [ ] Observability (Sentry, OpenTelemetry, PostHog), rate limiting, security hardening, SOC 2 / GDPR posture
+
+## Phase 4 — Future (AI & automation)
+- [ ] AI form generation from a prompt
+- [ ] AI logic / branching suggestions
+- [ ] Response summarization + analytics copilot
+- [ ] Auto-translation
+- [ ] Integration marketplace + visual workflow automation
+
+_Cross-cutting every phase: tests, CI/CD, monitoring, accessibility, security, docs._
