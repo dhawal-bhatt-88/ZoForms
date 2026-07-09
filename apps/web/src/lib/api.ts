@@ -110,6 +110,7 @@ export type FormListItem = {
   slug: string;
   status: FormStatus;
   createdAt: string;
+  updatedAt?: string;
   _count?: { responses: number };
 };
 
@@ -157,6 +158,10 @@ export function updateForm(
 
 export function duplicateForm(id: string) {
   return req<FormListItem>(`/v1/forms/${id}/duplicate`, { method: "POST" });
+}
+
+export function deleteForm(id: string) {
+  return req<{ ok: boolean }>(`/v1/forms/${id}`, { method: "DELETE" });
 }
 
 export function generateForm(prompt: string) {

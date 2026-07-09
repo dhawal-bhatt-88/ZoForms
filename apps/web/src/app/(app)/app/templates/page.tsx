@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { ChevronLeft, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import AppShell from "@/components/app-shell";
 import { createForm, saveSchema } from "@/lib/api";
 import { CATEGORIES, TEMPLATES, type Template } from "@/lib/templates";
 
@@ -26,21 +26,8 @@ export default function TemplatesPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-12">
-      <header className="mb-8 flex items-center gap-3">
-        <Link
-          href="/app"
-          className="grid h-9 w-9 flex-none place-items-center rounded-lg text-ink-2 hover:bg-surface-3"
-          aria-label="Back"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Link>
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Templates</h1>
-          <p className="text-sm text-muted">Start faster with a proven form.</p>
-        </div>
-      </header>
-
+    <AppShell title="Templates">
+      <p className="mb-5 text-sm text-muted">Start faster with a proven form.</p>
       <div className="mb-6 flex flex-wrap gap-2">
         {CATEGORIES.map((c) => (
           <button
@@ -89,6 +76,6 @@ export default function TemplatesPage() {
           </div>
         ))}
       </div>
-    </main>
+    </AppShell>
   );
 }

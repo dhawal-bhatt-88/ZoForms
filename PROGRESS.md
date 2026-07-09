@@ -19,6 +19,10 @@ _Last updated: 2026-07-09_
 ## 🚧 In progress
 - _(nothing in flight)_
 
+## 🎨 Design system / app shell
+- [x] Enterprise app shell — persistent sidebar (workspace switcher, nav with active states, user menu) + topbar; applied to dashboard / templates / integrations / settings (editor stays full-screen)
+- [x] Dashboard redesign — search + status filter + sort, refined form cards (status dot, responses, edited-time), hover micro-interactions, kebab menu (edit / copy link / duplicate / delete), skeleton loading, delete-confirm dialog (DELETE /v1/forms/:id)
+
 ---
 
 # Development Plan (phases)

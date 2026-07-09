@@ -1,17 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import {
-  Check,
-  ChevronLeft,
-  Eye,
-  EyeOff,
-  Loader2,
-  Sparkles,
-  X,
-  Zap,
-} from "lucide-react";
+import { Check, Eye, EyeOff, Loader2, Sparkles, X, Zap } from "lucide-react";
+import AppShell from "@/components/app-shell";
 import {
   getSettings,
   testAiConnection,
@@ -103,20 +94,9 @@ export default function SettingsPage() {
   const active = settings?.hasAnthropicKey || settings?.envKeyPresent;
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-10">
-      <div className="mb-8 flex items-center gap-3">
-        <Link
-          href="/app"
-          className="grid h-9 w-9 flex-none place-items-center rounded-lg text-ink-2 hover:bg-surface-3"
-          aria-label="Back"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Link>
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Settings</h1>
-          <p className="text-sm text-muted">Workspace configuration</p>
-        </div>
-      </div>
+    <AppShell title="Settings">
+      <div className="mx-auto max-w-2xl">
+      <p className="mb-6 text-sm text-muted">Workspace configuration</p>
 
       {status === "loading" && (
         <div className="grid place-items-center py-20 text-muted">
@@ -256,6 +236,7 @@ export default function SettingsPage() {
           )}
         </section>
       )}
-    </main>
+      </div>
+    </AppShell>
   );
 }

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -64,5 +65,10 @@ export class FormsController {
   @Post(":id/duplicate")
   duplicate(@CurrentUser() user: AuthUser, @Param("id") id: string) {
     return this.forms.duplicate(user, id);
+  }
+
+  @Delete(":id")
+  remove(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.forms.remove(user, id);
   }
 }

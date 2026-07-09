@@ -33,6 +33,7 @@ export class FormsService {
         slug: true,
         status: true,
         createdAt: true,
+        updatedAt: true,
         _count: { select: { responses: true } },
       },
     });
@@ -133,6 +134,12 @@ export class FormsService {
         },
       },
     });
+  }
+
+  async remove(user: AuthUser, id: string) {
+    await this.assertOwned(user, id);
+    await this.prisma.form.delete({ where: { id } });
+    return { ok: true };
   }
 
   async analytics(user: AuthUser, id: string) {

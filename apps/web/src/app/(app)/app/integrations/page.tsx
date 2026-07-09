@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import AppShell from "@/components/app-shell";
 import {
-  ChevronLeft,
   Database,
   Mail,
   MessageSquare,
@@ -74,23 +73,8 @@ const INTEGRATIONS: Integration[] = [
 
 export default function MarketplacePage() {
   return (
-    <main className="mx-auto max-w-5xl px-6 py-12">
-      <div className="mb-8 flex items-center gap-3">
-        <Link
-          href="/app"
-          className="grid h-9 w-9 flex-none place-items-center rounded-lg text-ink-2 hover:bg-surface-3"
-          aria-label="Back"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-xl font-semibold tracking-tight">Integrations</h1>
-          <p className="text-sm text-muted">
-            Send responses where your team already works.
-          </p>
-        </div>
-      </div>
-
+    <AppShell title="Integrations">
+      <p className="mb-5 text-sm text-muted">Send responses where your team already works.</p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {INTEGRATIONS.map((it) => {
           const Icon = it.icon;
@@ -131,6 +115,6 @@ export default function MarketplacePage() {
           );
         })}
       </div>
-    </main>
+    </AppShell>
   );
 }
