@@ -19,6 +19,16 @@ _Last updated: 2026-07-09_
 ## 🚧 In progress
 - _(nothing in flight)_
 
+## 🚀 CI/CD & deployment (single-EC2, dev)
+- [x] **CI** (`.github/workflows/ci.yml`) — pnpm install (cached) → `prisma validate` → `turbo typecheck` → `turbo build`, on PR + push to main
+- [x] `typecheck` scripts across web/admin/api/form-schema + Turbo task; Next `output: "standalone"` on web & admin
+- [x] **Dockerfiles** — multi-stage, pnpm-monorepo-aware images for web/admin (Next standalone) + api (NestJS + Prisma); `.dockerignore`. All three build clean.
+- [x] **CD** (`.github/workflows/deploy.yml`) — build 3 images → push GHCR (tagged `latest` + SHA) → scp compose + SSH `docker compose up -d` to EC2
+- [x] **Single-box compose** (`deploy/docker-compose.prod.yml`) — Postgres + api + web + admin, persistent `pgdata`/`uploads` volumes, DB healthcheck gate, `prisma migrate deploy` on api boot
+- [x] **Runbook** (`DEPLOY.md`) + `deploy/.env.prod.example` — EC2/security-group/GHCR/secrets setup
+- [x] Verified locally: full stack up → 5 migrations applied on boot → API `/health` ok, web + admin HTTP 200
+- [ ] Follow-ups: automated tests in CI (Vitest/Playwright); swap local-disk uploads → S3; optional Caddy + domain/HTTPS
+
 ## 🛡️ Admin console (`apps/admin`, port 3002)
 - [x] Platform data model — User.isAdmin/status, Organization.plan/status, AuditLog
 - [x] AdminModule (API) — AdminGuard (isAdmin), overview, tenants (list/detail/plan/suspend), users (list/suspend/impersonate/delete), cross-tenant form moderation (take-down/delete), audit log; every mutation audited

@@ -1,0 +1,99 @@
+name: Deploy
+
+# Builds one image per app, pushes them to GitHub Container Registry (GHCR),
+# then SSHes into the EC2 host and restarts the docker-compose stack.
+#
+# Required repo settings (see DEPLOY.md):
+#   Variables : NEXT_PUBLIC_API_URL, NEXT_PUBLIC_TENANT_URL
+#   Secrets   : EC2_HOST, EC2_USER, EC2_SSH_KEY
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build & push (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        app: [web, admin, api]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute lowercase image base
+        run: echo "IMAGE_BASE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/${{ matrix.app }}/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_BASE }}-${{ matrix.app }}:latest
+            ${{ env.IMAGE_BASE }}-${{ matrix.app }}:${{ github.sha }}
+          # NEXT_PUBLIC_* are only consumed by the web/admin images; the api
+          # image ignores them (a harmless "unused build arg" warning).
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_TENANT_URL=${{ vars.NEXT_PUBLIC_TENANT_URL }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to EC2
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Copy compose file to the server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "deploy/docker-compose.prod.yml"
+          target: "frame"
+          strip_components: 1
+
+      - name: Pull images & restart the stack
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/frame
+            # Log in to GHCR with the run's ephemeral token (valid for this run),
+            # so the box can pull the private images — no long-lived creds on disk.
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+            export IMAGE_WEB=ghcr.io/$REPO-web:${{ github.sha }}
+            export IMAGE_ADMIN=ghcr.io/$REPO-admin:${{ github.sha }}
+            export IMAGE_API=ghcr.io/$REPO-api:${{ github.sha }}
+            docker compose -f docker-compose.prod.yml --env-file .env.prod pull
+            docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+            docker image prune -f
