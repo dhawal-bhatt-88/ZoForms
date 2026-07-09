@@ -53,6 +53,8 @@ Critical path: **Editor → Runtime → Submit → Responses → Billing.**
 - [ ] Conditional logic engine (show / hide / jump) + calculations
 - [ ] Advanced blocks: payment (Stripe Connect), signature, matrix, ranking, hidden fields, answer piping, URL pre-fill
 - [x] Theme / design customization with live preview
+- [x] Customize panel — Tally parity: accent/background/text/button-text colors (swatch + picker), font (sans/serif/mono/rounded), corners (none→pill), width; luminance-aware runtime (adaptive dark surface, capped card radius)
+- [x] Workspace Settings + Claude API key (real AI generation; per-workspace key, Test connection); AI generate falls back to heuristic without a key
 - [ ] Analytics: views, starts, completion, drop-off, device & source
 - [x] Embeds (inline / popup / full-page) + `embed.js` (auto-resize) + editor Embed modal
 - [ ] Integrations: Google Sheets, Slack, webhooks, Zapier / Make
