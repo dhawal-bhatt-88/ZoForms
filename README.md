@@ -1,57 +1,189 @@
-# Formbuilder — Product & Engineering Blueprint
+# Frame
 
-Research, strategy, and a clickable prototype for building a **Tally.so-inspired form builder**. This repository is the working reference for product planning, technical architecture, and implementation.
+**An open-source, Tally.so-inspired form builder** — type a question, style it, publish, embed, and collect responses. Built as a production-shaped monorepo with a tenant app, a public form runtime, a REST API, and a multi-tenant **admin console**.
 
-> ⚠️ **Confidential** — internal product-strategy material. Not for public distribution.
+![Node](https://img.shields.io/badge/node-%E2%89%A520-3c873a)
+![pnpm](https://img.shields.io/badge/pnpm-9-f69220)
+![Next.js](https://img.shields.io/badge/Next.js-15-black)
+![NestJS](https://img.shields.io/badge/NestJS-10-e0234e)
+![Prisma](https://img.shields.io/badge/Prisma-5-2d3748)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791)
+![Tailwind](https://img.shields.io/badge/Tailwind-3-38bdf8)
 
-## Contents
+> 🔒 **Private / confidential** — internal project. Don't distribute publicly.
 
-| File | What it is |
+---
+
+## What's inside
+
+Frame is a working product, not a mockup. It has:
+
+- **Form editor** — a Notion-style `/` block inserter with 33 block types (short/long text, choice, checkbox, multi-select, dropdown, number, email, phone, link, file upload, date, time, linear scale, matrix, rating, ranking, headings, dividers, image/video/audio/embed, and more), drag-to-reorder, autosave, and a live inspector.
+- **Ask AI** — a conversational assistant that edits the live form ("add a phone field and a rating"), plus one-shot **generate-from-a-prompt**. Uses Claude when an API key is configured, with a heuristic fallback otherwise.
+- **Theming & customization** — colors, fonts, corners, width, logo, cover image, per-input styling, and custom CSS — with a luminance-aware runtime that adapts to dark themes.
+- **Public runtime** — themed, mobile-friendly form pages at `/r/:slug` with validation, file uploads, and a thank-you screen.
+- **Responses & analytics** — a responses table with CSV export, plus per-form analytics (views, starts, completion rate, funnel, 14-day trend, device & source).
+- **Templates, embeds & integrations** — a template gallery, inline/popup/full-page embeds via `embed.js`, and per-form webhook automations that fire on new responses.
+- **Auth & multi-tenancy** — email/password (JWT), org / workspace / membership, and org-scoped queries on every route.
+- **Admin console** — a separate app to manage the platform: tenants (plans, suspend), users (suspend, **impersonate**, delete), cross-tenant form moderation, and an audit log.
+
+---
+
+## Tech stack
+
+| Layer | Technology |
 | --- | --- |
-| [`tally-teardown.html`](tally-teardown.html) | **The teardown & build blueprint** — an 18-section report covering product, design, business, architecture, database, API, DevOps, security, scalability, **AWS cost analysis**, **capacity planning**, and roadmap. Open in a browser. |
-| [`TALLY-TEARDOWN.md`](TALLY-TEARDOWN.md) | The same report as Markdown (for diffing, search, and inline reference during implementation). |
-| [`frame-prototype.html`](frame-prototype.html) | **Clickable HTML prototype** of the product ("Frame") — 15 screens: landing, auth, onboarding, form builder (drag-and-drop, logic, theming, publish/embed/custom-domain), dashboard, responses + detail drawer, analytics, integrations, team, billing, notifications, and a "ship to production" guide. Open in a browser and click through. |
+| **Monorepo** | pnpm workspaces + [Turborepo](https://turbo.build) |
+| **Tenant app & admin app** | [Next.js 15](https://nextjs.org) (App Router), React 18, TypeScript, [Tailwind CSS](https://tailwindcss.com), [lucide-react](https://lucide.dev) |
+| **API** | [NestJS 10](https://nestjs.com), [Prisma 5](https://prisma.io) |
+| **Database** | PostgreSQL 16 (JSONB for form schema & responses) |
+| **Auth** | JWT (`@nestjs/jwt`) + bcrypt |
+| **Shared contract** | `@formbuilder/form-schema` (Zod) — the single source of truth for what a form _is_ |
+| **AI (optional)** | Anthropic Claude via `@anthropic-ai/sdk` |
+| **Uploads** | Local-disk driver (swappable seam for S3 / R2) |
 
-## How to view
+---
 
-Both HTML files are self-contained (no build step, no external dependencies) — just open them in any modern browser:
+## Repository layout
 
-```bash
-open tally-teardown.html
-open frame-prototype.html
+```
+formbuilder/
+├─ apps/
+│  ├─ web/           # Tenant app + public form runtime (Next.js) → :3000
+│  ├─ admin/         # Platform admin console (Next.js)          → :3002
+│  └─ api/           # REST API (NestJS + Prisma)                → :4000
+├─ packages/
+│  └─ form-schema/   # Shared Zod schema, block catalog, theme resolver
+├─ docker-compose.yml   # Postgres 16 (+ Redis, provisioned for future use)
+├─ TALLY-TEARDOWN.md    # Product & engineering blueprint (research/strategy)
+└─ PROGRESS.md          # Living build log — what's done, what's next
 ```
 
-Or serve the folder locally:
+---
+
+## Requirements
+
+- **Node.js ≥ 20** (22 works too)
+- **pnpm 9** — `npm install -g pnpm@9`
+- **PostgreSQL 16** — easiest via Docker (`docker compose up`), or a local install
+- _(optional)_ An **Anthropic API key** to enable real AI generation
+
+---
+
+## Quick start
 
 ```bash
-python3 -m http.server 8899
-# then visit http://localhost:8899/frame-prototype.html
+# 1. Clone & install
+git clone https://github.com/zoworkhq/formbuilder.git
+cd formbuilder
+pnpm install
+
+# 2. Start Postgres (Docker)
+docker compose up -d db
+
+# 3. Configure environment
+cp apps/api/.env.example         apps/api/.env
+cp apps/web/.env.local.example   apps/web/.env.local
+cp apps/admin/.env.local.example apps/admin/.env.local
+
+# 4. Create the database schema
+pnpm db:migrate      # runs prisma migrate + generates the client
+
+# 5. Run everything (web + admin + api together)
+pnpm dev
 ```
 
-## What's inside the blueprint
+Then open:
 
-The report analyzes Tally as it exists (product, features, UX, design system, business model) and lays out a full plan to build a better one:
+| App | URL |
+| --- | --- |
+| **Tenant app** (dashboard, editor, forms) | http://localhost:3000 |
+| **Admin console** | http://localhost:3002 |
+| **API** | http://localhost:4000 |
+| Public form runtime | `http://localhost:3000/r/<slug>` |
 
-- **Recommended stack** — Next.js + TypeScript + Tailwind/shadcn on the front end; NestJS + Prisma + PostgreSQL (JSONB) + Redis + BullMQ + S3/CloudFront + Typesense on the back end.
-- **Database schema** (DDL), **REST API** design, **DevOps/CI-CD**, **security & compliance** (OWASP, GDPR).
-- **AWS cost analysis** — per-phase estimates for vanilla EC2 vs. managed services, with cost-effective and performance recommendations.
-- **Capacity planning** — how many users/responses each tier carries, and the scale-out design (100 → 1M users).
-- **Phased roadmap** — MVP → V2 → V3 (enterprise) → AI-native future.
+Create an account from the tenant app's **Sign up** page and you're in.
 
-Claims are labeled **Verified** (grounded in public facts about Tally) vs **Assumption** (informed inference). The prototype uses an original placeholder brand ("Frame") — no Tally branding or assets are reproduced.
+> Not using Docker? Point `DATABASE_URL` in `apps/api/.env` at any PostgreSQL 16 instance and run `pnpm db:migrate`.
 
-## From prototype to production
+---
 
-The prototype's "Ship to production" screen maps each screen/flow onto the real codebase: a Turborepo monorepo with `apps/web` (Next.js), `apps/api` (NestJS), `apps/workers` (BullMQ), and shared `packages/*` (ui, form-schema, form-runtime, db). See that screen and the report's architecture sections for the full path.
+## Environment variables
 
-## Building the app (monorepo)
+**`apps/api/.env`**
 
-The scaffold for that app now lives in this repo:
+| Variable | Required | Description |
+| --- | --- | --- |
+| `DATABASE_URL` | ✅ | PostgreSQL connection string |
+| `PORT` | — | API port (default `4000`) |
+| `PUBLIC_API_URL` | — | Base URL used to build public file-upload links |
+| `JWT_SECRET` | ✅ (prod) | Secret for signing auth tokens — use a long random string |
+| `ANTHROPIC_API_KEY` | — | Enables real AI generation (heuristic fallback if unset) |
+| `ANTHROPIC_MODEL` | — | Override the Claude model (default `claude-haiku-4-5-20251001`) |
 
-- **`apps/web`** — Next.js (App Router) + Tailwind — the dashboard / builder UI
-- **`apps/api`** — NestJS REST API + Prisma — health + forms endpoints
-- **`packages/form-schema`** — the shared Zod form contract (the JSONB keystone)
+**`apps/web/.env.local`**
 
-It boots the **walking skeleton**: create a form → it persists to Postgres via Prisma → it appears in the dashboard.
+| Variable | Description |
+| --- | --- |
+| `NEXT_PUBLIC_API_URL` | API base URL (default `http://localhost:4000`) |
 
-**→ See [`GETTING-STARTED.md`](GETTING-STARTED.md) for prerequisites and first-run commands.**
+**`apps/admin/.env.local`**
+
+| Variable | Description |
+| --- | --- |
+| `NEXT_PUBLIC_API_URL` | API base URL (default `http://localhost:4000`) |
+| `NEXT_PUBLIC_TENANT_URL` | Tenant app URL, used for impersonation (default `http://localhost:3000`) |
+
+---
+
+## Scripts
+
+Run from the repo root:
+
+| Command | What it does |
+| --- | --- |
+| `pnpm dev` | Start web + admin + api in watch mode (Turborepo) |
+| `pnpm build` | Build all apps & packages |
+| `pnpm lint` | Lint all workspaces |
+| `pnpm db:migrate` | Apply Prisma migrations (+ generate client) |
+| `pnpm db:generate` | Regenerate the Prisma client |
+| `pnpm db:studio` | Open Prisma Studio to browse the database |
+
+Target a single workspace with `pnpm --filter <web|admin|api> <script>`.
+
+---
+
+## Admin access
+
+The admin console (`:3002`) only lets in users with the platform-admin flag. To promote an account after signing up in the tenant app, flip `isAdmin` on their `User` row:
+
+```bash
+pnpm db:studio        # open Prisma Studio → User → set isAdmin = true
+```
+
+or with SQL:
+
+```sql
+UPDATE "User" SET "isAdmin" = true WHERE email = 'you@example.com';
+```
+
+Then sign in at `http://localhost:3002` with the same credentials.
+
+---
+
+## How it fits together
+
+- **`packages/form-schema`** is the keystone: it defines `FormSchema`, the block catalog, validation, and `resolveTheme()`. The editor writes it, the runtime reads it, and the API validates it — stored as JSONB in `FormVersion.schema`.
+- The **API** owns auth (JWT), tenancy scoping, submissions, uploads, AI, webhooks, analytics, and the admin surface.
+- The **web app** is both the authenticated builder (`/app/*`) and the unauthenticated public runtime (`/r/:slug`).
+- The **admin app** talks to the same API through admin-guarded endpoints.
+
+For the product research, architecture rationale, AWS cost/capacity analysis, and roadmap, see **[`TALLY-TEARDOWN.md`](TALLY-TEARDOWN.md)**. For the running build log, see **[`PROGRESS.md`](PROGRESS.md)**.
+
+---
+
+## Notes for contributors
+
+- This is a **local-first dev setup**. Secrets in the `.env.example` files are development defaults — replace them before deploying anywhere.
+- File uploads use a local-disk driver; the storage layer is written as a seam so it can be swapped for S3 / R2.
+- Some advanced blocks (payment, signature, matrix, reCAPTCHA) are wired into the editor and runtime as clearly-labeled basics — the deep integrations are follow-ups tracked in `PROGRESS.md`.
