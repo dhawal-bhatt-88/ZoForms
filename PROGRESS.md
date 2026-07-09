@@ -36,16 +36,16 @@ Building the real Frame product. `[x]` = done, `[~]` = partial. Phase 1 is the l
 
 ## Phase 1 — MVP (the core loop, launchable)
 Critical path: **Editor → Runtime → Submit → Responses → Billing.**
-- [ ] Form editor (React): palette, canvas, dnd-kit reorder, inspector → writes blocks to `FormVersion.schema`
-- [ ] Core blocks: short/long text, choice, checkbox, dropdown, number, email, date, rating, file upload
-- [ ] Autosave + form versioning
-- [ ] Publish flow: status, slug, share link
-- [ ] Public runtime `/r/[slug]`: render from JSONB, React-Hook-Form + Zod validation, mobile
-- [ ] Submit endpoint: unauth, spam-guarded, idempotent → validate → store Response (+ file uploads to S3/R2)
-- [ ] Thank-you page + redirect on completion
+- [x] Form editor (React): palette, canvas, reorder (▲▼; drag next), inspector → writes blocks to `FormVersion.schema`
+- [x] Core blocks: short/long, choice, checkbox, dropdown, number, email, phone, date, rating, file
+- [x] Autosave (debounced) + schema persisted to the latest version
+- [x] Publish flow: status, slug, share link (copy-link + view-live)
+- [x] Public runtime `/r/[slug]`: render from JSONB, client validation, mobile, thank-you
+- [x] Submit endpoint: unauth → validate (required) → store Response  _(files = filename for now)_
+- [x] Dashboard on real data: create → opens editor; status + live link
+- [ ] Drag-drop reorder (dnd-kit) · file uploads to S3/R2 · redirect-on-completion
 - [ ] Responses dashboard: table + detail drawer + CSV export
 - [ ] Email notification on new response (Resend)
-- [ ] Dashboard on real data: create / duplicate / rename / delete, folders
 - [ ] Billing: Stripe subscriptions (Free / Pro / Business) + plan gating
 - [ ] Deploy MVP: Vercel (web) + API host (Fly/Render) + Neon Postgres + staging
 
