@@ -282,6 +282,9 @@ body.no-scroll{overflow:hidden}
 .skel--line{height:12px;margin:8px 0}
 .skel--block{height:80px}
 @keyframes shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}
+/* dashboard form-card thumbnails: static preview bars, not a perpetual loading shimmer */
+#screen-dashboard .card--hover .skel{animation:none;background:var(--line-2)}
+#screen-dashboard .card--hover .skel--block{border-radius:9px}
 
 /* ---------- progress / usage ---------- */
 .progress{height:8px;border-radius:100px;background:var(--surface-3);overflow:hidden}
@@ -1636,7 +1639,7 @@ body.no-scroll{overflow:hidden}
 <style>
 .bld{height:100vh;display:flex;flex-direction:column;background:var(--bg);overflow:hidden}
 .bld__top{height:56px;flex:none;display:flex;align-items:center;gap:12px;padding:0 14px;background:var(--surface);border-bottom:1px solid var(--line);z-index:5}
-.bld__title{font-weight:640;font-size:15px;border:1px solid transparent;border-radius:7px;padding:5px 8px;min-width:120px;max-width:280px;outline:none}
+.bld__title{font-weight:680;font-size:15px;letter-spacing:-.01em;border:1px solid transparent;border-radius:7px;padding:5px 8px;min-width:120px;max-width:280px;outline:none}
 .bld__title:hover{background:var(--surface-3)}.bld__title:focus{background:var(--surface-3);border-color:var(--accent-line)}
 .bld__saved{display:flex;align-items:center;gap:5px;color:var(--faint);font-size:12px}
 .bld__saved .dot{width:6px;height:6px}
@@ -1660,7 +1663,7 @@ body.no-scroll{overflow:hidden}
 
 .canvas-wrap{overflow:auto;padding:30px 24px 80px;background:var(--bg)}
 .canvas{max-width:660px;margin:0 auto}
-.canvas-cover{height:96px;border-radius:16px 16px 0 0;background:linear-gradient(120deg,var(--accent),#8b7bff 55%,#a78bfa);position:relative;overflow:hidden}
+.canvas-cover{height:104px;border-radius:16px 16px 0 0;background:radial-gradient(130% 130% at 12% 8%,rgba(255,255,255,.30),transparent 46%),linear-gradient(125deg,var(--accent) 0%,#7b6af7 46%,#a78bfa 100%);position:relative;overflow:hidden}
 .canvas-cover .btn{position:absolute;right:12px;bottom:12px}
 .canvas-body{background:var(--surface);border:1px solid var(--line);border-top:none;border-radius:0 0 16px 16px;box-shadow:var(--shadow);padding:26px 30px 34px;margin-bottom:16px}
 .canvas-title{font-size:26px;font-weight:720;letter-spacing:-.02em;border:none;outline:none;width:100%;margin-bottom:6px}
