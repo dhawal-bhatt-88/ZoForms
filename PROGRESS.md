@@ -55,6 +55,7 @@ Critical path: **Editor → Runtime → Submit → Responses → Billing.**
 - [x] Theme / design customization with live preview
 - [x] Customize panel — Tally parity: accent/background/text/button-text colors (swatch + picker), font (sans/serif/mono/rounded), corners (none→pill), width; luminance-aware runtime (adaptive dark surface, capped card radius)
 - [x] Workspace Settings + Claude API key (real AI generation; per-workspace key, Test connection); AI generate falls back to heuristic without a key
+- [x] Conversational "Ask AI" editor — in-editor chat drawer that edits the live form (POST /v1/ai/edit-form: Claude when keyed, heuristic add/remove/required otherwise); applies + autosaves
 - [ ] Analytics: views, starts, completion, drop-off, device & source
 - [x] Embeds (inline / popup / full-page) + `embed.js` (auto-resize) + editor Embed modal
 - [ ] Integrations: Google Sheets, Slack, webhooks, Zapier / Make

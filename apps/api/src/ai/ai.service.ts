@@ -153,4 +153,165 @@ export class AiService {
 
     return { title, description: `Drafted from: “${prompt.slice(0, 90)}”`, blocks };
   }
+
+  /* ---------- conversational edit ("Ask AI") ---------- */
+
+  async editSchema(
+    current: unknown,
+    instruction: string,
+    opts?: { apiKey?: string; model?: string },
+  ): Promise<{ schema: TFormSchema; message: string; changes: string[] }> {
+    const parsed = FormSchema.parse(current);
+    const inst = (instruction || "").trim();
+    if (!inst) throw new BadRequestException("Tell the assistant what to change.");
+    const apiKey = opts?.apiKey || process.env.ANTHROPIC_API_KEY;
+    if (apiKey) {
+      try {
+        return await this.editViaClaude(parsed, inst, apiKey, opts?.model);
+      } catch {
+        /* fall back to heuristic */
+      }
+    }
+    return this.editHeuristic(parsed, inst);
+  }
+
+  private async editViaClaude(
+    current: TFormSchema,
+    instruction: string,
+    apiKey: string,
+    model?: string,
+  ): Promise<{ schema: TFormSchema; message: string; changes: string[] }> {
+    const client = new Anthropic({ apiKey });
+    const msg = await client.messages.create({
+      model: model || process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001",
+      max_tokens: 2200,
+      tools: [
+        {
+          name: "update_form",
+          description: "Return the FULL updated form after applying the user's edit.",
+          input_schema: {
+            type: "object",
+            properties: {
+              title: { type: "string" },
+              description: { type: "string" },
+              blocks: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    type: {
+                      type: "string",
+                      enum: [
+                        "short", "long", "choice", "checkbox", "dropdown",
+                        "number", "email", "phone", "date", "rating", "file", "heading",
+                      ],
+                    },
+                    label: { type: "string" },
+                    required: { type: "boolean" },
+                    options: { type: "array", items: { type: "string" } },
+                    description: { type: "string" },
+                  },
+                  required: ["type", "label"],
+                },
+              },
+              message: {
+                type: "string",
+                description: "A short, friendly reply to the user (1-2 sentences).",
+              },
+              changes: {
+                type: "array",
+                items: { type: "string" },
+                description: "Short summaries of each change, e.g. 'Added phone field'.",
+              },
+            },
+            required: ["blocks", "message", "changes"],
+          },
+        },
+      ],
+      tool_choice: { type: "tool", name: "update_form" },
+      messages: [
+        {
+          role: "user",
+          content:
+            `Current form (JSON):\n${JSON.stringify({
+              title: current.title,
+              description: current.description,
+              blocks: current.blocks,
+            })}\n\nApply this instruction and return the complete updated form: ${instruction}`,
+        },
+      ],
+    });
+    const tool = msg.content.find((c) => c.type === "tool_use") as
+      | { input?: { title?: string; description?: string; blocks: Array<Record<string, unknown>>; message?: string; changes?: string[] } }
+      | undefined;
+    const raw = tool?.input;
+    if (!raw) throw new Error("No tool output");
+    const blocks = (raw.blocks || []).map((b, i) => ({ id: "b_" + i, required: false, ...b }));
+    const schema = FormSchema.parse({
+      title: raw.title || current.title,
+      description: raw.description ?? current.description,
+      blocks,
+      settings: current.settings,
+    });
+    return {
+      schema,
+      message: raw.message || "Done.",
+      changes: Array.isArray(raw.changes) ? raw.changes : [],
+    };
+  }
+
+  private editHeuristic(
+    current: TFormSchema,
+    instruction: string,
+  ): { schema: TFormSchema; message: string; changes: string[] } {
+    const p = instruction.toLowerCase();
+    const blocks = [...current.blocks];
+    const changes: string[] = [];
+    const typeMap: Array<[RegExp, BlockType, string]> = [
+      [/phone|mobile/, "phone", "Phone number"],
+      [/e-?mail/, "email", "Email"],
+      [/rating|rate|stars?/, "rating", "How would you rate this?"],
+      [/address/, "short", "Address"],
+      [/company|organi[sz]ation|employer/, "short", "Company"],
+      [/date|day|schedule|when/, "date", "Date"],
+      [/number|quantity|amount|age/, "number", "Number"],
+      [/file|upload|attachment|resume|cv/, "file", "Attachment"],
+      [/comment|message|feedback|note|long|paragraph/, "long", "Your message"],
+      [/name/, "short", "Your name"],
+    ];
+
+    if (/\b(add|include|insert|append|need|put)\b/.test(p)) {
+      let matched: [BlockType, string] | null = null;
+      for (const [re, type, label] of typeMap) {
+        if (re.test(p)) {
+          matched = [type, label];
+          break;
+        }
+      }
+      const [type, label] = matched || (["short", "New question"] as [BlockType, string]);
+      blocks.push({ id: "b_" + Date.now().toString(36), type, label, required: false } as Block);
+      changes.push(`Added ${label}`);
+    } else if (/\b(remove|delete|drop|get rid)\b/.test(p)) {
+      const kw = p.replace(/.*\b(remove|delete|drop|get rid of)\b/, "").trim().split(/\s+/)[0] || "";
+      const before = blocks.length;
+      const kept = blocks.filter((b) => !(kw && b.label.toLowerCase().includes(kw)));
+      if (kept.length < before) {
+        changes.push(`Removed ${before - kept.length} field(s)`);
+        blocks.length = 0;
+        blocks.push(...kept);
+      }
+    } else if (/required|optional/.test(p)) {
+      const makeOptional = /optional|not required|no longer/.test(p);
+      blocks.forEach((b) => {
+        (b as { required?: boolean }).required = !makeOptional;
+      });
+      changes.push(makeOptional ? "Made all fields optional" : "Made all fields required");
+    }
+
+    const message = changes.length
+      ? `Done — ${changes.join(", ").toLowerCase()}. Add a Claude API key in Settings for richer edits.`
+      : "I can add/remove fields and toggle required without a key. Try “add a phone field”, “remove company”, or add your Claude key in Settings for anything more.";
+    const schema = FormSchema.parse({ ...current, blocks });
+    return { schema, message, changes };
+  }
 }

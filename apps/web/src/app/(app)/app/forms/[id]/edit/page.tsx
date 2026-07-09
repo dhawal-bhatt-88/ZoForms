@@ -42,6 +42,8 @@ import {
   Upload,
   X,
   Zap,
+  Sparkles,
+  ArrowUp,
 } from "lucide-react";
 import {
   BLOCK_META,
@@ -52,7 +54,9 @@ import {
   type BlockType,
   type FormSchema,
 } from "@formbuilder/form-schema";
-import { getForm, saveSchema, updateForm, type FormStatus } from "@/lib/api";
+import { editForm, getForm, saveSchema, updateForm, type FormStatus } from "@/lib/api";
+
+type AiMsg = { role: "user" | "assistant"; text: string; changes?: string[] };
 
 const ICONS: Record<BlockType, typeof Type> = {
   short: Type,
@@ -252,6 +256,10 @@ export default function EditorPage() {
   const [copied, setCopied] = useState(false);
   const [embedOpen, setEmbedOpen] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiMsgs, setAiMsgs] = useState<AiMsg[]>([]);
+  const [aiInput, setAiInput] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
   const loaded = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -323,6 +331,30 @@ export default function EditorPage() {
       ...s,
       settings: { ...s.settings, theme: { ...s.settings?.theme, ...p } },
     }));
+
+  async function onAiSend() {
+    const text = aiInput.trim();
+    if (!text || aiBusy || !schema) return;
+    setAiMsgs((m) => [...m, { role: "user", text }]);
+    setAiInput("");
+    setAiBusy(true);
+    try {
+      const res = await editForm(schema, text);
+      setSchema(res.schema);
+      setSelectedId(null);
+      setAiMsgs((m) => [
+        ...m,
+        { role: "assistant", text: res.message, changes: res.changes },
+      ]);
+    } catch (e) {
+      setAiMsgs((m) => [
+        ...m,
+        { role: "assistant", text: (e as Error).message || "Something went wrong." },
+      ]);
+    } finally {
+      setAiBusy(false);
+    }
+  }
 
   function onDragEnd(e: DragEndEvent) {
     const { active, over } = e;
@@ -418,6 +450,12 @@ export default function EditorPage() {
           <Link href={`/app/forms/${id}/integrations`} className="btn btn-ghost btn-sm">
             <Zap className="h-4 w-4" /> Connect
           </Link>
+          <button
+            onClick={() => setAiOpen((v) => !v)}
+            className={`btn btn-sm ${aiOpen ? "btn-primary" : "btn-outline"}`}
+          >
+            <Sparkles className="h-4 w-4" /> Ask AI
+          </button>
           {status === "PUBLISHED" ? (
             <>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E7F6ED] px-2.5 py-1 text-xs font-semibold text-green">
@@ -749,6 +787,103 @@ export default function EditorPage() {
           )}
         </aside>
       </div>
+
+      {aiOpen && (
+        <div className="fixed bottom-0 right-0 top-14 z-40 flex w-[360px] flex-col border-l border-line bg-surface shadow-2xl">
+          <div className="flex items-center gap-2 border-b border-line px-4 py-3">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#EFEDFE] text-accent-2">
+              <Sparkles className="h-4 w-4" />
+            </span>
+            <div className="flex-1">
+              <div className="text-sm font-semibold tracking-tight">Ask AI</div>
+              <div className="text-[11px] text-faint">Describe a change and I&apos;ll edit the form</div>
+            </div>
+            <button
+              onClick={() => setAiOpen(false)}
+              className="grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-surface-3 hover:text-ink"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="flex-1 space-y-3 overflow-auto px-4 py-4">
+            {aiMsgs.length === 0 && (
+              <div className="rounded-xl bg-surface-2 p-4 text-sm">
+                <p className="mb-2 font-medium text-ink">Tell me what to change.</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    "Add a phone number field",
+                    "Make everything required",
+                    "Add 3 rating questions",
+                    "Remove the company field",
+                  ].map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => setAiInput(s)}
+                      className="rounded-full border border-line bg-surface px-2.5 py-1 text-xs text-ink-2 hover:border-line-2"
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {aiMsgs.map((m, i) => (
+              <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
+                <div
+                  className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm ${
+                    m.role === "user" ? "bg-primary text-white" : "bg-surface-2 text-ink"
+                  }`}
+                >
+                  <div>{m.text}</div>
+                  {m.changes && m.changes.length > 0 && (
+                    <ul className="mt-2 space-y-1">
+                      {m.changes.map((c, j) => (
+                        <li key={j} className="flex items-center gap-1.5 text-xs text-muted">
+                          <Check className="h-3.5 w-3.5 flex-none text-green" />
+                          {c}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            ))}
+            {aiBusy && (
+              <div className="flex items-center gap-2 text-sm text-muted">
+                <Loader2 className="h-4 w-4 animate-spin" /> Thinking…
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-line p-3">
+            <div className="relative">
+              <textarea
+                value={aiInput}
+                onChange={(e) => setAiInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    onAiSend();
+                  }
+                }}
+                rows={2}
+                placeholder="Ask AI to edit your form…"
+                className="w-full resize-none rounded-xl border border-line-2 px-3 py-2.5 pr-11 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent-weak"
+              />
+              <button
+                onClick={onAiSend}
+                disabled={aiBusy || !aiInput.trim()}
+                className="absolute bottom-2.5 right-2.5 grid h-8 w-8 place-items-center rounded-lg bg-primary text-white disabled:opacity-40"
+                aria-label="Send"
+              >
+                {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {embedOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

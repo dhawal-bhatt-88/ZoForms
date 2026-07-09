@@ -166,6 +166,13 @@ export function generateForm(prompt: string) {
   });
 }
 
+export function editForm(schema: FormSchema, instruction: string) {
+  return req<{ schema: FormSchema; message: string; changes: string[] }>(
+    "/v1/ai/edit-form",
+    { method: "POST", body: JSON.stringify({ schema, instruction }) },
+  );
+}
+
 export function listResponses(id: string) {
   return req<{ id: string; data: Record<string, unknown>; createdAt: string }[]>(
     `/v1/forms/${id}/responses`,

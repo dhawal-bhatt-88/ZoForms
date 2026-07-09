@@ -20,4 +20,13 @@ export class AiController {
     const schema = await this.ai.generateSchema(body?.prompt || "", cfg);
     return this.forms.createWithSchema(user, schema);
   }
+
+  @Post("edit-form")
+  async edit(
+    @CurrentUser() user: AuthUser,
+    @Body() body: { schema: unknown; instruction?: string },
+  ) {
+    const cfg = await this.settings.resolveAnthropic(user.orgId);
+    return this.ai.editSchema(body?.schema, body?.instruction || "", cfg);
+  }
 }
