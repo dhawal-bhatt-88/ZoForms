@@ -17,14 +17,27 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter,
-    "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--font-hanken), -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 * {
   box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
 }
 
 @layer components {
@@ -57,5 +70,32 @@ body {
   }
   .card-mkt {
     @apply rounded-2xl border border-line bg-surface shadow-soft;
+  }
+  .btn-dark {
+    @apply bg-primary text-white hover:bg-ink-2;
+  }
+  .gradient-text {
+    @apply bg-gradient-to-br from-accent to-[#8B7BFF] bg-clip-text text-transparent;
+  }
+  /* Soft radial glow used behind hero / CTA sections */
+  .glow {
+    background: radial-gradient(
+        60% 60% at 50% 0%,
+        rgba(109, 94, 250, 0.14) 0%,
+        rgba(109, 94, 250, 0) 70%
+      ),
+      radial-gradient(
+        40% 50% at 85% 20%,
+        rgba(109, 94, 250, 0.1) 0%,
+        rgba(109, 94, 250, 0) 70%
+      );
+  }
+  /* Subtle dotted grid backdrop */
+  .grid-bg {
+    background-image: radial-gradient(rgba(27, 29, 34, 0.05) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+  .marquee {
+    animation: marquee 32s linear infinite;
   }
 }
