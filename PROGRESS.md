@@ -19,6 +19,12 @@ _Last updated: 2026-07-09_
 ## 🚧 In progress
 - _(nothing in flight)_
 
+## 🛡️ Admin console (`apps/admin`, port 3002)
+- [x] Platform data model — User.isAdmin/status, Organization.plan/status, AuditLog
+- [x] AdminModule (API) — AdminGuard (isAdmin), overview, tenants (list/detail/plan/suspend), users (list/suspend/impersonate/delete), cross-tenant form moderation (take-down/delete), audit log; every mutation audited
+- [x] Impersonation — admin issues a 1h token → tenant app /impersonate stores it and enters the app as that user (support login-as)
+- [x] Admin app — separate Next.js app: login (admin-only gate), Overview (metrics/signup-trend/plan mix), Tenants + tenant detail, Users, Forms, Audit log; shares the Frame design system
+
 ## 🎨 Design system / app shell
 - [x] Enterprise app shell — persistent sidebar (workspace switcher, nav with active states, user menu) + topbar; applied to dashboard / templates / integrations / settings (editor stays full-screen)
 - [x] Dashboard redesign — search + status filter + sort, refined form cards (status dot, responses, edited-time), hover micro-interactions, kebab menu (edit / copy link / duplicate / delete), skeleton loading, delete-confirm dialog (DELETE /v1/forms/:id)
