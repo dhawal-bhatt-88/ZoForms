@@ -4,16 +4,31 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import {
   AlignLeft,
   Calendar,
   Check,
   CheckSquare,
   ChevronDown,
   ChevronLeft,
-  ChevronUp,
   CircleDot,
   Copy,
   ExternalLink,
+  GripVertical,
   Hash,
   Inbox,
   Loader2,
@@ -34,12 +49,7 @@ import {
   type BlockType,
   type FormSchema,
 } from "@formbuilder/form-schema";
-import {
-  getForm,
-  saveSchema,
-  updateForm,
-  type FormStatus,
-} from "@/lib/api";
+import { getForm, saveSchema, updateForm, type FormStatus } from "@/lib/api";
 
 const ICONS: Record<BlockType, typeof Type> = {
   short: Type,
@@ -123,6 +133,64 @@ function BlockPreview({ block }: { block: Block }) {
   return <div className={box}>{ph}</div>;
 }
 
+function SortableBlock({
+  block,
+  selected,
+  onSelect,
+  onDelete,
+}: {
+  block: Block;
+  selected: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: block.id });
+  const Icon = ICONS[block.type];
+  const style = { transform: CSS.Transform.toString(transform), transition };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      onClick={onSelect}
+      className={`group relative cursor-pointer rounded-xl border p-3.5 transition-colors ${
+        selected
+          ? "border-accent bg-white ring-2 ring-accent-weak"
+          : "border-transparent hover:border-line-2 hover:bg-surface-2"
+      } ${isDragging ? "z-10 opacity-70 shadow-pop" : ""}`}
+    >
+      <div className="mb-2.5 flex items-center gap-2">
+        <button
+          {...attributes}
+          {...listeners}
+          onClick={(e) => e.stopPropagation()}
+          className="cursor-grab text-faint opacity-0 transition-opacity hover:text-ink group-hover:opacity-100 active:cursor-grabbing"
+          aria-label="Drag to reorder"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+        <span className="grid h-[22px] w-[22px] flex-none place-items-center rounded-md bg-accent-weak text-accent-2">
+          <Icon className="h-3.5 w-3.5" />
+        </span>
+        <span className="font-semibold">{block.label}</span>
+        {block.required && <span className="text-red">*</span>}
+      </div>
+      <BlockPreview block={block} />
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete();
+        }}
+        className="absolute right-2.5 top-2.5 grid h-7 w-7 place-items-center rounded-md text-faint opacity-0 transition-opacity hover:bg-[#FCECEC] hover:text-red group-hover:opacity-100"
+        aria-label="Delete"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
 export default function EditorPage() {
   const params = useParams();
   const id = String(params.id);
@@ -136,6 +204,7 @@ export default function EditorPage() {
   const [copied, setCopied] = useState(false);
   const loaded = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   useEffect(() => {
     getForm(id)
@@ -144,6 +213,7 @@ export default function EditorPage() {
         setSchema({
           title: s?.title || f.title,
           description: s?.description,
+          settings: s?.settings,
           blocks: s?.blocks ?? [],
         });
         setSlug(f.slug);
@@ -154,7 +224,6 @@ export default function EditorPage() {
       .catch(() => setSave("error"));
   }, [id]);
 
-  // debounced autosave
   useEffect(() => {
     if (!loaded.current || !schema) return;
     setSave("saving");
@@ -187,17 +256,21 @@ export default function EditorPage() {
     }));
   const removeBlock = (bid: string) => {
     patch((s) => ({ ...s, blocks: s.blocks.filter((b) => b.id !== bid) }));
-    setSelectedId(null);
+    setSelectedId((cur) => (cur === bid ? null : cur));
   };
-  const move = (bid: string, dir: -1 | 1) =>
+  const updateSettings = (p: { submitLabel?: string; redirectUrl?: string }) =>
+    patch((s) => ({ ...s, settings: { ...s.settings, ...p } }));
+
+  function onDragEnd(e: DragEndEvent) {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
     patch((s) => {
-      const i = s.blocks.findIndex((b) => b.id === bid);
-      const j = i + dir;
-      if (i < 0 || j < 0 || j >= s.blocks.length) return s;
-      const blocks = [...s.blocks];
-      [blocks[i], blocks[j]] = [blocks[j], blocks[i]];
-      return { ...s, blocks };
+      const oldIndex = s.blocks.findIndex((b) => b.id === active.id);
+      const newIndex = s.blocks.findIndex((b) => b.id === over.id);
+      if (oldIndex < 0 || newIndex < 0) return s;
+      return { ...s, blocks: arrayMove(s.blocks, oldIndex, newIndex) };
     });
+  }
 
   async function publish() {
     if (!schema) return;
@@ -216,7 +289,6 @@ export default function EditorPage() {
 
   const shareUrl =
     typeof window !== "undefined" ? `${window.location.origin}/r/${slug}` : `/r/${slug}`;
-
   function copyLink() {
     navigator.clipboard?.writeText(shareUrl).catch(() => {});
     setCopied(true);
@@ -231,6 +303,8 @@ export default function EditorPage() {
     );
 
   const selected = schema.blocks.find((b) => b.id === selectedId) ?? null;
+  const fieldCls =
+    "w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent-weak";
 
   return (
     <div className="flex h-screen flex-col bg-bg">
@@ -281,7 +355,7 @@ export default function EditorPage() {
         </div>
       </header>
 
-      {/* Body: palette | canvas | inspector */}
+      {/* Body */}
       <div className="grid min-h-0 flex-1 grid-cols-[220px_minmax(0,1fr)_300px]">
         {/* Palette */}
         <aside className="overflow-auto border-r border-line bg-surface p-3">
@@ -316,78 +390,38 @@ export default function EditorPage() {
               <input
                 value={schema.title}
                 onChange={(e) => patch((s) => ({ ...s, title: e.target.value }))}
+                onFocus={() => setSelectedId(null)}
                 className="w-full text-[26px] font-bold tracking-tight outline-none"
                 spellCheck={false}
               />
               <input
                 value={schema.description ?? ""}
                 onChange={(e) => patch((s) => ({ ...s, description: e.target.value }))}
+                onFocus={() => setSelectedId(null)}
                 placeholder="Add a description…"
                 className="mt-1.5 w-full text-[14.5px] text-muted outline-none"
                 spellCheck={false}
               />
 
-              <div className="mt-6 flex flex-col gap-2.5">
-                {schema.blocks.map((b, i) => {
-                  const Icon = ICONS[b.type];
-                  const sel = b.id === selectedId;
-                  return (
-                    <div
-                      key={b.id}
-                      onClick={() => setSelectedId(b.id)}
-                      className={`group relative cursor-pointer rounded-xl border p-3.5 transition-colors ${
-                        sel
-                          ? "border-accent bg-white ring-2 ring-accent-weak"
-                          : "border-transparent hover:border-line-2 hover:bg-surface-2"
-                      }`}
-                    >
-                      <div className="mb-2.5 flex items-center gap-2">
-                        <span className="grid h-[22px] w-[22px] flex-none place-items-center rounded-md bg-accent-weak text-accent-2">
-                          <Icon className="h-3.5 w-3.5" />
-                        </span>
-                        <span className="font-semibold">{b.label}</span>
-                        {b.required && <span className="text-red">*</span>}
-                      </div>
-                      <BlockPreview block={b} />
-
-                      {/* row controls */}
-                      <div className="absolute right-2.5 top-2.5 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            move(b.id, -1);
-                          }}
-                          disabled={i === 0}
-                          className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-surface-3 hover:text-ink disabled:opacity-30"
-                          aria-label="Move up"
-                        >
-                          <ChevronUp className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            move(b.id, 1);
-                          }}
-                          disabled={i === schema.blocks.length - 1}
-                          className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-surface-3 hover:text-ink disabled:opacity-30"
-                          aria-label="Move down"
-                        >
-                          <ChevronDown className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeBlock(b.id);
-                          }}
-                          className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-[#FCECEC] hover:text-red"
-                          aria-label="Delete"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
+              <div className="mt-6">
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+                  <SortableContext
+                    items={schema.blocks.map((b) => b.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <div className="flex flex-col gap-2.5">
+                      {schema.blocks.map((b) => (
+                        <SortableBlock
+                          key={b.id}
+                          block={b}
+                          selected={b.id === selectedId}
+                          onSelect={() => setSelectedId(b.id)}
+                          onDelete={() => removeBlock(b.id)}
+                        />
+                      ))}
                     </div>
-                  );
-                })}
+                  </SortableContext>
+                </DndContext>
               </div>
 
               {schema.blocks.length === 0 && (
@@ -404,21 +438,19 @@ export default function EditorPage() {
         <aside className="overflow-auto border-l border-line bg-surface p-4">
           {selected ? (
             <div key={selected.id}>
-              <h4 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-faint">
-                Question
-              </h4>
+              <h4 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-faint">Question</h4>
               <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Label</label>
               <input
                 value={selected.label}
                 onChange={(e) => updateBlock(selected.id, { label: e.target.value })}
-                className="mb-3 w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent-weak"
+                className={`${fieldCls} mb-3`}
               />
               <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Help text</label>
               <input
                 value={selected.description ?? ""}
                 onChange={(e) => updateBlock(selected.id, { description: e.target.value })}
                 placeholder="Optional"
-                className="mb-4 w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent-weak"
+                className={`${fieldCls} mb-4`}
               />
 
               {OPTION_TYPES.includes(selected.type) && (
@@ -437,10 +469,11 @@ export default function EditorPage() {
                           className="w-full rounded-lg border border-line-2 px-3 py-1.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent-weak"
                         />
                         <button
-                          onClick={() => {
-                            const options = (selected.options ?? []).filter((_, k) => k !== i);
-                            updateBlock(selected.id, { options });
-                          }}
+                          onClick={() =>
+                            updateBlock(selected.id, {
+                              options: (selected.options ?? []).filter((_, k) => k !== i),
+                            })
+                          }
                           className="grid h-8 w-8 flex-none place-items-center rounded-lg text-faint hover:bg-surface-3 hover:text-ink"
                           aria-label="Remove option"
                         >
@@ -451,7 +484,10 @@ export default function EditorPage() {
                     <button
                       onClick={() =>
                         updateBlock(selected.id, {
-                          options: [...(selected.options ?? []), `Option ${(selected.options?.length ?? 0) + 1}`],
+                          options: [
+                            ...(selected.options ?? []),
+                            `Option ${(selected.options?.length ?? 0) + 1}`,
+                          ],
                         })
                       }
                       className="flex items-center gap-1.5 text-sm font-medium text-accent-2 hover:underline"
@@ -477,8 +513,28 @@ export default function EditorPage() {
               </div>
             </div>
           ) : (
-            <div className="pt-6 text-center text-sm text-muted">
-              Select a question to edit it, or add one from the left.
+            <div>
+              <h4 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-faint">Form settings</h4>
+              <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Submit button label</label>
+              <input
+                value={schema.settings?.submitLabel ?? ""}
+                onChange={(e) => updateSettings({ submitLabel: e.target.value })}
+                placeholder="Submit"
+                className={`${fieldCls} mb-3`}
+              />
+              <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Redirect URL after submit</label>
+              <input
+                value={schema.settings?.redirectUrl ?? ""}
+                onChange={(e) => updateSettings({ redirectUrl: e.target.value })}
+                placeholder="https://…"
+                className={fieldCls}
+              />
+              <p className="mt-1.5 text-xs text-muted">
+                Leave blank to show the built-in thank-you screen.
+              </p>
+              <p className="mt-8 border-t border-line pt-4 text-center text-sm text-muted">
+                Select a question to edit it, or add one from the left.
+              </p>
             </div>
           )}
         </aside>

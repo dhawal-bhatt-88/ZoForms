@@ -43,7 +43,7 @@ Critical path: **Editor → Runtime → Submit → Responses → Billing.**
 - [x] Public runtime `/r/[slug]`: render from JSONB, client validation, mobile, thank-you
 - [x] Submit endpoint: unauth → validate (required) → store Response  _(files = filename for now)_
 - [x] Dashboard on real data: create → opens editor; status + live link
-- [ ] Drag-drop reorder (dnd-kit) · file uploads to S3/R2 · redirect-on-completion
+- [x] Drag-drop reorder (dnd-kit) · file uploads _(local-disk driver; S3/R2 swap seam)_ · redirect-on-completion + custom submit label
 - [x] Responses dashboard: table (labels as columns) + detail drawer + CSV export
 - [ ] Email notification on new response (Resend)
 - [ ] Billing: Stripe subscriptions (Free / Pro / Business) + plan gating

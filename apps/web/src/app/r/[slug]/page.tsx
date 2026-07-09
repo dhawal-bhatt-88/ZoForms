@@ -2,9 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Check, Loader2, Star } from "lucide-react";
+import { Check, Loader2, Star, Upload, X } from "lucide-react";
 import type { Block } from "@formbuilder/form-schema";
-import { getPublicForm, submitResponse, type PublicForm } from "@/lib/api";
+import {
+  getPublicForm,
+  submitResponse,
+  uploadFile,
+  type PublicForm,
+} from "@/lib/api";
 
 type Values = Record<string, unknown>;
 
@@ -53,6 +58,11 @@ export default function PublicFormPage() {
     setSubmitting(true);
     try {
       await submitResponse(slug, values);
+      const redirect = form.schema.settings?.redirectUrl;
+      if (redirect) {
+        window.location.href = redirect;
+        return;
+      }
       setDone(true);
     } catch (err) {
       setErrors({ _form: (err as Error).message });
@@ -127,7 +137,7 @@ export default function PublicFormPage() {
           className="btn btn-accent mt-8 h-12 w-full text-[15px]"
         >
           {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          {submitting ? "Submitting…" : "Submit"}
+          {submitting ? "Submitting…" : form?.schema.settings?.submitLabel || "Submit"}
         </button>
 
         <p className="mt-6 text-center text-xs text-faint">
@@ -246,11 +256,7 @@ function Field({
           ))}
         </div>
       ) : block.type === "file" ? (
-        <input
-          type="file"
-          className="block w-full text-sm text-muted file:mr-3 file:rounded-lg file:border file:border-line-2 file:bg-surface file:px-3 file:py-2 file:text-sm file:font-medium"
-          onChange={(e) => onChange(e.target.files?.[0]?.name ?? "")}
-        />
+        <FileField value={value} onChange={onChange} />
       ) : (
         <input
           type={block.type === "email" ? "email" : block.type === "number" ? "number" : block.type === "date" ? "date" : block.type === "phone" ? "tel" : "text"}
@@ -263,5 +269,62 @@ function Field({
 
       {error && <p className="mt-1.5 text-sm text-red">{error}</p>}
     </div>
+  );
+}
+
+function FileField({
+  value,
+  onChange,
+}: {
+  value: unknown;
+  onChange: (v: unknown) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const file = value as { name: string; url: string } | undefined;
+
+  async function onPick(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setUploading(true);
+    setErr(null);
+    try {
+      onChange(await uploadFile(f));
+    } catch {
+      setErr("Upload failed — try again.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  if (file?.name)
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-line-2 px-3.5 py-2.5 text-sm">
+        <a
+          href={file.url}
+          target="_blank"
+          rel="noreferrer"
+          className="truncate font-medium text-accent-2 hover:underline"
+        >
+          {file.name}
+        </a>
+        <button
+          type="button"
+          onClick={() => onChange(undefined)}
+          className="flex-none text-faint hover:text-ink"
+          aria-label="Remove file"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+    );
+
+  return (
+    <label className="flex cursor-pointer flex-col items-center gap-1.5 rounded-lg border border-dashed border-line-2 py-5 text-sm text-muted transition-colors hover:border-accent">
+      {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+      {uploading ? "Uploading…" : "Choose a file"}
+      <input type="file" className="hidden" onChange={onPick} disabled={uploading} />
+      {err && <span className="text-red">{err}</span>}
+    </label>
   );
 }

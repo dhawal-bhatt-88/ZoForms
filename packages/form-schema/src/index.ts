@@ -38,9 +38,16 @@ export const Block = z.object({
 });
 export type Block = z.infer<typeof Block>;
 
+export const FormSettings = z.object({
+  submitLabel: z.string().optional(),
+  redirectUrl: z.string().optional(),
+});
+export type FormSettings = z.infer<typeof FormSettings>;
+
 export const FormSchema = z.object({
   title: z.string(),
   description: z.string().optional(),
+  settings: FormSettings.optional(),
   blocks: z.array(Block).default([]),
 });
 export type FormSchema = z.infer<typeof FormSchema>;

@@ -25,3 +25,6 @@ coverage/
 .env.*.local
 apps/*/.env
 apps/*/.env.local
+
+# local file-upload storage (dev)
+apps/api/uploads/

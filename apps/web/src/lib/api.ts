@@ -102,3 +102,16 @@ export function submitResponse(slug: string, data: Record<string, unknown>) {
     { method: "POST", body: JSON.stringify({ data }) },
   );
 }
+
+export type UploadedFile = { name: string; url: string; size: number };
+
+export async function uploadFile(file: File): Promise<UploadedFile> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch(`${API_URL}/v1/public/uploads`, {
+    method: "POST",
+    body: fd,
+  });
+  if (!res.ok) throw new Error("Upload failed");
+  return res.json() as Promise<UploadedFile>;
+}
