@@ -1,0 +1,1 @@
+# Keeps apps/admin/public present so the Docker image build can COPY it.
