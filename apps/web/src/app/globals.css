@@ -49,6 +49,9 @@ body {
   .btn-outline {
     @apply border border-line bg-surface text-ink hover:bg-bg;
   }
+  .input {
+    @apply w-full rounded-lg border border-line bg-surface px-3 py-2 text-[15px] leading-normal text-ink outline-none transition-colors placeholder:text-muted/60 focus:border-accent focus:ring-2 focus:ring-accent/15;
+  }
   .eyebrow {
     @apply inline-flex items-center gap-2 rounded-full border border-accent-weak bg-accent-weak px-3 py-1.5 text-[13px] font-semibold text-accent-2;
   }
