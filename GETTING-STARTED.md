@@ -47,7 +47,7 @@ packages/form-schema  Shared Zod form contract (the keystone; JSONB shape)
 > Prisma currently lives in `apps/api` for simplicity. Extract it into
 > `packages/db` (per the blueprint) once the web app needs direct DB access.
 
-## Next steps (from `tally-teardown.html`)
+## Next steps (from `blueprint.html`)
 
 1. **Builder** — port screens from `frame-prototype.html` into React components
    under `apps/web`; write the block list into `FormVersion.schema`.

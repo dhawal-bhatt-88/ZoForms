@@ -1,6 +1,6 @@
 # Frame
 
-**An open-source, Tally.so-inspired form builder** — type a question, style it, publish, embed, and collect responses. Built as a production-shaped monorepo with a tenant app, a public form runtime, a REST API, and a multi-tenant **admin console**.
+**Frame is a modern form builder.** Create forms with a block-based editor, style and publish them, embed them anywhere, and collect and analyze responses. It's a production-shaped monorepo with a tenant app, a public form runtime, a REST API, and a multi-tenant **admin console**.
 
 ![Node](https://img.shields.io/badge/node-%E2%89%A520-3c873a)
 ![pnpm](https://img.shields.io/badge/pnpm-9-f69220)
@@ -55,7 +55,7 @@ formbuilder/
 ├─ packages/
 │  └─ form-schema/   # Shared Zod schema, block catalog, theme resolver
 ├─ docker-compose.yml   # Postgres 16 (+ Redis, provisioned for future use)
-├─ TALLY-TEARDOWN.md    # Product & engineering blueprint (research/strategy)
+├─ BLUEPRINT.md         # Product & engineering blueprint (research/strategy)
 └─ PROGRESS.md          # Living build log — what's done, what's next
 ```
 
@@ -178,7 +178,7 @@ Then sign in at `http://localhost:3002` with the same credentials.
 - The **web app** is both the authenticated builder (`/app/*`) and the unauthenticated public runtime (`/r/:slug`).
 - The **admin app** talks to the same API through admin-guarded endpoints.
 
-For the product research, architecture rationale, AWS cost/capacity analysis, and roadmap, see **[`TALLY-TEARDOWN.md`](TALLY-TEARDOWN.md)**. For the running build log, see **[`PROGRESS.md`](PROGRESS.md)**.
+For the product research, architecture rationale, AWS cost/capacity analysis, and roadmap, see **[`BLUEPRINT.md`](BLUEPRINT.md)**. For the running build log, see **[`PROGRESS.md`](PROGRESS.md)**.
 
 ---
 

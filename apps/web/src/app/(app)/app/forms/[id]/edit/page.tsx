@@ -120,7 +120,7 @@ type CatalogItem = {
   soon?: boolean;
 };
 
-/** The slash-menu catalog, grouped like Tally. */
+/** The slash-menu block catalog, grouped by category. */
 const CATALOG: { group: string; items: CatalogItem[] }[] = [
   {
     group: "Questions",

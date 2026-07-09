@@ -5,7 +5,7 @@ A living checklist of work on the Frame form-builder project. Updated as tasks c
 _Last updated: 2026-07-09_
 
 ## ✅ Completed
-- [x] Product teardown & build blueprint — 18 sections (`tally-teardown.html`, `TALLY-TEARDOWN.md`)
+- [x] Product & engineering blueprint — 18 sections (`blueprint.html`, `BLUEPRINT.md`)
 - [x] AWS infrastructure cost analysis section added to the report
 - [x] Capacity planning & scaling-design section added to the report
 - [x] Clickable prototype — 15 screens (`frame-prototype.html`)
@@ -63,7 +63,7 @@ Critical path: **Editor → Runtime → Submit → Responses → Billing.**
 - [ ] Conditional logic engine (show / hide / jump) + calculations
 - [ ] Advanced blocks: payment (Stripe Connect), signature, matrix, ranking, hidden fields, answer piping, URL pre-fill
 - [x] Theme / design customization with live preview
-- [x] Customize panel — Tally parity: accent/background/text/button-text colors (swatch + picker), font (sans/serif/mono/rounded), corners (none→pill), width; luminance-aware runtime (adaptive dark surface, capped card radius)
+- [x] Customize panel — accent/background/text/button-text colors (swatch + picker), font (sans/serif/mono/rounded), corners (none→pill), width; luminance-aware runtime (adaptive dark surface, capped card radius)
 - [x] Workspace Settings + Claude API key (real AI generation; per-workspace key, Test connection); AI generate falls back to heuristic without a key
 - [x] Conversational "Ask AI" editor — in-editor chat drawer that edits the live form (POST /v1/ai/edit-form: Claude when keyed, heuristic add/remove/required otherwise); applies + autosaves
 - [x] Notion-style slash (/) block inserter replacing the left palette — searchable, grouped catalog (Questions/Layout/Embed/Advanced), 33 block types; inserts after the selected block
