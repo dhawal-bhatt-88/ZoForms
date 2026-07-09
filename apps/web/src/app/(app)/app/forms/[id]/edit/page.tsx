@@ -20,36 +20,55 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   AlignLeft,
+  ArrowUp,
+  AudioLines,
   Calendar,
   Check,
   CheckSquare,
   ChevronDown,
   ChevronLeft,
   CircleDot,
+  Clock,
   Code2,
   Copy,
+  CreditCard,
   ExternalLink,
+  EyeOff,
+  Film,
+  Gauge,
+  Globe,
   GripVertical,
   Hash,
+  Heading as HeadingIcon,
+  Image as ImageIcon,
   Inbox,
+  Link2,
+  ListChecks,
+  ListOrdered,
   Loader2,
   Mail,
+  Minus,
+  PenTool,
   Phone,
   Plus,
+  Search,
+  ShieldCheck,
+  Sparkles,
   Star,
+  Table2,
+  Tag,
   Trash2,
   Type,
   Upload,
   X,
   Zap,
-  Sparkles,
-  ArrowUp,
 } from "lucide-react";
 import {
   BLOCK_META,
   newBlock,
   OPTION_TYPES,
   resolveTheme,
+  STATIC_TYPES,
   type Block,
   type BlockType,
   type FormSchema,
@@ -64,22 +83,182 @@ const ICONS: Record<BlockType, typeof Type> = {
   choice: CircleDot,
   checkbox: CheckSquare,
   dropdown: ChevronDown,
+  multiselect: ListChecks,
   number: Hash,
   email: Mail,
   phone: Phone,
-  date: Calendar,
-  rating: Star,
+  link: Link2,
   file: Upload,
-  payment: Hash,
-  signature: Type,
-  heading: Type,
+  date: Calendar,
+  time: Clock,
+  scale: Gauge,
+  matrix: Table2,
+  rating: Star,
+  payment: CreditCard,
+  signature: PenTool,
+  ranking: ListOrdered,
+  heading: HeadingIcon,
+  text: AlignLeft,
+  divider: Minus,
+  title: HeadingIcon,
+  label: Tag,
+  image: ImageIcon,
+  video: Film,
+  audio: AudioLines,
+  embed: Globe,
+  hidden: EyeOff,
+  recaptcha: ShieldCheck,
+  country: Globe,
 };
 
-const PALETTE: { group: string; types: BlockType[] }[] = [
-  { group: "Text", types: ["short", "long", "email", "phone"] },
-  { group: "Choice", types: ["choice", "checkbox", "dropdown"] },
-  { group: "Other", types: ["number", "date", "rating", "file"] },
+type CatalogItem = {
+  type: BlockType;
+  label?: string;
+  keywords?: string;
+  level?: number;
+  soon?: boolean;
+};
+
+/** The slash-menu catalog, grouped like Tally. */
+const CATALOG: { group: string; items: CatalogItem[] }[] = [
+  {
+    group: "Questions",
+    items: [
+      { type: "short" },
+      { type: "long" },
+      { type: "choice", keywords: "multiple radio" },
+      { type: "checkbox" },
+      { type: "dropdown", keywords: "select" },
+      { type: "multiselect", keywords: "tags multiple" },
+      { type: "number" },
+      { type: "email" },
+      { type: "phone", keywords: "mobile" },
+      { type: "link", keywords: "url website" },
+      { type: "file", keywords: "upload attachment" },
+      { type: "date" },
+      { type: "time" },
+      { type: "scale", keywords: "linear nps" },
+      { type: "matrix", keywords: "grid table", soon: true },
+      { type: "rating", keywords: "stars" },
+      { type: "payment", keywords: "stripe pay", soon: true },
+      { type: "signature", keywords: "sign", soon: true },
+      { type: "ranking", keywords: "order rank" },
+    ],
+  },
+  {
+    group: "Layout",
+    items: [
+      { type: "text", keywords: "paragraph" },
+      { type: "heading", label: "Heading 1", level: 1, keywords: "h1 title" },
+      { type: "heading", label: "Heading 2", level: 2, keywords: "h2" },
+      { type: "heading", label: "Heading 3", level: 3, keywords: "h3" },
+      { type: "divider", keywords: "separator line hr" },
+      { type: "title" },
+      { type: "label" },
+    ],
+  },
+  {
+    group: "Embed",
+    items: [
+      { type: "image", keywords: "picture photo" },
+      { type: "video", keywords: "youtube" },
+      { type: "audio", keywords: "sound" },
+      { type: "embed", keywords: "iframe anything" },
+    ],
+  },
+  {
+    group: "Advanced",
+    items: [
+      { type: "hidden", keywords: "hidden field prefill" },
+      { type: "recaptcha", keywords: "spam captcha", soon: true },
+      { type: "country", keywords: "geo location" },
+    ],
+  },
 ];
+
+/** Notion-style slash / insert menu. Filters the catalog by a query string. */
+function BlockMenu({
+  query,
+  onQuery,
+  onPick,
+  onClose,
+  pos,
+}: {
+  query: string;
+  onQuery: (q: string) => void;
+  onPick: (item: CatalogItem) => void;
+  onClose: () => void;
+  pos: { left: number; top: number };
+}) {
+  const q = query.trim().toLowerCase();
+  const groups = CATALOG.map((g) => ({
+    group: g.group,
+    items: g.items.filter((it) => {
+      if (!q) return true;
+      const label = (it.label || BLOCK_META[it.type].label).toLowerCase();
+      return label.includes(q) || (it.keywords || "").includes(q) || it.type.includes(q);
+    }),
+  })).filter((g) => g.items.length > 0);
+
+  const flat = groups.flatMap((g) => g.items);
+
+  return (
+    <div
+      style={{ position: "fixed", left: pos.left, top: pos.top }}
+      className="z-40 max-h-[420px] w-[320px] overflow-auto rounded-xl border border-line bg-surface p-1.5 shadow-pop"
+      onMouseDown={(e) => e.preventDefault()}
+    >
+      <div className="sticky top-0 -mx-1.5 -mt-1.5 mb-1 flex items-center gap-2 border-b border-line bg-surface px-3 py-2">
+        <Search className="h-4 w-4 text-faint" />
+        <input
+          autoFocus
+          value={query}
+          onChange={(e) => onQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") onClose();
+            if (e.key === "Enter" && flat[0]) {
+              e.preventDefault();
+              onPick(flat[0]);
+            }
+          }}
+          placeholder="Search blocks…"
+          className="w-full bg-transparent text-sm outline-none placeholder:text-faint"
+        />
+      </div>
+      {groups.length === 0 && (
+        <div className="px-3 py-4 text-center text-sm text-muted">No blocks match “{query}”.</div>
+      )}
+      {groups.map((g) => (
+        <div key={g.group} className="mb-1">
+          <div className="px-2 pb-0.5 pt-1.5 text-[10.5px] font-bold uppercase tracking-wider text-faint">
+            {g.group}
+          </div>
+          {g.items.map((it, i) => {
+            const Icon = ICONS[it.type];
+            const label = it.label || BLOCK_META[it.type].label;
+            return (
+              <button
+                key={it.type + i}
+                onClick={() => onPick(it)}
+                className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm text-ink-2 transition-colors hover:bg-accent-weak hover:text-accent-2"
+              >
+                <span className="grid h-7 w-7 flex-none place-items-center rounded-md bg-surface-3 text-muted">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className="flex-1">{label}</span>
+                {it.soon && (
+                  <span className="rounded-full bg-surface-3 px-1.5 py-0.5 text-[10px] font-semibold text-faint">
+                    basic
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function ColorField({
   label,
@@ -128,13 +307,64 @@ function ColorField({
 
 function BlockPreview({ block }: { block: Block }) {
   const box = "rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-faint";
-  if (block.type === "long")
-    return <div className={`${box} min-h-[64px]`}>Long answer…</div>;
+
+  // ---- layout / static ----
+  if (block.type === "divider") return <hr className="my-1 border-line-2" />;
+  if (block.type === "text")
+    return <p className="text-sm text-muted">{block.content || "Descriptive text…"}</p>;
+  if (block.type === "title")
+    return <div className="text-xl font-bold tracking-tight text-ink">{block.content || "Title"}</div>;
+  if (block.type === "label")
+    return (
+      <div className="text-[11px] font-bold uppercase tracking-wider text-muted">
+        {block.content || "Label"}
+      </div>
+    );
+  if (block.type === "image")
+    return block.content ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={block.content} alt="" className="max-h-40 rounded-lg" />
+    ) : (
+      <div className={`${box} flex items-center gap-2`}>
+        <ImageIcon className="h-4 w-4" /> Add an image URL…
+      </div>
+    );
+  if (block.type === "video" || block.type === "audio" || block.type === "embed")
+    return (
+      <div className={`${box} flex items-center gap-2`}>
+        {BLOCK_META[block.type].label} · {block.content || "paste a URL"}
+      </div>
+    );
+  if (block.type === "hidden")
+    return <div className={box}>Hidden field — not shown to respondents</div>;
+  if (block.type === "recaptcha")
+    return (
+      <div className={`${box} flex items-center gap-2`}>
+        <ShieldCheck className="h-4 w-4" /> reCAPTCHA badge (added on publish)
+      </div>
+    );
+  if (block.type === "country")
+    return (
+      <div className={`${box} flex items-center justify-between`}>
+        <span>Auto-detected country</span>
+        <Globe className="h-4 w-4" />
+      </div>
+    );
+
+  // ---- inputs ----
+  if (block.type === "long") return <div className={`${box} min-h-[64px]`}>Long answer…</div>;
   if (block.type === "date")
     return (
       <div className={`${box} flex items-center justify-between`}>
         <span>mm / dd / yyyy</span>
         <Calendar className="h-4 w-4" />
+      </div>
+    );
+  if (block.type === "time")
+    return (
+      <div className={`${box} flex items-center justify-between`}>
+        <span>--:--</span>
+        <Clock className="h-4 w-4" />
       </div>
     );
   if (block.type === "file")
@@ -152,6 +382,50 @@ function BlockPreview({ block }: { block: Block }) {
         ))}
       </div>
     );
+  if (block.type === "scale") {
+    const min = block.min ?? 1;
+    const max = block.max ?? 5;
+    const arr: number[] = [];
+    for (let n = min; n <= max && arr.length < 12; n++) arr.push(n);
+    return (
+      <div className="flex flex-wrap gap-1.5">
+        {arr.map((n) => (
+          <span
+            key={n}
+            className="grid h-8 w-8 place-items-center rounded-lg border border-line-2 text-sm text-muted"
+          >
+            {n}
+          </span>
+        ))}
+      </div>
+    );
+  }
+  if (block.type === "matrix") {
+    const rows = block.options ?? [];
+    const cols = block.columns ?? [];
+    return (
+      <div className="overflow-hidden rounded-lg border border-line text-xs">
+        <div className="flex bg-surface-2">
+          <div className="flex-[1.2] p-1.5" />
+          {cols.map((c, i) => (
+            <div key={i} className="flex-1 p-1.5 text-center font-medium text-muted">
+              {c}
+            </div>
+          ))}
+        </div>
+        {rows.map((r, ri) => (
+          <div key={ri} className="flex border-t border-line">
+            <div className="flex-[1.2] p-1.5 text-ink-2">{r}</div>
+            {cols.map((_, ci) => (
+              <div key={ci} className="flex-1 p-1.5 text-center">
+                <span className="inline-block h-3.5 w-3.5 rounded-full border border-line-2" />
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+  }
   if (OPTION_TYPES.includes(block.type)) {
     const opts = block.options ?? [];
     if (block.type === "dropdown")
@@ -161,19 +435,43 @@ function BlockPreview({ block }: { block: Block }) {
           <ChevronDown className="h-4 w-4" />
         </div>
       );
+    if (block.type === "ranking")
+      return (
+        <div className="flex flex-col gap-2">
+          {opts.map((o, i) => (
+            <div key={i} className="flex items-center gap-2.5 text-sm text-ink/80">
+              <span className="grid h-5 w-5 place-items-center rounded-md bg-surface-3 text-xs font-semibold text-muted">
+                {i + 1}
+              </span>
+              {o}
+            </div>
+          ))}
+        </div>
+      );
+    const square = block.type === "checkbox" || block.type === "multiselect";
     return (
       <div className="flex flex-col gap-2">
         {opts.map((o, i) => (
           <div key={i} className="flex items-center gap-2.5 text-sm text-ink/80">
-            <span
-              className={`h-4 w-4 border border-line-2 ${block.type === "checkbox" ? "rounded" : "rounded-full"}`}
-            />
+            <span className={`h-4 w-4 border border-line-2 ${square ? "rounded" : "rounded-full"}`} />
             {o}
           </div>
         ))}
       </div>
     );
   }
+  if (block.type === "payment")
+    return (
+      <div className={`${box} flex items-center gap-2`}>
+        <CreditCard className="h-4 w-4" /> Card payment (connect Stripe)
+      </div>
+    );
+  if (block.type === "signature")
+    return (
+      <div className="rounded-lg border border-dashed border-line-2 py-6 text-center text-sm text-muted">
+        Sign here
+      </div>
+    );
   const ph =
     block.type === "email"
       ? "name@company.com"
@@ -181,7 +479,9 @@ function BlockPreview({ block }: { block: Block }) {
         ? "+1 (555) 000-0000"
         : block.type === "number"
           ? "0"
-          : "Short answer…";
+          : block.type === "link"
+            ? "https://…"
+            : "Short answer…";
   return <div className={box}>{ph}</div>;
 }
 
@@ -260,6 +560,10 @@ export default function EditorPage() {
   const [aiMsgs, setAiMsgs] = useState<AiMsg[]>([]);
   const [aiInput, setAiInput] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuQuery, setMenuQuery] = useState("");
+  const [menuAnchor, setMenuAnchor] = useState({ left: 0, top: 0 });
+  const insertRowRef = useRef<HTMLDivElement>(null);
   const loaded = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
@@ -302,10 +606,31 @@ export default function EditorPage() {
   const patch = (fn: (s: FormSchema) => FormSchema) =>
     setSchema((s) => (s ? fn(s) : s));
 
-  const addBlock = (type: BlockType) => {
-    const b = newBlock(type);
-    patch((s) => ({ ...s, blocks: [...s.blocks, b] }));
+  const openMenu = () => {
+    const r = insertRowRef.current?.getBoundingClientRect();
+    if (r) {
+      const vw = window.innerWidth || 1280;
+      const vh = window.innerHeight || 800;
+      const top = r.bottom + 6 + 430 > vh ? Math.max(8, r.top - 430) : r.bottom + 6;
+      const left = Math.max(8, Math.min(r.left, vw - 336));
+      setMenuAnchor({ left, top });
+    }
+    setMenuQuery("");
+    setMenuOpen(true);
+  };
+
+  const insertFromCatalog = (item: CatalogItem) => {
+    const b = newBlock(item.type, item.level ? { level: item.level } : undefined);
+    patch((s) => {
+      const idx = selectedId ? s.blocks.findIndex((x) => x.id === selectedId) : -1;
+      const at = idx >= 0 ? idx + 1 : s.blocks.length;
+      const blocks = [...s.blocks];
+      blocks.splice(at, 0, b);
+      return { ...s, blocks };
+    });
     setSelectedId(b.id);
+    setMenuOpen(false);
+    setMenuQuery("");
   };
   const updateBlock = (bid: string, p: Partial<Block>) =>
     patch((s) => ({
@@ -482,36 +807,10 @@ export default function EditorPage() {
       </header>
 
       {/* Body */}
-      <div className="grid min-h-0 flex-1 grid-cols-[220px_minmax(0,1fr)_300px]">
-        {/* Palette */}
-        <aside className="overflow-auto border-r border-line bg-surface p-3">
-          {PALETTE.map((grp) => (
-            <div key={grp.group}>
-              <h4 className="px-2 pb-1.5 pt-3 text-[10.5px] font-bold uppercase tracking-wider text-faint">
-                {grp.group}
-              </h4>
-              {grp.types.map((t) => {
-                const Icon = ICONS[t];
-                return (
-                  <button
-                    key={t}
-                    onClick={() => addBlock(t)}
-                    className="group flex w-full items-center gap-2.5 rounded-lg p-2 text-left text-[13.5px] font-medium text-ink-2 transition-colors hover:bg-accent-weak hover:text-accent-2"
-                  >
-                    <span className="grid h-7 w-7 flex-none place-items-center rounded-md bg-surface-3 text-muted group-hover:bg-surface group-hover:text-accent-2">
-                      <Icon className="h-4 w-4" />
-                    </span>
-                    {BLOCK_META[t].label}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </aside>
-
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_300px]">
         {/* Canvas */}
         <div className="overflow-auto bg-bg px-6 py-8">
-          <div className="mx-auto max-w-[640px]">
+          <div className="mx-auto max-w-[680px]">
             <div className="rounded-2xl border border-line bg-surface p-8 shadow-soft">
               <input
                 value={schema.title}
@@ -550,15 +849,64 @@ export default function EditorPage() {
                 </DndContext>
               </div>
 
+              {/* Notion-style slash inserter */}
+              <div ref={insertRowRef} className="mt-3 flex items-center gap-2 rounded-lg px-1 py-1">
+                <button
+                  onClick={openMenu}
+                  className="grid h-7 w-7 flex-none place-items-center rounded-md border border-line-2 text-muted transition-colors hover:bg-surface-3 hover:text-ink"
+                  title="Insert a block"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+                <input
+                  value=""
+                  onChange={() => {}}
+                  onKeyDown={(e) => {
+                    if (e.key === "/") {
+                      e.preventDefault();
+                      openMenu();
+                    }
+                  }}
+                  placeholder="Type / to insert a block, or click +"
+                  className="flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
+                  spellCheck={false}
+                />
+              </div>
+
               {schema.blocks.length === 0 && (
                 <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-dashed border-line-2 py-10 text-center">
-                  <span className="text-sm font-medium text-ink">Add your first question</span>
-                  <span className="text-sm text-muted">Pick a block from the left to get started.</span>
+                  <span className="text-sm font-medium text-ink">Add your first block</span>
+                  <span className="text-sm text-muted">
+                    Type <kbd className="rounded border border-line-2 bg-surface-2 px-1.5 font-mono text-xs">/</kbd>{" "}
+                    above or click + to choose from {CATALOG.reduce((n, g) => n + g.items.length, 0)} block types.
+                  </span>
                 </div>
               )}
             </div>
           </div>
         </div>
+
+        {menuOpen && (
+          <>
+            <div
+              className="fixed inset-0 z-30"
+              onClick={() => {
+                setMenuOpen(false);
+                setMenuQuery("");
+              }}
+            />
+            <BlockMenu
+              query={menuQuery}
+              onQuery={setMenuQuery}
+              onPick={insertFromCatalog}
+              onClose={() => {
+                setMenuOpen(false);
+                setMenuQuery("");
+              }}
+              pos={menuAnchor}
+            />
+          </>
+        )}
 
         {/* Inspector */}
         <aside className="overflow-auto border-l border-line bg-surface p-4">
@@ -579,9 +927,79 @@ export default function EditorPage() {
                 className={`${fieldCls} mb-4`}
               />
 
+              {["text", "title", "label"].includes(selected.type) && (
+                <div className="mb-4">
+                  <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Content</label>
+                  <textarea
+                    value={selected.content ?? ""}
+                    onChange={(e) => updateBlock(selected.id, { content: e.target.value })}
+                    rows={selected.type === "text" ? 3 : 1}
+                    className={`${fieldCls} resize-none`}
+                  />
+                </div>
+              )}
+
+              {["image", "video", "audio", "embed"].includes(selected.type) && (
+                <div className="mb-4">
+                  <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">URL</label>
+                  <input
+                    value={selected.content ?? ""}
+                    onChange={(e) => updateBlock(selected.id, { content: e.target.value })}
+                    placeholder="https://…"
+                    className={`${fieldCls} font-mono text-xs`}
+                  />
+                </div>
+              )}
+
+              {selected.type === "heading" && (
+                <div className="mb-4">
+                  <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Level</label>
+                  <div className="flex gap-1.5">
+                    {[1, 2, 3].map((l) => (
+                      <button
+                        key={l}
+                        onClick={() => updateBlock(selected.id, { level: l })}
+                        className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium ${
+                          (selected.level || 2) === l
+                            ? "border-accent bg-accent-weak text-accent-2"
+                            : "border-line-2 text-muted"
+                        }`}
+                      >
+                        H{l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selected.type === "scale" && (
+                <div className="mb-4 grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Min</label>
+                    <input
+                      type="number"
+                      value={selected.min ?? 1}
+                      onChange={(e) => updateBlock(selected.id, { min: Number(e.target.value) })}
+                      className={fieldCls}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Max</label>
+                    <input
+                      type="number"
+                      value={selected.max ?? 5}
+                      onChange={(e) => updateBlock(selected.id, { max: Number(e.target.value) })}
+                      className={fieldCls}
+                    />
+                  </div>
+                </div>
+              )}
+
               {OPTION_TYPES.includes(selected.type) && (
                 <div className="mb-4">
-                  <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Options</label>
+                  <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">
+                    {selected.type === "matrix" ? "Rows" : "Options"}
+                  </label>
                   <div className="flex flex-col gap-2">
                     {(selected.options ?? []).map((o, i) => (
                       <div key={i} className="flex items-center gap-1.5">
@@ -624,19 +1042,21 @@ export default function EditorPage() {
                 </div>
               )}
 
-              <div className="flex items-center justify-between border-t border-line py-3 text-[13.5px]">
-                <span>Required</span>
-                <button
-                  role="switch"
-                  aria-checked={selected.required}
-                  onClick={() => updateBlock(selected.id, { required: !selected.required })}
-                  className={`relative h-5 w-9 rounded-full transition-colors ${selected.required ? "bg-accent" : "bg-line-2"}`}
-                >
-                  <span
-                    className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-soft transition-transform ${selected.required ? "translate-x-[18px]" : "translate-x-0.5"}`}
-                  />
-                </button>
-              </div>
+              {!STATIC_TYPES.includes(selected.type) && (
+                <div className="flex items-center justify-between border-t border-line py-3 text-[13.5px]">
+                  <span>Required</span>
+                  <button
+                    role="switch"
+                    aria-checked={selected.required}
+                    onClick={() => updateBlock(selected.id, { required: !selected.required })}
+                    className={`relative h-5 w-9 rounded-full transition-colors ${selected.required ? "bg-accent" : "bg-line-2"}`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-soft transition-transform ${selected.required ? "translate-x-[18px]" : "translate-x-0.5"}`}
+                    />
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div>

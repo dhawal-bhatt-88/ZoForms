@@ -197,6 +197,29 @@ export default function PublicFormPage() {
   );
 }
 
+function toEmbedUrl(url?: string): string {
+  if (!url) return "";
+  const yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([\w-]+)/);
+  if (yt) return `https://www.youtube.com/embed/${yt[1]}`;
+  const vimeo = url.match(/vimeo\.com\/(\d+)/);
+  if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}`;
+  return url;
+}
+
+function scaleRange(min?: number, max?: number): number[] {
+  const lo = typeof min === "number" ? min : 1;
+  const hi = typeof max === "number" ? max : 5;
+  const out: number[] = [];
+  for (let n = lo; n <= hi && out.length < 20; n++) out.push(n);
+  return out;
+}
+
+const COUNTRIES = [
+  "United States", "United Kingdom", "Canada", "Australia", "India", "Germany",
+  "France", "Netherlands", "Spain", "Italy", "Brazil", "Mexico", "Japan",
+  "Singapore", "United Arab Emirates", "Other",
+];
+
 function Field({
   block,
   value,
@@ -216,8 +239,56 @@ function Field({
   mutedText: string;
   onChange: (v: unknown) => void;
 }) {
-  if (block.type === "heading")
-    return <h2 className="mt-2 text-lg font-bold tracking-tight">{block.label}</h2>;
+  // ---- layout / display blocks (no answer collected) ----
+  if (block.type === "heading") {
+    const L = block.level || 2;
+    const cls = L === 1 ? "text-2xl" : L === 2 ? "text-lg" : "text-[15px]";
+    return <div className={`mt-2 ${cls} font-bold tracking-tight`}>{block.label}</div>;
+  }
+  if (block.type === "title")
+    return <h2 className="text-2xl font-bold tracking-tight">{block.content || block.label}</h2>;
+  if (block.type === "text")
+    return (
+      <p className="text-[15px] leading-relaxed" style={{ color: mutedText }}>
+        {block.content}
+      </p>
+    );
+  if (block.type === "label")
+    return (
+      <div className="text-[11px] font-bold uppercase tracking-wider" style={{ color: mutedText }}>
+        {block.content || block.label}
+      </div>
+    );
+  if (block.type === "divider") return <hr className="my-1" style={{ borderColor: border }} />;
+  if (block.type === "image")
+    return block.content ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={block.content} alt={block.label} className="w-full" style={{ borderRadius: radius }} />
+    ) : null;
+  if (block.type === "video") {
+    const src = toEmbedUrl(block.content);
+    return src ? (
+      <div className="overflow-hidden" style={{ borderRadius: radius }}>
+        <iframe src={src} className="aspect-video w-full" allowFullScreen title={block.label} />
+      </div>
+    ) : null;
+  }
+  if (block.type === "audio")
+    return block.content ? <audio controls src={block.content} className="w-full" /> : null;
+  if (block.type === "embed") {
+    return block.content ? (
+      <div className="overflow-hidden" style={{ borderRadius: radius }}>
+        <iframe src={block.content} className="h-80 w-full" title={block.label} />
+      </div>
+    ) : null;
+  }
+  if (block.type === "hidden") return null;
+  if (block.type === "recaptcha")
+    return (
+      <p className="text-xs" style={{ color: mutedText }}>
+        🛡️ Protected by reCAPTCHA
+      </p>
+    );
 
   const inputStyle = {
     borderRadius: radius,
@@ -288,7 +359,7 @@ function Field({
             </label>
           ))}
         </div>
-      ) : block.type === "checkbox" ? (
+      ) : block.type === "checkbox" || block.type === "multiselect" ? (
         <div className="flex flex-col gap-2">
           {(block.options ?? []).map((o) => {
             const arr = Array.isArray(value) ? (value as string[]) : [];
@@ -310,6 +381,112 @@ function Field({
             );
           })}
         </div>
+      ) : block.type === "scale" ? (
+        <div className="flex flex-wrap gap-2">
+          {scaleRange(block.min, block.max).map((n) => {
+            const on = value === n;
+            return (
+              <button
+                key={n}
+                type="button"
+                onClick={() => onChange(n)}
+                className="grid h-11 w-11 place-items-center border text-[15px] font-medium transition-colors"
+                style={optStyle(on)}
+              >
+                {n}
+              </button>
+            );
+          })}
+        </div>
+      ) : block.type === "ranking" ? (
+        <div className="flex flex-col gap-2">
+          {(block.options ?? []).map((o) => {
+            const arr = Array.isArray(value) ? (value as string[]) : [];
+            const rank = arr.indexOf(o);
+            return (
+              <button
+                key={o}
+                type="button"
+                onClick={() =>
+                  onChange(rank >= 0 ? arr.filter((x) => x !== o) : [...arr, o])
+                }
+                className="flex items-center gap-3 border border-line-2 px-3.5 py-2.5 text-left text-[15px] transition-colors hover:border-line"
+                style={optStyle(rank >= 0)}
+              >
+                <span
+                  className="grid h-6 w-6 flex-none place-items-center rounded-md text-xs font-semibold"
+                  style={{
+                    background: rank >= 0 ? accent : "transparent",
+                    color: rank >= 0 ? "#fff" : mutedText,
+                    border: rank >= 0 ? "none" : `1px solid ${border}`,
+                  }}
+                >
+                  {rank >= 0 ? rank + 1 : ""}
+                </span>
+                {o}
+              </button>
+            );
+          })}
+        </div>
+      ) : block.type === "matrix" ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr>
+                <th />
+                {(block.columns ?? []).map((c) => (
+                  <th key={c} className="px-2 pb-2 text-center font-medium" style={{ color: mutedText }}>
+                    {c}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(block.options ?? []).map((r) => {
+                const map = (value as Record<string, string>) || {};
+                return (
+                  <tr key={r} style={{ borderTop: `1px solid ${border}` }}>
+                    <td className="py-2 pr-2 font-medium">{r}</td>
+                    {(block.columns ?? []).map((c) => (
+                      <td key={c} className="py-2 text-center">
+                        <input
+                          type="radio"
+                          name={`${block.id}_${r}`}
+                          checked={map[r] === c}
+                          onChange={() => onChange({ ...map, [r]: c })}
+                          style={{ accentColor: accent }}
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : block.type === "country" ? (
+        <select
+          className={inputCls}
+          style={inputStyle}
+          value={(value as string) ?? ""}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          <option value="">Select a country…</option>
+          {COUNTRIES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+      ) : block.type === "payment" || block.type === "signature" ? (
+        <div
+          className="border border-dashed px-3.5 py-4 text-center text-sm"
+          style={{ borderRadius: radius, borderColor: border, color: mutedText }}
+        >
+          {block.type === "payment"
+            ? "💳 Payment collection — connect Stripe to enable"
+            : "✍️ Signature capture — coming soon"}
+        </div>
       ) : block.type === "rating" ? (
         <div className="flex gap-1.5">
           {[1, 2, 3, 4, 5].map((n) => (
@@ -329,10 +506,24 @@ function Field({
         <FileField value={value} onChange={onChange} radius={radius} accent={accent} />
       ) : (
         <input
-          type={block.type === "email" ? "email" : block.type === "number" ? "number" : block.type === "date" ? "date" : block.type === "phone" ? "tel" : "text"}
+          type={
+            block.type === "email"
+              ? "email"
+              : block.type === "number"
+                ? "number"
+                : block.type === "date"
+                  ? "date"
+                  : block.type === "time"
+                    ? "time"
+                    : block.type === "phone"
+                      ? "tel"
+                      : block.type === "link"
+                        ? "url"
+                        : "text"
+          }
           className={inputCls}
           style={inputStyle}
-          placeholder={block.placeholder}
+          placeholder={block.placeholder || (block.type === "link" ? "https://…" : undefined)}
           value={(value as string) ?? ""}
           onChange={(e) => onChange(e.target.value)}
         />

@@ -9,20 +9,41 @@ import { z } from "zod";
  */
 
 export const BlockType = z.enum([
+  // question blocks (collect an answer)
   "short",
   "long",
   "choice",
   "checkbox",
   "dropdown",
+  "multiselect",
   "number",
   "email",
   "phone",
-  "date",
-  "rating",
+  "link",
   "file",
+  "date",
+  "time",
+  "scale",
+  "matrix",
+  "rating",
   "payment",
   "signature",
+  "ranking",
+  // layout blocks (structure / static content)
   "heading",
+  "text",
+  "divider",
+  "title",
+  "label",
+  // embed blocks
+  "image",
+  "video",
+  "audio",
+  "embed",
+  // advanced blocks
+  "hidden",
+  "recaptcha",
+  "country",
 ]);
 export type BlockType = z.infer<typeof BlockType>;
 
@@ -33,8 +54,17 @@ export const Block = z.object({
   description: z.string().optional(),
   placeholder: z.string().optional(),
   required: z.boolean().default(false),
-  /** for choice / checkbox / dropdown */
+  /** for choice / checkbox / dropdown / multiselect / ranking / matrix (rows) */
   options: z.array(z.string()).optional(),
+  /** for matrix (columns) */
+  columns: z.array(z.string()).optional(),
+  /** heading level 1–3 */
+  level: z.number().int().min(1).max(3).optional(),
+  /** static content: text/title/label copy, or the URL for image/video/audio/embed */
+  content: z.string().optional(),
+  /** linear scale bounds */
+  min: z.number().optional(),
+  max: z.number().optional(),
 });
 export type Block = z.infer<typeof Block>;
 
@@ -121,7 +151,28 @@ export const FormSchema = z.object({
 export type FormSchema = z.infer<typeof FormSchema>;
 
 /** Block types that carry a list of options. */
-export const OPTION_TYPES: BlockType[] = ["choice", "checkbox", "dropdown"];
+export const OPTION_TYPES: BlockType[] = [
+  "choice",
+  "checkbox",
+  "dropdown",
+  "multiselect",
+  "ranking",
+  "matrix",
+];
+
+/** Layout / display blocks that never collect an answer (skipped in validation). */
+export const STATIC_TYPES: BlockType[] = [
+  "heading",
+  "text",
+  "divider",
+  "title",
+  "label",
+  "image",
+  "video",
+  "audio",
+  "embed",
+  "recaptcha",
+];
 
 /** Human label + default question text for each block type. */
 export const BLOCK_META: Record<BlockType, { label: string; question: string }> = {
@@ -130,15 +181,32 @@ export const BLOCK_META: Record<BlockType, { label: string; question: string }> 
   choice: { label: "Multiple choice", question: "Multiple choice" },
   checkbox: { label: "Checkboxes", question: "Checkboxes" },
   dropdown: { label: "Dropdown", question: "Dropdown" },
+  multiselect: { label: "Multi-select", question: "Select all that apply" },
   number: { label: "Number", question: "Number" },
   email: { label: "Email", question: "Email address" },
-  phone: { label: "Phone", question: "Phone number" },
-  date: { label: "Date", question: "Date" },
-  rating: { label: "Rating", question: "How would you rate this?" },
+  phone: { label: "Phone number", question: "Phone number" },
+  link: { label: "Link", question: "Website / URL" },
   file: { label: "File upload", question: "Upload a file" },
+  date: { label: "Date", question: "Date" },
+  time: { label: "Time", question: "Time" },
+  scale: { label: "Linear scale", question: "Rate from 1 to 5" },
+  matrix: { label: "Matrix", question: "Matrix question" },
+  rating: { label: "Rating", question: "How would you rate this?" },
   payment: { label: "Payment", question: "Payment" },
   signature: { label: "Signature", question: "Signature" },
+  ranking: { label: "Ranking", question: "Rank these in order" },
   heading: { label: "Heading", question: "Section heading" },
+  text: { label: "Text", question: "Text" },
+  divider: { label: "Divider", question: "Divider" },
+  title: { label: "Title", question: "Title" },
+  label: { label: "Label", question: "Label" },
+  image: { label: "Image", question: "Image" },
+  video: { label: "Video", question: "Video" },
+  audio: { label: "Audio", question: "Audio" },
+  embed: { label: "Embed anything", question: "Embed" },
+  hidden: { label: "Hidden field", question: "Hidden field" },
+  recaptcha: { label: "reCAPTCHA", question: "Spam protection" },
+  country: { label: "Respondent's country", question: "Country" },
 };
 
 /** An empty starting form. */
@@ -147,7 +215,7 @@ export function emptyForm(title = "Untitled form"): FormSchema {
 }
 
 /** Create a fresh block of a given type with sensible defaults. */
-export function newBlock(type: BlockType): Block {
+export function newBlock(type: BlockType, overrides?: Partial<Block>): Block {
   const id = "b_" + Math.random().toString(36).slice(2, 10);
   const block: Block = {
     id,
@@ -158,7 +226,19 @@ export function newBlock(type: BlockType): Block {
   if (OPTION_TYPES.includes(type)) {
     block.options = ["Option 1", "Option 2", "Option 3"];
   }
-  return block;
+  if (type === "matrix") block.columns = ["Column 1", "Column 2", "Column 3"];
+  if (type === "scale") {
+    block.min = 1;
+    block.max = 5;
+  }
+  if (type === "heading") block.level = 2;
+  if (type === "text") block.content = "Add some descriptive text here.";
+  if (type === "title") block.content = "Section title";
+  if (type === "label") block.content = "Label";
+  if (type === "image" || type === "video" || type === "audio" || type === "embed") {
+    block.content = "";
+  }
+  return { ...block, ...overrides };
 }
 
 /** Validate an incoming submission against a form's blocks. Returns cleaned values or throws. */
@@ -168,7 +248,7 @@ export function validateSubmission(
 ): Record<string, unknown> {
   const cleaned: Record<string, unknown> = {};
   for (const block of form.blocks) {
-    if (block.type === "heading") continue;
+    if (STATIC_TYPES.includes(block.type)) continue;
     const v = values[block.id];
     const empty =
       v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
