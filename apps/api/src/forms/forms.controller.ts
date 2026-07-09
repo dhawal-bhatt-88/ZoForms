@@ -56,6 +56,11 @@ export class FormsController {
     return this.forms.listResponses(user, id);
   }
 
+  @Get(":id/analytics")
+  analytics(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.forms.analytics(user, id);
+  }
+
   @Post(":id/duplicate")
   duplicate(@CurrentUser() user: AuthUser, @Param("id") id: string) {
     return this.forms.duplicate(user, id);

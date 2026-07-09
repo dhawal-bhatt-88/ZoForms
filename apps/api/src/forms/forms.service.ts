@@ -135,7 +135,94 @@ export class FormsService {
     });
   }
 
+  async analytics(user: AuthUser, id: string) {
+    await this.assertOwned(user, id);
+    const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+    const [views, starts, submissions, deviceGroups, sourceGroups, viewRows, respRows] =
+      await Promise.all([
+        this.prisma.event.count({ where: { formId: id, type: "view" } }),
+        this.prisma.event.count({ where: { formId: id, type: "start" } }),
+        this.prisma.response.count({ where: { formId: id } }),
+        this.prisma.event.groupBy({
+          by: ["device"],
+          where: { formId: id, type: "view" },
+          _count: { _all: true },
+        }),
+        this.prisma.event.groupBy({
+          by: ["source"],
+          where: { formId: id, type: "view" },
+          _count: { _all: true },
+        }),
+        this.prisma.event.findMany({
+          where: { formId: id, type: "view", createdAt: { gte: since } },
+          select: { createdAt: true },
+        }),
+        this.prisma.response.findMany({
+          where: { formId: id, createdAt: { gte: since } },
+          select: { createdAt: true },
+        }),
+      ]);
+
+    const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+    const days: { date: string; views: number; submissions: number }[] = [];
+    const index: Record<string, number> = {};
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+      const key = dayKey(d);
+      index[key] = days.length;
+      days.push({ date: key, views: 0, submissions: 0 });
+    }
+    for (const r of viewRows) {
+      const k = index[dayKey(r.createdAt)];
+      if (k !== undefined) days[k].views++;
+    }
+    for (const r of respRows) {
+      const k = index[dayKey(r.createdAt)];
+      if (k !== undefined) days[k].submissions++;
+    }
+
+    const byDevice = { desktop: 0, mobile: 0, tablet: 0 } as Record<string, number>;
+    for (const g of deviceGroups) byDevice[g.device || "desktop"] = g._count._all;
+    const bySource = sourceGroups
+      .map((g) => ({ source: g.source || "direct", count: g._count._all }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
+
+    return {
+      views,
+      starts,
+      submissions,
+      completionRate: views > 0 ? Math.round((submissions / views) * 100) : 0,
+      startRate: views > 0 ? Math.round((starts / views) * 100) : 0,
+      byDevice,
+      bySource,
+      daily: days,
+    };
+  }
+
   /* ---------- public (form runtime, unauthenticated) ---------- */
+
+  async track(slug: string, type: string, source: string | undefined, userAgent: string) {
+    if (type !== "view" && type !== "start") return { ok: false };
+    const form = await this.prisma.form.findUnique({ where: { slug }, select: { id: true, status: true } });
+    if (!form || form.status !== "PUBLISHED") return { ok: false };
+    const ua = userAgent || "";
+    const device = /iPad|Tablet/i.test(ua)
+      ? "tablet"
+      : /Mobi|Android|iPhone/i.test(ua)
+        ? "mobile"
+        : "desktop";
+    let src = "direct";
+    if (source) {
+      try {
+        src = new URL(source).hostname || "direct";
+      } catch {
+        src = source.slice(0, 60);
+      }
+    }
+    await this.prisma.event.create({ data: { formId: form.id, type, device, source: src } });
+    return { ok: true };
+  }
 
   async getPublicBySlug(slug: string) {
     const form = await this.prisma.form.findUnique({

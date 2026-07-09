@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, Headers, Param, Post } from "@nestjs/common";
 import { FormsService } from "./forms.service";
 
 /** Unauthenticated endpoints used by the public form runtime (/r/[slug]). */
@@ -17,5 +17,14 @@ export class PublicController {
     @Body() body: { data?: Record<string, unknown> },
   ) {
     return this.forms.submit(slug, body?.data ?? {});
+  }
+
+  @Post(":slug/events")
+  track(
+    @Param("slug") slug: string,
+    @Body() body: { type?: string; source?: string },
+    @Headers("user-agent") ua: string,
+  ) {
+    return this.forms.track(slug, body?.type || "", body?.source, ua);
   }
 }

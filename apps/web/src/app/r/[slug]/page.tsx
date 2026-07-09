@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { Check, Loader2, Star, Upload, X } from "lucide-react";
 import { resolveTheme, type Block, type ResolvedTheme } from "@formbuilder/form-schema";
 import {
   getPublicForm,
   submitResponse,
+  trackEvent,
   uploadFile,
   type PublicForm,
 } from "@/lib/api";
@@ -26,6 +27,8 @@ export default function PublicFormPage() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [embed, setEmbed] = useState(false);
+  const viewed = useRef(false);
+  const started = useRef(false);
 
   useEffect(() => {
     setEmbed(new URLSearchParams(window.location.search).get("embed") === "1");
@@ -36,6 +39,10 @@ export default function PublicFormPage() {
       .then((f) => {
         setForm(f);
         setState("ready");
+        if (!viewed.current) {
+          viewed.current = true;
+          trackEvent(slug, "view", document.referrer || undefined);
+        }
       })
       .catch(() => setState("notfound"));
   }, [slug]);
@@ -54,6 +61,10 @@ export default function PublicFormPage() {
   }, [embed, slug]);
 
   function set(id: string, v: unknown) {
+    if (!started.current) {
+      started.current = true;
+      trackEvent(slug, "start", document.referrer || undefined);
+    }
     setValues((p) => ({ ...p, [id]: v }));
     setErrors((p) => {
       const n = { ...p };

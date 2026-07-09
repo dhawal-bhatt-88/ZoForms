@@ -58,7 +58,8 @@ Critical path: **Editor → Runtime → Submit → Responses → Billing.**
 - [x] Conversational "Ask AI" editor — in-editor chat drawer that edits the live form (POST /v1/ai/edit-form: Claude when keyed, heuristic add/remove/required otherwise); applies + autosaves
 - [x] Notion-style slash (/) block inserter replacing the left palette — searchable, grouped catalog (Questions/Layout/Embed/Advanced), 33 block types; inserts after the selected block
 - [x] Expanded block catalog: multi-select, link, time, linear scale, ranking, matrix, headings H1–H3, text, divider, title, label, image/video/audio/embed, country + payment/signature/hidden/reCAPTCHA (basic); runtime + validation + inspector controls for all
-- [ ] Analytics: views, starts, completion, drop-off, device & source
+- [x] Analytics: views, starts, completion rate, funnel (views→starts→submissions), 14-day daily trend, device & source breakdown (Event model + public /events tracking on the runtime + /forms/:id/analytics + dashboard page)
+- [x] Advanced customization: logo, cover image, per-input styling (bg/border), custom CSS injection (scoped .frame-form)
 - [x] Embeds (inline / popup / full-page) + `embed.js` (auto-resize) + editor Embed modal
 - [ ] Integrations: Google Sheets, Slack, webhooks, Zapier / Make
 - [x] Templates gallery (6 templates + categories) + one-click use + form duplication

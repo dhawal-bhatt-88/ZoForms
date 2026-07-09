@@ -76,6 +76,19 @@ model Form {
   versions    FormVersion[]
   responses   Response[]
   automations Automation[]
+  events      Event[]
+}
+
+model Event {
+  id        String   @id @default(uuid())
+  form      Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  formId    String
+  type      String // "view" | "start"
+  device    String? // mobile | tablet | desktop
+  source    String? // referrer host or "direct"
+  createdAt DateTime @default(now())
+
+  @@index([formId, type, createdAt])
 }
 
 model Automation {

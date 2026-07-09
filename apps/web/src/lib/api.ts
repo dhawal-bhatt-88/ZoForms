@@ -179,6 +179,37 @@ export function listResponses(id: string) {
   );
 }
 
+/* ---------- analytics ---------- */
+
+export type Analytics = {
+  views: number;
+  starts: number;
+  submissions: number;
+  completionRate: number;
+  startRate: number;
+  byDevice: { desktop: number; mobile: number; tablet: number };
+  bySource: { source: string; count: number }[];
+  daily: { date: string; views: number; submissions: number }[];
+};
+
+export function getAnalytics(id: string) {
+  return req<Analytics>(`/v1/forms/${id}/analytics`);
+}
+
+/** Fire-and-forget page-view / start tracking from the public runtime. */
+export function trackEvent(slug: string, type: "view" | "start", source?: string) {
+  try {
+    fetch(`${API_URL}/v1/public/forms/${slug}/events`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type, source }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch {
+    /* ignore */
+  }
+}
+
 /* ---------- automations / integrations ---------- */
 
 export type Automation = {
