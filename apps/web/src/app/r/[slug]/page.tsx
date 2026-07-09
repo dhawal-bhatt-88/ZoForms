@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Check, Loader2, Star, Upload, X } from "lucide-react";
-import type { Block } from "@formbuilder/form-schema";
+import { resolveTheme, type Block, type ResolvedTheme } from "@formbuilder/form-schema";
 import {
   getPublicForm,
   submitResponse,
@@ -12,6 +12,8 @@ import {
 } from "@/lib/api";
 
 type Values = Record<string, unknown>;
+
+const DEFAULT_THEME: ResolvedTheme = resolveTheme(undefined);
 
 export default function PublicFormPage() {
   const params = useParams();
@@ -71,16 +73,23 @@ export default function PublicFormPage() {
     }
   }
 
+  const t = form ? resolveTheme(form.schema.settings?.theme) : DEFAULT_THEME;
+  const page = {
+    minHeight: "100vh",
+    background: t.background,
+    fontFamily: t.fontFamily,
+  } as React.CSSProperties;
+
   if (state === "loading")
     return (
-      <div className="grid min-h-screen place-items-center text-muted">
+      <div style={page} className="grid place-items-center text-muted">
         <Loader2 className="h-5 w-5 animate-spin" />
       </div>
     );
 
   if (state === "notfound")
     return (
-      <div className="grid min-h-screen place-items-center px-6 text-center">
+      <div style={page} className="grid place-items-center px-6 text-center">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Form not found</h1>
           <p className="mt-2 text-muted">This form doesn&apos;t exist or isn&apos;t published yet.</p>
@@ -90,9 +99,15 @@ export default function PublicFormPage() {
 
   if (done)
     return (
-      <div className="grid min-h-screen place-items-center px-6">
-        <div className="w-full max-w-lg rounded-2xl border border-line bg-surface p-10 text-center shadow-soft">
-          <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-accent-weak text-accent-2">
+      <div style={page} className="grid place-items-center px-6">
+        <div
+          className="w-full max-w-lg border border-line bg-white p-10 text-center shadow-soft"
+          style={{ borderRadius: t.radius }}
+        >
+          <div
+            className="mx-auto grid h-12 w-12 place-items-center rounded-full text-white"
+            style={{ background: t.accent }}
+          >
             <Check className="h-6 w-6" />
           </div>
           <h1 className="mt-5 text-2xl font-bold tracking-tight">Thanks — got it!</h1>
@@ -105,15 +120,14 @@ export default function PublicFormPage() {
     );
 
   return (
-    <div className="min-h-screen px-6 py-10">
+    <div style={page} className="px-6 py-10">
       <form
         onSubmit={onSubmit}
-        className="mx-auto w-full max-w-xl rounded-2xl border border-line bg-surface p-8 shadow-soft sm:p-10"
+        className="mx-auto w-full max-w-xl border border-line bg-white p-8 shadow-soft sm:p-10"
+        style={{ borderRadius: t.radius }}
       >
         <h1 className="text-[26px] font-bold tracking-tight">{form?.title}</h1>
-        {form?.schema.description && (
-          <p className="mt-1.5 text-muted">{form.schema.description}</p>
-        )}
+        {form?.schema.description && <p className="mt-1.5 text-muted">{form.schema.description}</p>}
 
         <div className="mt-7 flex flex-col gap-6">
           {form?.schema.blocks.map((b) => (
@@ -122,6 +136,8 @@ export default function PublicFormPage() {
               block={b}
               value={values[b.id]}
               error={errors[b.id]}
+              accent={t.accent}
+              radius={t.radius}
               onChange={(v) => set(b.id, v)}
             />
           ))}
@@ -134,7 +150,8 @@ export default function PublicFormPage() {
         <button
           type="submit"
           disabled={submitting}
-          className="btn btn-accent mt-8 h-12 w-full text-[15px]"
+          className="mt-8 flex h-12 w-full items-center justify-center gap-2 text-[15px] font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+          style={{ background: t.accent, borderRadius: t.radius }}
         >
           {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           {submitting ? "Submitting…" : form?.schema.settings?.submitLabel || "Submit"}
@@ -152,19 +169,31 @@ function Field({
   block,
   value,
   error,
+  accent,
+  radius,
   onChange,
 }: {
   block: Block;
   value: unknown;
   error?: string;
+  accent: string;
+  radius: string;
   onChange: (v: unknown) => void;
 }) {
   if (block.type === "heading")
     return <h2 className="mt-2 text-lg font-bold tracking-tight">{block.label}</h2>;
 
-  const inputCls = `w-full rounded-lg border px-3.5 py-2.5 text-[15px] outline-none transition-colors focus:ring-2 focus:ring-accent-weak ${
-    error ? "border-red" : "border-line-2 focus:border-accent"
+  const inputStyle = { borderRadius: radius } as React.CSSProperties;
+  const inputCls = `w-full border px-3.5 py-2.5 text-[15px] outline-none transition-colors ${
+    error ? "border-red" : "border-line-2 focus:border-ink"
   }`;
+  const tint = `${accent}14`;
+  const optStyle = (on: boolean) =>
+    ({
+      borderRadius: radius,
+      borderColor: on ? accent : undefined,
+      background: on ? tint : undefined,
+    }) as React.CSSProperties;
 
   return (
     <div>
@@ -178,12 +207,14 @@ function Field({
         <textarea
           rows={4}
           className={inputCls}
+          style={inputStyle}
           value={(value as string) ?? ""}
           onChange={(e) => onChange(e.target.value)}
         />
       ) : block.type === "dropdown" ? (
         <select
           className={inputCls}
+          style={inputStyle}
           value={(value as string) ?? ""}
           onChange={(e) => onChange(e.target.value)}
         >
@@ -199,16 +230,15 @@ function Field({
           {(block.options ?? []).map((o) => (
             <label
               key={o}
-              className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3.5 py-2.5 text-[15px] transition-colors ${
-                value === o ? "border-accent bg-accent-weak" : "border-line-2 hover:border-line"
-              }`}
+              className="flex cursor-pointer items-center gap-3 border border-line-2 px-3.5 py-2.5 text-[15px] transition-colors hover:border-line"
+              style={optStyle(value === o)}
             >
               <input
                 type="radio"
                 name={block.id}
                 checked={value === o}
                 onChange={() => onChange(o)}
-                className="accent-accent"
+                style={{ accentColor: accent }}
               />
               {o}
             </label>
@@ -222,17 +252,14 @@ function Field({
             return (
               <label
                 key={o}
-                className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3.5 py-2.5 text-[15px] transition-colors ${
-                  on ? "border-accent bg-accent-weak" : "border-line-2 hover:border-line"
-                }`}
+                className="flex cursor-pointer items-center gap-3 border border-line-2 px-3.5 py-2.5 text-[15px] transition-colors hover:border-line"
+                style={optStyle(on)}
               >
                 <input
                   type="checkbox"
                   checked={on}
-                  onChange={() =>
-                    onChange(on ? arr.filter((x) => x !== o) : [...arr, o])
-                  }
-                  className="accent-accent"
+                  onChange={() => onChange(on ? arr.filter((x) => x !== o) : [...arr, o])}
+                  style={{ accentColor: accent }}
                 />
                 {o}
               </label>
@@ -247,20 +274,20 @@ function Field({
               type="button"
               onClick={() => onChange(n)}
               aria-label={`${n} stars`}
-              className={`transition-transform hover:scale-110 ${
-                (value as number) >= n ? "text-[#e2c14d]" : "text-line-2"
-              }`}
+              className="transition-transform hover:scale-110"
+              style={{ color: (value as number) >= n ? accent : "#E2E4E9" }}
             >
               <Star className="h-8 w-8" fill={(value as number) >= n ? "currentColor" : "none"} />
             </button>
           ))}
         </div>
       ) : block.type === "file" ? (
-        <FileField value={value} onChange={onChange} />
+        <FileField value={value} onChange={onChange} radius={radius} accent={accent} />
       ) : (
         <input
           type={block.type === "email" ? "email" : block.type === "number" ? "number" : block.type === "date" ? "date" : block.type === "phone" ? "tel" : "text"}
           className={inputCls}
+          style={inputStyle}
           placeholder={block.placeholder}
           value={(value as string) ?? ""}
           onChange={(e) => onChange(e.target.value)}
@@ -275,9 +302,13 @@ function Field({
 function FileField({
   value,
   onChange,
+  radius,
+  accent,
 }: {
   value: unknown;
   onChange: (v: unknown) => void;
+  radius: string;
+  accent: string;
 }) {
   const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -299,12 +330,16 @@ function FileField({
 
   if (file?.name)
     return (
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-line-2 px-3.5 py-2.5 text-sm">
+      <div
+        className="flex items-center justify-between gap-3 border border-line-2 px-3.5 py-2.5 text-sm"
+        style={{ borderRadius: radius }}
+      >
         <a
           href={file.url}
           target="_blank"
           rel="noreferrer"
-          className="truncate font-medium text-accent-2 hover:underline"
+          className="truncate font-medium hover:underline"
+          style={{ color: accent }}
         >
           {file.name}
         </a>
@@ -320,7 +355,10 @@ function FileField({
     );
 
   return (
-    <label className="flex cursor-pointer flex-col items-center gap-1.5 rounded-lg border border-dashed border-line-2 py-5 text-sm text-muted transition-colors hover:border-accent">
+    <label
+      className="flex cursor-pointer flex-col items-center gap-1.5 border border-dashed border-line-2 py-5 text-sm text-muted transition-colors hover:border-ink"
+      style={{ borderRadius: radius }}
+    >
       {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
       {uploading ? "Uploading…" : "Choose a file"}
       <input type="file" className="hidden" onChange={onPick} disabled={uploading} />

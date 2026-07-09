@@ -45,6 +45,7 @@ import {
   BLOCK_META,
   newBlock,
   OPTION_TYPES,
+  resolveTheme,
   type Block,
   type BlockType,
   type FormSchema,
@@ -260,6 +261,16 @@ export default function EditorPage() {
   };
   const updateSettings = (p: { submitLabel?: string; redirectUrl?: string }) =>
     patch((s) => ({ ...s, settings: { ...s.settings, ...p } }));
+  const updateTheme = (p: {
+    accent?: string;
+    background?: string;
+    font?: "sans" | "serif" | "mono";
+    radius?: "sm" | "md" | "lg";
+  }) =>
+    patch((s) => ({
+      ...s,
+      settings: { ...s.settings, theme: { ...s.settings?.theme, ...p } },
+    }));
 
   function onDragEnd(e: DragEndEvent) {
     const { active, over } = e;
@@ -532,7 +543,89 @@ export default function EditorPage() {
               <p className="mt-1.5 text-xs text-muted">
                 Leave blank to show the built-in thank-you screen.
               </p>
-              <p className="mt-8 border-t border-line pt-4 text-center text-sm text-muted">
+
+              <h4 className="mb-3 mt-6 border-t border-line pt-4 text-[11px] font-bold uppercase tracking-wider text-faint">
+                Design
+              </h4>
+              <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Accent</label>
+              <div className="mb-3 flex gap-2">
+                {["#6D5EFA", "#2F6BE4", "#159C56", "#E1663E", "#D93F87", "#18181B"].map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => updateTheme({ accent: c })}
+                    className="h-7 w-7 rounded-lg border-2 transition-transform hover:scale-110"
+                    style={{
+                      background: c,
+                      borderColor: (schema.settings?.theme?.accent || "#6D5EFA") === c ? "#1B1D22" : "transparent",
+                    }}
+                    aria-label={`Accent ${c}`}
+                  />
+                ))}
+              </div>
+              <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Background</label>
+              <div className="mb-3 flex gap-2">
+                {["#FFFFFF", "#F6F7F9", "#FAF7F2", "#F2F4FF", "#111318"].map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => updateTheme({ background: c })}
+                    className="h-7 w-7 rounded-lg border transition-transform hover:scale-110"
+                    style={{
+                      background: c,
+                      borderColor: (schema.settings?.theme?.background || "#F6F7F9") === c ? "#1B1D22" : "#E2E4E9",
+                    }}
+                    aria-label={`Background ${c}`}
+                  />
+                ))}
+              </div>
+              <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Font</label>
+              <select
+                value={schema.settings?.theme?.font ?? "sans"}
+                onChange={(e) => updateTheme({ font: e.target.value as "sans" | "serif" | "mono" })}
+                className={`${fieldCls} mb-3`}
+              >
+                <option value="sans">Sans</option>
+                <option value="serif">Serif</option>
+                <option value="mono">Mono</option>
+              </select>
+              <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Corners</label>
+              <div className="mb-4 flex gap-1.5">
+                {(["sm", "md", "lg"] as const).map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => updateTheme({ radius: r })}
+                    className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium ${
+                      (schema.settings?.theme?.radius || "md") === r
+                        ? "border-accent bg-accent-weak text-accent-2"
+                        : "border-line-2 text-muted"
+                    }`}
+                  >
+                    {r === "sm" ? "Sharp" : r === "md" ? "Rounded" : "Round"}
+                  </button>
+                ))}
+              </div>
+
+              <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Live preview</label>
+              {(() => {
+                const th = resolveTheme(schema.settings?.theme);
+                return (
+                  <div
+                    className="border border-line p-3"
+                    style={{ background: th.background, borderRadius: th.radius, fontFamily: th.fontFamily }}
+                  >
+                    <div className="border border-line bg-white p-3" style={{ borderRadius: th.radius }}>
+                      <div className="mb-2 text-sm font-bold">{schema.title || "Sample form"}</div>
+                      <div className="mb-2 border border-line-2 px-2 py-1.5 text-xs text-faint" style={{ borderRadius: th.radius }}>
+                        Your answer…
+                      </div>
+                      <button className="w-full py-1.5 text-xs font-semibold text-white" style={{ background: th.accent, borderRadius: th.radius }}>
+                        {schema.settings?.submitLabel || "Submit"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <p className="mt-6 border-t border-line pt-4 text-center text-sm text-muted">
                 Select a question to edit it, or add one from the left.
               </p>
             </div>

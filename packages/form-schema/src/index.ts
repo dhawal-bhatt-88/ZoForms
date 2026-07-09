@@ -38,11 +38,43 @@ export const Block = z.object({
 });
 export type Block = z.infer<typeof Block>;
 
+export const FormTheme = z.object({
+  accent: z.string().optional(),
+  background: z.string().optional(),
+  font: z.enum(["sans", "serif", "mono"]).optional(),
+  radius: z.enum(["sm", "md", "lg"]).optional(),
+});
+export type FormTheme = z.infer<typeof FormTheme>;
+
 export const FormSettings = z.object({
   submitLabel: z.string().optional(),
   redirectUrl: z.string().optional(),
+  theme: FormTheme.optional(),
 });
 export type FormSettings = z.infer<typeof FormSettings>;
+
+export type ResolvedTheme = {
+  accent: string;
+  background: string;
+  fontFamily: string;
+  radius: string;
+};
+
+/** Turn a (partial) theme into concrete CSS values the runtime + preview can apply. */
+export function resolveTheme(theme?: FormTheme): ResolvedTheme {
+  const fonts = {
+    sans: "system-ui, -apple-system, 'Hanken Grotesk', 'Segoe UI', sans-serif",
+    serif: "Georgia, 'Times New Roman', serif",
+    mono: "ui-monospace, 'SF Mono', 'JetBrains Mono', monospace",
+  } as const;
+  const radii = { sm: "6px", md: "12px", lg: "20px" } as const;
+  return {
+    accent: theme?.accent || "#6D5EFA",
+    background: theme?.background || "#F6F7F9",
+    fontFamily: fonts[theme?.font || "sans"],
+    radius: radii[theme?.radius || "md"],
+  };
+}
 
 export const FormSchema = z.object({
   title: z.string(),
