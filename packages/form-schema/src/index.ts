@@ -89,6 +89,12 @@ export const FormSettings = z.object({
   submitLabel: z.string().optional(),
   redirectUrl: z.string().optional(),
   theme: FormTheme.optional(),
+  /** Require a Cloudflare Turnstile challenge before the form can be submitted. */
+  spamProtection: z.boolean().optional(),
+  /** Capture in-progress answers as partial submissions before the user finishes. */
+  partialSubmissions: z.boolean().optional(),
+  /** Email addresses notified when a new response arrives. */
+  notifyEmails: z.array(z.string()).optional(),
 });
 export type FormSettings = z.infer<typeof FormSettings>;
 

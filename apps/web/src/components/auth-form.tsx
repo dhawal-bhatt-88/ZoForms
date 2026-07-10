@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
+import { Button, Input } from "@formbuilder/ui";
 import { login, signup } from "@/lib/api";
 import { Logo } from "@/components/marketing/logo";
 
@@ -28,8 +29,9 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     }
   }
 
-  const input =
-    "w-full rounded-lg border border-line-2 px-3.5 py-2.5 text-[15px] outline-none transition-colors focus:border-accent focus:ring-2 focus:ring-accent-weak";
+  // Auth inputs sit a touch larger than the default; cn() merges these over
+  // the shared <Input> base styles (tailwind-merge resolves the conflicts).
+  const input = "border-line-2 px-3.5 py-2.5 focus:ring-accent-weak";
 
   return (
     <div className="grid min-h-screen place-items-center px-6 py-12">
@@ -51,7 +53,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             {isSignup && (
               <div>
                 <label className="mb-1.5 block text-[13px] font-semibold text-ink-2">Name</label>
-                <input
+                <Input
                   className={input}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -62,7 +64,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             )}
             <div>
               <label className="mb-1.5 block text-[13px] font-semibold text-ink-2">Email</label>
-              <input
+              <Input
                 type="email"
                 required
                 className={input}
@@ -74,7 +76,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             </div>
             <div>
               <label className="mb-1.5 block text-[13px] font-semibold text-ink-2">Password</label>
-              <input
+              <Input
                 type="password"
                 required
                 className={input}
@@ -89,10 +91,10 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
               <p className="rounded-lg bg-[#FCECEC] px-3.5 py-2.5 text-sm text-red">{err}</p>
             )}
 
-            <button type="submit" disabled={busy} className="btn btn-primary h-11 w-full">
+            <Button type="submit" disabled={busy} className="h-11 w-full">
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
               {busy ? "Please wait…" : isSignup ? "Create account" : "Log in"}
-            </button>
+            </Button>
           </form>
         </div>
 

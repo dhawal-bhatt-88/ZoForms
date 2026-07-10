@@ -8,6 +8,7 @@ import {
 import { FileInterceptor } from "@nestjs/platform-express";
 import { diskStorage } from "multer";
 import { extname, join } from "path";
+import { env } from "../config/env";
 
 /**
  * Public file uploads for the form runtime.
@@ -34,7 +35,7 @@ export class UploadsController {
   )
   upload(@UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException("No file provided");
-    const base = process.env.PUBLIC_API_URL || "http://localhost:4000";
+    const base = env.PUBLIC_API_URL;
     return {
       name: file.originalname,
       size: file.size,

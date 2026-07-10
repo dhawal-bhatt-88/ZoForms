@@ -1,12 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Eye, EyeOff, Loader2, Sparkles, X, Zap } from "lucide-react";
+import { Check, Eye, EyeOff, Loader2, Lock, Shield, Sparkles, Trash2, X, Zap } from "lucide-react";
 import AppShell from "@/components/app-shell";
 import {
+  getOrgSettings,
   getSettings,
+  purgeResponses,
   testAiConnection,
+  updateOrgSettings,
   updateSettings,
+  type OrgSettings,
   type Settings,
 } from "@/lib/api";
 
@@ -236,7 +240,116 @@ export default function SettingsPage() {
           )}
         </section>
       )}
+
+      <OrgDataControls />
       </div>
     </AppShell>
+  );
+}
+
+function OrgDataControls() {
+  const [org, setOrg] = useState<OrgSettings | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [purging, setPurging] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    getOrgSettings().then(setOrg).catch(() => {});
+  }, []);
+
+  async function save(patch: Partial<OrgSettings>) {
+    if (!org) return;
+    const prev = org;
+    setOrg({ ...org, ...patch });
+    try {
+      const next = await updateOrgSettings(patch);
+      setOrg(next);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch (e) {
+      setOrg(prev);
+      setMsg((e as Error).message);
+    }
+  }
+
+  async function onPurge() {
+    if (!confirm("Delete all responses older than your retention window now?")) return;
+    setPurging(true);
+    setMsg(null);
+    try {
+      const r = await purgeResponses();
+      setMsg(`Purged ${r.purged} response${r.purged === 1 ? "" : "s"}.`);
+    } catch (e) {
+      setMsg((e as Error).message);
+    } finally {
+      setPurging(false);
+    }
+  }
+
+  if (!org) return null;
+
+  return (
+    <section className="mt-6 rounded-2xl border border-line bg-surface p-6 shadow-soft">
+      <div className="mb-1 flex items-center gap-2">
+        <Shield className="h-4 w-4 text-accent-2" />
+        <h2 className="font-semibold tracking-tight">Data & privacy</h2>
+        {saved && <span className="text-xs font-medium text-green">Saved</span>}
+      </div>
+      <p className="mb-5 text-sm text-muted">
+        Residency, retention, and branding for your organization.
+      </p>
+
+      <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Data region</label>
+      <select
+        value={org.dataRegion}
+        onChange={(e) => save({ dataRegion: e.target.value as "us" | "eu" })}
+        className="input w-full"
+      >
+        <option value="us">United States (us)</option>
+        <option value="eu">European Union (eu)</option>
+      </select>
+
+      <label className="mb-1.5 mt-4 block text-[12.5px] font-semibold text-ink-2">
+        Response retention (days)
+      </label>
+      <div className="flex items-center gap-3">
+        <input
+          type="number"
+          min={0}
+          max={3650}
+          defaultValue={org.retentionDays}
+          onBlur={(e) => save({ retentionDays: Number(e.target.value) })}
+          className="input w-32"
+        />
+        <button onClick={onPurge} disabled={purging} className="btn btn-outline btn-sm">
+          {purging ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+          Purge now
+        </button>
+      </div>
+      <p className="mt-1.5 text-xs text-muted">
+        0 keeps responses forever. Older responses are auto-deleted daily.
+      </p>
+
+      <label className="mt-4 flex items-start gap-2.5">
+        <input
+          type="checkbox"
+          disabled={!org.canWhiteLabel}
+          checked={org.brandingHidden}
+          onChange={(e) => save({ brandingHidden: e.target.checked })}
+          className="mt-0.5 h-4 w-4 accent-[#6D5EFA] disabled:opacity-40"
+        />
+        <span>
+          <span className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-2">
+            White-label {!org.canWhiteLabel && <Lock className="h-3 w-3 text-faint" />}
+          </span>
+          <span className="block text-xs text-muted">
+            Remove the “Made with Frame” footer from your forms.
+            {!org.canWhiteLabel && " Requires the Pro or Business plan."}
+          </span>
+        </span>
+      </label>
+
+      {msg && <p className="mt-3 text-sm text-ink-2">{msg}</p>}
+    </section>
   );
 }

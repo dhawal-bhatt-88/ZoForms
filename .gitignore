@@ -16,6 +16,11 @@ build/
 .turbo/
 coverage/
 
+# Test artifacts (Playwright)
+test-results/
+playwright-report/
+.playwright/
+
 # Prisma generated client
 **/generated/
 

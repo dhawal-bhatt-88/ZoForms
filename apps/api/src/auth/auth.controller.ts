@@ -20,6 +20,17 @@ export class AuthController {
   @Get("me")
   @UseGuards(AuthGuard)
   me(@CurrentUser() user: AuthUser) {
-    return this.auth.me(user.sub);
+    return this.auth.me(user);
+  }
+
+  @Post("verify-email")
+  verifyEmail(@Body() body: { token: string }) {
+    return this.auth.verifyEmail(body?.token);
+  }
+
+  @Post("resend-verification")
+  @UseGuards(AuthGuard)
+  resend(@CurrentUser() user: AuthUser) {
+    return this.auth.resendVerification(user.sub);
   }
 }

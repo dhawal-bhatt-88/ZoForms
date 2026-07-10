@@ -5,18 +5,26 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ChevronsUpDown,
+  CreditCard,
+  Globe,
   LayoutGrid,
   LayoutTemplate,
   LogOut,
   Settings,
+  Users,
   Zap,
 } from "lucide-react";
-import { logout, me, type User } from "@/lib/api";
+import { logout, me, resendVerification } from "@/lib/api";
+
+type Me = Awaited<ReturnType<typeof me>>;
 
 const NAV = [
   { href: "/app", label: "My forms", icon: LayoutGrid, exact: true },
   { href: "/app/templates", label: "Templates", icon: LayoutTemplate },
   { href: "/app/integrations", label: "Integrations", icon: Zap },
+  { href: "/app/domains", label: "Domains", icon: Globe },
+  { href: "/app/team", label: "Team", icon: Users },
+  { href: "/app/billing", label: "Billing", icon: CreditCard },
   { href: "/app/settings", label: "Settings", icon: Settings },
 ];
 
@@ -31,12 +39,23 @@ export default function AppShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<Me | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     me().then(setUser).catch(() => {});
   }, []);
+
+  async function onResend() {
+    try {
+      const r = await resendVerification();
+      setVerifyMsg(r.alreadyVerified ? "Already verified." : "Verification email sent.");
+    } catch {
+      setVerifyMsg("Couldn't send — try again.");
+    }
+  }
 
   const initial = (user?.name || user?.email || "?").charAt(0).toUpperCase();
 
@@ -134,6 +153,28 @@ export default function AppShell({
           <h1 className="text-[15px] font-semibold tracking-tight">{title}</h1>
           <div className="ml-auto flex items-center gap-2">{actions}</div>
         </header>
+        {user && !user.emailVerified && !dismissed && (
+          <div className="border-b border-amber/20 bg-[#FBF0D9]">
+            <div className="mx-auto flex w-full max-w-[1200px] flex-wrap items-center gap-3 px-6 py-2.5 text-sm sm:px-8">
+              <span className="font-medium text-amber">Verify your email</span>
+              <span className="text-ink-2">
+                {verifyMsg || "Confirm your address to secure your account."}
+              </span>
+              {!verifyMsg && (
+                <button onClick={onResend} className="font-semibold text-accent-2 hover:underline">
+                  Resend link
+                </button>
+              )}
+              <button
+                onClick={() => setDismissed(true)}
+                className="ml-auto text-muted hover:text-ink"
+                aria-label="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
         <main className="mx-auto w-full max-w-[1200px] flex-1 px-6 py-7 sm:px-8">{children}</main>
       </div>
     </div>

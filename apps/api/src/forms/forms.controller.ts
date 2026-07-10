@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   UseGuards,
 } from "@nestjs/common";
 import { FormStatus } from "@prisma/client";
@@ -53,13 +54,31 @@ export class FormsController {
   }
 
   @Get(":id/responses")
-  responses(@CurrentUser() user: AuthUser, @Param("id") id: string) {
-    return this.forms.listResponses(user, id);
+  responses(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Query("q") q?: string,
+  ) {
+    return this.forms.listResponses(user, id, q);
   }
 
   @Get(":id/analytics")
   analytics(@CurrentUser() user: AuthUser, @Param("id") id: string) {
     return this.forms.analytics(user, id);
+  }
+
+  @Get(":id/versions")
+  versions(@CurrentUser() user: AuthUser, @Param("id") id: string) {
+    return this.forms.listVersions(user, id);
+  }
+
+  @Post(":id/versions/:versionId/restore")
+  restore(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Param("versionId") versionId: string,
+  ) {
+    return this.forms.restoreVersion(user, id, versionId);
   }
 
   @Post(":id/duplicate")
