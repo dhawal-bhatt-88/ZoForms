@@ -3,9 +3,24 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, Download, Inbox, Loader2, PenLine, X } from "lucide-react";
+import {
+  ChevronLeft,
+  Download,
+  Inbox,
+  Loader2,
+  PenLine,
+  Search,
+  Send,
+  Sparkles,
+  X,
+} from "lucide-react";
 import type { Block } from "@formbuilder/form-schema";
-import { getForm, listResponses } from "@/lib/api";
+import {
+  getForm,
+  listResponses,
+  responsesCopilot,
+  summarizeResponses,
+} from "@/lib/api";
 
 type Resp = { id: string; data: Record<string, unknown>; createdAt: string };
 
@@ -28,6 +43,8 @@ export default function ResponsesPage() {
   const [rows, setRows] = useState<Resp[]>([]);
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
   const [open, setOpen] = useState<Resp | null>(null);
+  const [query, setQuery] = useState("");
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -43,6 +60,23 @@ export default function ResponsesPage() {
       }
     })();
   }, [fid]);
+
+  // Debounced full-text search over responses.
+  useEffect(() => {
+    if (status !== "ok") return;
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        setRows(await listResponses(fid, query));
+      } catch {
+        /* keep current rows */
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
 
   function exportCsv() {
     const headers = ["Submitted", ...blocks.map((b) => b.label)];
@@ -90,6 +124,22 @@ export default function ResponsesPage() {
         </button>
       </div>
 
+      {status === "ok" && (
+        <div className="relative mb-4 max-w-sm">
+          {searching ? (
+            <Loader2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-faint" />
+          ) : (
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
+          )}
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search responses…"
+            className="input w-full pl-9"
+          />
+        </div>
+      )}
+
       {status === "loading" && (
         <div className="grid place-items-center py-20 text-muted">
           <Loader2 className="h-5 w-5 animate-spin" />
@@ -107,13 +157,20 @@ export default function ResponsesPage() {
           <div className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-full bg-surface-3 text-muted">
             <Inbox className="h-5 w-5" />
           </div>
-          <p className="mb-1 font-semibold">No responses yet</p>
-          <p className="text-sm text-muted">Share your form — submissions will show up here in real time.</p>
+          <p className="mb-1 font-semibold">
+            {query ? "No matching responses" : "No responses yet"}
+          </p>
+          <p className="text-sm text-muted">
+            {query
+              ? `Nothing matches “${query}”.`
+              : "Share your form — submissions will show up here in real time."}
+          </p>
         </div>
       )}
 
       {status === "ok" && rows.length > 0 && (
         <>
+          <ResponseInsights fid={fid} />
           <p className="mb-3 text-sm text-muted">
             {rows.length} {rows.length === 1 ? "response" : "responses"}
           </p>
@@ -186,5 +243,74 @@ export default function ResponsesPage() {
         </div>
       )}
     </main>
+  );
+}
+
+function ResponseInsights({ fid }: { fid: string }) {
+  const [summary, setSummary] = useState<string | null>(null);
+  const [summarizing, setSummarizing] = useState(false);
+  const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
+
+  async function onSummarize() {
+    setSummarizing(true);
+    try {
+      setSummary((await summarizeResponses(fid)).summary);
+    } catch (e) {
+      setSummary((e as Error).message);
+    } finally {
+      setSummarizing(false);
+    }
+  }
+
+  async function onAsk() {
+    if (!question.trim()) return;
+    setAsking(true);
+    setAnswer(null);
+    try {
+      setAnswer((await responsesCopilot(fid, question)).answer);
+    } catch (e) {
+      setAnswer((e as Error).message);
+    } finally {
+      setAsking(false);
+    }
+  }
+
+  return (
+    <div className="mb-5 rounded-2xl border border-line bg-surface p-5 shadow-soft">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="flex items-center gap-2 font-semibold tracking-tight">
+          <Sparkles className="h-4 w-4 text-accent-2" /> AI insights
+        </span>
+        <button onClick={onSummarize} disabled={summarizing} className="btn btn-outline btn-sm">
+          {summarizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+          Summarize responses
+        </button>
+      </div>
+      {summary && (
+        <p className="mt-3 rounded-xl bg-surface-2 px-4 py-3 text-sm leading-relaxed text-ink-2">
+          {summary}
+        </p>
+      )}
+      <div className="mt-3 flex gap-2">
+        <input
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && onAsk()}
+          placeholder="Ask about your responses…"
+          className="input flex-1"
+        />
+        <button onClick={onAsk} disabled={asking} className="btn btn-primary btn-sm">
+          {asking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          Ask
+        </button>
+      </div>
+      {answer && (
+        <p className="mt-3 rounded-xl bg-accent-weak/40 px-4 py-3 text-sm leading-relaxed text-ink-2">
+          {answer}
+        </p>
+      )}
+    </div>
   );
 }

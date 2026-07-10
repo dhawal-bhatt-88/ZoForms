@@ -14,9 +14,25 @@ export class PublicController {
   @Post(":slug/responses")
   submit(
     @Param("slug") slug: string,
-    @Body() body: { data?: Record<string, unknown> },
+    @Body()
+    body: {
+      data?: Record<string, unknown>;
+      sessionId?: string;
+      turnstileToken?: string;
+    },
   ) {
-    return this.forms.submit(slug, body?.data ?? {});
+    return this.forms.submit(slug, body?.data ?? {}, {
+      sessionId: body?.sessionId,
+      turnstileToken: body?.turnstileToken,
+    });
+  }
+
+  @Post(":slug/partial")
+  partial(
+    @Param("slug") slug: string,
+    @Body() body: { sessionId?: string; data?: Record<string, unknown> },
+  ) {
+    return this.forms.savePartial(slug, body?.sessionId ?? "", body?.data ?? {});
   }
 
   @Post(":slug/events")

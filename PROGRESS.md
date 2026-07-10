@@ -2,7 +2,7 @@
 
 A living checklist of work on the Frame form-builder project. Updated as tasks complete.
 
-_Last updated: 2026-07-09_
+_Last updated: 2026-07-10_
 
 ## ✅ Completed
 - [x] Product & engineering blueprint — 18 sections (`blueprint.html`, `BLUEPRINT.md`)
@@ -27,7 +27,8 @@ _Last updated: 2026-07-09_
 - [x] **Single-box compose** (`deploy/docker-compose.prod.yml`) — Postgres + api + web + admin, persistent `pgdata`/`uploads` volumes, DB healthcheck gate, `prisma migrate deploy` on api boot
 - [x] **Runbook** (`DEPLOY.md`) + `deploy/.env.prod.example` — EC2/security-group/GHCR/secrets setup
 - [x] Verified locally: full stack up → 5 migrations applied on boot → API `/health` ok, web + admin HTTP 200
-- [ ] Follow-ups: automated tests in CI (Vitest/Playwright); swap local-disk uploads → S3; optional Caddy + domain/HTTPS
+- [x] **Automated tests in CI** — `Unit tests` step (Vitest) in the build job + a separate **E2E (Playwright)** job (installs chromium, boots web, runs smoke specs)
+- [ ] Follow-ups: swap local-disk uploads → S3; optional Caddy + domain/HTTPS
 
 ## 🛡️ Admin console (`apps/admin`, port 3002)
 - [x] Platform data model — User.isAdmin/status, Organization.plan/status, AuditLog
@@ -48,11 +49,11 @@ Building the real Frame product. `[x]` = done, `[~]` = partial. Phase 1 is the l
 ## Phase 0 — Foundations  _(mostly done)_
 - [x] Turborepo monorepo (web + api + form-schema)
 - [x] Prisma schema — 6 core tables; local Postgres; walking skeleton verified
-- [~] `packages/ui` — port design tokens + shadcn components from the mockup
+- [x] `packages/ui` — shared design system: Tailwind **preset** (tokens: colors/radii/shadows/font) + component-class **plugin** (`.btn`/`.input`/`.eyebrow`/`.card-mkt`) + shadcn-style React components (`Button`/`Input`/`Badge`/`Card` via `cva` + `cn`); web & admin both consume it (tokens no longer duplicated); auth form migrated onto `<Button>`/`<Input>`
 - [x] Auth: email + password — JWT + bcrypt in the API; login/signup/logout + auth-gate in web _(SSO/magic-link later)_
 - [x] Multi-tenancy: org / workspace / membership + org-scoped queries on every form route (tenant isolation verified)
-- [ ] Baseline: env/secrets, error handling, logging, CI (lint · typecheck · test · build), Vitest + Playwright
-- [ ] Align marketing site typography to Hanken (web ↔ mockup consistency)
+- [x] Baseline: **env/secrets** (zod-validated `env`, fail-fast at boot, prod placeholder-secret guard) · **error handling** (Nest `AllExceptionsFilter` → consistent JSON; web+admin `error`/`not-found`/`global-error` boundaries) · **logging** (Nest `LoggingInterceptor`, one line per request) · **CI test step** · **Vitest** (form-schema + ui, 19 tests) + **Playwright** (web smoke)
+- [x] Align marketing site typography to Hanken — web already on Hanken; admin brought onto the same next/font setup and the family centralized in the shared preset (`font-sans`), so web ↔ admin ↔ mockup now match
 
 ## Phase 1 — MVP (the core loop, launchable)
 Critical path: **Editor → Runtime → Submit → Responses → Billing.**
@@ -65,8 +66,8 @@ Critical path: **Editor → Runtime → Submit → Responses → Billing.**
 - [x] Dashboard on real data: create → opens editor; status + live link
 - [x] Drag-drop reorder (dnd-kit) · file uploads _(local-disk driver; S3/R2 swap seam)_ · redirect-on-completion + custom submit label
 - [x] Responses dashboard: table (labels as columns) + detail drawer + CSV export
-- [ ] Email notification on new response (Resend)
-- [ ] Billing: Stripe subscriptions (Free / Pro / Business) + plan gating
+- [x] Email notification on new response (Resend) — shared `MailService` (graceful no-op without key) powering per-form notify list, plus invite & email-verification emails; per-form notification emails configured in the editor
+- [x] Billing: Stripe subscriptions (Free / Pro / Business) + plan gating — Checkout + Customer Portal + signature-verified webhook (raw body), with a dev-mode fallback that applies plans instantly when Stripe is unset; plan gating enforced (form quota + custom-domains feature); `/app/billing` plan cards + usage
 - [ ] Deploy MVP: Vercel (web) + API host (Fly/Render) + Neon Postgres + staging
 
 ## Phase 2 — V2 (usability & collaboration)
@@ -81,25 +82,25 @@ Critical path: **Editor → Runtime → Submit → Responses → Billing.**
 - [x] Analytics: views, starts, completion rate, funnel (views→starts→submissions), 14-day daily trend, device & source breakdown (Event model + public /events tracking on the runtime + /forms/:id/analytics + dashboard page)
 - [x] Advanced customization: logo, cover image, per-input styling (bg/border), custom CSS injection (scoped .frame-form)
 - [x] Embeds (inline / popup / full-page) + `embed.js` (auto-resize) + editor Embed modal
-- [ ] Integrations: Google Sheets, Slack, webhooks, Zapier / Make
-- [x] Templates gallery (6 templates + categories) + one-click use + form duplication
-- [ ] Team roles / permissions + invites
-- [ ] Custom domains (Cloudflare SSL-for-SaaS)
-- [ ] Partial submissions, Turnstile spam protection, email verification, version history
+- [x] Integrations: webhooks + **Slack** (formatted message), **Google Sheets** (Apps Script row), **Zapier / Make** (catch hooks) — per-destination delivery formatting on the Automation model; destination picker + per-type setup help on the Connect page; verified end-to-end
+- [x] Templates gallery — redesigned to match the prototype: featured banner (faux NPS preview), search + sort (popular/newest/rated/A–Z), 12 category chips, 16 templates with per-card mini form-previews (rendered from each real schema) + rating/uses, a working **Preview modal** (read-only form render), a **Community templates** section, empty-search state; one-click use + form duplication
+- [x] Team roles / permissions + invites — Invite model + accept flow (`/invite/[token]`); OWNER/ADMIN/EDITOR/VIEWER with member management UI (`/app/team`); role-gated endpoints + VIEWER read-only enforcement on form mutations; last-owner protection
+- [x] Custom domains (Cloudflare SSL-for-SaaS) — Domain model + add/verify/delete (`/app/domains`); CF custom-hostname when configured, DNS (CNAME) verification fallback otherwise; manager-gated
+- [x] Partial submissions (session-keyed capture, completed in place on submit, hidden from responses/analytics), Turnstile spam protection (per-form toggle + server-side siteverify, graceful without secret), email verification (token flow + `/verify-email/[token]` + resend banner), version history (immutable publish snapshots + `/app/forms/[id]/versions` list & restore)
 
 ## Phase 3 — V3 (enterprise & scale)
 - [ ] SSO / SAML + SCIM (WorkOS); granular RBAC + audit logs
-- [ ] Data residency + retention controls; white-label
-- [ ] Response search (Typesense / Meilisearch)
+- [x] Data residency + retention controls; white-label — org-level data region (us/eu), response retention with a daily in-process purge (+ "Purge now"), and white-label (hide "Made with Frame") gated to Pro+; all in Settings → Data & privacy
+- [x] Response search (Typesense / Meilisearch) — full-text search on the responses page; indexes to Meilisearch when configured, with a Postgres `ILIKE` fallback that works out of the box
 - [ ] Async fabric: BullMQ workers (webhooks, exports, emails, integrations)
 - [ ] Scale: read replicas, response-table partitioning, edge-cached form delivery
 - [ ] Observability (Sentry, OpenTelemetry, PostHog), rate limiting, security hardening, SOC 2 / GDPR posture
 
 ## Phase 4 — Future (AI & automation)
 - [x] AI form generation from a prompt (POST /v1/ai/generate-form — Claude when ANTHROPIC_API_KEY set, heuristic fallback; "Generate with AI" on dashboard)
-- [ ] AI logic / branching suggestions
-- [ ] Response summarization + analytics copilot
-- [ ] Auto-translation
+- [x] AI logic / branching suggestions — `POST /v1/ai/suggest-logic` proposes conditional rules (Claude when keyed, heuristic on choice questions otherwise); surfaced in the editor's AI tools
+- [x] Response summarization + analytics copilot — `summarize-responses` (themes/sentiment) + `responses-copilot` (Q&A over responses) with real heuristic stats as fallback; "AI insights" panel on the responses page
+- [x] Auto-translation — `translate-form` translates all form copy into a target language via Claude; editor "Translate" control applies it (graceful note without a key)
 - [x] Integration marketplace + visual workflow automation (Automation model; per-form webhooks fire on new response; /app/integrations catalog + per-form Connect page with add/toggle/test/delete)
 
 _Cross-cutting every phase: tests, CI/CD, monitoring, accessibility, security, docs._

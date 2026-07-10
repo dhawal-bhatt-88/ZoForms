@@ -6,6 +6,7 @@ import { Check, Loader2, Star, Upload, X } from "lucide-react";
 import { resolveTheme, type Block, type ResolvedTheme } from "@formbuilder/form-schema";
 import {
   getPublicForm,
+  savePartial,
   submitResponse,
   trackEvent,
   uploadFile,
@@ -15,6 +16,7 @@ import {
 type Values = Record<string, unknown>;
 
 const DEFAULT_THEME: ResolvedTheme = resolveTheme(undefined);
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
 export default function PublicFormPage() {
   const params = useParams();
@@ -27,8 +29,16 @@ export default function PublicFormPage() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [embed, setEmbed] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState("");
   const viewed = useRef(false);
   const started = useRef(false);
+  const sessionId = useRef("");
+  if (!sessionId.current && typeof crypto !== "undefined") {
+    sessionId.current = crypto.randomUUID();
+  }
+
+  const partialOn = !!form?.schema.settings?.partialSubmissions;
+  const spamOn = !!form?.schema.settings?.spamProtection && !!TURNSTILE_SITE_KEY;
 
   useEffect(() => {
     setEmbed(new URLSearchParams(window.location.search).get("embed") === "1");
@@ -60,6 +70,15 @@ export default function PublicFormPage() {
     return () => ro.disconnect();
   }, [embed, slug]);
 
+  // Debounced capture of in-progress answers when partial submissions are on.
+  useEffect(() => {
+    if (!partialOn || !started.current || !sessionId.current) return;
+    const t = setTimeout(() => {
+      void savePartial(slug, sessionId.current, values);
+    }, 900);
+    return () => clearTimeout(t);
+  }, [values, partialOn, slug]);
+
   function set(id: string, v: unknown) {
     if (!started.current) {
       started.current = true;
@@ -86,9 +105,16 @@ export default function PublicFormPage() {
     }
     setErrors(errs);
     if (Object.keys(errs).length) return;
+    if (spamOn && !turnstileToken) {
+      setErrors({ _form: "Please complete the spam check below." });
+      return;
+    }
     setSubmitting(true);
     try {
-      await submitResponse(slug, values);
+      await submitResponse(slug, values, {
+        sessionId: sessionId.current,
+        turnstileToken: spamOn ? turnstileToken : undefined,
+      });
       const redirect = form.schema.settings?.redirectUrl;
       if (redirect) {
         window.location.href = redirect;
@@ -211,6 +237,12 @@ export default function PublicFormPage() {
           <p className="mt-5 rounded-lg bg-[#FCECEC] px-4 py-3 text-sm text-red">{errors._form}</p>
         )}
 
+        {spamOn && (
+          <div className="mt-6">
+            <Turnstile siteKey={TURNSTILE_SITE_KEY!} onToken={setTurnstileToken} />
+          </div>
+        )}
+
         <button
           type="submit"
           disabled={submitting}
@@ -221,12 +253,71 @@ export default function PublicFormPage() {
           {submitting ? "Submitting…" : form?.schema.settings?.submitLabel || "Submit"}
         </button>
 
-        <p className="mt-6 text-center text-xs text-faint">
-          Made with <span className="font-semibold text-ink">Frame</span>
-        </p>
+        {form?.branding !== false && (
+          <p className="mt-6 text-center text-xs text-faint">
+            Made with <span className="font-semibold text-ink">Frame</span>
+          </p>
+        )}
       </form>
     </div>
   );
+}
+
+type TurnstileApi = {
+  render: (
+    el: HTMLElement,
+    opts: {
+      sitekey: string;
+      callback: (token: string) => void;
+      "expired-callback"?: () => void;
+    },
+  ) => string;
+};
+
+/** Cloudflare Turnstile widget — loads the CF script and renders once. */
+function Turnstile({
+  siteKey,
+  onToken,
+}: {
+  siteKey: string;
+  onToken: (token: string) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js";
+    const api = () => (window as unknown as { turnstile?: TurnstileApi }).turnstile;
+    const render = () => {
+      if (ref.current && api()) {
+        api()!.render(ref.current, {
+          sitekey: siteKey,
+          callback: onToken,
+          "expired-callback": () => onToken(""),
+        });
+      }
+    };
+    if (api()) {
+      render();
+      return;
+    }
+    if (!document.querySelector(`script[src^="${SRC}"]`)) {
+      const s = document.createElement("script");
+      s.src = SRC;
+      s.async = true;
+      s.defer = true;
+      s.onload = render;
+      document.head.appendChild(s);
+      return;
+    }
+    const timer = setInterval(() => {
+      if (api()) {
+        clearInterval(timer);
+        render();
+      }
+    }, 200);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return <div ref={ref} />;
 }
 
 function toEmbedUrl(url?: string): string {

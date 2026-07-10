@@ -68,8 +68,182 @@ export async function login(email: string, password: string) {
   return r.user;
 }
 
+export type Role = "OWNER" | "ADMIN" | "EDITOR" | "VIEWER";
+
 export function me() {
-  return req<User>("/v1/auth/me");
+  return req<User & { role: Role; orgId: string; emailVerified: boolean }>(
+    "/v1/auth/me",
+  );
+}
+
+export function verifyEmail(token: string) {
+  return req<{ ok: boolean }>("/v1/auth/verify-email", {
+    method: "POST",
+    body: JSON.stringify({ token }),
+  });
+}
+export function resendVerification() {
+  return req<{ ok: boolean; alreadyVerified?: boolean; verifyUrl?: string }>(
+    "/v1/auth/resend-verification",
+    { method: "POST" },
+  );
+}
+
+/* ---------- team ---------- */
+
+export type Member = {
+  userId: string;
+  email: string;
+  name: string | null;
+  status: string;
+  role: Role;
+  isYou: boolean;
+  joinedAt: string;
+};
+export type Invite = {
+  id: string;
+  email: string;
+  role: Role;
+  status: string;
+  createdAt: string;
+  expiresAt: string;
+};
+
+export function listMembers() {
+  return req<Member[]>("/v1/team/members");
+}
+export function setMemberRole(userId: string, role: Role) {
+  return req<Member>(`/v1/team/members/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ role }),
+  });
+}
+export function removeMember(userId: string) {
+  return req<{ ok: boolean }>(`/v1/team/members/${userId}`, { method: "DELETE" });
+}
+export function listInvites() {
+  return req<Invite[]>("/v1/team/invites");
+}
+export function createInvite(email: string, role: Role) {
+  return req<{ invite: Invite; acceptUrl: string }>("/v1/team/invites", {
+    method: "POST",
+    body: JSON.stringify({ email, role }),
+  });
+}
+export function revokeInvite(id: string) {
+  return req<{ ok: boolean }>(`/v1/team/invites/${id}`, { method: "DELETE" });
+}
+
+/* ---------- organization data controls ---------- */
+
+export type OrgSettings = {
+  dataRegion: "us" | "eu";
+  retentionDays: number;
+  brandingHidden: boolean;
+  canWhiteLabel: boolean;
+};
+export function getOrgSettings() {
+  return req<OrgSettings>("/v1/settings/org");
+}
+export function updateOrgSettings(patch: Partial<Omit<OrgSettings, "canWhiteLabel">>) {
+  return req<OrgSettings>("/v1/settings/org", {
+    method: "PUT",
+    body: JSON.stringify(patch),
+  });
+}
+export function purgeResponses() {
+  return req<{ ok: boolean; purged: number }>("/v1/settings/org/purge", {
+    method: "POST",
+  });
+}
+
+/* ---------- billing ---------- */
+
+export type PlanId = "free" | "pro" | "business";
+export type PlanDef = {
+  id: PlanId;
+  name: string;
+  price: number;
+  maxForms: number | null;
+  customDomains: boolean;
+  removeBranding: boolean;
+  features: string[];
+};
+export type BillingSummary = {
+  plan: PlanId;
+  managed: boolean;
+  usage: { forms: number };
+  plans: PlanDef[];
+};
+
+export function getBilling() {
+  return req<BillingSummary>("/v1/billing");
+}
+export function checkout(plan: PlanId) {
+  return req<{ url?: string; devMode?: boolean; plan?: PlanId }>("/v1/billing/checkout", {
+    method: "POST",
+    body: JSON.stringify({ plan }),
+  });
+}
+export function billingPortal() {
+  return req<{ url: string }>("/v1/billing/portal", { method: "POST" });
+}
+
+/* ---------- custom domains ---------- */
+
+export type Domain = {
+  id: string;
+  hostname: string;
+  status: "pending" | "active" | "error";
+  cfHostnameId: string | null;
+  lastError: string | null;
+  verifiedAt: string | null;
+  createdAt: string;
+};
+export type DomainList = {
+  domains: Domain[];
+  cnameTarget: string;
+  managed: boolean;
+};
+
+export function listDomains() {
+  return req<DomainList>("/v1/domains");
+}
+export function addDomain(hostname: string) {
+  return req<{ domain: Domain; cnameTarget: string; managed: boolean }>("/v1/domains", {
+    method: "POST",
+    body: JSON.stringify({ hostname }),
+  });
+}
+export function verifyDomain(id: string) {
+  return req<Domain>(`/v1/domains/${id}/verify`, { method: "POST" });
+}
+export function deleteDomain(id: string) {
+  return req<{ ok: boolean }>(`/v1/domains/${id}`, { method: "DELETE" });
+}
+
+/* ---------- invite accept (public) ---------- */
+
+export type InviteInfo = {
+  email: string;
+  role: Role;
+  orgName: string;
+  needsAccount: boolean;
+};
+export function getInvite(token: string) {
+  return req<InviteInfo>(`/v1/invites/${token}`);
+}
+export async function acceptInvite(
+  token: string,
+  password: string,
+  name?: string,
+) {
+  const r = await req<{ token: string; user: User }>(
+    `/v1/invites/${token}/accept`,
+    { method: "POST", body: JSON.stringify({ password, name }) },
+  );
+  setToken(r.token);
+  return r.user;
 }
 
 /* ---------- settings ---------- */
@@ -156,6 +330,21 @@ export function updateForm(
   });
 }
 
+export type FormVersion = {
+  id: string;
+  version: number;
+  label: string | null;
+  createdAt: string;
+};
+export function listVersions(id: string) {
+  return req<FormVersion[]>(`/v1/forms/${id}/versions`);
+}
+export function restoreVersion(id: string, versionId: string) {
+  return req<{ ok: boolean }>(`/v1/forms/${id}/versions/${versionId}/restore`, {
+    method: "POST",
+  });
+}
+
 export function duplicateForm(id: string) {
   return req<FormListItem>(`/v1/forms/${id}/duplicate`, { method: "POST" });
 }
@@ -178,9 +367,36 @@ export function editForm(schema: FormSchema, instruction: string) {
   );
 }
 
-export function listResponses(id: string) {
+export type LogicSuggestion = { when: string; then: string; rationale?: string };
+export function suggestLogic(schema: FormSchema) {
+  return req<{ suggestions: LogicSuggestion[]; ai: boolean }>("/v1/ai/suggest-logic", {
+    method: "POST",
+    body: JSON.stringify({ schema }),
+  });
+}
+export function summarizeResponses(formId: string) {
+  return req<{ summary: string; ai: boolean }>("/v1/ai/summarize-responses", {
+    method: "POST",
+    body: JSON.stringify({ formId }),
+  });
+}
+export function responsesCopilot(formId: string, question: string) {
+  return req<{ answer: string; ai: boolean }>("/v1/ai/responses-copilot", {
+    method: "POST",
+    body: JSON.stringify({ formId, question }),
+  });
+}
+export function translateForm(schema: FormSchema, targetLang: string) {
+  return req<{ schema: FormSchema; translated: boolean; note?: string }>(
+    "/v1/ai/translate-form",
+    { method: "POST", body: JSON.stringify({ schema, targetLang }) },
+  );
+}
+
+export function listResponses(id: string, q?: string) {
+  const qs = q && q.trim() ? `?q=${encodeURIComponent(q.trim())}` : "";
   return req<{ id: string; data: Record<string, unknown>; createdAt: string }[]>(
-    `/v1/forms/${id}/responses`,
+    `/v1/forms/${id}/responses${qs}`,
   );
 }
 
@@ -271,17 +487,35 @@ export type PublicForm = {
   title: string;
   slug: string;
   schema: FormSchema;
+  /** false when the org has white-label enabled — hide the "Made with Frame" footer. */
+  branding?: boolean;
 };
 
 export function getPublicForm(slug: string) {
   return req<PublicForm>(`/v1/public/forms/${slug}`);
 }
 
-export function submitResponse(slug: string, data: Record<string, unknown>) {
+export function submitResponse(
+  slug: string,
+  data: Record<string, unknown>,
+  opts?: { sessionId?: string; turnstileToken?: string },
+) {
   return req<{ ok: boolean; id: string }>(
     `/v1/public/forms/${slug}/responses`,
-    { method: "POST", body: JSON.stringify({ data }) },
+    { method: "POST", body: JSON.stringify({ data, ...opts }) },
   );
+}
+
+/** Best-effort save of an in-progress submission (partial). Never throws to the UI. */
+export function savePartial(
+  slug: string,
+  sessionId: string,
+  data: Record<string, unknown>,
+) {
+  return req<{ ok: boolean }>(`/v1/public/forms/${slug}/partial`, {
+    method: "POST",
+    body: JSON.stringify({ sessionId, data }),
+  }).catch(() => ({ ok: false }));
 }
 
 export type UploadedFile = { name: string; url: string; size: number };

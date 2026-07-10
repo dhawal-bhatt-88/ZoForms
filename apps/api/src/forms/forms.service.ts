@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -7,17 +8,32 @@ import { Prisma } from "@prisma/client";
 import {
   emptyForm,
   FormSchema,
+  STATIC_TYPES,
   validateSubmission,
 } from "@formbuilder/form-schema";
 import { PrismaService } from "../prisma/prisma.service";
 import { AutomationsService } from "../automations/automations.service";
+import { MailService } from "../mail/mail.service";
+import { SearchService } from "../search/search.service";
+import { assertFormQuota } from "../billing/billing.service";
+import { env } from "../config/env";
 import type { AuthUser } from "../auth/current-user.decorator";
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
 @Injectable()
 export class FormsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly automations: AutomationsService,
+    private readonly mail: MailService,
+    private readonly search: SearchService,
   ) {}
 
   /* ---------- authenticated (scoped to the user's org) ---------- */
@@ -42,13 +58,18 @@ export class FormsService {
   async get(user: AuthUser, id: string) {
     const form = await this.prisma.form.findFirst({
       where: { id, workspace: { orgId: user.orgId } },
-      include: { versions: { orderBy: { version: "desc" }, take: 1 } },
+      // The `published = false` row is the live, editable working draft.
+      include: {
+        versions: { where: { published: false }, orderBy: { version: "desc" }, take: 1 },
+      },
     });
     if (!form) throw new NotFoundException("Form not found");
     return form;
   }
 
-  create(user: AuthUser, title: string) {
+  async create(user: AuthUser, title: string) {
+    await this.assertCanEdit(user);
+    await assertFormQuota(this.prisma, user.orgId);
     return this.prisma.form.create({
       data: {
         title,
@@ -71,13 +92,71 @@ export class FormsService {
     patch: { title?: string; status?: Prisma.FormUpdateInput["status"] },
   ) {
     await this.assertOwned(user, id);
-    return this.prisma.form.update({
+    await this.assertCanEdit(user);
+    const updated = await this.prisma.form.update({
       where: { id },
       data: { title: patch.title, status: patch.status },
     });
+    // Snapshot the working draft into version history when publishing.
+    if (patch.status === "PUBLISHED") {
+      await this.snapshot(id, "Published");
+    }
+    return updated;
+  }
+
+  /* ---------- version history ---------- */
+
+  /** Save an immutable copy of the current working draft as a published snapshot. */
+  private async snapshot(formId: string, label: string) {
+    const working = await this.prisma.formVersion.findFirst({
+      where: { formId, published: false },
+      orderBy: { version: "desc" },
+    });
+    if (!working) return;
+    const top = await this.prisma.formVersion.aggregate({
+      where: { formId },
+      _max: { version: true },
+    });
+    await this.prisma.formVersion.create({
+      data: {
+        formId,
+        version: (top._max.version ?? 1) + 1,
+        schema: working.schema as Prisma.InputJsonValue,
+        published: true,
+        label,
+      },
+    });
+  }
+
+  async listVersions(user: AuthUser, id: string) {
+    await this.assertOwned(user, id);
+    const versions = await this.prisma.formVersion.findMany({
+      where: { formId: id, published: true },
+      orderBy: { version: "desc" },
+      select: { id: true, version: true, label: true, createdAt: true },
+    });
+    return versions;
+  }
+
+  async restoreVersion(user: AuthUser, id: string, versionId: string) {
+    await this.assertCanEdit(user);
+    const snapshot = await this.prisma.formVersion.findFirst({
+      where: { id: versionId, formId: id, published: true, form: { workspace: { orgId: user.orgId } } },
+    });
+    if (!snapshot) throw new NotFoundException("Version not found");
+    const working = await this.prisma.formVersion.findFirst({
+      where: { formId: id, published: false },
+    });
+    if (!working) throw new NotFoundException("Form not found");
+    await this.prisma.formVersion.update({
+      where: { id: working.id },
+      data: { schema: snapshot.schema as Prisma.InputJsonValue },
+    });
+    return { ok: true };
   }
 
   async saveSchema(user: AuthUser, id: string, raw: unknown) {
+    await this.assertCanEdit(user);
     const parsed = FormSchema.safeParse(raw);
     if (!parsed.success) throw new BadRequestException("Invalid form schema");
     const form = await this.get(user, id);
@@ -95,16 +174,21 @@ export class FormsService {
     return { ok: true };
   }
 
-  async listResponses(user: AuthUser, id: string) {
+  async listResponses(user: AuthUser, id: string, q?: string) {
     await this.assertOwned(user, id);
+    if (q && q.trim()) {
+      return this.search.search(id, q);
+    }
     return this.prisma.response.findMany({
-      where: { formId: id },
+      where: { formId: id, partial: false },
       orderBy: { createdAt: "desc" },
       take: 100,
     });
   }
 
   async duplicate(user: AuthUser, id: string) {
+    await this.assertCanEdit(user);
+    await assertFormQuota(this.prisma, user.orgId);
     const form = await this.get(user, id);
     const schema = form.versions[0]?.schema ?? emptyForm(form.title);
     const title = `${form.title} (copy)`;
@@ -122,6 +206,8 @@ export class FormsService {
   }
 
   async createWithSchema(user: AuthUser, schema: unknown) {
+    await this.assertCanEdit(user);
+    await assertFormQuota(this.prisma, user.orgId);
     const parsed = FormSchema.parse(schema);
     return this.prisma.form.create({
       data: {
@@ -138,6 +224,7 @@ export class FormsService {
 
   async remove(user: AuthUser, id: string) {
     await this.assertOwned(user, id);
+    await this.assertCanEdit(user);
     await this.prisma.form.delete({ where: { id } });
     return { ok: true };
   }
@@ -149,7 +236,7 @@ export class FormsService {
       await Promise.all([
         this.prisma.event.count({ where: { formId: id, type: "view" } }),
         this.prisma.event.count({ where: { formId: id, type: "start" } }),
-        this.prisma.response.count({ where: { formId: id } }),
+        this.prisma.response.count({ where: { formId: id, partial: false } }),
         this.prisma.event.groupBy({
           by: ["device"],
           where: { formId: id, type: "view" },
@@ -165,7 +252,7 @@ export class FormsService {
           select: { createdAt: true },
         }),
         this.prisma.response.findMany({
-          where: { formId: id, createdAt: { gte: since } },
+          where: { formId: id, partial: false, createdAt: { gte: since } },
           select: { createdAt: true },
         }),
       ]);
@@ -234,7 +321,10 @@ export class FormsService {
   async getPublicBySlug(slug: string) {
     const form = await this.prisma.form.findUnique({
       where: { slug },
-      include: { versions: { orderBy: { version: "desc" }, take: 1 } },
+      include: {
+        versions: { where: { published: false }, orderBy: { version: "desc" }, take: 1 },
+        workspace: { select: { org: { select: { brandingHidden: true } } } },
+      },
     });
     if (!form || form.status !== "PUBLISHED") {
       throw new NotFoundException("Form not found");
@@ -244,13 +334,44 @@ export class FormsService {
       title: form.title,
       slug: form.slug,
       schema: form.versions[0]?.schema ?? emptyForm(form.title),
+      // White-label: hide the "Made with Frame" footer for Pro+ orgs that opt in.
+      branding: !form.workspace.org.brandingHidden,
     };
   }
 
-  async submit(slug: string, data: Record<string, unknown>) {
+  /** Store an in-progress (partial) submission, keyed by a client session id. */
+  async savePartial(slug: string, sessionId: string, data: Record<string, unknown>) {
+    if (!sessionId) throw new BadRequestException("Missing session.");
     const form = await this.prisma.form.findUnique({
       where: { slug },
-      include: { versions: { orderBy: { version: "desc" }, take: 1 } },
+      select: { id: true, status: true },
+    });
+    if (!form || form.status !== "PUBLISHED") {
+      throw new NotFoundException("This form is not accepting responses");
+    }
+    await this.prisma.response.upsert({
+      where: { formId_sessionId: { formId: form.id, sessionId } },
+      create: {
+        formId: form.id,
+        sessionId,
+        partial: true,
+        data: (data || {}) as Prisma.InputJsonValue,
+      },
+      update: { data: (data || {}) as Prisma.InputJsonValue, partial: true },
+    });
+    return { ok: true };
+  }
+
+  async submit(
+    slug: string,
+    data: Record<string, unknown>,
+    opts?: { sessionId?: string; turnstileToken?: string },
+  ) {
+    const form = await this.prisma.form.findUnique({
+      where: { slug },
+      include: {
+        versions: { where: { published: false }, orderBy: { version: "desc" }, take: 1 },
+      },
     });
     if (!form || form.status !== "PUBLISHED") {
       throw new NotFoundException("This form is not accepting responses");
@@ -258,26 +379,91 @@ export class FormsService {
     const schema = FormSchema.parse(
       form.versions[0]?.schema ?? emptyForm(form.title),
     );
+    if (schema.settings?.spamProtection) {
+      await this.verifyTurnstile(opts?.turnstileToken);
+    }
     let cleaned: Record<string, unknown>;
     try {
       cleaned = validateSubmission(schema, data || {});
     } catch (e) {
       throw new BadRequestException((e as Error).message);
     }
-    const response = await this.prisma.response.create({
-      data: {
-        formId: form.id,
-        data: cleaned as unknown as Prisma.InputJsonValue,
-      },
-    });
+    // If this submitter left a partial trail, complete it in place; else create.
+    const sessionId = opts?.sessionId;
+    const existingPartial = sessionId
+      ? await this.prisma.response.findUnique({
+          where: { formId_sessionId: { formId: form.id, sessionId } },
+        })
+      : null;
+    const response = existingPartial
+      ? await this.prisma.response.update({
+          where: { id: existingPartial.id },
+          data: {
+            data: cleaned as unknown as Prisma.InputJsonValue,
+            partial: false,
+            completedAt: new Date(),
+          },
+        })
+      : await this.prisma.response.create({
+          data: {
+            formId: form.id,
+            sessionId: sessionId ?? null,
+            partial: false,
+            completedAt: new Date(),
+            data: cleaned as unknown as Prisma.InputJsonValue,
+          },
+        });
+    // Index for search (no-op without Meilisearch).
+    void this.search.index(response);
+
+    // Resolve answers to human labels so Slack/Sheets deliveries read well.
+    const fields = schema.blocks
+      .filter((b) => !STATIC_TYPES.includes(b.type) && b.id in cleaned)
+      .map((b) => ({ label: b.label, value: cleaned[b.id] }));
+
     // Fire webhooks/automations without blocking the submitter's response.
     void this.automations.dispatch(form.id, {
       formId: form.id,
+      formTitle: form.title,
       slug: form.slug,
       responseId: response.id,
+      submittedAt: response.createdAt.toISOString(),
       data: cleaned,
+      fields,
     });
+
+    // Email the form's notify list (fire-and-forget; never blocks the submit).
+    const notifyEmails = schema.settings?.notifyEmails?.filter(Boolean) ?? [];
+    if (notifyEmails.length) {
+      void this.notifyNewResponse(form.title, form.slug, notifyEmails, fields);
+    }
     return { ok: true, id: response.id };
+  }
+
+  private async notifyNewResponse(
+    formTitle: string,
+    slug: string,
+    to: string[],
+    fields: { label: string; value: unknown }[],
+  ) {
+    const rows = fields
+      .slice(0, 20)
+      .map(
+        (f) =>
+          `<tr><td style="padding:4px 12px 4px 0;color:#6B7280;vertical-align:top">${escapeHtml(
+            f.label,
+          )}</td><td style="padding:4px 0;color:#1B1D22">${escapeHtml(
+            Array.isArray(f.value) ? f.value.join(", ") : String(f.value ?? ""),
+          )}</td></tr>`,
+      )
+      .join("");
+    const link = `${env.PUBLIC_TENANT_URL.replace(/\/$/, "")}/app`;
+    const html = this.mail.layout(
+      `New response to “${escapeHtml(formTitle)}”`,
+      `<table style="width:100%;border-collapse:collapse;margin-top:6px">${rows}</table>`,
+      { label: "View all responses", url: link },
+    );
+    await this.mail.send({ to, subject: `New response · ${formTitle}`, html }).catch(() => {});
   }
 
   /* ---------- helpers ---------- */
@@ -288,6 +474,38 @@ export class FormsService {
       select: { id: true },
     });
     if (!f) throw new NotFoundException("Form not found");
+  }
+
+  /** Verify a Cloudflare Turnstile token. No-op when no secret is configured. */
+  private async verifyTurnstile(token: string | undefined) {
+    if (!env.TURNSTILE_SECRET) return; // graceful: not enforced until configured
+    if (!token) throw new BadRequestException("Please complete the spam check.");
+    try {
+      const res = await fetch(
+        "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ secret: env.TURNSTILE_SECRET, response: token }),
+          signal: AbortSignal.timeout(8000),
+        },
+      );
+      const body = (await res.json()) as { success: boolean };
+      if (!body.success) throw new Error();
+    } catch {
+      throw new BadRequestException("Spam check failed. Please try again.");
+    }
+  }
+
+  /** Viewers can read everything in the org but never mutate. */
+  private async assertCanEdit(user: AuthUser) {
+    const m = await this.prisma.membership.findFirst({
+      where: { orgId: user.orgId, userId: user.sub },
+      select: { role: true },
+    });
+    if (!m || m.role === "VIEWER") {
+      throw new ForbiddenException("Viewers have read-only access.");
+    }
   }
 
   private slugify(title: string) {

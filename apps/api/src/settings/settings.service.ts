@@ -1,7 +1,14 @@
-import { Injectable } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+} from "@nestjs/common";
 import Anthropic from "@anthropic-ai/sdk";
 import { PrismaService } from "../prisma/prisma.service";
+import { planOf } from "../billing/plans";
+import { purgeOrg } from "./retention.service";
 import type { AuthUser } from "../auth/current-user.decorator";
+import { env } from "../config/env";
 
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
 
@@ -20,7 +27,7 @@ export class SettingsService {
       hasAnthropicKey: !!key,
       keyHint: key ? `${key.slice(0, 6)}…${key.slice(-4)}` : null,
       aiModel: org?.aiModel || DEFAULT_MODEL,
-      envKeyPresent: !!process.env.ANTHROPIC_API_KEY,
+      envKeyPresent: !!env.ANTHROPIC_API_KEY,
     };
   }
 
@@ -41,6 +48,83 @@ export class SettingsService {
     return this.get(user);
   }
 
+  /* ---------- organization data controls ---------- */
+
+  async getOrg(user: AuthUser) {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: user.orgId },
+      select: { plan: true, dataRegion: true, retentionDays: true, brandingHidden: true },
+    });
+    return {
+      dataRegion: org?.dataRegion ?? "us",
+      retentionDays: org?.retentionDays ?? 0,
+      brandingHidden: org?.brandingHidden ?? false,
+      canWhiteLabel: planOf(org?.plan).removeBranding,
+    };
+  }
+
+  async updateOrg(
+    user: AuthUser,
+    dto: { dataRegion?: string; retentionDays?: number; brandingHidden?: boolean },
+  ) {
+    await this.assertManager(user);
+    const data: {
+      dataRegion?: string;
+      retentionDays?: number;
+      brandingHidden?: boolean;
+    } = {};
+
+    if (dto.dataRegion !== undefined) {
+      if (!["us", "eu"].includes(dto.dataRegion)) {
+        throw new BadRequestException("Region must be 'us' or 'eu'.");
+      }
+      data.dataRegion = dto.dataRegion;
+    }
+    if (dto.retentionDays !== undefined) {
+      const n = Math.floor(Number(dto.retentionDays));
+      if (Number.isNaN(n) || n < 0 || n > 3650) {
+        throw new BadRequestException("Retention must be between 0 and 3650 days.");
+      }
+      data.retentionDays = n;
+    }
+    if (dto.brandingHidden !== undefined) {
+      if (dto.brandingHidden) {
+        const org = await this.prisma.organization.findUnique({
+          where: { id: user.orgId },
+          select: { plan: true },
+        });
+        if (!planOf(org?.plan).removeBranding) {
+          throw new ForbiddenException("White-label requires the Pro or Business plan.");
+        }
+      }
+      data.brandingHidden = dto.brandingHidden;
+    }
+
+    await this.prisma.organization.update({ where: { id: user.orgId }, data });
+    return this.getOrg(user);
+  }
+
+  /** Apply the org's retention policy immediately (manager-only). */
+  async purgeNow(user: AuthUser) {
+    await this.assertManager(user);
+    const org = await this.prisma.organization.findUnique({
+      where: { id: user.orgId },
+      select: { retentionDays: true },
+    });
+    const purged = await purgeOrg(this.prisma, user.orgId, org?.retentionDays ?? 0);
+    return { ok: true, purged };
+  }
+
+  private async assertManager(user: AuthUser) {
+    const m = await this.prisma.membership.findFirst({
+      where: { orgId: user.orgId, userId: user.sub },
+      select: { role: true },
+    });
+    if (!m || (m.role !== "OWNER" && m.role !== "ADMIN")) {
+      throw new ForbiddenException("Only owners and admins can change these settings.");
+    }
+  }
+
   /** Resolve the effective Anthropic config (org key wins, else env). */
   async resolveAnthropic(orgId: string) {
     const org = await this.prisma.organization.findUnique({
@@ -48,8 +132,8 @@ export class SettingsService {
       select: { anthropicApiKey: true, aiModel: true },
     });
     return {
-      apiKey: org?.anthropicApiKey || process.env.ANTHROPIC_API_KEY || undefined,
-      model: org?.aiModel || process.env.ANTHROPIC_MODEL || DEFAULT_MODEL,
+      apiKey: org?.anthropicApiKey || env.ANTHROPIC_API_KEY || undefined,
+      model: org?.aiModel || env.ANTHROPIC_MODEL,
     };
   }
 

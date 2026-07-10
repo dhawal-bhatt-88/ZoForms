@@ -25,4 +25,23 @@ export class SettingsController {
   testAi(@CurrentUser() user: AuthUser) {
     return this.settings.testAnthropic(user);
   }
+
+  @Get("org")
+  getOrg(@CurrentUser() user: AuthUser) {
+    return this.settings.getOrg(user);
+  }
+
+  @Put("org")
+  updateOrg(
+    @CurrentUser() user: AuthUser,
+    @Body()
+    body: { dataRegion?: string; retentionDays?: number; brandingHidden?: boolean },
+  ) {
+    return this.settings.updateOrg(user, body);
+  }
+
+  @Post("org/purge")
+  purge(@CurrentUser() user: AuthUser) {
+    return this.settings.purgeNow(user);
+  }
 }

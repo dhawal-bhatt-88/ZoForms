@@ -5,7 +5,11 @@ import {
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcryptjs";
+import { randomBytes } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
+import { MailService } from "../mail/mail.service";
+import { env } from "../config/env";
+import type { AuthUser } from "./current-user.decorator";
 
 type IssueUser = {
   id: string;
@@ -19,6 +23,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly mail: MailService,
   ) {}
 
   async signup(emailRaw: string, password: string, name?: string) {
@@ -56,7 +61,8 @@ export class AuthService {
         memberships: { include: { org: { include: { workspaces: true } } } },
       },
     });
-    return this.issue(user);
+    const emailVerifyUrl = await this.createEmailToken(user.id);
+    return { ...this.issue(user), emailVerifyUrl };
   }
 
   async login(emailRaw: string, password: string) {
@@ -77,13 +83,82 @@ export class AuthService {
     return this.issue(user);
   }
 
-  async me(userId: string) {
+  async me(auth: AuthUser) {
     const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { id: true, email: true, name: true },
+      where: { id: auth.sub },
+      select: { id: true, email: true, name: true, emailVerified: true },
     });
     if (!user) throw new UnauthorizedException();
-    return user;
+    const membership = await this.prisma.membership.findFirst({
+      where: { orgId: auth.orgId, userId: auth.sub },
+      select: { role: true },
+    });
+    return { ...user, role: membership?.role ?? "VIEWER", orgId: auth.orgId };
+  }
+
+  /* ---------- email verification ---------- */
+
+  private async createEmailToken(userId: string): Promise<string> {
+    const token = randomBytes(24).toString("hex");
+    const record = await this.prisma.emailToken.create({
+      data: { userId, token, expiresAt: new Date(Date.now() + 3 * 86_400_000) },
+      include: { user: { select: { email: true } } },
+    });
+    const url = `${env.PUBLIC_TENANT_URL.replace(/\/$/, "")}/verify-email/${token}`;
+    void this.mail.send({
+      to: record.user.email,
+      subject: "Verify your email · Frame",
+      html: this.mail.layout(
+        "Confirm your email",
+        "Please confirm your email address to secure your Frame account.",
+        { label: "Verify email", url },
+      ),
+    });
+    return url;
+  }
+
+  async verifyEmail(token: string) {
+    const record = await this.prisma.emailToken.findUnique({ where: { token } });
+    if (!record || record.expiresAt.getTime() < Date.now()) {
+      throw new BadRequestException("This verification link is invalid or expired.");
+    }
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: record.userId }, data: { emailVerified: true } }),
+      this.prisma.emailToken.deleteMany({ where: { userId: record.userId } }),
+    ]);
+    return { ok: true };
+  }
+
+  async resendVerification(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { emailVerified: true },
+    });
+    if (!user) throw new UnauthorizedException();
+    if (user.emailVerified) return { ok: true, alreadyVerified: true };
+    await this.prisma.emailToken.deleteMany({ where: { userId } });
+    const url = await this.createEmailToken(userId);
+    return { ok: true, verifyUrl: url };
+  }
+
+  /* ---------- password + token helpers (shared with invites) ---------- */
+
+  hashPassword(password: string) {
+    return bcrypt.hash(password, 10);
+  }
+
+  verifyPassword(password: string, hash: string) {
+    return bcrypt.compare(password, hash);
+  }
+
+  /** Issue a fresh token for a user id (used after accepting an invite). */
+  async issueForUserId(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { memberships: { include: { org: { include: { workspaces: true } } } } },
+    });
+    if (!user || !user.memberships[0]) throw new UnauthorizedException();
+    return this.issue(user);
   }
 
   private issue(user: IssueUser) {

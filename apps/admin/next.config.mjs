@@ -8,6 +8,7 @@ const nextConfig = {
   // Emit a self-contained server bundle for Docker (traces workspace deps).
   output: "standalone",
   outputFileTracingRoot: join(__dirname, "../../"),
+  transpilePackages: ["@formbuilder/ui"],
 };
 
 export default nextConfig;

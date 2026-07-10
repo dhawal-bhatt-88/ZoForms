@@ -74,7 +74,16 @@ import {
   type BlockType,
   type FormSchema,
 } from "@formbuilder/form-schema";
-import { editForm, getForm, saveSchema, updateForm, type FormStatus } from "@/lib/api";
+import {
+  editForm,
+  getForm,
+  saveSchema,
+  suggestLogic,
+  translateForm,
+  updateForm,
+  type FormStatus,
+  type LogicSuggestion,
+} from "@/lib/api";
 
 type AiMsg = { role: "user" | "assistant"; text: string; changes?: string[] };
 
@@ -561,6 +570,11 @@ export default function EditorPage() {
   const [aiMsgs, setAiMsgs] = useState<AiMsg[]>([]);
   const [aiInput, setAiInput] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
+  const [logicTips, setLogicTips] = useState<LogicSuggestion[] | null>(null);
+  const [logicBusy, setLogicBusy] = useState(false);
+  const [transLang, setTransLang] = useState("Spanish");
+  const [transBusy, setTransBusy] = useState(false);
+  const [transNote, setTransNote] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuQuery, setMenuQuery] = useState("");
   const [menuAnchor, setMenuAnchor] = useState({ left: 0, top: 0 });
@@ -607,6 +621,37 @@ export default function EditorPage() {
   const patch = (fn: (s: FormSchema) => FormSchema) =>
     setSchema((s) => (s ? fn(s) : s));
 
+  async function onSuggestLogic() {
+    if (!schema) return;
+    setLogicBusy(true);
+    try {
+      setLogicTips((await suggestLogic(schema)).suggestions);
+    } catch (e) {
+      setLogicTips([{ when: "Error", then: (e as Error).message }]);
+    } finally {
+      setLogicBusy(false);
+    }
+  }
+
+  async function onTranslate() {
+    if (!schema) return;
+    setTransBusy(true);
+    setTransNote(null);
+    try {
+      const r = await translateForm(schema, transLang);
+      if (r.translated) {
+        setSchema(r.schema);
+        setTransNote(`Translated to ${transLang}.`);
+      } else {
+        setTransNote(r.note || "Translation unavailable.");
+      }
+    } catch (e) {
+      setTransNote((e as Error).message);
+    } finally {
+      setTransBusy(false);
+    }
+  }
+
   const openMenu = () => {
     const r = insertRowRef.current?.getBoundingClientRect();
     if (r) {
@@ -642,8 +687,13 @@ export default function EditorPage() {
     patch((s) => ({ ...s, blocks: s.blocks.filter((b) => b.id !== bid) }));
     setSelectedId((cur) => (cur === bid ? null : cur));
   };
-  const updateSettings = (p: { submitLabel?: string; redirectUrl?: string }) =>
-    patch((s) => ({ ...s, settings: { ...s.settings, ...p } }));
+  const updateSettings = (p: {
+    submitLabel?: string;
+    redirectUrl?: string;
+    spamProtection?: boolean;
+    partialSubmissions?: boolean;
+    notifyEmails?: string[];
+  }) => patch((s) => ({ ...s, settings: { ...s.settings, ...p } }));
   const updateTheme = (p: {
     accent?: string;
     background?: string;
@@ -1087,6 +1137,102 @@ export default function EditorPage() {
               <p className="mt-1.5 text-xs text-muted">
                 Leave blank to show the built-in thank-you screen.
               </p>
+
+              <label className="mt-4 flex items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  checked={!!schema.settings?.spamProtection}
+                  onChange={(e) => updateSettings({ spamProtection: e.target.checked })}
+                  className="mt-0.5 h-4 w-4 accent-[#6D5EFA]"
+                />
+                <span>
+                  <span className="block text-[12.5px] font-semibold text-ink-2">
+                    Spam protection
+                  </span>
+                  <span className="block text-xs text-muted">
+                    Require a Cloudflare Turnstile challenge before submitting.
+                  </span>
+                </span>
+              </label>
+              <label className="mt-3 flex items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  checked={!!schema.settings?.partialSubmissions}
+                  onChange={(e) => updateSettings({ partialSubmissions: e.target.checked })}
+                  className="mt-0.5 h-4 w-4 accent-[#6D5EFA]"
+                />
+                <span>
+                  <span className="block text-[12.5px] font-semibold text-ink-2">
+                    Capture partial submissions
+                  </span>
+                  <span className="block text-xs text-muted">
+                    Save in-progress answers before the respondent finishes.
+                  </span>
+                </span>
+              </label>
+
+              <label className="mb-1.5 mt-4 block text-[12.5px] font-semibold text-ink-2">
+                Email notifications
+              </label>
+              <input
+                defaultValue={(schema.settings?.notifyEmails ?? []).join(", ")}
+                onBlur={(e) =>
+                  updateSettings({
+                    notifyEmails: e.target.value
+                      .split(",")
+                      .map((s) => s.trim())
+                      .filter(Boolean),
+                  })
+                }
+                placeholder="you@team.com, ops@team.com"
+                className={fieldCls}
+              />
+              <p className="mt-1.5 text-xs text-muted">
+                Comma-separated. We&apos;ll email these addresses on every new response.
+              </p>
+
+              <h4 className="mb-3 mt-6 border-t border-line pt-4 text-[11px] font-bold uppercase tracking-wider text-faint">
+                AI tools
+              </h4>
+              <button
+                onClick={onSuggestLogic}
+                disabled={logicBusy}
+                className="btn btn-outline btn-sm w-full"
+              >
+                {logicBusy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                Suggest logic & branching
+              </button>
+              {logicTips && (
+                <ul className="mt-2 space-y-1.5">
+                  {logicTips.map((t, i) => (
+                    <li key={i} className="rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-2">
+                      <span className="font-semibold">If</span> {t.when} →{" "}
+                      <span className="font-semibold">then</span> {t.then}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="mt-3 flex gap-2">
+                <input
+                  value={transLang}
+                  onChange={(e) => setTransLang(e.target.value)}
+                  placeholder="Language"
+                  className={fieldCls}
+                />
+                <button
+                  onClick={onTranslate}
+                  disabled={transBusy}
+                  className="btn btn-outline btn-sm flex-none"
+                >
+                  {transBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  Translate
+                </button>
+              </div>
+              {transNote && <p className="mt-1.5 text-xs text-muted">{transNote}</p>}
 
               <h4 className="mb-3 mt-6 border-t border-line pt-4 text-[11px] font-bold uppercase tracking-wider text-faint">
                 Design
