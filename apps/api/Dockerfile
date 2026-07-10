@@ -17,6 +17,7 @@ COPY apps/web/package.json ./apps/web/package.json
 COPY apps/admin/package.json ./apps/admin/package.json
 COPY apps/api/package.json ./apps/api/package.json
 COPY packages/form-schema/package.json ./packages/form-schema/package.json
+COPY packages/ui/package.json ./packages/ui/package.json
 # --ignore-scripts: the api postinstall (prisma generate) needs the schema,
 # which isn't copied yet — we run generate explicitly in the build stage.
 RUN pnpm install --frozen-lockfile --ignore-scripts

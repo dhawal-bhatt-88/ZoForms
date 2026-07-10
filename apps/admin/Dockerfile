@@ -14,6 +14,7 @@ COPY apps/web/package.json ./apps/web/package.json
 COPY apps/admin/package.json ./apps/admin/package.json
 COPY apps/api/package.json ./apps/api/package.json
 COPY packages/form-schema/package.json ./packages/form-schema/package.json
+COPY packages/ui/package.json ./packages/ui/package.json
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # ---- build ----
@@ -24,6 +25,7 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_TENANT_URL=$NEXT_PUBLIC_TENANT_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY tsconfig.base.json ./
+COPY packages/ui ./packages/ui
 COPY apps/admin ./apps/admin
 RUN pnpm --filter admin build
 
