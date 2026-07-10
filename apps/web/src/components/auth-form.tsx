@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { Button, Input } from "@formbuilder/ui";
-import { login, signup } from "@/lib/api";
+import { GOOGLE_CLIENT_ID, googleLogin, login, signup } from "@/lib/api";
+import { GoogleButton } from "@/components/google-button";
 import { Logo } from "@/components/marketing/logo";
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
@@ -22,6 +23,18 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     try {
       if (isSignup) await signup(email, password, name);
       else await login(email, password);
+      window.location.href = "/app";
+    } catch (e) {
+      setErr((e as Error).message);
+      setBusy(false);
+    }
+  }
+
+  async function onGoogle(credential: string) {
+    setBusy(true);
+    setErr(null);
+    try {
+      await googleLogin(credential);
       window.location.href = "/app";
     } catch (e) {
       setErr((e as Error).message);
@@ -49,7 +62,23 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
               : "Log in to your Frame workspace."}
           </p>
 
-          <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
+          {GOOGLE_CLIENT_ID && (
+            <>
+              <div className="mt-6">
+                <GoogleButton onCredential={onGoogle} />
+              </div>
+              <div className="my-5 flex items-center gap-3">
+                <span className="h-px flex-1 bg-line" />
+                <span className="text-xs font-medium text-faint">or</span>
+                <span className="h-px flex-1 bg-line" />
+              </div>
+            </>
+          )}
+
+          <form
+            onSubmit={onSubmit}
+            className={`flex flex-col gap-4 ${GOOGLE_CLIENT_ID ? "" : "mt-6"}`}
+          >
             {isSignup && (
               <div>
                 <label className="mb-1.5 block text-[13px] font-semibold text-ink-2">Name</label>
@@ -75,7 +104,17 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-[13px] font-semibold text-ink-2">Password</label>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label className="block text-[13px] font-semibold text-ink-2">Password</label>
+                {!isSignup && (
+                  <Link
+                    href="/forgot-password"
+                    className="text-[13px] font-medium text-accent-2 hover:underline"
+                  >
+                    Forgot password?
+                  </Link>
+                )}
+              </div>
               <Input
                 type="password"
                 required
