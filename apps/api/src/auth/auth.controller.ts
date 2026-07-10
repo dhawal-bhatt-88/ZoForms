@@ -1,9 +1,11 @@
 import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
+import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 import { AuthService } from "./auth.service";
 import { AuthGuard } from "./auth.guard";
 import { CurrentUser, type AuthUser } from "./current-user.decorator";
 
 @Controller("v1/auth")
+@UseGuards(ThrottlerGuard)
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
@@ -23,6 +25,7 @@ export class AuthController {
   }
 
   @Post("forgot-password")
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   forgotPassword(@Body() body: { email: string }) {
     return this.auth.forgotPassword(body?.email);
   }
