@@ -68,6 +68,34 @@ export async function login(email: string, password: string) {
   return r.user;
 }
 
+/** Client-side Google OAuth client id (empty → hide the Google button). */
+export const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+
+export async function googleLogin(credential: string) {
+  const r = await req<{ token: string; user: User }>("/v1/auth/google", {
+    method: "POST",
+    body: JSON.stringify({ credential }),
+  });
+  setToken(r.token);
+  return r.user;
+}
+
+export function forgotPassword(email: string) {
+  return req<{ ok: boolean; resetUrl?: string }>("/v1/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function resetPassword(token: string, password: string) {
+  const r = await req<{ token: string; user: User }>("/v1/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+  });
+  setToken(r.token);
+  return r.user;
+}
+
 export type Role = "OWNER" | "ADMIN" | "EDITOR" | "VIEWER";
 
 export function me() {

@@ -17,6 +17,21 @@ export class AuthController {
     return this.auth.login(body?.email, body?.password);
   }
 
+  @Post("google")
+  google(@Body() body: { credential: string }) {
+    return this.auth.loginWithGoogle(body?.credential);
+  }
+
+  @Post("forgot-password")
+  forgotPassword(@Body() body: { email: string }) {
+    return this.auth.forgotPassword(body?.email);
+  }
+
+  @Post("reset-password")
+  resetPassword(@Body() body: { token: string; password: string }) {
+    return this.auth.resetPassword(body?.token, body?.password);
+  }
+
   @Get("me")
   @UseGuards(AuthGuard)
   me(@CurrentUser() user: AuthUser) {

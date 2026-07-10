@@ -41,6 +41,7 @@ model EmailToken {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
   token     String   @unique
+  type      String   @default("verify") // verify | reset
   expiresAt DateTime
   createdAt DateTime @default(now())
 

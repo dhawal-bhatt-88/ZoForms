@@ -39,6 +39,9 @@ const EnvSchema = z.object({
   // Meilisearch for response search. Without it, search falls back to Postgres.
   MEILI_HOST: z.string().optional(),
   MEILI_KEY: z.string().optional(),
+  // Google sign-in — verifies the ID token audience. Without it, the /google
+  // endpoint rejects and the web login hides the Google button.
+  GOOGLE_CLIENT_ID: z.string().optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
