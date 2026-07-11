@@ -67,3 +67,154 @@ html {
     animation: marquee 32s linear infinite;
   }
 }
+
+/* ============================================================
+   Marketing — motion & effects (performance-first, CSS only)
+   ============================================================ */
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-16px); }
+}
+@keyframes aurora {
+  0%   { transform: translate(0, 0) rotate(0deg) scale(1); }
+  33%  { transform: translate(4%, -5%) rotate(6deg) scale(1.05); }
+  66%  { transform: translate(-4%, 4%) rotate(-5deg) scale(0.97); }
+  100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+}
+@keyframes shimmerX {
+  100% { transform: translateX(100%); }
+}
+
+/* Scroll reveal */
+.reveal {
+  opacity: 0;
+  transform: translateY(var(--reveal-y, 18px));
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+.reveal-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* Animated gradient mesh backdrop */
+.mesh {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.mesh::before,
+.mesh::after {
+  content: "";
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(64px);
+}
+.mesh::before {
+  width: 640px;
+  height: 640px;
+  left: -8%;
+  top: -34%;
+  background: radial-gradient(circle at 30% 30%, rgba(109, 94, 250, 0.34), transparent 62%);
+  animation: aurora 20s ease-in-out infinite;
+}
+.mesh::after {
+  width: 560px;
+  height: 560px;
+  right: -6%;
+  top: -20%;
+  background: radial-gradient(circle at 60% 40%, rgba(139, 123, 255, 0.26), rgba(45, 212, 191, 0.08) 55%, transparent 70%);
+  animation: aurora 26s ease-in-out infinite reverse;
+}
+
+/* Glass */
+.glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(14px) saturate(1.15);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+}
+
+.float { animation: float 6s ease-in-out infinite; }
+.float-slow { animation: floatSlow 9s ease-in-out infinite; }
+
+/* Skeleton / product shimmer */
+.shimmer { position: relative; overflow: hidden; }
+.shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+  animation: shimmerX 1.9s infinite;
+}
+
+/* Edge fade for marquees */
+.fade-x {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 8%, #000 92%, transparent);
+}
+
+/* Hover lift for cards */
+.card-lift {
+  transition:
+    transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.28s;
+}
+.card-lift:hover { transform: translateY(-4px); }
+
+/* Sliding underline for nav links */
+.nav-link { position: relative; }
+.nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -6px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.nav-link:hover::after { transform: scaleX(1); }
+
+/* Moving sheen on primary CTAs */
+.btn-shine { position: relative; overflow: hidden; }
+.btn-shine::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -75%;
+  width: 55%;
+  height: 100%;
+  transform: skewX(-20deg);
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  transition: left 0.6s ease;
+}
+.btn-shine:hover::before { left: 135%; }
+
+/* Fine grid backdrop */
+.grid-lines {
+  background-image:
+    linear-gradient(rgba(27, 29, 34, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(27, 29, 34, 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
+  .float, .float-slow, .marquee,
+  .shimmer::after, .mesh::before, .mesh::after { animation: none !important; }
+  .card-lift:hover { transform: none !important; }
+  html { scroll-behavior: auto; }
+}
