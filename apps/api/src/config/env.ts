@@ -15,6 +15,9 @@ const EnvSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   JWT_SECRET: z.string().min(1, "JWT_SECRET is required").default("dev-secret-change-me"),
   PUBLIC_API_URL: z.string().url().default("http://localhost:4000"),
+  // Extra comma-separated origins allowed by CORS (the deployment host + its
+  // ports are always allowed automatically).
+  CORS_ORIGINS: z.string().optional(),
   // Public origin of the tenant web app — used to build invite/accept links.
   PUBLIC_TENANT_URL: z.string().url().default("http://localhost:3000"),
   ANTHROPIC_API_KEY: z.string().optional(),
