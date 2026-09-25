@@ -26,12 +26,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const status = isHttp ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
 
     let message: string | string[] = "Internal server error";
+    // Optional machine-readable reason, for clients that must tell apart errors
+    // sharing a status (e.g. the two 409s a form save can return).
+    let code: string | undefined;
     if (isHttp) {
       const body = exception.getResponse();
       message =
         typeof body === "string"
           ? body
           : ((body as Record<string, unknown>).message as string) ?? exception.message;
+      if (typeof body === "object" && typeof (body as Record<string, unknown>).code === "string") {
+        code = (body as Record<string, unknown>).code as string;
+      }
     }
 
     if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
@@ -46,6 +52,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     res.status(status).json({
       statusCode: status,
       message,
+      ...(code ? { code } : {}),
       error: isHttp ? exception.name : "InternalServerError",
       path: req.url,
       timestamp: new Date().toISOString(),

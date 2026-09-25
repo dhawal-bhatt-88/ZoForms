@@ -19,7 +19,20 @@ export function logout() {
   if (typeof window !== "undefined") localStorage.removeItem(TOKEN_KEY);
 }
 
-async function req<T>(path: string, init?: RequestInit): Promise<T> {
+/** A failed API request. `code` is the API's machine-readable reason, when it sends one. */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
+/** Authenticated fetch: adds the token, handles 401, and throws ApiError on failure. */
+async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   const token = getToken();
   const res = await fetch(`${API_URL}${path}`, {
     cache: "no-store",
@@ -37,14 +50,21 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   }
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
+    let code: string | undefined;
     try {
       const body = await res.json();
       if (body?.message) message = String(body.message);
+      if (typeof body?.code === "string") code = body.code;
     } catch {
       /* ignore */
     }
-    throw new Error(message);
+    throw new ApiError(message, res.status, code);
   }
+  return res;
+}
+
+async function req<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await apiFetch(path, init);
   return res.json() as Promise<T>;
 }
 
@@ -341,11 +361,32 @@ export function getForm(id: string) {
   return req<FormDetail>(`/v1/forms/${id}`);
 }
 
+/**
+ * Save the schema as a new version. Rejects with ApiError 409 and code
+ * "NO_CHANGES" when it matches the current version, or "VERSION_CONFLICT" when
+ * another save got there first.
+ */
 export function saveSchema(id: string, schema: FormSchema) {
-  return req<{ ok: boolean }>(`/v1/forms/${id}/schema`, {
+  return req<{ ok: boolean; versionId: string; version: number }>(`/v1/forms/${id}/schema`, {
     method: "PUT",
     body: JSON.stringify(schema),
   });
+}
+
+/**
+ * Download the form's latest *saved* version as a JSON file. Read-only: never
+ * saves and never includes unsaved editor changes.
+ */
+export async function downloadArtifact(id: string) {
+  const res = await apiFetch(`/v1/forms/${id}/artifact`);
+  const disposition = res.headers.get("Content-Disposition") ?? "";
+  const fileName = /filename="([^"]+)"/.exec(disposition)?.[1] ?? "form-schema.json";
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export function updateForm(
@@ -367,8 +408,9 @@ export type FormVersion = {
 export function listVersions(id: string) {
   return req<FormVersion[]>(`/v1/forms/${id}/versions`);
 }
+/** Save an old version's content as a new version. */
 export function restoreVersion(id: string, versionId: string) {
-  return req<{ ok: boolean }>(`/v1/forms/${id}/versions/${versionId}/restore`, {
+  return req<{ ok: boolean; versionId: string; version: number }>(`/v1/forms/${id}/versions/${versionId}/restore`, {
     method: "POST",
   });
 }

@@ -68,6 +68,8 @@ async function bootstrap() {
         req.headers["access-control-request-headers"] || "Content-Type,Authorization",
       );
       res.setHeader("Access-Control-Max-Age", "600");
+      // Lets the web app read the artifact download's filename cross-origin.
+      res.setHeader("Access-Control-Expose-Headers", "Content-Disposition");
       if (req.method === "OPTIONS") {
         res.statusCode = 204;
         return res.end();

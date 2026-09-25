@@ -8,9 +8,11 @@ import {
   Post,
   Put,
   Query,
+  Res,
   UseGuards,
 } from "@nestjs/common";
 import { FormStatus } from "@prisma/client";
+import type { Response } from "express";
 import { FormsService } from "./forms.service";
 import { AuthGuard } from "../auth/auth.guard";
 import { CurrentUser, type AuthUser } from "../auth/current-user.decorator";
@@ -51,6 +53,19 @@ export class FormsController {
     @Body() body: unknown,
   ) {
     return this.forms.saveSchema(user, id, body);
+  }
+
+  /** Download the current version as a schema artifact. Read-only. */
+  @Get(":id/artifact")
+  async artifact(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { fileName, artifact } = await this.forms.getArtifact(user, id);
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    return `${JSON.stringify(artifact, null, 2)}\n`;
   }
 
   @Get(":id/responses")

@@ -1,12 +1,16 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import {
+  conditionProblems,
   emptyForm,
+  FormArtifact,
+  sameContent,
   FormSchema,
   STATIC_TYPES,
   validateSubmission,
@@ -18,6 +22,29 @@ import { SearchService } from "../search/search.service";
 import { assertFormQuota } from "../billing/billing.service";
 import { env } from "../config/env";
 import type { AuthUser } from "../auth/current-user.decorator";
+
+/** Versions are append-only, so a form's current version is its highest `version`. */
+const LATEST_VERSION = { orderBy: { version: "desc" }, take: 1 } as const;
+
+/**
+ * Turn the first schema validation issue into a message a person can act on,
+ * naming the block by its label when the issue is inside one.
+ */
+function describeSchemaError(
+  raw: unknown,
+  error: { issues: { path: (string | number)[]; message: string }[] },
+): string {
+  const issue = error.issues[0];
+  const [head, index, ...rest] = issue.path;
+  if (head === "blocks" && typeof index === "number") {
+    const blocks = (raw as { blocks?: { label?: unknown }[] } | null)?.blocks;
+    const label = blocks?.[index]?.label;
+    const name = typeof label === "string" && label ? `Block "${label}"` : `Block ${index + 1}`;
+    const where = rest.length ? ` (${rest.join(".")})` : "";
+    return `${name}${where}: ${issue.message}`;
+  }
+  return `Invalid form schema${issue.path.length ? ` (${issue.path.join(".")})` : ""}: ${issue.message}`;
+}
 
 function escapeHtml(s: string): string {
   return s
@@ -58,10 +85,7 @@ export class FormsService {
   async get(user: AuthUser, id: string) {
     const form = await this.prisma.form.findFirst({
       where: { id, workspace: { orgId: user.orgId } },
-      // The `published = false` row is the live, editable working draft.
-      include: {
-        versions: { where: { published: false }, orderBy: { version: "desc" }, take: 1 },
-      },
+      include: { versions: LATEST_VERSION },
     });
     if (!form) throw new NotFoundException("Form not found");
     return form;
@@ -93,85 +117,113 @@ export class FormsService {
   ) {
     await this.assertOwned(user, id);
     await this.assertCanEdit(user);
-    const updated = await this.prisma.form.update({
+    return this.prisma.form.update({
       where: { id },
       data: { title: patch.title, status: patch.status },
     });
-    // Snapshot the working draft into version history when publishing.
-    if (patch.status === "PUBLISHED") {
-      await this.snapshot(id, "Published");
-    }
-    return updated;
   }
 
-  /* ---------- version history ---------- */
+  /* ---------- versions ---------- */
 
-  /** Save an immutable copy of the current working draft as a published snapshot. */
-  private async snapshot(formId: string, label: string) {
-    const working = await this.prisma.formVersion.findFirst({
-      where: { formId, published: false },
-      orderBy: { version: "desc" },
-    });
-    if (!working) return;
-    const top = await this.prisma.formVersion.aggregate({
-      where: { formId },
-      _max: { version: true },
-    });
-    await this.prisma.formVersion.create({
-      data: {
-        formId,
-        version: (top._max.version ?? 1) + 1,
-        schema: working.schema as Prisma.InputJsonValue,
-        published: true,
-        label,
-      },
-    });
+  /**
+   * Insert `content` as the form's next version. Versions are append-only: this
+   * never updates an existing row. Content identical to the current version is
+   * rejected, so a save can't mint an empty version.
+   */
+  private async appendVersion(
+    form: { id: string; title: string; versions: { version: number; schema: Prisma.JsonValue }[] },
+    content: FormSchema,
+    label?: string,
+  ) {
+    const current = form.versions[0];
+    if (current && sameContent(current.schema, content)) {
+      throw new ConflictException({ message: "No changes to save.", code: "NO_CHANGES" });
+    }
+    try {
+      const [created] = await this.prisma.$transaction([
+        this.prisma.formVersion.create({
+          data: {
+            formId: form.id,
+            version: (current?.version ?? 0) + 1,
+            schema: content as unknown as Prisma.InputJsonValue,
+            label,
+          },
+        }),
+        this.prisma.form.update({
+          where: { id: form.id },
+          data: { title: content.title || form.title },
+        }),
+      ]);
+      return created;
+    } catch (e) {
+      // A concurrent save claimed this version number first (@@unique([formId, version])).
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        throw new ConflictException({
+          message: "This form was saved elsewhere. Reload to get the latest version.",
+          code: "VERSION_CONFLICT",
+        });
+      }
+      throw e;
+    }
   }
 
   async listVersions(user: AuthUser, id: string) {
     await this.assertOwned(user, id);
-    const versions = await this.prisma.formVersion.findMany({
-      where: { formId: id, published: true },
+    return this.prisma.formVersion.findMany({
+      where: { formId: id },
       orderBy: { version: "desc" },
       select: { id: true, version: true, label: true, createdAt: true },
     });
-    return versions;
   }
 
+  /** Restore by appending an old version's content as a new version; no row is modified. */
   async restoreVersion(user: AuthUser, id: string, versionId: string) {
     await this.assertCanEdit(user);
-    const snapshot = await this.prisma.formVersion.findFirst({
-      where: { id: versionId, formId: id, published: true, form: { workspace: { orgId: user.orgId } } },
+    const form = await this.get(user, id);
+    const source = await this.prisma.formVersion.findFirst({
+      where: { id: versionId, formId: form.id },
     });
-    if (!snapshot) throw new NotFoundException("Version not found");
-    const working = await this.prisma.formVersion.findFirst({
-      where: { formId: id, published: false },
-    });
-    if (!working) throw new NotFoundException("Form not found");
-    await this.prisma.formVersion.update({
-      where: { id: working.id },
-      data: { schema: snapshot.schema as Prisma.InputJsonValue },
-    });
-    return { ok: true };
+    if (!source) throw new NotFoundException("Version not found");
+    const created = await this.appendVersion(
+      form,
+      FormSchema.parse(source.schema),
+      `Restored from v${source.version}`,
+    );
+    return { ok: true, versionId: created.id, version: created.version };
   }
 
   async saveSchema(user: AuthUser, id: string, raw: unknown) {
     await this.assertCanEdit(user);
     const parsed = FormSchema.safeParse(raw);
-    if (!parsed.success) throw new BadRequestException("Invalid form schema");
+    if (!parsed.success) throw new BadRequestException(describeSchemaError(raw, parsed.error));
+    // Conditional logic must reference real questions above it, with operators and
+    // answers the source supports — the same rules the editor checks inline.
+    const problems = conditionProblems(parsed.data);
+    if (problems.length) {
+      const more = problems.length > 1 ? ` (+${problems.length - 1} more)` : "";
+      throw new BadRequestException(problems[0].message + more);
+    }
     const form = await this.get(user, id);
-    const latest = form.versions[0];
-    await this.prisma.$transaction([
-      this.prisma.formVersion.update({
-        where: { id: latest.id },
-        data: { schema: parsed.data as unknown as Prisma.InputJsonValue },
-      }),
-      this.prisma.form.update({
-        where: { id },
-        data: { title: parsed.data.title || form.title },
-      }),
-    ]);
-    return { ok: true };
+    const created = await this.appendVersion(form, parsed.data);
+    return { ok: true, versionId: created.id, version: created.version };
+  }
+
+  /**
+   * The export artifact for the form's current version. A pure read: it writes
+   * nothing, so downloading can never create or alter a version.
+   */
+  async getArtifact(user: AuthUser, id: string) {
+    const form = await this.get(user, id);
+    const current = form.versions[0];
+    if (!current) throw new NotFoundException("Form has no saved version");
+    // Identity is stamped here, never stored in or read from the schema itself.
+    // Spread first so these always win; FormArtifact requires both.
+    const artifact = FormArtifact.parse({
+      ...(current.schema as Prisma.JsonObject),
+      formId: form.id,
+      formVersionId: current.id,
+    });
+    return { fileName: `${form.slug}-schema.json`, artifact };
   }
 
   async listResponses(user: AuthUser, id: string, q?: string) {
@@ -322,7 +374,7 @@ export class FormsService {
     const form = await this.prisma.form.findUnique({
       where: { slug },
       include: {
-        versions: { where: { published: false }, orderBy: { version: "desc" }, take: 1 },
+        versions: LATEST_VERSION,
         workspace: { select: { org: { select: { brandingHidden: true } } } },
       },
     });
@@ -369,9 +421,7 @@ export class FormsService {
   ) {
     const form = await this.prisma.form.findUnique({
       where: { slug },
-      include: {
-        versions: { where: { published: false }, orderBy: { version: "desc" }, take: 1 },
-      },
+      include: { versions: LATEST_VERSION },
     });
     if (!form || form.status !== "PUBLISHED") {
       throw new NotFoundException("This form is not accepting responses");

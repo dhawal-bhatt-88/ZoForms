@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -33,6 +33,7 @@ import {
   Code2,
   Copy,
   CreditCard,
+  Download,
   ExternalLink,
   EyeOff,
   Film,
@@ -66,21 +67,32 @@ import {
 } from "lucide-react";
 import {
   BLOCK_META,
+  conditionAnswerOptions,
+  conditionProblems,
+  dependentsOf,
+  misorderedDependents,
   newBlock,
+  NUMERIC_SOURCE_TYPES,
+  OPTION_SOURCE_TYPES,
   OPTION_TYPES,
   resolveTheme,
+  sameContent,
+  SOURCE_OPERATORS,
   STATIC_TYPES,
   type Block,
   type BlockType,
+  type Condition,
+  type ConditionOperator,
   type FormSchema,
 } from "@formbuilder/form-schema";
 import {
+  ApiError,
+  downloadArtifact,
   editForm,
   getForm,
   saveSchema,
   suggestLogic,
   translateForm,
-  updateForm,
   type FormStatus,
   type LogicSuggestion,
 } from "@/lib/api";
@@ -515,6 +527,7 @@ function SortableBlock({
     <div
       ref={setNodeRef}
       style={style}
+      data-block-id={block.id}
       onClick={onSelect}
       className={`group relative cursor-pointer rounded-xl border p-3.5 transition-colors ${
         selected
@@ -537,6 +550,11 @@ function SortableBlock({
         </span>
         <span className="font-semibold">{block.label}</span>
         {block.required && <span className="text-red">*</span>}
+        {!!block.enableWhen?.length && (
+          <span className="rounded-full bg-accent-weak px-2 py-0.5 text-[11px] font-semibold text-accent-2">
+            Conditional
+          </span>
+        )}
       </div>
       <BlockPreview block={block} />
       <button
@@ -553,16 +571,256 @@ function SortableBlock({
   );
 }
 
+/* ---------- conditional logic panel ---------- */
+
+const OPERATOR_TEXT: Record<ConditionOperator, string> = {
+  exists: "is answered",
+  "=": "is",
+  "!=": "is not",
+  contains: "includes",
+  ">": "is greater than",
+  "<": "is less than",
+  ">=": "is at least",
+  "<=": "is at most",
+};
+
+/** A starting answer that satisfies the rules for `source`. */
+function defaultAnswer(source: Block): string | number {
+  const answers = conditionAnswerOptions(source);
+  if (answers) return answers[0] ?? "";
+  if (NUMERIC_SOURCE_TYPES.includes(source.type)) return source.type === "scale" ? (source.min ?? 1) : 1;
+  return "";
+}
+
+/** `c` pointed at `source` with `operator`; the answer is kept only if it still applies. */
+function retarget(c: Condition, source: Block, operator: ConditionOperator): Condition {
+  if (operator === "exists") return { question: source.id, operator };
+  const keep = c.question === source.id && c.answer !== undefined;
+  return { question: source.id, operator, answer: keep ? c.answer : defaultAnswer(source) };
+}
+
+const logicField =
+  "min-w-0 flex-1 rounded-lg border border-line-2 bg-surface px-2 py-1.5 text-[13px] outline-none focus:border-accent";
+
+/**
+ * Number box that lets the author clear and retype without the value snapping
+ * back. A stored answer that isn't a number shows as empty; the panel's inline
+ * problem explains why.
+ */
+function NumberAnswer({ value, onChange }: { value?: number; onChange: (n: number) => void }) {
+  const [text, setText] = useState(value === undefined ? "" : String(value));
+  useEffect(() => {
+    if (value === undefined) setText("");
+    else if (Number(text) !== value) setText(String(value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+  return (
+    <input
+      aria-label="Answer"
+      type="number"
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value);
+        const n = Number(e.target.value);
+        if (e.target.value.trim() !== "" && Number.isFinite(n)) onChange(n);
+      }}
+      className={logicField}
+    />
+  );
+}
+
+/** Answer input matched to the source: a fixed list (options or countries), a number, or free text. */
+function AnswerInput({
+  source,
+  value,
+  onChange,
+}: {
+  source: Block;
+  value: Condition["answer"];
+  onChange: (v: string | number) => void;
+}) {
+  const options = conditionAnswerOptions(source);
+  if (options) {
+    const current = typeof value === "string" ? value : "";
+    return (
+      <select aria-label="Answer" value={current} onChange={(e) => onChange(e.target.value)} className={logicField}>
+        {!options.includes(current) && <option value={current}>{current || "Choose…"}</option>}
+        {options.map((o, k) => (
+          <option key={k} value={o}>
+            {o}
+          </option>
+        ))}
+      </select>
+    );
+  }
+  if (NUMERIC_SOURCE_TYPES.includes(source.type)) {
+    return <NumberAnswer value={typeof value === "number" ? value : undefined} onChange={onChange} />;
+  }
+  return (
+    <input
+      aria-label="Answer"
+      value={value === undefined ? "" : String(value)}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder="Answer"
+      className={logicField}
+    />
+  );
+}
+
+/** "Show this question only when…" — edits a block's enableWhen / enableBehavior. */
+function ConditionsPanel({
+  block,
+  blocks,
+  onChange,
+}: {
+  block: Block;
+  blocks: Block[];
+  onChange: (p: Partial<Block>) => void;
+}) {
+  const at = blocks.findIndex((b) => b.id === block.id);
+  // Only questions above can be used, which also rules out cycles.
+  const sources = blocks.slice(0, at).filter((b) => SOURCE_OPERATORS[b.type]);
+  const number = new Map(blocks.map((b, i) => [b.id, i + 1]));
+  const conditions = block.enableWhen ?? [];
+  const prefix = `Block "${block.label}": `;
+  const problems = conditionProblems({ blocks })
+    .filter((p) => p.blockId === block.id)
+    .map((p) => (p.message.startsWith(prefix) ? p.message.slice(prefix.length) : p.message));
+
+  // No conditions -> drop both fields; "all" is the default, so it's left implicit.
+  const commit = (next: Condition[], behavior = block.enableBehavior) =>
+    onChange(
+      next.length
+        ? { enableWhen: next, enableBehavior: behavior === "any" ? "any" : undefined }
+        : { enableWhen: undefined, enableBehavior: undefined },
+    );
+  const setAt = (i: number, c: Condition) => commit(conditions.map((x, k) => (k === i ? c : x)));
+
+  return (
+    <div className="border-t border-line pt-3">
+      <h4 className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-faint">Logic</h4>
+      <p className="mb-2 text-[12.5px] font-semibold text-ink-2">Show this question only when…</p>
+
+      {conditions.length >= 2 && (
+        <div className="mb-2 flex items-center gap-2 text-[12.5px] text-muted">
+          <div className="flex rounded-lg border border-line-2 p-0.5">
+            {(["all", "any"] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => commit(conditions, v)}
+                className={`rounded-md px-2.5 py-0.5 text-xs font-medium ${
+                  (block.enableBehavior ?? "all") === v ? "bg-ink text-white" : "text-muted hover:text-ink"
+                }`}
+              >
+                {v === "all" ? "All" : "Any"}
+              </button>
+            ))}
+          </div>
+          of these are true
+        </div>
+      )}
+
+      <div className="flex flex-col gap-2">
+        {conditions.map((c, i) => {
+          const source = blocks.find((b) => b.id === c.question);
+          const eligible = !!source && sources.includes(source);
+          const operators = source ? (SOURCE_OPERATORS[source.type] ?? []) : [];
+          return (
+            <div key={i} className="rounded-lg border border-line bg-surface-2 p-2">
+              <div className="mb-1.5 flex items-center gap-1.5">
+                <select
+                  aria-label="Question"
+                  value={c.question}
+                  onChange={(e) => {
+                    const next = blocks.find((b) => b.id === e.target.value)!;
+                    const ops = SOURCE_OPERATORS[next.type] ?? [];
+                    setAt(i, retarget(c, next, ops.includes(c.operator) ? c.operator : "exists"));
+                  }}
+                  className={logicField}
+                >
+                  {!eligible && (
+                    <option value={c.question}>{source ? source.label : "Missing question"}</option>
+                  )}
+                  {sources.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {number.get(s.id)}. {s.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => commit(conditions.filter((_, k) => k !== i))}
+                  className="grid h-7 w-7 flex-none place-items-center rounded-md text-faint hover:bg-surface-3 hover:text-ink"
+                  aria-label="Remove condition"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <select
+                  aria-label="Condition"
+                  value={c.operator}
+                  disabled={!source}
+                  onChange={(e) => source && setAt(i, retarget(c, source, e.target.value as ConditionOperator))}
+                  className={logicField}
+                >
+                  {!operators.includes(c.operator) && (
+                    <option value={c.operator}>{OPERATOR_TEXT[c.operator]}</option>
+                  )}
+                  {operators.map((op) => (
+                    <option key={op} value={op}>
+                      {OPERATOR_TEXT[op]}
+                    </option>
+                  ))}
+                </select>
+                {c.operator !== "exists" && source && (
+                  <AnswerInput source={source} value={c.answer} onChange={(a) => setAt(i, { ...c, answer: a })} />
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {problems.map((p, i) => (
+        <p key={i} className="mt-2 text-xs text-red">
+          {p}
+        </p>
+      ))}
+
+      {sources.length ? (
+        <button
+          onClick={() =>
+            // Default to the nearest eligible question above, "is answered".
+            commit([...conditions, { question: sources[sources.length - 1].id, operator: "exists" }])
+          }
+          className="mt-2 flex items-center gap-1.5 text-sm font-medium text-accent-2 hover:underline"
+        >
+          <Plus className="h-4 w-4" /> Add condition
+        </button>
+      ) : (
+        <p className="text-xs text-muted">
+          Only questions above this one can be used. Add or move a question above it first.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function EditorPage() {
   const params = useParams();
   const id = String(params.id);
 
   const [schema, setSchema] = useState<FormSchema | null>(null);
+  // The latest saved version's content: the baseline for dirty-state and Cancel.
+  const [saved, setSaved] = useState<FormSchema | null>(null);
   const [slug, setSlug] = useState("");
   const [status, setStatus] = useState<FormStatus>("DRAFT");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [save, setSave] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [publishing, setPublishing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  // A message under the header; `blocks` are questions to offer "jump to" links for.
+  const [notice, setNotice] = useState<{ text: string; blocks?: Block[] } | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [copied, setCopied] = useState(false);
   const [embedOpen, setEmbedOpen] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -579,44 +837,93 @@ export default function EditorPage() {
   const [menuQuery, setMenuQuery] = useState("");
   const [menuAnchor, setMenuAnchor] = useState({ left: 0, top: 0 });
   const insertRowRef = useRef<HTMLDivElement>(null);
-  const loaded = useRef(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   useEffect(() => {
     getForm(id)
       .then((f) => {
         const s = f.versions[0]?.schema;
-        setSchema({
+        const latest: FormSchema = {
           title: s?.title || f.title,
-          description: s?.description,
+          // Same rule on load, so a version saved with `description: ""` starts clean too.
+          description: s?.description || undefined,
           settings: s?.settings,
           blocks: s?.blocks ?? [],
-        });
+        };
+        setSchema(latest);
+        setSaved(latest);
         setSlug(f.slug);
         setStatus(f.status);
         setSelectedId(s?.blocks?.[0]?.id ?? null);
-        requestAnimationFrame(() => (loaded.current = true));
       })
-      .catch(() => setSave("error"));
+      .catch(() => setLoadError(true));
   }, [id]);
 
+  // Nothing is persisted until Save, so "dirty" = editor differs from the latest
+  // saved version, compared the same key-order-insensitive way the API does.
+  const dirty = useMemo(
+    () => !!schema && !!saved && !sameContent(schema, saved),
+    [schema, saved],
+  );
+
+  // With no autosave, closing or reloading the tab would silently lose edits.
   useEffect(() => {
-    if (!loaded.current || !schema) return;
-    setSave("saving");
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(async () => {
-      try {
-        await saveSchema(id, schema);
-        setSave("saved");
-      } catch {
-        setSave("error");
-      }
-    }, 650);
-    return () => {
-      if (timer.current) clearTimeout(timer.current);
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
     };
-  }, [schema, id]);
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
+
+  /** Guard the editor's in-app links: the App Router has no navigation-blocking API. */
+  function confirmLeave(e: React.MouseEvent) {
+    if (dirty && !confirm("Leave without saving? Your unsaved changes will be lost.")) {
+      e.preventDefault();
+    }
+  }
+
+  async function onSave() {
+    if (!schema || !dirty || saving) return;
+    // Baseline is what was sent, so edits made while the request is in flight stay dirty.
+    const sent = schema;
+    setSaving(true);
+    setNotice(null);
+    try {
+      await saveSchema(id, sent);
+      setSaved(sent);
+    } catch (e) {
+      if (e instanceof ApiError && e.code === "NO_CHANGES") {
+        setSaved(sent); // identical to the current version: nothing to save
+      } else if (e instanceof ApiError && e.code === "VERSION_CONFLICT") {
+        // Keep the unsaved edits; the author decides whether to reload.
+        setNotice({ text: e.message });
+      } else {
+        setNotice({ text: `Couldn't save: ${(e as Error).message}` });
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function onCancel() {
+    if (!saved || !dirty) return;
+    if (!confirm("Discard unsaved changes? This cannot be undone.")) return;
+    setSchema(saved);
+    setNotice(null);
+  }
+
+  async function onDownload() {
+    setDownloading(true);
+    try {
+      await downloadArtifact(id); // latest saved version, never the unsaved editor state
+    } catch (e) {
+      setNotice({ text: `Couldn't download: ${(e as Error).message}` });
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   const patch = (fn: (s: FormSchema) => FormSchema) =>
     setSchema((s) => (s ? fn(s) : s));
@@ -666,7 +973,11 @@ export default function EditorPage() {
   };
 
   const insertFromCatalog = (item: CatalogItem) => {
-    const b = newBlock(item.type, item.level ? { level: item.level } : undefined);
+    const b = newBlock(
+      item.type,
+      item.level ? { level: item.level } : undefined,
+      schema?.blocks.map((x) => x.id),
+    );
     patch((s) => {
       const idx = selectedId ? s.blocks.findIndex((x) => x.id === selectedId) : -1;
       const at = idx >= 0 ? idx + 1 : s.blocks.length;
@@ -678,12 +989,66 @@ export default function EditorPage() {
     setMenuOpen(false);
     setMenuQuery("");
   };
-  const updateBlock = (bid: string, p: Partial<Block>) =>
+  /** Select a block and bring it into view (used by the "jump to" links). */
+  function jumpTo(bid: string) {
+    setSelectedId(bid);
+    document
+      .querySelector(`[data-block-id="${bid.replace(/["\\]/g, "\\$&")}"]`)
+      ?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+
+  /*
+   * Dependency guards: other blocks' conditions reference a source block by id,
+   * by position (sources must sit above) and by option text. These edits would
+   * silently break those conditions, so they're refused, naming the dependents.
+   */
+  const updateBlock = (bid: string, p: Partial<Block>) => {
+    const current = schema?.blocks.find((b) => b.id === bid);
+    if (schema && current) {
+      if (p.type && p.type !== current.type) {
+        const deps = dependentsOf(schema.blocks, bid);
+        if (deps.length) {
+          setNotice({
+            text: `Can't change the type of "${current.label}" — these questions have conditions that depend on it:`,
+            blocks: deps,
+          });
+          return;
+        }
+      }
+      if (p.options && OPTION_SOURCE_TYPES.includes(current.type)) {
+        const before = current.options ?? [];
+        const after = p.options;
+        const lost = (c: Condition) =>
+          typeof c.answer === "string" && before.includes(c.answer) && !after.includes(c.answer);
+        const deps = dependentsOf(schema.blocks, bid, lost);
+        if (deps.length) {
+          const answers = [
+            ...new Set(deps.flatMap((d) => (d.enableWhen ?? []).filter((c) => c.question === bid && lost(c)))
+              .map((c) => `"${c.answer}"`)),
+          ];
+          setNotice({
+            text: `Can't change or remove the option ${answers.join(", ")} of "${current.label}" — it's the answer in conditions on:`,
+            blocks: deps,
+          });
+          return;
+        }
+      }
+    }
     patch((s) => ({
       ...s,
       blocks: s.blocks.map((b) => (b.id === bid ? { ...b, ...p } : b)),
     }));
+  };
   const removeBlock = (bid: string) => {
+    const current = schema?.blocks.find((b) => b.id === bid);
+    const deps = schema ? dependentsOf(schema.blocks, bid) : [];
+    if (current && deps.length) {
+      setNotice({
+        text: `Can't delete "${current.label}" — these questions have conditions that depend on it:`,
+        blocks: deps,
+      });
+      return;
+    }
     patch((s) => ({ ...s, blocks: s.blocks.filter((b) => b.id !== bid) }));
     setSelectedId((cur) => (cur === bid ? null : cur));
   };
@@ -739,28 +1104,22 @@ export default function EditorPage() {
 
   function onDragEnd(e: DragEndEvent) {
     const { active, over } = e;
-    if (!over || active.id === over.id) return;
-    patch((s) => {
-      const oldIndex = s.blocks.findIndex((b) => b.id === active.id);
-      const newIndex = s.blocks.findIndex((b) => b.id === over.id);
-      if (oldIndex < 0 || newIndex < 0) return s;
-      return { ...s, blocks: arrayMove(s.blocks, oldIndex, newIndex) };
-    });
-  }
-
-  async function publish() {
-    if (!schema) return;
-    setPublishing(true);
-    try {
-      await saveSchema(id, schema);
-      await updateForm(id, { status: "PUBLISHED" });
-      setStatus("PUBLISHED");
-      setSave("saved");
-    } catch {
-      setSave("error");
-    } finally {
-      setPublishing(false);
+    if (!schema || !over || active.id === over.id) return;
+    const oldIndex = schema.blocks.findIndex((b) => b.id === active.id);
+    const newIndex = schema.blocks.findIndex((b) => b.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const next = arrayMove(schema.blocks, oldIndex, newIndex);
+    // Refuse only breakage this move causes, so an already-broken form can still be rearranged.
+    const alreadyBroken = new Set(misorderedDependents(schema.blocks).map((b) => b.id));
+    const broken = misorderedDependents(next).filter((b) => !alreadyBroken.has(b.id));
+    if (broken.length) {
+      setNotice({
+        text: `Can't move "${schema.blocks[oldIndex].label}" there — these questions would end up above a question their conditions depend on:`,
+        blocks: broken,
+      });
+      return;
     }
+    patch((s) => ({ ...s, blocks: next }));
   }
 
   const shareUrl =
@@ -793,7 +1152,7 @@ export default function EditorPage() {
   if (!schema)
     return (
       <div className="grid h-screen place-items-center text-muted">
-        <Loader2 className="h-5 w-5 animate-spin" />
+        {loadError ? "Couldn't load this form." : <Loader2 className="h-5 w-5 animate-spin" />}
       </div>
     );
 
@@ -807,6 +1166,7 @@ export default function EditorPage() {
       <header className="flex h-14 flex-none items-center gap-3 border-b border-line bg-surface px-4">
         <Link
           href="/app"
+          onClick={confirmLeave}
           className="grid h-9 w-9 flex-none place-items-center rounded-lg text-ink-2 hover:bg-surface-3"
           aria-label="Back"
         >
@@ -819,19 +1179,29 @@ export default function EditorPage() {
           spellCheck={false}
         />
         <span className="flex items-center gap-1.5 text-xs text-faint">
-          {save === "saving" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-          {save === "saved" && <Check className="h-3.5 w-3.5 text-green" />}
-          {save === "error" ? "Save failed" : save === "saving" ? "Saving…" : "Saved"}
+          {saving ? (
+            <>
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…
+            </>
+          ) : dirty ? (
+            <>
+              <span className="h-1.5 w-1.5 rounded-full bg-amber" /> Unsaved changes
+            </>
+          ) : (
+            <>
+              <Check className="h-3.5 w-3.5 text-green" /> All changes saved
+            </>
+          )}
         </span>
 
         <div className="ml-auto flex items-center gap-2">
-          <Link href={`/app/forms/${id}/responses`} className="btn btn-ghost btn-sm">
+          <Link href={`/app/forms/${id}/responses`} onClick={confirmLeave} className="btn btn-ghost btn-sm">
             <Inbox className="h-4 w-4" /> Responses
           </Link>
-          <Link href={`/app/forms/${id}/analytics`} className="btn btn-ghost btn-sm">
+          <Link href={`/app/forms/${id}/analytics`} onClick={confirmLeave} className="btn btn-ghost btn-sm">
             <BarChart3 className="h-4 w-4" /> Analytics
           </Link>
-          <Link href={`/app/forms/${id}/integrations`} className="btn btn-ghost btn-sm">
+          <Link href={`/app/forms/${id}/integrations`} onClick={confirmLeave} className="btn btn-ghost btn-sm">
             <Zap className="h-4 w-4" /> Connect
           </Link>
           <button
@@ -840,7 +1210,7 @@ export default function EditorPage() {
           >
             <Sparkles className="h-4 w-4" /> Ask AI
           </button>
-          {status === "PUBLISHED" ? (
+          {status === "PUBLISHED" && (
             <>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E7F6ED] px-2.5 py-1 text-xs font-semibold text-green">
                 <span className="h-1.5 w-1.5 rounded-full bg-green" /> Published
@@ -856,14 +1226,47 @@ export default function EditorPage() {
                 <ExternalLink className="h-4 w-4" /> View live
               </a>
             </>
-          ) : (
-            <button onClick={publish} disabled={publishing} className="btn btn-primary btn-sm">
-              {publishing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-              {publishing ? "Publishing…" : "Publish"}
-            </button>
           )}
+          <button
+            onClick={onDownload}
+            className="btn btn-outline btn-sm"
+            title="Download the latest saved version"
+          >
+            {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Download
+          </button>
+          <button onClick={onCancel} disabled={!dirty || saving} className="btn btn-outline btn-sm">
+            Cancel
+          </button>
+          <button onClick={onSave} disabled={!dirty || saving} className="btn btn-primary btn-sm">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Save
+          </button>
         </div>
       </header>
+
+      {notice && (
+        <div
+          role="alert"
+          className="flex flex-none items-center gap-3 border-b border-[#F5C2C2] bg-[#FCECEC] px-4 py-2 text-sm text-red"
+        >
+          <span className="flex flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+            {notice.text}
+            {notice.blocks?.map((b) => (
+              <button
+                key={b.id}
+                onClick={() => jumpTo(b.id)}
+                className="rounded-md border border-[#F5C2C2] bg-white px-2 py-0.5 text-xs font-medium text-ink-2 hover:border-red"
+              >
+                {b.label} →
+              </button>
+            ))}
+          </span>
+          <button onClick={() => setNotice(null)} aria-label="Dismiss" className="hover:opacity-70">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Body */}
       <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_300px]">
@@ -880,7 +1283,9 @@ export default function EditorPage() {
               />
               <input
                 value={schema.description ?? ""}
-                onChange={(e) => patch((s) => ({ ...s, description: e.target.value }))}
+                // A cleared description is "no description", not "" — otherwise typing
+                // then deleting would count as an unsaved change.
+                onChange={(e) => patch((s) => ({ ...s, description: e.target.value || undefined }))}
                 onFocus={() => setSelectedId(null)}
                 placeholder="Add a description…"
                 className="mt-1.5 w-full text-[14.5px] text-muted outline-none"
@@ -1116,6 +1521,12 @@ export default function EditorPage() {
                   </button>
                 </div>
               )}
+
+              <ConditionsPanel
+                block={selected}
+                blocks={schema.blocks}
+                onChange={(p) => updateBlock(selected.id, p)}
+              />
             </div>
           ) : (
             <div>

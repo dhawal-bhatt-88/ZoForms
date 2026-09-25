@@ -18,11 +18,13 @@ import {
   Sparkles,
   Trash2,
   X,
+  Download,
 } from "lucide-react";
 import AppShell from "@/components/app-shell";
 import {
   createForm,
   deleteForm,
+  downloadArtifact,
   duplicateForm,
   generateForm,
   listForms,
@@ -124,6 +126,14 @@ export default function Dashboard() {
     try {
       await duplicateForm(id);
       refresh();
+    } catch {
+      /* ignore */
+    }
+  }
+
+  async function onDownload(id: string) {
+    try {
+      await downloadArtifact(id);
     } catch {
       /* ignore */
     }
@@ -285,6 +295,7 @@ export default function Dashboard() {
               key={f.id}
               form={f}
               onDuplicate={() => onDuplicate(f.id)}
+              onDownload={() => onDownload(f.id)}
               onDelete={() => setToDelete(f)}
             />
           ))}
@@ -401,10 +412,12 @@ export default function Dashboard() {
 function FormCard({
   form: f,
   onDuplicate,
+  onDownload,
   onDelete,
 }: {
   form: FormListItem;
   onDuplicate: () => void;
+  onDownload: () => void;
   onDelete: () => void;
 }) {
   const [menu, setMenu] = useState(false);
@@ -490,6 +503,14 @@ function FormCard({
                     danger
                     onClick={() => {
                       onDelete();
+                      setMenu(false);
+                    }}
+                  />
+                  <MenuItem
+                    icon={Download}
+                    label="Download"
+                    onClick={() => {
+                      onDownload();
                       setMenu(false);
                     }}
                   />

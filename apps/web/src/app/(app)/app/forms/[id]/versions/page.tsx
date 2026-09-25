@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft, History, Loader2, PenLine, RotateCcw } from "lucide-react";
 import {
@@ -13,13 +13,13 @@ import {
 
 export default function VersionsPage() {
   const params = useParams();
+  const router = useRouter();
   const fid = String(params.id);
 
   const [title, setTitle] = useState("");
   const [versions, setVersions] = useState<FormVersion[]>([]);
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
   const [restoring, setRestoring] = useState<string | null>(null);
-  const [restored, setRestored] = useState<string | null>(null);
 
   async function load() {
     try {
@@ -38,15 +38,15 @@ export default function VersionsPage() {
   }, [fid]);
 
   async function onRestore(v: FormVersion) {
-    if (!confirm(`Restore version ${v.version}? This replaces your current draft.`)) return;
+    if (!confirm(`Restore version ${v.version}? Its content will be saved as a new version.`))
+      return;
     setRestoring(v.id);
-    setRestored(null);
     try {
       await restoreVersion(fid, v.id);
-      setRestored(v.id);
+      // The editor loads the latest version on mount, which is now the restored one.
+      router.push(`/app/forms/${fid}/edit`);
     } catch (e) {
       alert((e as Error).message);
-    } finally {
       setRestoring(null);
     }
   }
@@ -85,11 +85,11 @@ export default function VersionsPage() {
         <section className="rounded-2xl border border-line bg-surface p-5 shadow-soft">
           <div className="mb-4 flex items-center gap-2">
             <History className="h-4 w-4 text-accent-2" />
-            <h2 className="font-semibold tracking-tight">Published snapshots</h2>
+            <h2 className="font-semibold tracking-tight">Saved versions</h2>
           </div>
           {versions.length === 0 ? (
             <p className="rounded-xl border border-dashed border-line-2 bg-surface-2 px-4 py-6 text-center text-sm text-muted">
-              No snapshots yet. Every time you publish, Frame saves a restorable snapshot here.
+              No versions yet. Every time you save, Frame keeps a restorable version here.
             </p>
           ) : (
             <div className="divide-y divide-line">
@@ -100,10 +100,10 @@ export default function VersionsPage() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 text-sm font-medium">
-                      {v.label || "Snapshot"}
+                      {v.label || "Saved"}
                       {i === 0 && (
                         <span className="rounded-full bg-[#E7F6ED] px-2 py-0.5 text-[11px] font-semibold text-green">
-                          Latest
+                          Current
                         </span>
                       )}
                     </div>
@@ -111,22 +111,20 @@ export default function VersionsPage() {
                       {new Date(v.createdAt).toLocaleString()}
                     </div>
                   </div>
-                  {restored === v.id ? (
-                    <span className="text-xs font-medium text-green">Restored to draft</span>
-                  ) : (
-                    <button
-                      onClick={() => onRestore(v)}
-                      disabled={restoring === v.id}
-                      className="flex items-center gap-1 text-xs font-medium text-ink-2 hover:text-ink"
-                    >
-                      {restoring === v.id ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <RotateCcw className="h-3.5 w-3.5" />
-                      )}
-                      Restore
-                    </button>
-                  )}
+                  <button
+                    onClick={() => onRestore(v)}
+                    // Restoring the current version would duplicate it; the API rejects that with a 409.
+                    disabled={i === 0 || restoring !== null}
+                    title={i === 0 ? "This is the current version" : undefined}
+                    className="flex items-center gap-1 text-xs font-medium text-ink-2 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-ink-2"
+                  >
+                    {restoring === v.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <RotateCcw className="h-3.5 w-3.5" />
+                    )}
+                    Restore
+                  </button>
                 </div>
               ))}
             </div>

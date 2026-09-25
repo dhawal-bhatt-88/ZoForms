@@ -180,15 +180,15 @@ model FormVersion {
   id        String   @id @default(uuid())
   form      Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
   formId    String
-  version   Int      @default(1)
+  // Append-only: every Save inserts a new row and no row is updated after
+  // insert. A form's current version is the one with the highest `version`.
+  version   Int
   schema    Json
-  // A `published` version is an immutable snapshot kept for history; the single
-  // `published = false` row per form is the live, editable working draft.
-  published Boolean  @default(false)
   label     String?
   createdAt DateTime @default(now())
 
-  @@index([formId, published])
+  // Also stops two concurrent saves from both claiming the next number.
+  @@unique([formId, version])
 }
 
 model Response {

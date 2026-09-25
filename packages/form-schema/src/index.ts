@@ -47,6 +47,25 @@ export const BlockType = z.enum([
 ]);
 export type BlockType = z.infer<typeof BlockType>;
 
+/* ---------- conditional logic (enableWhen) — the @yourco/forms contract ---------- */
+
+export const ConditionOperator = z.enum(["exists", "=", "!=", ">", "<", ">=", "<=", "contains"]);
+export type ConditionOperator = z.infer<typeof ConditionOperator>;
+
+/** "Show this block only when <question> <operator> <answer>". */
+export const Condition = z
+  .object({
+    /** Id of the source block. */
+    question: z.string(),
+    operator: ConditionOperator,
+    answer: z.union([z.string(), z.number()]).optional(),
+  })
+  .refine((c) => (c.operator === "exists") === (c.answer === undefined), {
+    message: '"exists" takes no answer; every other operator requires one',
+    path: ["answer"],
+  });
+export type Condition = z.infer<typeof Condition>;
+
 export const Block = z.object({
   id: z.string(),
   type: BlockType,
@@ -65,6 +84,10 @@ export const Block = z.object({
   /** linear scale bounds */
   min: z.number().optional(),
   max: z.number().optional(),
+  /** Show this block only when these conditions hold. Absent = always shown. */
+  enableWhen: z.array(Condition).optional(),
+  /** How `enableWhen` combines. Absent means "all". */
+  enableBehavior: z.enum(["all", "any"]).optional(),
 });
 export type Block = z.infer<typeof Block>;
 
@@ -173,6 +196,56 @@ export const FormSchema = z.object({
 });
 export type FormSchema = z.infer<typeof FormSchema>;
 
+/**
+ * True when two schemas have the same form content. Both sides go through
+ * `FormSchema`, so defaults are applied, unknown keys are stripped, and object
+ * keys come out in schema-shape order — whatever order they arrived in (Postgres
+ * jsonb reorders stored keys). A plain string compare is then a content compare.
+ *
+ * The API uses this to reject a save identical to the current version, and the
+ * editor uses it for dirty-state, so the two always agree on "changed".
+ */
+export function sameContent(a: unknown, b: unknown): boolean {
+  const pa = FormSchema.safeParse(a);
+  const pb = FormSchema.safeParse(b);
+  return pa.success && pb.success && JSON.stringify(pa.data) === JSON.stringify(pb.data);
+}
+
+/**
+ * The exported schema artifact: form content plus the identity of the form it
+ * came from and of the saved version it was exported from.
+ *
+ * Both identity fields are REQUIRED here, so an artifact cannot be produced
+ * without them — `FormsService.getArtifact` (served by
+ * `GET /v1/forms/:id/artifact`) parses through this, which is what guarantees
+ * consumers (@yourco/forms) always receive them.
+ *
+ * They live here rather than on `FormSchema` because `FormSchema` describes
+ * stored, editable form *content*, which legitimately has no identity yet
+ * (templates, AI drafts, a form seeded by `emptyForm`). Identity belongs to the
+ * `FormVersion` row the content is stored in, not to the content itself.
+ *
+ * The API stamps both and never reads them from client input: a client could
+ * otherwise send a stale or forged identity.
+ */
+/*
+ * Built as a merge rather than `FormSchema.extend(...)` so the identity fields
+ * sit directly after `title` instead of being appended last: Zod emits parsed
+ * keys in shape order, and that order is what lands in the downloaded JSON.
+ * Deriving the rest from `FormSchema` (rather than restating it) keeps the
+ * artifact automatically in step when form content gains a field.
+ */
+export const FormArtifact = z
+  .object({
+    title: FormSchema.shape.title,
+    /** `Form.id` — a uuid, stable across edits and saves. */
+    formId: z.string().min(1),
+    /** The saved `FormVersion` row's id — changes on every save, never on download. */
+    formVersionId: z.string().min(1),
+  })
+  .merge(FormSchema.omit({ title: true }));
+export type FormArtifact = z.infer<typeof FormArtifact>;
+
 /** Block types that carry a list of options. */
 export const OPTION_TYPES: BlockType[] = [
   "choice",
@@ -237,9 +310,38 @@ export function emptyForm(title = "Untitled form"): FormSchema {
   return { title, blocks: [] };
 }
 
-/** Create a fresh block of a given type with sensible defaults. */
-export function newBlock(type: BlockType, overrides?: Partial<Block>): Block {
-  const id = "b_" + Math.random().toString(36).slice(2, 10);
+const ID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+/**
+ * A fresh block id, guaranteed not to be in `taken` (pass the form's current
+ * ids). Random rather than positional or time-based, so it can't collide with a
+ * block that was deleted or added in the same instant. Conditions reference
+ * blocks by id, so ids must be unique within a form.
+ */
+export function newBlockId(taken: Iterable<string> = []): string {
+  const used = new Set(taken);
+  // getRandomValues works in browsers (secure context or not) and Node 19+.
+  const cryptoApi = (globalThis as { crypto?: { getRandomValues?(a: Uint8Array): Uint8Array } })
+    .crypto;
+  for (;;) {
+    const bytes = new Uint8Array(8);
+    if (cryptoApi?.getRandomValues) cryptoApi.getRandomValues(bytes);
+    else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+    const id = "b_" + Array.from(bytes, (b) => ID_ALPHABET[b % ID_ALPHABET.length]).join("");
+    if (!used.has(id)) return id;
+  }
+}
+
+/**
+ * Create a fresh block of a given type with sensible defaults. Pass the form's
+ * existing block ids as `taken` so the new id can't collide with them.
+ */
+export function newBlock(
+  type: BlockType,
+  overrides?: Partial<Block>,
+  taken?: Iterable<string>,
+): Block {
+  const id = newBlockId(taken);
   const block: Block = {
     id,
     type,
@@ -281,4 +383,174 @@ export function validateSubmission(
     if (!empty) cleaned[block.id] = v;
   }
   return cleaned;
+}
+
+/* ---------- conditional logic rules ---------- */
+
+const EQUALITY: readonly ConditionOperator[] = ["exists", "=", "!="];
+const COMPARISON: readonly ConditionOperator[] = ["exists", "=", "!=", ">", "<", ">=", "<="];
+const MEMBERSHIP: readonly ConditionOperator[] = ["exists", "contains"];
+
+/**
+ * The operators each block type allows when used as a condition source. A type
+ * missing from this table can't be a source at all (matrix, layout blocks, and
+ * types whose answers can't be compared, e.g. long text or file uploads).
+ */
+export const SOURCE_OPERATORS: Partial<Record<BlockType, readonly ConditionOperator[]>> = {
+  choice: EQUALITY,
+  dropdown: EQUALITY,
+  country: EQUALITY,
+  short: EQUALITY,
+  email: EQUALITY,
+  phone: EQUALITY,
+  link: EQUALITY,
+  date: EQUALITY,
+  time: EQUALITY,
+  number: COMPARISON,
+  scale: COMPARISON,
+  rating: COMPARISON,
+  checkbox: MEMBERSHIP,
+  multiselect: MEMBERSHIP,
+  ranking: MEMBERSHIP,
+};
+
+/** Sources whose condition answer must be one of the source's options. */
+export const OPTION_SOURCE_TYPES: BlockType[] = [
+  "choice",
+  "dropdown",
+  "checkbox",
+  "multiselect",
+  "ranking",
+];
+
+/** Sources compared as numbers. */
+export const NUMERIC_SOURCE_TYPES: BlockType[] = ["number", "scale", "rating"];
+
+/** Operators that compare magnitudes, so their answer must be a number. */
+const ORDERING: readonly ConditionOperator[] = [">", "<", ">=", "<="];
+
+/**
+ * The countries a country question offers. This MUST match the @yourco/forms
+ * renderer's country list exactly — same strings, same order — because a
+ * condition on a country question is matched against these values.
+ */
+export const COUNTRY_OPTIONS: readonly string[] = [
+  "United States",
+  "United Kingdom",
+  "Canada",
+  "Australia",
+  "India",
+  "Germany",
+  "France",
+  "Netherlands",
+  "Spain",
+  "Italy",
+  "Brazil",
+  "Mexico",
+  "Japan",
+  "Singapore",
+  "United Arab Emirates",
+  "Other",
+];
+
+/**
+ * The fixed set of answers a condition on `source` may use: the source's own
+ * options for choice-type questions, the country list for country questions,
+ * or null when any answer of the right kind is allowed.
+ */
+export function conditionAnswerOptions(source: Block): readonly string[] | null {
+  if (OPTION_SOURCE_TYPES.includes(source.type)) return source.options ?? [];
+  if (source.type === "country") return COUNTRY_OPTIONS;
+  return null;
+}
+
+export type ConditionProblem = { blockId: string; message: string };
+
+/**
+ * Every way the form's conditions break the rules, each naming the dependent
+ * block. Empty means valid. The API rejects a save with any problem; the editor
+ * shows them inline.
+ *
+ * A condition may only use a question *above* its block, which also makes
+ * cycles impossible.
+ */
+export function conditionProblems(form: { blocks: Block[] }): ConditionProblem[] {
+  const problems: ConditionProblem[] = [];
+  const position = new Map<string, number>();
+  form.blocks.forEach((b, i) => {
+    if (position.has(b.id)) {
+      problems.push({
+        blockId: b.id,
+        message: `Block "${b.label}": another block has the same id "${b.id}". Block ids must be unique.`,
+      });
+    } else position.set(b.id, i);
+  });
+
+  form.blocks.forEach((b, i) => {
+    for (const c of b.enableWhen ?? []) {
+      const problem = conditionProblem(form.blocks, position, i, c);
+      if (problem) problems.push({ blockId: b.id, message: `Block "${b.label}": ${problem}` });
+    }
+  });
+  return problems;
+}
+
+function conditionProblem(
+  blocks: Block[],
+  position: Map<string, number>,
+  at: number,
+  c: Condition,
+): string | null {
+  if (c.question === blocks[at].id) return "a condition can't depend on the block itself.";
+  const from = position.get(c.question);
+  if (from === undefined) {
+    return `a condition refers to a question that isn't in this form (id "${c.question}").`;
+  }
+  const source = blocks[from];
+  if (from > at) {
+    return `a condition depends on "${source.label}", which comes after it. Conditions can only use questions above them.`;
+  }
+  const allowed = SOURCE_OPERATORS[source.type];
+  if (!allowed) {
+    return `"${source.label}" is a ${source.type} block, which can't be used in a condition.`;
+  }
+  if (!allowed.includes(c.operator)) {
+    return `the operator "${c.operator}" can't be used with "${source.label}" (a ${source.type} question). Allowed: ${allowed.join(", ")}.`;
+  }
+  if (ORDERING.includes(c.operator) && !(typeof c.answer === "number" && Number.isFinite(c.answer))) {
+    return `the operator "${c.operator}" needs a number as its answer, but got ${JSON.stringify(c.answer)}.`;
+  }
+  const answers = conditionAnswerOptions(source);
+  if (
+    answers &&
+    c.answer !== undefined &&
+    !(typeof c.answer === "string" && answers.includes(c.answer))
+  ) {
+    return `the answer "${c.answer}" isn't one of the options of "${source.label}".`;
+  }
+  return null;
+}
+
+/** Blocks (other than the source) with a condition on `sourceId`, optionally only matching conditions. */
+export function dependentsOf(
+  blocks: Block[],
+  sourceId: string,
+  matching: (c: Condition) => boolean = () => true,
+): Block[] {
+  return blocks.filter(
+    (b) =>
+      b.id !== sourceId &&
+      (b.enableWhen ?? []).some((c) => c.question === sourceId && matching(c)),
+  );
+}
+
+/** Blocks that sit at or above a block one of their conditions depends on. */
+export function misorderedDependents(blocks: Block[]): Block[] {
+  const position = new Map(blocks.map((b, i) => [b.id, i]));
+  return blocks.filter((b, i) =>
+    (b.enableWhen ?? []).some((c) => {
+      const from = position.get(c.question);
+      return from !== undefined && from >= i && c.question !== b.id;
+    }),
+  );
 }
