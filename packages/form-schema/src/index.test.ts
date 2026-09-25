@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   Block,
   formProblems,
+  isPresentationalType,
   COUNTRY_OPTIONS,
   dependentsOf,
   emptyForm,
@@ -69,13 +70,15 @@ describe("newBlockId", () => {
 
 /* ---------- conditional logic ---------- */
 
-const q = (id: string, type: TBlock["type"], extra: Partial<TBlock> = {}): TBlock => ({
-  id,
-  type,
-  label: id.toUpperCase(),
-  required: false,
-  ...extra,
-});
+// Presentational blocks carry no `required`; every other leaf defaults to false.
+const q = (id: string, type: TBlock["type"], extra: Partial<TBlock> = {}): TBlock =>
+  ({
+    id,
+    type,
+    label: id.toUpperCase(),
+    ...(isPresentationalType(type) ? {} : { required: false }),
+    ...extra,
+  }) as TBlock;
 const when = (block: TBlock, ...enableWhen: Condition[]): TBlock => ({ ...block, enableWhen });
 
 describe("Condition schema", () => {
@@ -231,7 +234,7 @@ describe("validateSubmission", () => {
     blocks: [
       { id: "name", type: "short", label: "Name", required: true },
       { id: "note", type: "long", label: "Note", required: false },
-      { id: "intro", type: "heading", label: "Welcome", required: false },
+      { id: "intro", type: "heading", label: "Welcome" },
     ],
   };
 

@@ -9,8 +9,10 @@ import {
   FormSchema,
   insertBlockIntoTree,
   isAnswerable,
+  isPresentationalType,
   moveBlockInTree,
   moveBreaks,
+  newBlock,
   newBlockId,
   newGroup,
   questionNumbers,
@@ -27,13 +29,15 @@ import {
 
 /* ---------- fixtures ---------- */
 
-const leaf = (id: string, type: LeafBlock["type"] = "short", extra: Partial<LeafBlock> = {}): LeafBlock => ({
-  id,
-  type,
-  label: id.toUpperCase(),
-  required: false,
-  ...extra,
-});
+// Presentational blocks carry no `required`; every other leaf defaults to false.
+const leaf = (id: string, type: LeafBlock["type"] = "short", extra: Partial<LeafBlock> = {}): LeafBlock =>
+  ({
+    id,
+    type,
+    label: id.toUpperCase(),
+    ...(isPresentationalType(type) ? {} : { required: false }),
+    ...extra,
+  }) as LeafBlock;
 const choice = (id: string) => leaf(id, "choice", { options: ["Yes", "No"] });
 const group = (id: string, blocks: Block[], extra: Partial<GroupBlock> = {}): GroupBlock => ({
   id,
@@ -124,6 +128,30 @@ describe("group schema", () => {
     expect(sameContent(a, shuffled)).toBe(true);
     const changed = { title: "t", blocks: [group("g", [leaf("a", "short", { label: "Changed" })])] };
     expect(sameContent(a, changed)).toBe(false);
+  });
+
+  it("gives presentational blocks no required, like groups — even if one is sent", () => {
+    const parsed = FormSchema.parse({
+      title: "t",
+      blocks: ["divider", "heading", "title", "label", "hidden"].map((type) => ({
+        id: type, type, label: type, required: true,
+      })),
+    });
+    for (const block of parsed.blocks) expect(block, block.type).not.toHaveProperty("required");
+  });
+
+  it("keeps required defaulting to false for every other leaf, the untouched types included", () => {
+    const types = ["short", "long", "text", "image", "video", "audio", "embed", "file", "choice", "matrix"];
+    const parsed = FormSchema.parse({ title: "t", blocks: types.map((type) => ({ id: type, type, label: type })) });
+    for (const block of parsed.blocks) expect(block, block.type).toHaveProperty("required", false);
+  });
+
+  it("creates presentational blocks without required, questions with required: false", () => {
+    for (const type of ["divider", "heading", "title", "label", "hidden"] as const) {
+      expect(newBlock(type), type).not.toHaveProperty("required");
+    }
+    expect(newBlock("short")).toHaveProperty("required", false);
+    expect(newBlock("text")).toHaveProperty("required", false);
   });
 
   it("gives a new group the contract's default label", () => {

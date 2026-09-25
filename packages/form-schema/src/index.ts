@@ -66,10 +66,31 @@ export const Condition = z
   });
 export type Condition = z.infer<typeof Condition>;
 
-/** A question or presentational block — anything that isn't a group. */
-export const LeafBlock = z.object({
+/**
+ * Blocks that only present content (contract §1, §4): never answered, never
+ * required, not numbered, never a condition source. Like groups, they carry no
+ * `required` at all.
+ */
+export const PRESENTATIONAL_TYPES = ["divider", "heading", "title", "label", "hidden"] as const;
+export type PresentationalType = (typeof PRESENTATIONAL_TYPES)[number];
+
+export function isPresentationalType(type: string): type is PresentationalType {
+  return (PRESENTATIONAL_TYPES as readonly string[]).includes(type);
+}
+
+/** Every other leaf block — the ones that can be required. */
+export const QuestionType = BlockType.exclude([...PRESENTATIONAL_TYPES]);
+
+const shownWhen = {
+  /** Show this block only when these conditions hold. Absent = always shown. */
+  enableWhen: z.array(Condition).optional(),
+  /** How `enableWhen` combines. Absent means "all". */
+  enableBehavior: z.enum(["all", "any"]).optional(),
+};
+
+export const QuestionBlock = z.object({
   id: z.string(),
-  type: BlockType,
+  type: QuestionType,
   label: z.string().min(1),
   description: z.string().optional(),
   placeholder: z.string().optional(),
@@ -78,19 +99,36 @@ export const LeafBlock = z.object({
   options: z.array(z.string()).optional(),
   /** for matrix (columns) */
   columns: z.array(z.string()).optional(),
-  /** heading level 1–3 */
+  /** Unused by question types (headings are presentational); kept so their shape is unchanged. */
   level: z.number().int().min(1).max(3).optional(),
-  /** static content: text/title/label copy, or the URL for image/video/audio/embed */
+  /** static content: text copy, or the URL for image/video/audio/embed */
   content: z.string().optional(),
   /** linear scale bounds */
   min: z.number().optional(),
   max: z.number().optional(),
-  /** Show this block only when these conditions hold. Absent = always shown. */
-  enableWhen: z.array(Condition).optional(),
-  /** How `enableWhen` combines. Absent means "all". */
-  enableBehavior: z.enum(["all", "any"]).optional(),
+  ...shownWhen,
 });
-export type LeafBlock = z.infer<typeof LeafBlock>;
+export type QuestionBlock = z.infer<typeof QuestionBlock>;
+
+export const PresentationalBlock = z.object({
+  id: z.string(),
+  type: z.enum(PRESENTATIONAL_TYPES),
+  label: z.string().min(1),
+  description: z.string().optional(),
+  /** heading level 1–3 */
+  level: z.number().int().min(1).max(3).optional(),
+  /** title/label copy */
+  content: z.string().optional(),
+  ...shownWhen,
+});
+// Question-only fields are declared `never`, so code can read them off any leaf.
+type QuestionOnlyKey = Exclude<keyof QuestionBlock, keyof z.infer<typeof PresentationalBlock>>;
+export type PresentationalBlock = z.infer<typeof PresentationalBlock> & {
+  [K in QuestionOnlyKey]?: never;
+};
+
+/** A question or presentational block — anything that isn't a group. */
+export type LeafBlock = QuestionBlock | PresentationalBlock;
 
 /*
  * Groups — docs/GROUPS-AND-PAGES-CONTRACT.md §1. A group holds other blocks,
@@ -100,7 +138,7 @@ export type LeafBlock = z.infer<typeof LeafBlock>;
  * any block, group or not, and simply get undefined for a group.
  */
 type NoLeafFields = {
-  [K in Exclude<keyof LeafBlock, "id" | "type" | "label" | "enableWhen" | "enableBehavior">]?: never;
+  [K in Exclude<keyof QuestionBlock, "id" | "type" | "label" | "enableWhen" | "enableBehavior">]?: never;
 };
 
 export interface GroupBlock extends NoLeafFields {
@@ -125,7 +163,10 @@ interface GroupBlockInput {
 
 /** Any entry in a `blocks` array: a leaf block or a group. */
 export type Block = LeafBlock | GroupBlock;
-export type BlockInput = z.input<typeof LeafBlock> | GroupBlockInput;
+export type BlockInput =
+  | z.input<typeof QuestionBlock>
+  | z.input<typeof PresentationalBlock>
+  | GroupBlockInput;
 
 // Lazy, so a group's children can themselves be groups. Annotated explicitly
 // because TypeScript can't infer a type that refers to itself.
@@ -146,7 +187,8 @@ export const GroupBlock = z.object({
 // a bad leaf keeps its precise message instead of a generic "invalid input".
 export const Block: z.ZodType<Block, z.ZodTypeDef, BlockInput> = z.discriminatedUnion("type", [
   GroupBlock,
-  LeafBlock,
+  QuestionBlock,
+  PresentationalBlock,
 ]);
 
 export function isGroup(block: Block): block is GroupBlock {
@@ -410,12 +452,10 @@ export function newBlock(
   taken?: Iterable<string>,
 ): LeafBlock {
   const id = newBlockId(taken);
-  const block: LeafBlock = {
-    id,
-    type,
-    label: BLOCK_META[type].question,
-    required: false,
-  };
+  // Built loosely, then checked as a whole: which fields apply depends on `type`.
+  const block: Record<string, unknown> = { id, type, label: BLOCK_META[type].question };
+  // Presentational blocks have no `required` at all (contract §1).
+  if (!isPresentationalType(type)) block.required = false;
   if (OPTION_TYPES.includes(type)) {
     block.options = ["Option 1", "Option 2", "Option 3"];
   }
@@ -431,7 +471,7 @@ export function newBlock(
   if (type === "image" || type === "video" || type === "audio" || type === "embed") {
     block.content = "";
   }
-  return { ...block, ...overrides };
+  return { ...block, ...overrides } as LeafBlock;
 }
 
 /** The label a new group gets (contract §2.5). */
@@ -558,7 +598,7 @@ export function conditionAnswerOptions(source: Block): readonly string[] | null 
  * blocks and `hidden` fields are not.
  */
 export function isAnswerable(block: Block): boolean {
-  return !isGroup(block) && !STATIC_TYPES.includes(block.type) && block.type !== "hidden";
+  return !isGroup(block) && !isPresentationalType(block.type) && !STATIC_TYPES.includes(block.type);
 }
 
 /* ---------- the block tree ---------- */

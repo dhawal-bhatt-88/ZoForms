@@ -71,6 +71,7 @@ import {
   conditionAnswerOptions,
   dependentsOf,
   formProblems,
+  isAnswerable,
   misorderedDependents,
   newBlock,
   NUMERIC_SOURCE_TYPES,
@@ -79,7 +80,6 @@ import {
   resolveTheme,
   sameContent,
   SOURCE_OPERATORS,
-  STATIC_TYPES,
   updateBlockInTree,
   type AnyBlockType,
   type Block,
@@ -166,8 +166,6 @@ const CATALOG: { group: string; items: CatalogItem[] }[] = [
       { type: "scale", keywords: "linear nps" },
       { type: "matrix", keywords: "grid table", soon: true },
       { type: "rating", keywords: "stars" },
-      { type: "payment", keywords: "stripe pay", soon: true },
-      { type: "signature", keywords: "sign", soon: true },
       { type: "ranking", keywords: "order rank" },
     ],
   },
@@ -196,7 +194,6 @@ const CATALOG: { group: string; items: CatalogItem[] }[] = [
     group: "Advanced",
     items: [
       { type: "hidden", keywords: "hidden field prefill" },
-      { type: "recaptcha", keywords: "spam captcha", soon: true },
       { type: "country", keywords: "geo location" },
     ],
   },
@@ -1509,7 +1506,8 @@ export default function EditorPage() {
                 </div>
               )}
 
-              {!STATIC_TYPES.includes(selected.type) && (
+              {/* Only questions can be required: not presentational blocks or groups. */}
+              {isAnswerable(selected) && (
                 <div className="flex items-center justify-between border-t border-line py-3 text-[13.5px]">
                   <span>Required</span>
                   <button
