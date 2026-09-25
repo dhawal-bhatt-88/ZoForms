@@ -10,16 +10,19 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragMoveEvent,
+  type DragOverEvent,
+  type DragStartEvent,
 } from "@dnd-kit/core";
 import {
   SortableContext,
-  arrayMove,
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import {
   AlignLeft,
+  ArrowDown,
   ArrowUp,
   AudioLines,
   BarChart3,
@@ -28,6 +31,7 @@ import {
   CheckSquare,
   ChevronDown,
   ChevronLeft,
+  ChevronRight,
   CircleDot,
   Clock,
   Code2,
@@ -67,27 +71,47 @@ import {
   Zap,
 } from "lucide-react";
 import {
+  allBlockIds,
   BLOCK_META,
   conditionAnswerOptions,
+  deletionBlockers,
   dependentsOf,
+  findBlock,
   formProblems,
+  insertBlockIntoTree,
   isAnswerable,
-  misorderedDependents,
+  isGroup,
+  moveBlockInTree,
+  moveBreaks,
   newBlock,
+  newGroup,
   NUMERIC_SOURCE_TYPES,
   OPTION_SOURCE_TYPES,
   OPTION_TYPES,
+  questionNumbers,
+  removeBlockFromTree,
   resolveTheme,
   sameContent,
-  SOURCE_OPERATORS,
+  sourceOperators,
+  unwrapGroup,
   updateBlockInTree,
+  walkBlocks,
   type AnyBlockType,
   type Block,
-  type BlockType,
   type Condition,
   type ConditionOperator,
   type FormSchema,
+  type GroupBlock,
+  type TreeEntry,
 } from "@formbuilder/form-schema";
+import {
+  flattenVisible,
+  getProjection,
+  moveDestinations,
+  stepMove,
+  type FlatItem,
+  type MoveTarget,
+} from "@/lib/tree-dnd";
 import {
   ApiError,
   downloadArtifact,
@@ -138,7 +162,7 @@ const ICONS: Record<AnyBlockType, typeof Type> = {
 };
 
 type CatalogItem = {
-  type: BlockType;
+  type: AnyBlockType;
   label?: string;
   keywords?: string;
   level?: number;
@@ -147,6 +171,10 @@ type CatalogItem = {
 
 /** The slash-menu block catalog, grouped by category. */
 const CATALOG: { group: string; items: CatalogItem[] }[] = [
+  {
+    group: "Structure",
+    items: [{ type: "group", label: "Group", keywords: "section fieldset container nest" }],
+  },
   {
     group: "Questions",
     items: [
@@ -199,6 +227,10 @@ const CATALOG: { group: string; items: CatalogItem[] }[] = [
   },
 ];
 
+function catalogLabel(item: CatalogItem): string {
+  return item.label ?? (item.type === "group" ? "Group" : BLOCK_META[item.type].label);
+}
+
 /** Notion-style slash / insert menu. Filters the catalog by a query string. */
 function BlockMenu({
   query,
@@ -218,7 +250,7 @@ function BlockMenu({
     group: g.group,
     items: g.items.filter((it) => {
       if (!q) return true;
-      const label = (it.label || BLOCK_META[it.type].label).toLowerCase();
+      const label = catalogLabel(it).toLowerCase();
       return label.includes(q) || (it.keywords || "").includes(q) || it.type.includes(q);
     }),
   })).filter((g) => g.items.length > 0);
@@ -258,7 +290,7 @@ function BlockMenu({
           </div>
           {g.items.map((it, i) => {
             const Icon = ICONS[it.type];
-            const label = it.label || BLOCK_META[it.type].label;
+            const label = catalogLabel(it);
             return (
               <button
                 key={it.type + i}
@@ -508,66 +540,360 @@ function BlockPreview({ block }: { block: Block }) {
   return <div className={box}>{ph}</div>;
 }
 
-function SortableBlock({
-  block,
+/* ---------- canvas: cards, group ends, dialogs ---------- */
+
+/** Horizontal step per nesting level on the canvas, in px. */
+const INDENT = 14;
+/** Indentation stops growing after this many levels, so deep nesting keeps its width. */
+const MAX_INDENT_LEVELS = 6;
+/** How far a drag must move sideways to change depth by one level, in px. */
+const DRAG_INDENT = 28;
+
+const indentFor = (depth: number) => Math.min(depth, MAX_INDENT_LEVELS) * INDENT;
+
+/** The thin rail that marks a row as inside a group. */
+function NestRail({ depth }: { depth: number }) {
+  if (depth === 0) return null;
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute bottom-1 top-1 w-[2px] rounded-full bg-line-2"
+      style={{ left: -INDENT + 4 }}
+    />
+  );
+}
+
+function CanvasCard({
+  item,
+  depth,
+  number,
   selected,
+  canMoveUp,
+  canMoveDown,
   onSelect,
   onDelete,
+  onMove,
+  onToggle,
 }: {
-  block: Block;
+  item: FlatItem;
+  /** Shown depth — the projected one while this card is being dragged. */
+  depth: number;
+  /** Question number, for answerable questions. */
+  number?: number;
   selected: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
   onSelect: () => void;
   onDelete: () => void;
+  onMove: (direction: -1 | 1) => void;
+  onToggle: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: block.id });
+    useSortable({ id: item.id });
+  const block = item.block;
+  const group = isGroup(block) ? block : null;
   const Icon = ICONS[block.type];
-  const style = { transform: CSS.Transform.toString(transform), transition };
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    transition,
+    marginLeft: indentFor(depth),
+  };
+  // Everything inside a collapsed group, so the author knows what's hidden.
+  const hiddenCount = group && item.collapsed ? walkBlocks(group.blocks).length : 0;
 
   return (
     <div
       ref={setNodeRef}
       style={style}
       data-block-id={block.id}
+      data-depth={depth}
       onClick={onSelect}
-      className={`group relative cursor-pointer rounded-xl border p-3.5 transition-colors ${
+      className={`group relative cursor-pointer rounded-xl border transition-colors ${
+        group ? "px-3.5 py-2.5" : "p-3.5"
+      } ${
         selected
           ? "border-accent bg-white ring-2 ring-accent-weak"
-          : "border-transparent hover:border-line-2 hover:bg-surface-2"
+          : group
+            ? "border-line bg-surface-2 hover:border-line-2"
+            : "border-transparent hover:border-line-2 hover:bg-surface-2"
       } ${isDragging ? "z-10 opacity-70 shadow-pop" : ""}`}
     >
-      <div className="mb-2.5 flex items-center gap-2">
+      <NestRail depth={depth} />
+      <div className={`flex items-center gap-2 ${group ? "" : "mb-2.5"} pr-[88px]`}>
         <button
           {...attributes}
           {...listeners}
           onClick={(e) => e.stopPropagation()}
-          className="cursor-grab text-faint opacity-0 transition-opacity hover:text-ink group-hover:opacity-100 active:cursor-grabbing"
+          className="cursor-grab text-faint opacity-0 transition-opacity hover:text-ink focus-visible:opacity-100 group-hover:opacity-100 active:cursor-grabbing"
           aria-label="Drag to reorder"
         >
           <GripVertical className="h-4 w-4" />
         </button>
+        {group && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+            aria-expanded={!item.collapsed}
+            aria-label={item.collapsed ? `Expand group "${group.label}"` : `Collapse group "${group.label}"`}
+            className="grid h-6 w-6 flex-none place-items-center rounded-md text-muted hover:bg-surface-3 hover:text-ink"
+          >
+            {item.collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </button>
+        )}
         <span className="grid h-[22px] w-[22px] flex-none place-items-center rounded-md bg-accent-weak text-accent-2">
           <Icon className="h-3.5 w-3.5" />
         </span>
-        <span className="font-semibold">{block.label}</span>
+        {number !== undefined && (
+          <span className="flex-none text-[13px] font-semibold tabular-nums text-muted">{number}.</span>
+        )}
+        <span className={`min-w-0 truncate font-semibold ${group && !group.label.trim() ? "italic text-faint" : ""}`}>
+          {group && !group.label.trim() ? "Unlabelled group" : block.label}
+        </span>
         {block.required && <span className="text-red">*</span>}
         {!!block.enableWhen?.length && (
-          <span className="rounded-full bg-accent-weak px-2 py-0.5 text-[11px] font-semibold text-accent-2">
+          <span className="flex-none rounded-full bg-accent-weak px-2 py-0.5 text-[11px] font-semibold text-accent-2">
             Conditional
           </span>
         )}
+        {depth > MAX_INDENT_LEVELS && (
+          <span className="flex-none rounded-full bg-surface-3 px-2 py-0.5 text-[11px] font-semibold text-muted">
+            Level {depth + 1}
+          </span>
+        )}
+        {group && item.collapsed && (
+          <span className="flex-none text-xs text-muted">
+            {hiddenCount} {hiddenCount === 1 ? "block" : "blocks"} inside
+          </span>
+        )}
       </div>
-      <BlockPreview block={block} />
+      {!group && <BlockPreview block={block} />}
+
+      {/* Visible on hover, and whenever focus is inside the card, so these work from the keyboard. */}
+      <div className="absolute right-2 top-2 flex gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onMove(-1);
+          }}
+          disabled={!canMoveUp}
+          className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-surface-3 hover:text-ink disabled:opacity-30"
+          aria-label="Move up"
+        >
+          <ArrowUp className="h-4 w-4" />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onMove(1);
+          }}
+          disabled={!canMoveDown}
+          className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-surface-3 hover:text-ink disabled:opacity-30"
+          aria-label="Move down"
+        >
+          <ArrowDown className="h-4 w-4" />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-[#FCECEC] hover:text-red"
+          aria-label={group ? "Delete group" : "Delete"}
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** The end of an open group: where its contents stop, and a way to add to it. */
+function GroupEnd({
+  group,
+  depth,
+  onAdd,
+}: {
+  group: GroupBlock;
+  depth: number;
+  onAdd: (anchor: HTMLElement) => void;
+}) {
+  const name = group.label.trim() || "this group";
+  return (
+    <div className="relative" style={{ marginLeft: indentFor(depth) }}>
+      <NestRail depth={depth} />
       <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete();
-        }}
-        className="absolute right-2.5 top-2.5 grid h-7 w-7 place-items-center rounded-md text-faint opacity-0 transition-opacity hover:bg-[#FCECEC] hover:text-red group-hover:opacity-100"
-        aria-label="Delete"
+        onClick={(e) => onAdd(e.currentTarget)}
+        className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] hover:bg-surface-2 hover:text-accent-2 ${
+          group.blocks.length ? "text-muted" : "text-amber"
+        }`}
       >
-        <Trash2 className="h-4 w-4" />
+        <Plus className="h-3.5 w-3.5" />
+        {group.blocks.length ? `Add to "${name}"` : `"${name}" is empty — add a block to it`}
       </button>
+    </div>
+  );
+}
+
+/** "Show when <question> <condition> <answer>", as the author would say it. */
+function describeCondition(c: Condition, blocks: readonly Block[]): string {
+  const source = findBlock(blocks, c.question)?.block;
+  const answer = c.operator === "exists" ? "" : ` ${c.answer}`;
+  return `Show when ${source ? source.label : "a missing question"} ${OPERATOR_TEXT[c.operator]}${answer}`;
+}
+
+/**
+ * The two ways to delete a group. Keeping its questions moves them up to where
+ * the group was; the group's own conditions don't carry over, so the dialog says
+ * which conditions stop applying and to how many questions.
+ */
+function DeleteGroupDialog({
+  group,
+  blocks,
+  onKeep,
+  onDeleteAll,
+  onClose,
+}: {
+  group: GroupBlock;
+  blocks: readonly Block[];
+  onKeep: () => void;
+  onDeleteAll: () => void;
+  onClose: () => void;
+}) {
+  const inside = walkBlocks(group.blocks);
+  const questions = inside.filter((e) => isAnswerable(e.block)).length;
+  const name = group.label.trim() || "this group";
+  const conditions = group.enableWhen ?? [];
+  const whom =
+    questions === 0 ? "its contents" : questions === 1 ? "this question" : `these ${questions} questions`;
+  const quoted = conditions.map((c) => `'${describeCondition(c, blocks)}'`);
+  const conditionNote =
+    conditions.length === 0
+      ? null
+      : `The ${conditions.length === 1 ? "condition" : "conditions"} ${quoted.join(
+          group.enableBehavior === "any" ? " or " : " and ",
+        )} will no longer apply to ${whom}.`;
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-group-title"
+        className="w-full max-w-md rounded-2xl bg-surface p-5 shadow-pop"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.key === "Escape" && onClose()}
+      >
+        <h2 id="delete-group-title" className="text-base font-semibold">
+          Delete the group &quot;{name}&quot;?
+        </h2>
+        <p className="mt-1 text-sm text-muted">
+          It contains {inside.length} {inside.length === 1 ? "block" : "blocks"}. Choose what happens to them.
+        </p>
+        <div className="mt-4 flex flex-col gap-2">
+          <button
+            autoFocus
+            onClick={onKeep}
+            className="rounded-xl border border-line-2 px-4 py-3 text-left hover:border-accent hover:bg-accent-weak"
+          >
+            <span className="block text-sm font-semibold">Group only (keep questions)</span>
+            <span className="mt-0.5 block text-[13px] text-muted">
+              Its contents move up to where the group is now, in the same order.
+            </span>
+            {conditionNote && (
+              <span className="mt-1.5 block rounded-md bg-[#FBF0D9] px-2 py-1.5 text-[13px] text-ink-2">
+                {conditionNote}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={onDeleteAll}
+            className="rounded-xl border border-line-2 px-4 py-3 text-left hover:border-red hover:bg-[#FCECEC]"
+          >
+            <span className="block text-sm font-semibold text-red">Group and its questions</span>
+            <span className="mt-0.5 block text-[13px] text-muted">
+              Deletes the group and all {inside.length} {inside.length === 1 ? "block" : "blocks"} inside it.
+            </span>
+          </button>
+        </div>
+        <div className="mt-4 flex justify-end">
+          <button onClick={onClose} className="btn btn-outline btn-sm">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Keyboard-friendly moving: up, down (stepping out of a group at its ends) and
+ * straight into any group. Every move goes through the same dependency guard as
+ * dragging.
+ */
+function PositionPanel({
+  blocks,
+  blockId,
+  onMove,
+}: {
+  blocks: readonly Block[];
+  blockId: string;
+  onMove: (target: MoveTarget) => void;
+}) {
+  const [destination, setDestination] = useState("");
+  const up = stepMove(blocks, blockId, -1);
+  const down = stepMove(blocks, blockId, 1);
+  const destinations = moveDestinations(blocks, blockId);
+  const ROOT = "__top_level__";
+
+  function moveInto() {
+    if (!destination) return;
+    const parentId = destination === ROOT ? null : destination;
+    const target = parentId ? findBlock(blocks, parentId)?.block : null;
+    // Appended at the end: the moving block isn't among the destination's children.
+    const index = target && isGroup(target) ? target.blocks.length : blocks.length;
+    onMove({ parentId, index });
+    setDestination("");
+  }
+
+  return (
+    <div className="mt-3 border-t border-line pt-3">
+      <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-faint">Position</h4>
+      <div className="mb-2 flex gap-1.5">
+        <button
+          onClick={() => up && onMove(up)}
+          disabled={!up}
+          className="btn btn-outline btn-sm flex-1 disabled:opacity-40"
+        >
+          <ArrowUp className="h-3.5 w-3.5" /> Move up
+        </button>
+        <button
+          onClick={() => down && onMove(down)}
+          disabled={!down}
+          className="btn btn-outline btn-sm flex-1 disabled:opacity-40"
+        >
+          <ArrowDown className="h-3.5 w-3.5" /> Move down
+        </button>
+      </div>
+      <div className="flex gap-1.5">
+        <select
+          aria-label="Move to group"
+          value={destination}
+          onChange={(e) => setDestination(e.target.value)}
+          className="min-w-0 flex-1 rounded-lg border border-line-2 bg-surface px-2 py-1.5 text-[13px] outline-none focus:border-accent"
+        >
+          <option value="">Move to group…</option>
+          {destinations.map((d) => (
+            <option key={d.id ?? ROOT} value={d.id ?? ROOT}>
+              {d.id === null ? "Top level (outside any group)" : d.path.join(" › ")}
+            </option>
+          ))}
+        </select>
+        <button onClick={moveInto} disabled={!destination} className="btn btn-outline btn-sm disabled:opacity-40">
+          Move
+        </button>
+      </div>
     </div>
   );
 }
@@ -668,7 +994,12 @@ function AnswerInput({
   );
 }
 
-/** "Show this question only when…" — edits a block's enableWhen / enableBehavior. */
+/**
+ * "Show this question/group only when…" — edits a block's enableWhen /
+ * enableBehavior. Sources are the eligible questions that come before this block
+ * in reading order, numbered as on the canvas and listed under the path of
+ * groups they sit in.
+ */
 function ConditionsPanel({
   block,
   blocks,
@@ -678,14 +1009,39 @@ function ConditionsPanel({
   blocks: Block[];
   onChange: (p: Partial<Block>) => void;
 }) {
-  const at = blocks.findIndex((b) => b.id === block.id);
-  // Only questions above can be used, which also rules out cycles.
-  const sources = blocks.slice(0, at).filter((b) => SOURCE_OPERATORS[b.type]);
-  const number = new Map(blocks.map((b, i) => [b.id, i + 1]));
+  const entries = walkBlocks(blocks);
+  const at = entries.find((e) => e.block.id === block.id)?.order ?? entries.length;
+  // Only questions before it in reading order can be used, which also rules out cycles.
+  const sources = entries.filter((e) => e.order < at && sourceOperators(e.block));
+  const numbers = questionNumbers(blocks);
+  const noun = isGroup(block) ? "group" : "question";
   const conditions = block.enableWhen ?? [];
   const problems = formProblems({ blocks })
     .filter((p) => p.blockId === block.id)
     .map((p) => p.detail);
+
+  // Consecutive sources in the same group share one <optgroup> labelled with its path.
+  const runs: { path: string; entries: TreeEntry[] }[] = [];
+  for (const e of sources) {
+    const path = e.ancestors.map((a) => a.label).join(" › ");
+    const last = runs[runs.length - 1];
+    if (last && last.path === path) last.entries.push(e);
+    else runs.push({ path, entries: [e] });
+  }
+  const sourceOptions = runs.map((run, r) => {
+    const options = run.entries.map((e) => (
+      <option key={e.block.id} value={e.block.id}>
+        {numbers.get(e.block.id)}. {e.block.label}
+      </option>
+    ));
+    return run.path ? (
+      <optgroup key={r} label={run.path}>
+        {options}
+      </optgroup>
+    ) : (
+      options
+    );
+  });
 
   // No conditions -> drop both fields; "all" is the default, so it's left implicit.
   const commit = (next: Condition[], behavior = block.enableBehavior) =>
@@ -699,7 +1055,7 @@ function ConditionsPanel({
   return (
     <div className="border-t border-line pt-3">
       <h4 className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-faint">Logic</h4>
-      <p className="mb-2 text-[12.5px] font-semibold text-ink-2">Show this question only when…</p>
+      <p className="mb-2 text-[12.5px] font-semibold text-ink-2">Show this {noun} only when…</p>
 
       {conditions.length >= 2 && (
         <div className="mb-2 flex items-center gap-2 text-[12.5px] text-muted">
@@ -722,9 +1078,9 @@ function ConditionsPanel({
 
       <div className="flex flex-col gap-2">
         {conditions.map((c, i) => {
-          const source = blocks.find((b) => b.id === c.question);
-          const eligible = !!source && sources.includes(source);
-          const operators = source ? (SOURCE_OPERATORS[source.type] ?? []) : [];
+          const source = findBlock(blocks, c.question)?.block;
+          const eligible = !!source && sources.some((e) => e.block.id === source.id);
+          const operators = source ? (sourceOperators(source) ?? []) : [];
           return (
             <div key={i} className="rounded-lg border border-line bg-surface-2 p-2">
               <div className="mb-1.5 flex items-center gap-1.5">
@@ -732,8 +1088,8 @@ function ConditionsPanel({
                   aria-label="Question"
                   value={c.question}
                   onChange={(e) => {
-                    const next = blocks.find((b) => b.id === e.target.value)!;
-                    const ops = SOURCE_OPERATORS[next.type] ?? [];
+                    const next = findBlock(blocks, e.target.value)!.block;
+                    const ops = sourceOperators(next) ?? [];
                     setAt(i, retarget(c, next, ops.includes(c.operator) ? c.operator : "exists"));
                   }}
                   className={logicField}
@@ -741,11 +1097,7 @@ function ConditionsPanel({
                   {!eligible && (
                     <option value={c.question}>{source ? source.label : "Missing question"}</option>
                   )}
-                  {sources.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {number.get(s.id)}. {s.label}
-                    </option>
-                  ))}
+                  {sourceOptions}
                 </select>
                 <button
                   onClick={() => commit(conditions.filter((_, k) => k !== i))}
@@ -790,8 +1142,8 @@ function ConditionsPanel({
       {sources.length ? (
         <button
           onClick={() =>
-            // Default to the nearest eligible question above, "is answered".
-            commit([...conditions, { question: sources[sources.length - 1].id, operator: "exists" }])
+            // Default to the nearest eligible question before it, "is answered".
+            commit([...conditions, { question: sources[sources.length - 1].block.id, operator: "exists" }])
           }
           className="mt-2 flex items-center gap-1.5 text-sm font-medium text-accent-2 hover:underline"
         >
@@ -799,7 +1151,7 @@ function ConditionsPanel({
         </button>
       ) : (
         <p className="text-xs text-muted">
-          Only questions above this one can be used. Add or move a question above it first.
+          Only questions before this {noun} can be used. Add or move a question before it first.
         </p>
       )}
     </div>
@@ -836,6 +1188,14 @@ export default function EditorPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuQuery, setMenuQuery] = useState("");
   const [menuAnchor, setMenuAnchor] = useState({ left: 0, top: 0 });
+  // Where the insert menu puts the next block; null = decided by the selection.
+  const [insertTarget, setInsertTarget] = useState<MoveTarget | null>(null);
+  // Groups folded on the canvas. Editor-only state: never saved.
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  // The group whose delete dialog is open.
+  const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
+  // A drag in progress: the block, the row it's over, and how far it has moved sideways.
+  const [drag, setDrag] = useState<{ activeId: string; overId: string; offsetX: number } | null>(null);
   const insertRowRef = useRef<HTMLDivElement>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -959,8 +1319,9 @@ export default function EditorPage() {
     }
   }
 
-  const openMenu = () => {
-    const r = insertRowRef.current?.getBoundingClientRect();
+  const openMenu = (anchor?: HTMLElement | null, target: MoveTarget | null = null) => {
+    setInsertTarget(target);
+    const r = (anchor ?? insertRowRef.current)?.getBoundingClientRect();
     if (r) {
       const vw = window.innerWidth || 1280;
       const vh = window.innerHeight || 800;
@@ -972,38 +1333,63 @@ export default function EditorPage() {
     setMenuOpen(true);
   };
 
-  const insertFromCatalog = (item: CatalogItem) => {
-    const b = newBlock(
-      item.type,
-      item.level ? { level: item.level } : undefined,
-      schema?.blocks.map((x) => x.id),
-    );
-    patch((s) => {
-      const idx = selectedId ? s.blocks.findIndex((x) => x.id === selectedId) : -1;
-      const at = idx >= 0 ? idx + 1 : s.blocks.length;
-      const blocks = [...s.blocks];
-      blocks.splice(at, 0, b);
-      return { ...s, blocks };
+  /**
+   * Where a new block goes when no explicit target was chosen: inside the
+   * selected group (at its end), or just after the selected block in its group,
+   * or at the end of the form.
+   */
+  function selectionInsertTarget(): MoveTarget {
+    const entry = schema && selectedId ? findBlock(schema.blocks, selectedId) : undefined;
+    if (!schema || !entry) return { parentId: null, index: schema?.blocks.length ?? 0 };
+    if (isGroup(entry.block)) return { parentId: entry.block.id, index: entry.block.blocks.length };
+    const parent = entry.ancestors[entry.ancestors.length - 1];
+    return { parentId: parent?.id ?? null, index: entry.path[entry.path.length - 1] + 1 };
+  }
+
+  const expand = (...groupIds: string[]) =>
+    setCollapsed((c) => {
+      if (!groupIds.some((g) => c.has(g))) return c;
+      const next = new Set(c);
+      for (const g of groupIds) next.delete(g);
+      return next;
     });
+
+  const insertFromCatalog = (item: CatalogItem) => {
+    if (!schema) return;
+    const taken = allBlockIds(schema.blocks);
+    const b: Block =
+      item.type === "group"
+        ? newGroup(taken)
+        : newBlock(item.type, item.level ? { level: item.level } : undefined, taken);
+    const target = insertTarget ?? selectionInsertTarget();
+    patch((s) => ({ ...s, blocks: insertBlockIntoTree(s.blocks, target.parentId, target.index, b) }));
+    if (target.parentId) expand(target.parentId);
     setSelectedId(b.id);
     setMenuOpen(false);
     setMenuQuery("");
+    setInsertTarget(null);
   };
-  /** Select a block and bring it into view (used by the "jump to" links). */
+  /** Select a block and bring it into view (used by the "jump to" links), opening any folded groups around it. */
   function jumpTo(bid: string) {
+    const entry = schema ? findBlock(schema.blocks, bid) : undefined;
+    if (entry) expand(...entry.ancestors.map((a) => a.id));
     setSelectedId(bid);
-    document
-      .querySelector(`[data-block-id="${bid.replace(/["\\]/g, "\\$&")}"]`)
-      ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    // After the expanded groups have rendered.
+    setTimeout(() => {
+      document
+        .querySelector(`[data-block-id="${bid.replace(/["\\]/g, "\\$&")}"]`)
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 50);
   }
 
   /*
    * Dependency guards: other blocks' conditions reference a source block by id,
-   * by position (sources must sit above) and by option text. These edits would
-   * silently break those conditions, so they're refused, naming the dependents.
+   * by reading order (sources must come first) and by option text. These edits
+   * would silently break those conditions, so they're refused, naming the
+   * dependents — wherever in the tree they are.
    */
   const updateBlock = (bid: string, p: Partial<Block>) => {
-    const current = schema?.blocks.find((b) => b.id === bid);
+    const current = schema ? findBlock(schema.blocks, bid)?.block : undefined;
     if (schema && current) {
       if (p.type && p.type !== current.type) {
         const deps = dependentsOf(schema.blocks, bid);
@@ -1039,19 +1425,91 @@ export default function EditorPage() {
       blocks: updateBlockInTree(s.blocks, bid, (b) => ({ ...b, ...p }) as Block),
     }));
   };
+
+  /** Delete a question or layout block. A group opens the two-choice dialog instead. */
   const removeBlock = (bid: string) => {
-    const current = schema?.blocks.find((b) => b.id === bid);
-    const deps = schema ? dependentsOf(schema.blocks, bid) : [];
-    if (current && deps.length) {
+    if (!schema) return;
+    const current = findBlock(schema.blocks, bid)?.block;
+    if (!current) return;
+    if (isGroup(current)) {
+      setDeletingGroupId(bid);
+      return;
+    }
+    const deps = deletionBlockers(schema.blocks, bid);
+    if (deps.length) {
       setNotice({
         text: `Can't delete "${current.label}" — these questions have conditions that depend on it:`,
         blocks: deps,
       });
       return;
     }
-    patch((s) => ({ ...s, blocks: s.blocks.filter((b) => b.id !== bid) }));
+    patch((s) => ({ ...s, blocks: removeBlockFromTree(s.blocks, bid) }));
     setSelectedId((cur) => (cur === bid ? null : cur));
   };
+
+  /** Delete a group but keep its contents where it was. Its own conditions go with it. */
+  function deleteGroupKeepingContents(gid: string) {
+    if (!schema) return;
+    setDeletingGroupId(null);
+    const next = unwrapGroup(schema.blocks, gid);
+    // Unwrapping never changes reading order, but it goes through the same guard as any move.
+    const broken = moveBreaks(schema.blocks, next);
+    if (broken.length) {
+      setNotice({
+        text: "Can't remove that group — these questions would end up before a question their conditions depend on:",
+        blocks: broken,
+      });
+      return;
+    }
+    patch((s) => ({ ...s, blocks: unwrapGroup(s.blocks, gid) }));
+    setSelectedId((cur) => (cur === gid ? null : cur));
+  }
+
+  /** Delete a group and everything in it — refused while anything outside depends on something inside. */
+  function deleteGroupWithContents(gid: string) {
+    if (!schema) return;
+    setDeletingGroupId(null);
+    const group = findBlock(schema.blocks, gid)?.block;
+    const deps = deletionBlockers(schema.blocks, gid);
+    if (deps.length) {
+      setNotice({
+        text: `Can't delete "${group?.label ?? "the group"}" and its questions — these questions outside it have conditions that depend on something inside it:`,
+        blocks: deps,
+      });
+      return;
+    }
+    patch((s) => ({ ...s, blocks: removeBlockFromTree(s.blocks, gid) }));
+    setSelectedId(null);
+  }
+
+  /**
+   * Every move — drag, the arrow buttons, "Move to group…" — comes through here.
+   * A group moves with everything inside it. Refused if afterwards any condition
+   * in the form would use a question that no longer comes before it.
+   */
+  function tryMove(bid: string, target: MoveTarget) {
+    if (!schema) return;
+    const moving = findBlock(schema.blocks, bid)?.block;
+    if (!moving) return;
+    let next: Block[];
+    try {
+      next = moveBlockInTree(schema.blocks, bid, target.parentId, target.index);
+    } catch (e) {
+      setNotice({ text: (e as Error).message });
+      return;
+    }
+    const broken = moveBreaks(schema.blocks, next);
+    if (broken.length) {
+      setNotice({
+        text: `Can't move "${moving.label}" there — these questions would end up before a question their conditions depend on:`,
+        blocks: broken,
+      });
+      return;
+    }
+    if (target.parentId) expand(target.parentId);
+    patch((s) => ({ ...s, blocks: next }));
+  }
+
   const updateSettings = (p: {
     submitLabel?: string;
     redirectUrl?: string;
@@ -1102,24 +1560,32 @@ export default function EditorPage() {
     }
   }
 
+  /* Dragging: one flat list of the visible rows; sideways movement sets depth. */
+  const dragItems = (activeId: string | null) =>
+    schema ? flattenVisible(schema.blocks, collapsed, activeId) : [];
+
+  function onDragStart(e: DragStartEvent) {
+    const id = String(e.active.id);
+    setDrag({ activeId: id, overId: id, offsetX: 0 });
+  }
+  function onDragMove(e: DragMoveEvent) {
+    setDrag((d) => (d ? { ...d, offsetX: e.delta.x } : d));
+  }
+  function onDragOver(e: DragOverEvent) {
+    const over = e.over;
+    if (over) setDrag((d) => (d ? { ...d, overId: String(over.id) } : d));
+  }
   function onDragEnd(e: DragEndEvent) {
-    const { active, over } = e;
-    if (!schema || !over || active.id === over.id) return;
-    const oldIndex = schema.blocks.findIndex((b) => b.id === active.id);
-    const newIndex = schema.blocks.findIndex((b) => b.id === over.id);
-    if (oldIndex < 0 || newIndex < 0) return;
-    const next = arrayMove(schema.blocks, oldIndex, newIndex);
-    // Refuse only breakage this move causes, so an already-broken form can still be rearranged.
-    const alreadyBroken = new Set(misorderedDependents(schema.blocks).map((b) => b.id));
-    const broken = misorderedDependents(next).filter((b) => !alreadyBroken.has(b.id));
-    if (broken.length) {
-      setNotice({
-        text: `Can't move "${schema.blocks[oldIndex].label}" there — these questions would end up above a question their conditions depend on:`,
-        blocks: broken,
-      });
-      return;
-    }
-    patch((s) => ({ ...s, blocks: next }));
+    setDrag(null);
+    if (!e.over || !schema) return;
+    const activeId = String(e.active.id);
+    const projection = getProjection(dragItems(activeId), activeId, String(e.over.id), e.delta.x, DRAG_INDENT);
+    if (!projection) return;
+    const entry = findBlock(schema.blocks, activeId);
+    const currentParent = entry?.ancestors[entry.ancestors.length - 1]?.id ?? null;
+    const currentIndex = entry ? entry.path[entry.path.length - 1] : -1;
+    if (projection.parentId === currentParent && projection.index === currentIndex) return; // dropped in place
+    tryMove(activeId, { parentId: projection.parentId, index: projection.index });
   }
 
   const shareUrl =
@@ -1156,7 +1622,72 @@ export default function EditorPage() {
       </div>
     );
 
-  const selected = schema.blocks.find((b) => b.id === selectedId) ?? null;
+  const selected = selectedId ? (findBlock(schema.blocks, selectedId)?.block ?? null) : null;
+  const numbers = questionNumbers(schema.blocks);
+  // While a group is dragged, its contents travel with it as one row.
+  const rows = flattenVisible(schema.blocks, collapsed, drag?.activeId ?? null);
+  const projection = drag
+    ? getProjection(rows, drag.activeId, drag.overId, drag.offsetX, DRAG_INDENT)
+    : null;
+  const deletingGroup = deletingGroupId ? findBlock(schema.blocks, deletingGroupId)?.block : undefined;
+  const autoTarget = selectionInsertTarget();
+  const autoTargetGroup = autoTarget.parentId ? findBlock(schema.blocks, autoTarget.parentId)?.block : undefined;
+
+  /** Cards in reading order, with an "end of group" row after each open group's contents. */
+  function canvasRows() {
+    const out: React.ReactNode[] = [];
+    const open: FlatItem[] = [];
+    const closeGroupsDownTo = (depth: number) => {
+      while (open.length && open[open.length - 1].depth >= depth) {
+        const g = open.pop()!;
+        // Hidden while dragging, so the drop targets don't jump around.
+        if (!drag && isGroup(g.block)) {
+          out.push(
+            <GroupEnd
+              key={`end-${g.id}`}
+              group={g.block}
+              depth={g.depth + 1}
+              onAdd={(anchor) =>
+                openMenu(anchor, { parentId: g.id, index: (g.block as GroupBlock).blocks.length })
+              }
+            />,
+          );
+        }
+      }
+    };
+    for (const item of rows) {
+      closeGroupsDownTo(item.depth);
+      const step = { up: stepMove(schema!.blocks, item.id, -1), down: stepMove(schema!.blocks, item.id, 1) };
+      out.push(
+        <CanvasCard
+          key={item.id}
+          item={item}
+          depth={drag?.activeId === item.id && projection ? projection.depth : item.depth}
+          number={numbers.get(item.id)}
+          selected={item.id === selectedId}
+          canMoveUp={!!step.up}
+          canMoveDown={!!step.down}
+          onSelect={() => setSelectedId(item.id)}
+          onDelete={() => removeBlock(item.id)}
+          onMove={(direction) => {
+            const target = direction === -1 ? step.up : step.down;
+            if (target) tryMove(item.id, target);
+          }}
+          onToggle={() =>
+            setCollapsed((c) => {
+              const next = new Set(c);
+              if (next.has(item.id)) next.delete(item.id);
+              else next.add(item.id);
+              return next;
+            })
+          }
+        />,
+      );
+      if (item.isGroup && !item.collapsed && item.id !== drag?.activeId) open.push(item);
+    }
+    closeGroupsDownTo(0);
+    return out;
+  }
   const fieldCls =
     "w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent-weak";
 
@@ -1245,6 +1776,16 @@ export default function EditorPage() {
         </div>
       </header>
 
+      {deletingGroup && isGroup(deletingGroup) && (
+        <DeleteGroupDialog
+          group={deletingGroup}
+          blocks={schema.blocks}
+          onKeep={() => deleteGroupKeepingContents(deletingGroup.id)}
+          onDeleteAll={() => deleteGroupWithContents(deletingGroup.id)}
+          onClose={() => setDeletingGroupId(null)}
+        />
+      )}
+
       {notice && (
         <div
           role="alert"
@@ -1293,22 +1834,17 @@ export default function EditorPage() {
               />
 
               <div className="mt-6">
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-                  <SortableContext
-                    items={schema.blocks.map((b) => b.id)}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    <div className="flex flex-col gap-2.5">
-                      {schema.blocks.map((b) => (
-                        <SortableBlock
-                          key={b.id}
-                          block={b}
-                          selected={b.id === selectedId}
-                          onSelect={() => setSelectedId(b.id)}
-                          onDelete={() => removeBlock(b.id)}
-                        />
-                      ))}
-                    </div>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragStart={onDragStart}
+                  onDragMove={onDragMove}
+                  onDragOver={onDragOver}
+                  onDragEnd={onDragEnd}
+                  onDragCancel={() => setDrag(null)}
+                >
+                  <SortableContext items={rows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
+                    <div className="flex flex-col gap-2.5">{canvasRows()}</div>
                   </SortableContext>
                 </DndContext>
               </div>
@@ -1316,7 +1852,7 @@ export default function EditorPage() {
               {/* Notion-style slash inserter */}
               <div ref={insertRowRef} className="mt-3 flex items-center gap-2 rounded-lg px-1 py-1">
                 <button
-                  onClick={openMenu}
+                  onClick={() => openMenu()}
                   className="grid h-7 w-7 flex-none place-items-center rounded-md border border-line-2 text-muted transition-colors hover:bg-surface-3 hover:text-ink"
                   title="Insert a block"
                 >
@@ -1331,7 +1867,11 @@ export default function EditorPage() {
                       openMenu();
                     }
                   }}
-                  placeholder="Type / to insert a block, or click +"
+                  placeholder={
+                    autoTargetGroup
+                      ? `Type / to add a block to "${autoTargetGroup.label.trim() || "this group"}", or click +`
+                      : "Type / to insert a block, or click +"
+                  }
                   className="flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
                   spellCheck={false}
                 />
@@ -1376,20 +1916,30 @@ export default function EditorPage() {
         <aside className="overflow-auto border-l border-line bg-surface p-4">
           {selected ? (
             <div key={selected.id}>
-              <h4 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-faint">Question</h4>
-              <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Label</label>
+              <h4 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-faint">
+                {isGroup(selected) ? "Group" : "Question"}
+              </h4>
+              <label htmlFor="block-label" className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">
+                Label
+              </label>
               <input
+                id="block-label"
                 value={selected.label}
                 onChange={(e) => updateBlock(selected.id, { label: e.target.value })}
                 className={`${fieldCls} mb-3`}
               />
-              <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Help text</label>
-              <input
-                value={selected.description ?? ""}
-                onChange={(e) => updateBlock(selected.id, { description: e.target.value })}
-                placeholder="Optional"
-                className={`${fieldCls} mb-4`}
-              />
+              {/* Groups have no help text (contract §1). */}
+              {!isGroup(selected) && (
+                <>
+                  <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Help text</label>
+                  <input
+                    value={selected.description ?? ""}
+                    onChange={(e) => updateBlock(selected.id, { description: e.target.value })}
+                    placeholder="Optional"
+                    className={`${fieldCls} mb-4`}
+                  />
+                </>
+              )}
 
               {["text", "title", "label"].includes(selected.type) && (
                 <div className="mb-4">
@@ -1528,6 +2078,15 @@ export default function EditorPage() {
                 blocks={schema.blocks}
                 onChange={(p) => updateBlock(selected.id, p)}
               />
+              <PositionPanel blocks={schema.blocks} blockId={selected.id} onMove={(t) => tryMove(selected.id, t)} />
+              {isGroup(selected) && (
+                <button
+                  onClick={() => setDeletingGroupId(selected.id)}
+                  className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line-2 px-3 py-1.5 text-sm font-medium text-red hover:bg-[#FCECEC]"
+                >
+                  <Trash2 className="h-4 w-4" /> Delete group…
+                </button>
+              )}
             </div>
           ) : (
             <div>
