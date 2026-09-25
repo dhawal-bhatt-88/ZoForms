@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   Block,
-  conditionProblems,
+  formProblems,
   COUNTRY_OPTIONS,
   dependentsOf,
   emptyForm,
@@ -11,7 +11,7 @@ import {
   newBlockId,
   resolveTheme,
   validateSubmission,
-  type Block as TBlock,
+  type LeafBlock as TBlock,
   type Condition,
 } from "./index";
 
@@ -116,9 +116,9 @@ describe("Condition schema", () => {
   });
 });
 
-describe("conditionProblems", () => {
+describe("formProblems", () => {
   const choice = q("a", "choice", { options: ["Yes", "No"] });
-  const problems = (...blocks: TBlock[]) => conditionProblems({ blocks }).map((p) => p.message);
+  const problems = (...blocks: TBlock[]) => formProblems({ blocks }).map((p) => p.message);
 
   it("accepts a valid condition on a question above", () => {
     expect(problems(choice, when(q("b", "short"), { question: "a", operator: "=", answer: "Yes" }))).toEqual([]);

@@ -25,11 +25,11 @@ navigation?: {
 ```
 
 - The children field is `blocks`, the same name as the form's root array.
-- `enableWhen` / `enableBehavior` have the existing contract. `enableBehavior` is stored only as `"any"`; absent means all.
+- `enableWhen` / `enableBehavior` have the existing contract. The builder stores only `"any"`; absent means all. The renderer also accepts an explicit `"all"`.
 - No `mode` field: a form is **paged if and only if its root contains pages**.
 - The page `title` is the wizard step name. There is no separate step-name field.
 - `navigation` is ignored when the form is not paged.
-- `schemaVersion` becomes **2**. Renderer 1.3.0+ accepts 1 and 2 (v1 = v2 without groups/pages).
+- `schemaVersion` becomes **2**. The first renderer release with groups (0.5.0) and later accept 1 and 2 (v1 = v2 without groups/pages). All integrity checks in section 6 apply to v1 schemas too.
 - Groups and pages have no value, no `required`, no `completeRequired`.
 
 ## 2. Structure rules
@@ -40,6 +40,7 @@ navigation?: {
 4. Block ids are unique across the whole tree, including group and page ids.
 5. `label` (group) and `title` (page) are required and non-blank. The builder defaults them to "Untitled group" / "Untitled page".
 6. Empty group or page (`blocks: []`): **builder rejects at save**; **renderer renders nothing** for it (does not throw).
+7. **Effectively empty:** a group or page with no *displayable* descendant — every descendant is hidden by conditions, or is a `hidden`-type block — is treated as not visible. Its heading and rule are not rendered. In paged mode, such a page is skipped and not counted in progress. This is computed in `/core`, not in `/react`. It has no effect on the payload.
 
 ## 3. Condition rules
 
@@ -62,7 +63,7 @@ navigation?: {
 ## 5. Payload
 
 Unchanged. `answers` stays a flat map keyed by block id. Groups and pages contribute nothing.
-The payload filter (visible blocks only; unknown ids dropped) now walks the tree.
+The payload filter now walks the tree and keeps only **visible answerable questions**. Unknown ids, groups, pages and presentational blocks are dropped. "Answerable" is one list in `/core`, shared by validation and the payload filter.
 
 ## 6. Integrity checks
 

@@ -66,7 +66,8 @@ export const Condition = z
   });
 export type Condition = z.infer<typeof Condition>;
 
-export const Block = z.object({
+/** A question or presentational block — anything that isn't a group. */
+export const LeafBlock = z.object({
   id: z.string(),
   type: BlockType,
   label: z.string().min(1),
@@ -89,7 +90,68 @@ export const Block = z.object({
   /** How `enableWhen` combines. Absent means "all". */
   enableBehavior: z.enum(["all", "any"]).optional(),
 });
-export type Block = z.infer<typeof Block>;
+export type LeafBlock = z.infer<typeof LeafBlock>;
+
+/*
+ * Groups — docs/GROUPS-AND-PAGES-CONTRACT.md §1. A group holds other blocks,
+ * including groups, to any depth. It has none of a leaf's own fields — no value,
+ * no `required`, no help text, no options — and those keys are stripped if sent.
+ * The type declares each of them as `never`, so code can read any of them off
+ * any block, group or not, and simply get undefined for a group.
+ */
+type NoLeafFields = {
+  [K in Exclude<keyof LeafBlock, "id" | "type" | "label" | "enableWhen" | "enableBehavior">]?: never;
+};
+
+export interface GroupBlock extends NoLeafFields {
+  id: string;
+  type: "group";
+  label: string;
+  enableWhen?: Condition[];
+  enableBehavior?: "all" | "any";
+  blocks: Block[];
+}
+
+/** Any block's `type`: a leaf block type, or "group". */
+export type AnyBlockType = BlockType | "group";
+interface GroupBlockInput {
+  id: string;
+  type: "group";
+  label: string;
+  enableWhen?: z.input<typeof Condition>[];
+  enableBehavior?: "all" | "any";
+  blocks: BlockInput[];
+}
+
+/** Any entry in a `blocks` array: a leaf block or a group. */
+export type Block = LeafBlock | GroupBlock;
+export type BlockInput = z.input<typeof LeafBlock> | GroupBlockInput;
+
+// Lazy, so a group's children can themselves be groups. Annotated explicitly
+// because TypeScript can't infer a type that refers to itself.
+const childBlocks: z.ZodType<Block[], z.ZodTypeDef, BlockInput[]> = z.lazy(() => z.array(Block));
+
+export const GroupBlock = z.object({
+  id: z.string(),
+  type: z.literal("group"),
+  // Blank labels parse, so the save rules can reject them with a message that
+  // names the group, rather than a generic schema error.
+  label: z.string(),
+  enableWhen: z.array(Condition).optional(),
+  enableBehavior: z.enum(["all", "any"]).optional(),
+  blocks: childBlocks,
+});
+
+// A discriminated union reports errors from the one branch matching `type`, so
+// a bad leaf keeps its precise message instead of a generic "invalid input".
+export const Block: z.ZodType<Block, z.ZodTypeDef, BlockInput> = z.discriminatedUnion("type", [
+  GroupBlock,
+  LeafBlock,
+]);
+
+export function isGroup(block: Block): block is GroupBlock {
+  return block.type === "group";
+}
 
 export const FormTheme = z.object({
   accent: z.string().optional(),
@@ -242,12 +304,14 @@ export const FormArtifact = z
     formId: z.string().min(1),
     /** The saved `FormVersion` row's id — changes on every save, never on download. */
     formVersionId: z.string().min(1),
+    /** Schema format. 2 = groups may appear (contract §1). Stamped at export. */
+    schemaVersion: z.literal(2),
   })
   .merge(FormSchema.omit({ title: true }));
 export type FormArtifact = z.infer<typeof FormArtifact>;
 
 /** Block types that carry a list of options. */
-export const OPTION_TYPES: BlockType[] = [
+export const OPTION_TYPES: readonly AnyBlockType[] = [
   "choice",
   "checkbox",
   "dropdown",
@@ -256,8 +320,12 @@ export const OPTION_TYPES: BlockType[] = [
   "matrix",
 ];
 
-/** Layout / display blocks that never collect an answer (skipped in validation). */
-export const STATIC_TYPES: BlockType[] = [
+/**
+ * Layout / display blocks that never collect an answer (skipped in validation).
+ * Typed to accept a group's type too, so any block's type can be checked
+ * against it; groups aren't in it.
+ */
+export const STATIC_TYPES: readonly AnyBlockType[] = [
   "heading",
   "text",
   "divider",
@@ -338,11 +406,11 @@ export function newBlockId(taken: Iterable<string> = []): string {
  */
 export function newBlock(
   type: BlockType,
-  overrides?: Partial<Block>,
+  overrides?: Partial<LeafBlock>,
   taken?: Iterable<string>,
-): Block {
+): LeafBlock {
   const id = newBlockId(taken);
-  const block: Block = {
+  const block: LeafBlock = {
     id,
     type,
     label: BLOCK_META[type].question,
@@ -364,6 +432,17 @@ export function newBlock(
     block.content = "";
   }
   return { ...block, ...overrides };
+}
+
+/** The label a new group gets (contract §2.5). */
+export const DEFAULT_GROUP_LABEL = "Untitled group";
+
+/**
+ * Create an empty group. It must be given at least one block before the form
+ * can be saved. Pass every id in the form (`allBlockIds`) as `taken`.
+ */
+export function newGroup(taken?: Iterable<string>, label = DEFAULT_GROUP_LABEL): GroupBlock {
+  return { id: newBlockId(taken), type: "group", label, blocks: [] };
 }
 
 /** Validate an incoming submission against a form's blocks. Returns cleaned values or throws. */
@@ -396,7 +475,7 @@ const MEMBERSHIP: readonly ConditionOperator[] = ["exists", "contains"];
  * missing from this table can't be a source at all (matrix, layout blocks, and
  * types whose answers can't be compared, e.g. long text or file uploads).
  */
-export const SOURCE_OPERATORS: Partial<Record<BlockType, readonly ConditionOperator[]>> = {
+export const SOURCE_OPERATORS: Partial<Record<AnyBlockType, readonly ConditionOperator[]>> = {
   choice: EQUALITY,
   dropdown: EQUALITY,
   country: EQUALITY,
@@ -415,7 +494,7 @@ export const SOURCE_OPERATORS: Partial<Record<BlockType, readonly ConditionOpera
 };
 
 /** Sources whose condition answer must be one of the source's options. */
-export const OPTION_SOURCE_TYPES: BlockType[] = [
+export const OPTION_SOURCE_TYPES: readonly AnyBlockType[] = [
   "choice",
   "dropdown",
   "checkbox",
@@ -424,7 +503,7 @@ export const OPTION_SOURCE_TYPES: BlockType[] = [
 ];
 
 /** Sources compared as numbers. */
-export const NUMERIC_SOURCE_TYPES: BlockType[] = ["number", "scale", "rating"];
+export const NUMERIC_SOURCE_TYPES: readonly AnyBlockType[] = ["number", "scale", "rating"];
 
 /** Operators that compare magnitudes, so their answer must be a number. */
 const ORDERING: readonly ConditionOperator[] = [">", "<", ">=", "<="];
@@ -454,63 +533,287 @@ export const COUNTRY_OPTIONS: readonly string[] = [
 ];
 
 /**
+ * The operators `block` allows as a condition source, or undefined when it can't
+ * be one. Groups never can (contract §3.3); nor can any type missing from
+ * SOURCE_OPERATORS.
+ */
+export function sourceOperators(block: Block): readonly ConditionOperator[] | undefined {
+  return isGroup(block) ? undefined : SOURCE_OPERATORS[block.type];
+}
+
+/**
  * The fixed set of answers a condition on `source` may use: the source's own
  * options for choice-type questions, the country list for country questions,
  * or null when any answer of the right kind is allowed.
  */
 export function conditionAnswerOptions(source: Block): readonly string[] | null {
+  if (isGroup(source)) return null;
   if (OPTION_SOURCE_TYPES.includes(source.type)) return source.options ?? [];
   if (source.type === "country") return COUNTRY_OPTIONS;
   return null;
 }
 
-export type ConditionProblem = { blockId: string; message: string };
+/**
+ * Collects an answer, so it is numbered (contract §4). Groups, presentational
+ * blocks and `hidden` fields are not.
+ */
+export function isAnswerable(block: Block): boolean {
+  return !isGroup(block) && !STATIC_TYPES.includes(block.type) && block.type !== "hidden";
+}
+
+/* ---------- the block tree ---------- */
+
+/** One block as met in reading order, with where it sits in the tree. */
+export interface TreeEntry {
+  block: Block;
+  /** Enclosing groups, outermost first. Empty at the root. */
+  ancestors: GroupBlock[];
+  /** Nesting depth: 0 at the root. */
+  depth: number;
+  /** Position in reading order across the whole tree, from 0. */
+  order: number;
+  /** Indices from the root: [2, 0] is the first child of the third root block. */
+  path: number[];
+}
 
 /**
- * Every way the form's conditions break the rules, each naming the dependent
- * block. Empty means valid. The API rejects a save with any problem; the editor
- * shows them inline.
- *
- * A condition may only use a question *above* its block, which also makes
- * cycles impossible.
+ * THE walk over a form's blocks: depth-first, pre-order — a group is visited
+ * before its children, which is the contract's reading order (§3.2). Every rule,
+ * guard and count that must see inside groups goes through this. Nothing else
+ * in the builder recurses over the tree.
  */
-export function conditionProblems(form: { blocks: Block[] }): ConditionProblem[] {
-  const problems: ConditionProblem[] = [];
-  const position = new Map<string, number>();
-  form.blocks.forEach((b, i) => {
-    if (position.has(b.id)) {
-      problems.push({
-        blockId: b.id,
-        message: `Block "${b.label}": another block has the same id "${b.id}". Block ids must be unique.`,
-      });
-    } else position.set(b.id, i);
-  });
+export function walkBlocks(blocks: readonly Block[]): TreeEntry[] {
+  const entries: TreeEntry[] = [];
+  const visit = (list: readonly Block[], ancestors: GroupBlock[], parentPath: number[]) => {
+    list.forEach((block, index) => {
+      const path = [...parentPath, index];
+      entries.push({ block, ancestors, depth: ancestors.length, order: entries.length, path });
+      if (isGroup(block)) visit(block.blocks, [...ancestors, block], path);
+    });
+  };
+  visit(blocks, [], []);
+  return entries;
+}
 
-  form.blocks.forEach((b, i) => {
-    for (const c of b.enableWhen ?? []) {
-      const problem = conditionProblem(form.blocks, position, i, c);
-      if (problem) problems.push({ blockId: b.id, message: `Block "${b.label}": ${problem}` });
-    }
+/** Every id in the tree — what `newBlockId` must avoid. */
+export function allBlockIds(blocks: readonly Block[]): string[] {
+  return walkBlocks(blocks).map((entry) => entry.block.id);
+}
+
+/** Where `id` sits, or undefined if it isn't in the tree. */
+export function findBlock(blocks: readonly Block[], id: string): TreeEntry | undefined {
+  return walkBlocks(blocks).find((entry) => entry.block.id === id);
+}
+
+/**
+ * Question numbers, 1…n in reading order across the whole tree. Only answerable
+ * questions are numbered; numbers never shift when something is hidden.
+ */
+export function questionNumbers(blocks: readonly Block[]): Map<string, number> {
+  const numbers = new Map<string, number>();
+  for (const { block } of walkBlocks(blocks)) {
+    if (isAnswerable(block)) numbers.set(block.id, numbers.size + 1);
+  }
+  return numbers;
+}
+
+/*
+ * Tree edits. Each returns a new tree and leaves its input untouched. They
+ * rebuild only the chain of groups from the root down to the edited list — a
+ * single path, found by walkBlocks — so they aren't another walk of the tree.
+ */
+
+/** Replace the children of the group at `parentPath` ([] = the root list). */
+function editChildren(
+  blocks: readonly Block[],
+  parentPath: readonly number[],
+  edit: (children: Block[]) => Block[],
+): Block[] {
+  const spine: GroupBlock[] = [];
+  let level: readonly Block[] = blocks;
+  for (const index of parentPath) {
+    const group = level[index];
+    if (!group || !isGroup(group)) throw new Error(`No group at path [${parentPath.join(", ")}]`);
+    spine.push(group);
+    level = group.blocks;
+  }
+  let rebuilt = edit([...level]);
+  for (let k = spine.length - 1; k >= 0; k -= 1) {
+    const siblings = [...(k === 0 ? blocks : spine[k - 1].blocks)];
+    siblings[parentPath[k]] = { ...spine[k], blocks: rebuilt };
+    rebuilt = siblings;
+  }
+  return rebuilt;
+}
+
+function entryOrThrow(blocks: readonly Block[], id: string): TreeEntry {
+  const entry = findBlock(blocks, id);
+  if (!entry) throw new Error(`No block with id "${id}"`);
+  return entry;
+}
+
+/** The path of a group's children list: [] for the root (`parentId` null). */
+function childrenPath(blocks: readonly Block[], parentId: string | null): number[] {
+  if (parentId === null) return [];
+  const entry = entryOrThrow(blocks, parentId);
+  if (!isGroup(entry.block)) throw new Error(`Block "${parentId}" is not a group`);
+  return entry.path;
+}
+
+/** Apply `update` to the block with `id`, wherever it is. */
+export function updateBlockInTree(
+  blocks: readonly Block[],
+  id: string,
+  update: (block: Block) => Block,
+): Block[] {
+  const { path } = entryOrThrow(blocks, id);
+  const at = path[path.length - 1];
+  return editChildren(blocks, path.slice(0, -1), (children) => {
+    children[at] = update(children[at]);
+    return children;
   });
+}
+
+/** Insert `block` into group `parentId` (null = the root) at `index`. */
+export function insertBlockIntoTree(
+  blocks: readonly Block[],
+  parentId: string | null,
+  index: number,
+  block: Block,
+): Block[] {
+  return editChildren(blocks, childrenPath(blocks, parentId), (children) => {
+    children.splice(Math.max(0, Math.min(index, children.length)), 0, block);
+    return children;
+  });
+}
+
+/** Remove the block with `id` — for a group, together with everything inside it. */
+export function removeBlockFromTree(blocks: readonly Block[], id: string): Block[] {
+  const { path } = entryOrThrow(blocks, id);
+  const at = path[path.length - 1];
+  return editChildren(blocks, path.slice(0, -1), (children) => {
+    children.splice(at, 1);
+    return children;
+  });
+}
+
+/**
+ * Delete a group but keep its contents: its children take its place in its
+ * parent, in their order. Reading order is otherwise unchanged, so this can't
+ * break a condition. The group's own conditions go with it.
+ */
+export function unwrapGroup(blocks: readonly Block[], groupId: string): Block[] {
+  const { block, path } = entryOrThrow(blocks, groupId);
+  if (!isGroup(block)) throw new Error(`Block "${groupId}" is not a group`);
+  const at = path[path.length - 1];
+  return editChildren(blocks, path.slice(0, -1), (children) => {
+    children.splice(at, 1, ...block.blocks);
+    return children;
+  });
+}
+
+/**
+ * Move the block with `id` — a group with its whole subtree — into group
+ * `toParentId` (null = the root) at `toIndex`, counted among that group's
+ * children after the block has been taken out. Refuses to move a group into
+ * itself or into one of its own descendants.
+ */
+export function moveBlockInTree(
+  blocks: readonly Block[],
+  id: string,
+  toParentId: string | null,
+  toIndex: number,
+): Block[] {
+  const moving = entryOrThrow(blocks, id).block;
+  if (toParentId !== null) {
+    const target = entryOrThrow(blocks, toParentId);
+    if (target.block.id === id || target.ancestors.some((a) => a.id === id)) {
+      throw new Error(`Can't move "${moving.label}" into itself.`);
+    }
+  }
+  return insertBlockIntoTree(removeBlockFromTree(blocks, id), toParentId, toIndex, moving);
+}
+
+/* ---------- save rules ---------- */
+
+export type ConditionProblem = {
+  blockId: string;
+  /** The full message, naming the block — what the API returns. */
+  message: string;
+  /** The same message without the block's name — for showing inline, on that block. */
+  detail: string;
+};
+
+/** How a message names a block: by label, never by id. */
+function subject(entry: TreeEntry): string {
+  const { block, ancestors } = entry;
+  if (!isGroup(block)) return `Block "${block.label}"`;
+  if (block.label.trim()) return `Group "${block.label}"`;
+  const parent = ancestors[ancestors.length - 1];
+  return parent ? `An unlabelled group inside "${parent.label}"` : "An unlabelled group at the top level";
+}
+
+/**
+ * Every way the form breaks the save rules, each naming the offending block.
+ * Empty means valid. The API rejects a save with any problem; the editor shows
+ * them inline. Covers the whole tree:
+ *
+ *  - block ids unique across the tree, groups included (contract §2.4);
+ *  - a group has a non-blank label and at least one block (§2.5, §2.6);
+ *  - every condition refers to a block in the form that comes BEFORE its
+ *    dependent in reading order (§3.2) — so a group can never depend on its own
+ *    contents, and cycles are impossible;
+ *  - the source is a type that can be a source (§3.3), with an operator and an
+ *    answer that type supports.
+ */
+export function formProblems(form: { blocks: readonly Block[] }): ConditionProblem[] {
+  const entries = walkBlocks(form.blocks);
+  const problems: ConditionProblem[] = [];
+  const add = (entry: TreeEntry, detail: string) =>
+    problems.push({ blockId: entry.block.id, message: `${subject(entry)}: ${detail}`, detail });
+
+  const position = new Map<string, number>();
+  for (const entry of entries) {
+    const { block } = entry;
+    if (position.has(block.id)) {
+      add(entry, `another block has the same id "${block.id}". Block ids must be unique.`);
+    } else position.set(block.id, entry.order);
+
+    if (isGroup(block)) {
+      if (!block.label.trim()) add(entry, "a group needs a label.");
+      if (block.blocks.length === 0) add(entry, "a group must contain at least one block.");
+    }
+  }
+
+  for (const entry of entries) {
+    for (const c of entry.block.enableWhen ?? []) {
+      const detail = conditionProblem(entries, position, entry, c);
+      if (detail) add(entry, detail);
+    }
+  }
   return problems;
 }
 
 function conditionProblem(
-  blocks: Block[],
-  position: Map<string, number>,
-  at: number,
+  entries: readonly TreeEntry[],
+  position: ReadonlyMap<string, number>,
+  dependent: TreeEntry,
   c: Condition,
 ): string | null {
-  if (c.question === blocks[at].id) return "a condition can't depend on the block itself.";
+  if (c.question === dependent.block.id) return "a condition can't depend on the block itself.";
   const from = position.get(c.question);
   if (from === undefined) {
     return `a condition refers to a question that isn't in this form (id "${c.question}").`;
   }
-  const source = blocks[from];
-  if (from > at) {
-    return `a condition depends on "${source.label}", which comes after it. Conditions can only use questions above them.`;
+  const sourceEntry = entries[from];
+  const source = sourceEntry.block;
+  if (from > dependent.order) {
+    if (sourceEntry.ancestors.some((a) => a.id === dependent.block.id)) {
+      return `a condition depends on "${source.label}", which is inside this group. A group can't depend on its own questions.`;
+    }
+    return `a condition depends on "${source.label}", which comes after it. A condition can only use a question that comes before it.`;
   }
-  const allowed = SOURCE_OPERATORS[source.type];
+  const allowed = sourceOperators(source);
   if (!allowed) {
     return `"${source.label}" is a ${source.type} block, which can't be used in a condition.`;
   }
@@ -531,26 +834,65 @@ function conditionProblem(
   return null;
 }
 
-/** Blocks (other than the source) with a condition on `sourceId`, optionally only matching conditions. */
+/* ---------- dependency guards ---------- */
+
+/**
+ * Blocks anywhere in the tree (other than the source) with a condition on
+ * `sourceId`, optionally only those with a matching condition. Backs the
+ * delete, type-change and option-change guards.
+ */
 export function dependentsOf(
-  blocks: Block[],
+  blocks: readonly Block[],
   sourceId: string,
   matching: (c: Condition) => boolean = () => true,
 ): Block[] {
-  return blocks.filter(
-    (b) =>
-      b.id !== sourceId &&
-      (b.enableWhen ?? []).some((c) => c.question === sourceId && matching(c)),
-  );
+  return walkBlocks(blocks)
+    .map((entry) => entry.block)
+    .filter(
+      (b) =>
+        b.id !== sourceId &&
+        (b.enableWhen ?? []).some((c) => c.question === sourceId && matching(c)),
+    );
 }
 
-/** Blocks that sit at or above a block one of their conditions depends on. */
-export function misorderedDependents(blocks: Block[]): Block[] {
-  const position = new Map(blocks.map((b, i) => [b.id, i]));
-  return blocks.filter((b, i) =>
-    (b.enableWhen ?? []).some((c) => {
-      const from = position.get(c.question);
-      return from !== undefined && from >= i && c.question !== b.id;
-    }),
+/**
+ * Deleting `id` — with everything inside it, for a group — would leave these
+ * blocks depending on something that no longer exists. A condition between two
+ * deleted blocks doesn't count: both go.
+ */
+export function deletionBlockers(blocks: readonly Block[], id: string): Block[] {
+  const target = findBlock(blocks, id);
+  if (!target) return [];
+  const deleted = new Set(
+    walkBlocks([target.block]).map((entry) => entry.block.id),
   );
+  return walkBlocks(blocks)
+    .map((entry) => entry.block)
+    .filter(
+      (b) => !deleted.has(b.id) && (b.enableWhen ?? []).some((c) => deleted.has(c.question)),
+    );
+}
+
+/** Blocks with a condition whose source doesn't come before them in reading order. */
+export function misorderedDependents(blocks: readonly Block[]): Block[] {
+  const entries = walkBlocks(blocks);
+  const position = new Map(entries.map((entry) => [entry.block.id, entry.order]));
+  return entries
+    .filter((entry) =>
+      (entry.block.enableWhen ?? []).some((c) => {
+        const from = position.get(c.question);
+        return from !== undefined && from >= entry.order && c.question !== entry.block.id;
+      }),
+    )
+    .map((entry) => entry.block);
+}
+
+/**
+ * The blocks a rearrangement (`before` → `after`) would newly put out of order.
+ * Only breakage the move causes counts, so an already-broken form can still be
+ * rearranged. Empty means the move is allowed.
+ */
+export function moveBreaks(before: readonly Block[], after: readonly Block[]): Block[] {
+  const alreadyBroken = new Set(misorderedDependents(before).map((b) => b.id));
+  return misorderedDependents(after).filter((b) => !alreadyBroken.has(b.id));
 }

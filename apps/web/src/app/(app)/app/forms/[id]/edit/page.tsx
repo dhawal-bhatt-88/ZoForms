@@ -44,6 +44,7 @@ import {
   Heading as HeadingIcon,
   Image as ImageIcon,
   Inbox,
+  Layers,
   Link2,
   ListChecks,
   ListOrdered,
@@ -68,8 +69,8 @@ import {
 import {
   BLOCK_META,
   conditionAnswerOptions,
-  conditionProblems,
   dependentsOf,
+  formProblems,
   misorderedDependents,
   newBlock,
   NUMERIC_SOURCE_TYPES,
@@ -79,6 +80,8 @@ import {
   sameContent,
   SOURCE_OPERATORS,
   STATIC_TYPES,
+  updateBlockInTree,
+  type AnyBlockType,
   type Block,
   type BlockType,
   type Condition,
@@ -99,7 +102,8 @@ import {
 
 type AiMsg = { role: "user" | "assistant"; text: string; changes?: string[] };
 
-const ICONS: Record<BlockType, typeof Type> = {
+const ICONS: Record<AnyBlockType, typeof Type> = {
+  group: Layers,
   short: Type,
   long: AlignLeft,
   choice: CircleDot,
@@ -682,10 +686,9 @@ function ConditionsPanel({
   const sources = blocks.slice(0, at).filter((b) => SOURCE_OPERATORS[b.type]);
   const number = new Map(blocks.map((b, i) => [b.id, i + 1]));
   const conditions = block.enableWhen ?? [];
-  const prefix = `Block "${block.label}": `;
-  const problems = conditionProblems({ blocks })
+  const problems = formProblems({ blocks })
     .filter((p) => p.blockId === block.id)
-    .map((p) => (p.message.startsWith(prefix) ? p.message.slice(prefix.length) : p.message));
+    .map((p) => p.detail);
 
   // No conditions -> drop both fields; "all" is the default, so it's left implicit.
   const commit = (next: Condition[], behavior = block.enableBehavior) =>
@@ -1036,7 +1039,7 @@ export default function EditorPage() {
     }
     patch((s) => ({
       ...s,
-      blocks: s.blocks.map((b) => (b.id === bid ? { ...b, ...p } : b)),
+      blocks: updateBlockInTree(s.blocks, bid, (b) => ({ ...b, ...p }) as Block),
     }));
   };
   const removeBlock = (bid: string) => {
