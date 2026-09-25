@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   DndContext,
+  DragOverlay,
+  MeasuringStrategy,
   PointerSensor,
   closestCenter,
   useSensor,
@@ -14,12 +16,7 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { SortableContext, useSortable, type SortingStrategy } from "@dnd-kit/sortable";
 import {
   AlignLeft,
   ArrowDown,
@@ -542,30 +539,81 @@ function BlockPreview({ block }: { block: Block }) {
 
 /* ---------- canvas: cards, group ends, dialogs ---------- */
 
-/** Horizontal step per nesting level on the canvas, in px. */
-const INDENT = 14;
-/** Indentation stops growing after this many levels, so deep nesting keeps its width. */
+/** Blocks nested deeper than this get no more indentation, and a "Level N" chip instead. */
 const MAX_INDENT_LEVELS = 6;
 /** How far a drag must move sideways to change depth by one level, in px. */
 const DRAG_INDENT = 28;
 
-const indentFor = (depth: number) => Math.min(depth, MAX_INDENT_LEVELS) * INDENT;
+/**
+ * Cards stay where they are while dragging: nested boxes can't make room for
+ * cards sliding past their edges. The drop line and the highlighted box show
+ * where the block will land instead.
+ */
+const noDisplacement: SortingStrategy = () => null;
 
-/** The thin rail that marks a row as inside a group. */
-function NestRail({ depth }: { depth: number }) {
-  if (depth === 0) return null;
+/** Where a dragged block will land: an accent line just above or below an element. */
+function DropLine({ at }: { at: "top" | "bottom" }) {
   return (
     <span
       aria-hidden="true"
-      className="absolute bottom-1 top-1 w-[2px] rounded-full bg-line-2"
-      style={{ left: -INDENT + 4 }}
+      data-drop-line=""
+      className="pointer-events-none absolute inset-x-0 z-20 h-[3px] rounded-full bg-accent"
+      style={at === "top" ? { top: -7 } : { bottom: -7 }}
     />
+  );
+}
+
+/**
+ * A group on the canvas: a box holding its header card, its contents and the
+ * "Add to" row. Nested boxes alternate background so adjacent levels stay
+ * distinct; past MAX_INDENT_LEVELS they stop adding padding.
+ */
+function GroupBox({
+  group,
+  depth,
+  selected,
+  dropTarget,
+  dimmed,
+  dropLine,
+  header,
+  children,
+}: {
+  group: GroupBlock;
+  depth: number;
+  selected: boolean;
+  /** The box a dragged block will be dropped into. */
+  dropTarget: boolean;
+  /** This group is the one being dragged. */
+  dimmed: boolean;
+  dropLine?: "top" | "bottom";
+  header: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  // Only the deepest boxes stop padding: their contents are marked with the "Level N" chip instead.
+  const capped = depth > MAX_INDENT_LEVELS;
+  return (
+    <div
+      data-group-box={group.id}
+      data-drop-target={dropTarget || undefined}
+      className={`relative rounded-xl border transition-[border-color,box-shadow,background-color] ${
+        capped ? "-mx-px px-0" : "px-2.5"
+      } ${children ? (capped ? "pb-1.5" : "pb-2.5") : ""} ${dropTarget ? "bg-accent-weak" : depth % 2 === 0 ? "bg-surface-3" : "bg-surface"} ${
+        dropTarget
+          ? "border-accent ring-2 ring-accent/30"
+          : selected
+            ? "border-accent ring-2 ring-accent-weak"
+            : "border-line-2"
+      } ${dimmed ? "opacity-50" : ""}`}
+    >
+      {dropLine && <DropLine at={dropLine} />}
+      {header}
+      {children && <div className="flex flex-col gap-2.5">{children}</div>}
+    </div>
   );
 }
 
 function CanvasCard({
   item,
-  depth,
   number,
   selected,
   canMoveUp,
@@ -574,10 +622,9 @@ function CanvasCard({
   onDelete,
   onMove,
   onToggle,
+  dropLine,
 }: {
   item: FlatItem;
-  /** Shown depth — the projected one while this card is being dragged. */
-  depth: number;
   /** Question number, for answerable questions. */
   number?: number;
   selected: boolean;
@@ -587,38 +634,35 @@ function CanvasCard({
   onDelete: () => void;
   onMove: (direction: -1 | 1) => void;
   onToggle: () => void;
+  /** Leaves only; a group's drop line is drawn by its box. */
+  dropLine?: "top" | "bottom";
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: item.id });
+  // The card itself never moves while dragging; a DragOverlay follows the pointer.
+  const { attributes, listeners, setNodeRef, isDragging } = useSortable({ id: item.id });
   const block = item.block;
   const group = isGroup(block) ? block : null;
+  const depth = item.depth;
   const Icon = ICONS[block.type];
-  const style = {
-    transform: CSS.Translate.toString(transform),
-    transition,
-    marginLeft: indentFor(depth),
-  };
-  // Everything inside a collapsed group, so the author knows what's hidden.
   const hiddenCount = group && item.collapsed ? walkBlocks(group.blocks).length : 0;
 
   return (
     <div
       ref={setNodeRef}
-      style={style}
       data-block-id={block.id}
       data-depth={depth}
       onClick={onSelect}
-      className={`group relative cursor-pointer rounded-xl border transition-colors ${
-        group ? "px-3.5 py-2.5" : "p-3.5"
-      } ${
-        selected
-          ? "border-accent bg-white ring-2 ring-accent-weak"
-          : group
-            ? "border-line bg-surface-2 hover:border-line-2"
-            : "border-transparent hover:border-line-2 hover:bg-surface-2"
-      } ${isDragging ? "z-10 opacity-70 shadow-pop" : ""}`}
+      className={`group relative cursor-pointer transition-colors ${
+        group
+          ? // A group's card is the header inside its box; the box shows selection.
+            "rounded-lg px-1.5 py-2.5"
+          : `rounded-xl border p-3.5 ${
+              selected
+                ? "border-accent bg-white ring-2 ring-accent-weak"
+                : "border-transparent hover:border-line-2 hover:bg-surface-2"
+            }`
+      } ${isDragging && !group ? "opacity-40" : ""}`}
     >
-      <NestRail depth={depth} />
+      {dropLine && <DropLine at={dropLine} />}
       <div className={`flex items-center gap-2 ${group ? "" : "mb-2.5"} pr-[88px]`}>
         <button
           {...attributes}
@@ -709,20 +753,21 @@ function CanvasCard({
   );
 }
 
-/** The end of an open group: where its contents stop, and a way to add to it. */
+/** The last row inside an open group's box: a way to add to it. */
 function GroupEnd({
   group,
-  depth,
+  dropLine,
   onAdd,
 }: {
   group: GroupBlock;
-  depth: number;
+  /** A block dropped now would land at the end of this group. */
+  dropLine: boolean;
   onAdd: (anchor: HTMLElement) => void;
 }) {
   const name = group.label.trim() || "this group";
   return (
-    <div className="relative" style={{ marginLeft: indentFor(depth) }}>
-      <NestRail depth={depth} />
+    <div className="relative">
+      {dropLine && <DropLine at="top" />}
       <button
         onClick={(e) => onAdd(e.currentTarget)}
         className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] hover:bg-surface-2 hover:text-accent-2 ${
@@ -732,6 +777,25 @@ function GroupEnd({
         <Plus className="h-3.5 w-3.5" />
         {group.blocks.length ? `Add to "${name}"` : `"${name}" is empty — add a block to it`}
       </button>
+    </div>
+  );
+}
+
+/** What follows the pointer while dragging: the block's icon and label. */
+function DragGhost({ block }: { block: Block }) {
+  const Icon = ICONS[block.type];
+  const inside = isGroup(block) ? walkBlocks(block.blocks).length : 0;
+  return (
+    <div className="flex h-full items-start gap-2 rounded-xl border border-accent bg-white px-3.5 py-2.5 shadow-pop">
+      <span className="grid h-[22px] w-[22px] flex-none place-items-center rounded-md bg-accent-weak text-accent-2">
+        <Icon className="h-3.5 w-3.5" />
+      </span>
+      <span className="min-w-0 truncate font-semibold">{block.label.trim() || "Unlabelled group"}</span>
+      {isGroup(block) && (
+        <span className="flex-none pt-0.5 text-xs text-muted">
+          {inside} {inside === 1 ? "block" : "blocks"} inside
+        </span>
+      )}
     </div>
   );
 }
@@ -1633,40 +1697,34 @@ export default function EditorPage() {
   const autoTarget = selectionInsertTarget();
   const autoTargetGroup = autoTarget.parentId ? findBlock(schema.blocks, autoTarget.parentId)?.block : undefined;
 
-  /** Cards in reading order, with an "end of group" row after each open group's contents. */
-  function canvasRows() {
-    const out: React.ReactNode[] = [];
-    const open: FlatItem[] = [];
-    const closeGroupsDownTo = (depth: number) => {
-      while (open.length && open[open.length - 1].depth >= depth) {
-        const g = open.pop()!;
-        // Hidden while dragging, so the drop targets don't jump around.
-        if (!drag && isGroup(g.block)) {
-          out.push(
-            <GroupEnd
-              key={`end-${g.id}`}
-              group={g.block}
-              depth={g.depth + 1}
-              onAdd={(anchor) =>
-                openMenu(anchor, { parentId: g.id, index: (g.block as GroupBlock).blocks.length })
-              }
-            />,
-          );
-        }
-      }
-    };
-    for (const item of rows) {
-      closeGroupsDownTo(item.depth);
+  // Where a drop would land: before one of the target's visible children, or at its end.
+  let dropBefore: string | null = null;
+  let dropAtEndOfGroup: string | null = null;
+  let dropAtEndOfForm = false;
+  if (drag && projection) {
+    const siblings = rows.filter((r) => r.parentId === projection.parentId && r.id !== drag.activeId);
+    if (projection.index < siblings.length) dropBefore = siblings[projection.index].id;
+    else if (projection.parentId) dropAtEndOfGroup = projection.parentId;
+    else dropAtEndOfForm = true;
+  }
+
+  /**
+   * The canvas as nested boxes, built from the flat row list with a stack of
+   * open groups: each group's box holds its header card, its contents and an
+   * "Add to" row.
+   */
+  function canvasTree() {
+    const card = (item: FlatItem) => {
       const step = { up: stepMove(schema!.blocks, item.id, -1), down: stepMove(schema!.blocks, item.id, 1) };
-      out.push(
+      return (
         <CanvasCard
           key={item.id}
           item={item}
-          depth={drag?.activeId === item.id && projection ? projection.depth : item.depth}
           number={numbers.get(item.id)}
           selected={item.id === selectedId}
           canMoveUp={!!step.up}
           canMoveDown={!!step.down}
+          dropLine={!item.isGroup && dropBefore === item.id ? "top" : undefined}
           onSelect={() => setSelectedId(item.id)}
           onDelete={() => removeBlock(item.id)}
           onMove={(direction) => {
@@ -1681,13 +1739,50 @@ export default function EditorPage() {
               return next;
             })
           }
-        />,
+        />
       );
-      if (item.isGroup && !item.collapsed && item.id !== drag?.activeId) open.push(item);
+    };
+    type Frame = { item: FlatItem | null; children: React.ReactNode[] };
+    const stack: Frame[] = [{ item: null, children: [] }];
+    const close = () => {
+      const { item, children } = stack.pop()!;
+      const g = item!.block as GroupBlock;
+      // Collapsed, or being dragged: a single closed box.
+      const open = !item!.collapsed && item!.id !== drag?.activeId;
+      stack[stack.length - 1].children.push(
+        <GroupBox
+          key={g.id}
+          group={g}
+          depth={item!.depth}
+          selected={g.id === selectedId}
+          dropTarget={!!drag && projection?.parentId === g.id}
+          dimmed={drag?.activeId === g.id}
+          dropLine={dropBefore === g.id ? "top" : undefined}
+          header={card(item!)}
+        >
+          {open
+            ? [
+                ...children,
+                <GroupEnd
+                  key={`end-${g.id}`}
+                  group={g}
+                  dropLine={dropAtEndOfGroup === g.id}
+                  onAdd={(anchor) => openMenu(anchor, { parentId: g.id, index: g.blocks.length })}
+                />,
+              ]
+            : null}
+        </GroupBox>,
+      );
+    };
+    for (const item of rows) {
+      while (stack.length > 1 && stack[stack.length - 1].item!.depth >= item.depth) close();
+      if (item.isGroup) stack.push({ item, children: [] });
+      else stack[stack.length - 1].children.push(card(item));
     }
-    closeGroupsDownTo(0);
-    return out;
+    while (stack.length > 1) close();
+    return stack[0].children;
   }
+  const draggedBlock = drag ? findBlock(schema.blocks, drag.activeId)?.block : undefined;
   const fieldCls =
     "w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent-weak";
 
@@ -1837,15 +1932,23 @@ export default function EditorPage() {
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
+                  // A dragged group's contents are folded away, so re-measure as the layout changes.
+                  measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
                   onDragStart={onDragStart}
                   onDragMove={onDragMove}
                   onDragOver={onDragOver}
                   onDragEnd={onDragEnd}
                   onDragCancel={() => setDrag(null)}
                 >
-                  <SortableContext items={rows.map((r) => r.id)} strategy={verticalListSortingStrategy}>
-                    <div className="flex flex-col gap-2.5">{canvasRows()}</div>
+                  <SortableContext items={rows.map((r) => r.id)} strategy={noDisplacement}>
+                    <div className="relative flex flex-col gap-2.5">
+                      {canvasTree()}
+                      {dropAtEndOfForm && <DropLine at="bottom" />}
+                    </div>
                   </SortableContext>
+                  <DragOverlay dropAnimation={null}>
+                    {draggedBlock && <DragGhost block={draggedBlock} />}
+                  </DragOverlay>
                 </DndContext>
               </div>
 
