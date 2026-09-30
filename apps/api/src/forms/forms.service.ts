@@ -7,9 +7,11 @@ import {
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import {
+  buildArtifact,
+  describeBlockPath,
+  draftsProblem,
   formProblems,
   emptyForm,
-  FormArtifact,
   sameContent,
   FormSchema,
   STATIC_TYPES,
@@ -26,13 +28,14 @@ import type { AuthUser } from "../auth/current-user.decorator";
 /** Versions are append-only, so a form's current version is its highest `version`. */
 const LATEST_VERSION = { orderBy: { version: "desc" }, take: 1 } as const;
 
-type RawBlock = { type?: unknown; label?: unknown; blocks?: RawBlock[] };
+type RawBlock = { type?: unknown; label?: unknown; title?: unknown; blocks?: RawBlock[] };
 
 /**
  * Turn the first schema validation issue into a message a person can act on,
- * naming the innermost block it's in — inside a group, the question, not the
- * group. Follows the issue's own path (blocks.2.blocks.0…) down the raw input,
- * so it visits one chain of blocks, not the whole tree.
+ * naming the innermost block it's in by its path — inside a page or group, the
+ * question, not the container — the same way the save rules name blocks.
+ * Follows the issue's own path (blocks.2.blocks.0…) down the raw input, so it
+ * visits one chain of blocks, not the whole tree.
  */
 function describeSchemaError(
   raw: unknown,
@@ -40,34 +43,27 @@ function describeSchemaError(
 ): string {
   const issue = error.issues[0];
   let list = (raw as { blocks?: RawBlock[] } | null)?.blocks;
-  let block: RawBlock | undefined;
-  let parent: RawBlock | undefined;
-  let index = -1;
+  const chain: RawBlock[] = [];
+  const indices: number[] = [];
   let consumed = 0;
   while (
     issue.path[consumed] === "blocks" &&
     typeof issue.path[consumed + 1] === "number" &&
     Array.isArray(list)
   ) {
-    parent = block;
-    index = issue.path[consumed + 1] as number;
-    block = list[index];
-    list = block?.blocks;
+    const index = issue.path[consumed + 1] as number;
+    const block: RawBlock = list[index] ?? {};
+    chain.push(block);
+    indices.push(index);
+    list = block.blocks;
     consumed += 2;
   }
   if (consumed === 0) {
     return `Invalid form schema${issue.path.length ? ` (${issue.path.join(".")})` : ""}: ${issue.message}`;
   }
-
-  const kind = block?.type === "group" ? "Group" : "Block";
-  const label = typeof block?.label === "string" && block.label.trim() ? block.label : null;
-  const parentLabel = typeof parent?.label === "string" && parent.label.trim() ? parent.label : null;
-  const name = label
-    ? `${kind} "${label}"`
-    : `${kind} ${index + 1}${parentLabel ? ` inside "${parentLabel}"` : ""}`;
   const rest = issue.path.slice(consumed);
   const where = rest.length ? ` (${rest.join(".")})` : "";
-  return `${name}${where}: ${issue.message}`;
+  return `${describeBlockPath(chain, indices)}${where}: ${issue.message}`;
 }
 
 function escapeHtml(s: string): string {
@@ -228,6 +224,9 @@ export class FormsService {
       const more = problems.length > 1 ? ` (+${problems.length - 1} more)` : "";
       throw new BadRequestException(problems[0].message + more);
     }
+    // Form-level settings: "server" drafts need pages (drafts contract §2).
+    const draftsIssue = draftsProblem(parsed.data);
+    if (draftsIssue) throw new BadRequestException(draftsIssue);
     const form = await this.get(user, id);
     const created = await this.appendVersion(form, parsed.data);
     return { ok: true, versionId: created.id, version: created.version };
@@ -241,14 +240,9 @@ export class FormsService {
     const form = await this.get(user, id);
     const current = form.versions[0];
     if (!current) throw new NotFoundException("Form has no saved version");
-    // Identity and schema format are stamped here, never stored in or read from
-    // the schema itself. Spread first so these always win; FormArtifact requires all three.
-    const artifact = FormArtifact.parse({
-      ...(current.schema as Prisma.JsonObject),
-      formId: form.id,
-      formVersionId: current.id,
-      schemaVersion: 2,
-    });
+    // Identity, schema format and navigation are stamped by buildArtifact, never
+    // stored in or read from the schema itself.
+    const artifact = buildArtifact(current.schema, { formId: form.id, formVersionId: current.id });
     return { fileName: `${form.slug}-schema.json`, artifact };
   }
 

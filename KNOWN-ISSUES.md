@@ -1,0 +1,3 @@
+# Known issues
+
+- **Pages have no `label`, but the AI service and the responses page read `block.label`.** A page is named by `title`. To keep those out-of-scope files compiling without changing them, `PageBlock.label` is typed as a required `never` in `packages/form-schema`, so `block.label` still types as `string`. At runtime `apps/api/src/ai/ai.service.ts` and the responses page get `undefined` for a page (for a paged form, that is every top-level block), with no compile error. Revisit when they come back into scope: read names with `blockName`, then change `PageBlock.label` to `label?: never` so the compiler flags any remaining reads. (Phase 7, pages.)

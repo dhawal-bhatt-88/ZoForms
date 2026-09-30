@@ -81,11 +81,19 @@ export function isPresentationalType(type: string): type is PresentationalType {
 /** Every other leaf block — the ones that can be required. */
 export const QuestionType = BlockType.exclude([...PRESENTATIONAL_TYPES]);
 
+/**
+ * How `enableWhen` combines. Absent means "all". An explicit "all" is accepted
+ * but normalised away, so only "any" or absence is ever stored (contract §1).
+ */
+const enableBehavior = z
+  .enum(["all", "any"])
+  .optional()
+  .transform((b): "any" | undefined => (b === "any" ? "any" : undefined));
+
 const shownWhen = {
   /** Show this block only when these conditions hold. Absent = always shown. */
   enableWhen: z.array(Condition).optional(),
-  /** How `enableWhen` combines. Absent means "all". */
-  enableBehavior: z.enum(["all", "any"]).optional(),
+  enableBehavior,
 };
 
 export const QuestionBlock = z.object({
@@ -146,12 +154,47 @@ export interface GroupBlock extends NoLeafFields {
   type: "group";
   label: string;
   enableWhen?: Condition[];
-  enableBehavior?: "all" | "any";
+  enableBehavior?: "any";
   blocks: Block[];
 }
 
-/** Any block's `type`: a leaf block type, or "group". */
-export type AnyBlockType = BlockType | "group";
+/*
+ * Pages — contract §1, §2. A page is one step of a paged form. It holds blocks,
+ * groups included, and may only sit at the root: if any root item is a page,
+ * every root item is. Like a group it has no value, `required` or help text.
+ * It is named by `title`, not `label`: read any block's name with `blockName`.
+ */
+export interface PageBlock extends NoLeafFields {
+  id: string;
+  type: "page";
+  title: string;
+  /**
+   * WORKAROUND — a page has NO `label` at runtime; it is named by `title`.
+   *
+   * Declared as a required `never` (not an optional one) purely so that
+   * `block.label` on the `Block` union still types as `string`. An optional
+   * `never` would make it `string | undefined`, which breaks code written
+   * before pages existed that must not be touched in Phase 7: the AI service
+   * (apps/api/src/ai/ai.service.ts) and the responses page.
+   *
+   * RUNTIME RISK: this is a lie to the type checker. Any code that reads
+   * `block.label` on a block that turns out to be a page gets `undefined`,
+   * with no compile error to warn about it. The AI service and the responses
+   * page do exactly that for a paged form's top-level blocks. In-scope code
+   * reads names with `blockName`. See KNOWN-ISSUES.md: revisit this when
+   * those features come back into scope, and make this `label?: never`.
+   */
+  label: never;
+  enableWhen?: Condition[];
+  enableBehavior?: "any";
+  blocks: Block[];
+}
+
+/** Something that holds blocks: a group or a page. */
+export type ContainerBlock = GroupBlock | PageBlock;
+
+/** Any block's `type`: a leaf block type, "group" or "page". */
+export type AnyBlockType = BlockType | "group" | "page";
 interface GroupBlockInput {
   id: string;
   type: "group";
@@ -160,13 +203,25 @@ interface GroupBlockInput {
   enableBehavior?: "all" | "any";
   blocks: BlockInput[];
 }
+interface PageBlockInput {
+  id: string;
+  type: "page";
+  title: string;
+  enableWhen?: z.input<typeof Condition>[];
+  enableBehavior?: "all" | "any";
+  blocks: BlockInput[];
+}
 
-/** Any entry in a `blocks` array: a leaf block or a group. */
-export type Block = LeafBlock | GroupBlock;
+/**
+ * Any entry in a `blocks` array: a leaf block, a group or a page. Pages parse
+ * anywhere, so the save rules can reject a misplaced one by name (§2.2).
+ */
+export type Block = LeafBlock | GroupBlock | PageBlock;
 export type BlockInput =
   | z.input<typeof QuestionBlock>
   | z.input<typeof PresentationalBlock>
-  | GroupBlockInput;
+  | GroupBlockInput
+  | PageBlockInput;
 
 // Lazy, so a group's children can themselves be groups. Annotated explicitly
 // because TypeScript can't infer a type that refers to itself.
@@ -178,21 +233,64 @@ export const GroupBlock = z.object({
   // Blank labels parse, so the save rules can reject them with a message that
   // names the group, rather than a generic schema error.
   label: z.string(),
-  enableWhen: z.array(Condition).optional(),
-  enableBehavior: z.enum(["all", "any"]).optional(),
+  ...shownWhen,
+  blocks: childBlocks,
+});
+
+export const PageBlock = z.object({
+  id: z.string(),
+  type: z.literal("page"),
+  // Blank titles parse too, for the same reason as blank group labels.
+  title: z.string(),
+  ...shownWhen,
   blocks: childBlocks,
 });
 
 // A discriminated union reports errors from the one branch matching `type`, so
 // a bad leaf keeps its precise message instead of a generic "invalid input".
-export const Block: z.ZodType<Block, z.ZodTypeDef, BlockInput> = z.discriminatedUnion("type", [
+const BlockUnion = z.discriminatedUnion("type", [
   GroupBlock,
+  PageBlock,
   QuestionBlock,
   PresentationalBlock,
 ]);
+/*
+ * A parsed page has no `label`, while PageBlock declares a phantom
+ * `label: never` (see PageBlock.label), so the union is cast to `Block`. These
+ * compile-time checks keep what the cast would otherwise hide: every member's
+ * parsed shape matches its TypeScript type, and so does every input.
+ */
+type Parsed = z.output<typeof BlockUnion>;
+type Expect<T extends true> = T;
+type Assignable<A, B> = [A] extends [B] ? true : false;
+export type _BlockShapesMatch = [
+  Expect<Assignable<Exclude<Parsed, { type: "page" }>, Block>>,
+  Expect<Assignable<Extract<Parsed, { type: "page" }>, Omit<PageBlock, "label">>>,
+  Expect<Assignable<BlockInput, z.input<typeof BlockUnion>>>,
+];
+export const Block = BlockUnion as unknown as z.ZodType<Block, z.ZodTypeDef, BlockInput>;
 
 export function isGroup(block: Block): block is GroupBlock {
   return block.type === "group";
+}
+
+export function isPage(block: Block): block is PageBlock {
+  return block.type === "page";
+}
+
+/** A group or a page: something with `blocks` inside. */
+export function isContainer(block: Block): block is ContainerBlock {
+  return isGroup(block) || isPage(block);
+}
+
+/** A block's name as the author sees it: a page's title, anything else's label. */
+export function blockName(block: Block): string {
+  return isPage(block) ? block.title : block.label;
+}
+
+/** A form is paged if and only if its root contains pages (contract §1). */
+export function isPaged(blocks: readonly Block[]): boolean {
+  return blocks.some(isPage);
 }
 
 export const FormTheme = z.object({
@@ -292,13 +390,76 @@ export function resolveTheme(theme?: FormTheme): ResolvedTheme {
   };
 }
 
+/**
+ * Paged-form navigation (contract §1). Stored as the author left it, whether or
+ * not the form currently has pages, so the choices come back if pages are added
+ * again. Only exported for paged forms — see `artifactNavigation`.
+ */
+export const ProgressStyle = z.enum(["caption", "bar"]);
+export type ProgressStyle = z.infer<typeof ProgressStyle>;
+
+export const Navigation = z.object({
+  /** "Step 2 of 5" above each page title. Default true. */
+  showProgress: z.boolean().optional(),
+  /**
+   * "caption": the "Step 2 of 5" text only; "bar": a segmented bar above it
+   * as well. Default "caption"; only used when showProgress is on. The
+   * client's app can override it (contract §8).
+   */
+  progressStyle: ProgressStyle.optional(),
+  /** A review step before submit. Default false. */
+  reviewPage: z.boolean().optional(),
+});
+export type Navigation = z.infer<typeof Navigation>;
+
+/** What `navigation` means when the author hasn't set a field. */
+export const NAVIGATION_DEFAULTS = {
+  showProgress: true,
+  progressStyle: "caption",
+  reviewPage: false,
+} as const satisfies Required<Navigation>;
+
+/**
+ * Where a respondent's unfinished answers are kept (docs/DRAFTS-CONTRACT.md §2):
+ * "session" — the tab only (the default); "device" — encrypted on the
+ * respondent's device; "server" — by the host app's backend, at page changes,
+ * so paged forms only. The host app must be set up for device and server;
+ * otherwise the renderer falls back to session.
+ */
+export const DraftMode = z.enum(["session", "device", "server"]);
+export type DraftMode = z.infer<typeof DraftMode>;
+export const Drafts = z.object({ mode: DraftMode });
+export type Drafts = z.infer<typeof Drafts>;
+
+/** The mode when the author hasn't chosen one. */
+export const DEFAULT_DRAFT_MODE: DraftMode = "session";
+
 export const FormSchema = z.object({
   title: z.string(),
   description: z.string().optional(),
   settings: FormSettings.optional(),
   blocks: z.array(Block).default([]),
+  navigation: Navigation.optional(),
+  drafts: Drafts.optional(),
 });
 export type FormSchema = z.infer<typeof FormSchema>;
+
+/** Whether a form with these blocks can use `mode`: "server" saves at page changes, so it needs pages. */
+export function draftModeAvailable(mode: DraftMode, blocks: readonly Block[]): boolean {
+  return mode !== "server" || isPaged(blocks);
+}
+
+/** The save rule for `drafts`: a message when the chosen mode can't be used on this form, else null. */
+export function draftsProblem(form: Pick<FormSchema, "blocks" | "drafts">): string | null {
+  const mode = form.drafts?.mode ?? DEFAULT_DRAFT_MODE;
+  if (draftModeAvailable(mode, form.blocks)) return null;
+  return "Save progress \"On the app's server\" needs a form with pages, because it saves at each page change. Add pages, or choose another Save progress option.";
+}
+
+/** `drafts` as the editor stores it: nothing for the default mode (as with `navigationWithoutDefaults`). */
+export function draftsWithoutDefault(drafts: Drafts | undefined): Drafts | undefined {
+  return drafts && drafts.mode !== DEFAULT_DRAFT_MODE ? { mode: drafts.mode } : undefined;
+}
 
 /**
  * True when two schemas have the same form content. Both sides go through
@@ -346,11 +507,84 @@ export const FormArtifact = z
     formId: z.string().min(1),
     /** The saved `FormVersion` row's id — changes on every save, never on download. */
     formVersionId: z.string().min(1),
-    /** Schema format. 2 = groups may appear (contract §1). Stamped at export. */
+    /** Schema format. 2 = groups and pages may appear (contract §1). Stamped at export. */
     schemaVersion: z.literal(2),
   })
-  .merge(FormSchema.omit({ title: true }));
+  .merge(FormSchema.omit({ title: true, navigation: true, drafts: true }))
+  .extend({
+    /** Present exactly when the form is paged, with every field explicit. */
+    navigation: z
+      .object({ showProgress: z.boolean(), progressStyle: ProgressStyle, reviewPage: z.boolean() })
+      .optional(),
+    /** Present only when the mode isn't the default "session" (drafts contract §2). */
+    drafts: Drafts.optional(),
+  })
+  .superRefine((artifact, ctx) => {
+    if (artifact.drafts?.mode === DEFAULT_DRAFT_MODE) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["drafts"], message: 'drafts is omitted for the default "session" mode' });
+    }
+    const problem = draftsProblem(artifact);
+    if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["drafts", "mode"], message: problem });
+    if (isPaged(artifact.blocks) !== (artifact.navigation !== undefined)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["navigation"],
+        message: "navigation must be present exactly when the form has pages",
+      });
+    }
+  });
 export type FormArtifact = z.infer<typeof FormArtifact>;
+
+/**
+ * `navigation` as the editor stores it: fields equal to their default are
+ * dropped (undefined when nothing is left), so switching a setting back leaves
+ * the form unchanged. Meaning is unaffected: the artifact fills defaults in.
+ */
+export function navigationWithoutDefaults(navigation: Navigation | undefined): Navigation | undefined {
+  const kept: Navigation = {};
+  for (const key of Object.keys(NAVIGATION_DEFAULTS) as (keyof Navigation)[]) {
+    const value = navigation?.[key];
+    if (value !== undefined && value !== NAVIGATION_DEFAULTS[key]) Object.assign(kept, { [key]: value });
+  }
+  return Object.keys(kept).length ? kept : undefined;
+}
+
+/**
+ * The navigation a form exports: every field explicit, with the author's
+ * values or the defaults, for a paged form; nothing for a form without pages.
+ */
+export function artifactNavigation(
+  form: Pick<FormSchema, "blocks" | "navigation">,
+): Required<Navigation> | undefined {
+  if (!isPaged(form.blocks)) return undefined;
+  return {
+    showProgress: form.navigation?.showProgress ?? NAVIGATION_DEFAULTS.showProgress,
+    progressStyle: form.navigation?.progressStyle ?? NAVIGATION_DEFAULTS.progressStyle,
+    reviewPage: form.navigation?.reviewPage ?? NAVIGATION_DEFAULTS.reviewPage,
+  };
+}
+
+/**
+ * The export artifact for stored form content: the content, the identity of
+ * the form and version it came from, schemaVersion 2, navigation resolved by
+ * `artifactNavigation`, and `drafts` only when its mode isn't "session". The
+ * only way the API builds one.
+ */
+export function buildArtifact(
+  content: unknown,
+  identity: { formId: string; formVersionId: string },
+): FormArtifact {
+  const { navigation: stored, drafts: storedDrafts, ...form } = FormSchema.parse(content);
+  const navigation = artifactNavigation({ blocks: form.blocks, navigation: stored });
+  const drafts = draftsWithoutDefault(storedDrafts);
+  return FormArtifact.parse({
+    ...form,
+    ...identity,
+    schemaVersion: 2,
+    ...(navigation ? { navigation } : {}),
+    ...(drafts ? { drafts } : {}),
+  });
+}
 
 /** Block types that carry a list of options. */
 export const OPTION_TYPES: readonly AnyBlockType[] = [
@@ -485,6 +719,18 @@ export function newGroup(taken?: Iterable<string>, label = DEFAULT_GROUP_LABEL):
   return { id: newBlockId(taken), type: "group", label, blocks: [] };
 }
 
+/** The title a new page gets (contract §2.5). */
+export const DEFAULT_PAGE_TITLE = "Untitled page";
+
+/**
+ * Create an empty page. It must be given at least one block before the form
+ * can be saved. Pass every id in the form (`allBlockIds`) as `taken`.
+ */
+export function newPage(taken?: Iterable<string>, title = DEFAULT_PAGE_TITLE): PageBlock {
+  // No `label` at runtime: see PageBlock.label.
+  return { id: newBlockId(taken), type: "page", title, blocks: [] } as unknown as PageBlock;
+}
+
 /** Validate an incoming submission against a form's blocks. Returns cleaned values or throws. */
 export function validateSubmission(
   form: FormSchema,
@@ -578,7 +824,7 @@ export const COUNTRY_OPTIONS: readonly string[] = [
  * SOURCE_OPERATORS.
  */
 export function sourceOperators(block: Block): readonly ConditionOperator[] | undefined {
-  return isGroup(block) ? undefined : SOURCE_OPERATORS[block.type];
+  return isContainer(block) ? undefined : SOURCE_OPERATORS[block.type];
 }
 
 /**
@@ -587,18 +833,20 @@ export function sourceOperators(block: Block): readonly ConditionOperator[] | un
  * or null when any answer of the right kind is allowed.
  */
 export function conditionAnswerOptions(source: Block): readonly string[] | null {
-  if (isGroup(source)) return null;
+  if (isContainer(source)) return null;
   if (OPTION_SOURCE_TYPES.includes(source.type)) return source.options ?? [];
   if (source.type === "country") return COUNTRY_OPTIONS;
   return null;
 }
 
 /**
- * Collects an answer, so it is numbered (contract §4). Groups, presentational
- * blocks and `hidden` fields are not.
+ * Collects an answer, so it is numbered (contract §4). Groups, pages,
+ * presentational blocks and `hidden` fields are not.
  */
 export function isAnswerable(block: Block): boolean {
-  return !isGroup(block) && !isPresentationalType(block.type) && !STATIC_TYPES.includes(block.type);
+  return (
+    !isContainer(block) && !isPresentationalType(block.type) && !STATIC_TYPES.includes(block.type)
+  );
 }
 
 /* ---------- the block tree ---------- */
@@ -606,8 +854,8 @@ export function isAnswerable(block: Block): boolean {
 /** One block as met in reading order, with where it sits in the tree. */
 export interface TreeEntry {
   block: Block;
-  /** Enclosing groups, outermost first. Empty at the root. */
-  ancestors: GroupBlock[];
+  /** Enclosing pages and groups, outermost first. Empty at the root. */
+  ancestors: ContainerBlock[];
   /** Nesting depth: 0 at the root. */
   depth: number;
   /** Position in reading order across the whole tree, from 0. */
@@ -617,18 +865,18 @@ export interface TreeEntry {
 }
 
 /**
- * THE walk over a form's blocks: depth-first, pre-order — a group is visited
- * before its children, which is the contract's reading order (§3.2). Every rule,
- * guard and count that must see inside groups goes through this. Nothing else
- * in the builder recurses over the tree.
+ * THE walk over a form's blocks: depth-first, pre-order — a page or group is
+ * visited before its children, which is the contract's reading order (§3.2).
+ * Every rule, guard and count that must see inside pages and groups goes
+ * through this. Nothing else in the builder recurses over the tree.
  */
 export function walkBlocks(blocks: readonly Block[]): TreeEntry[] {
   const entries: TreeEntry[] = [];
-  const visit = (list: readonly Block[], ancestors: GroupBlock[], parentPath: number[]) => {
+  const visit = (list: readonly Block[], ancestors: ContainerBlock[], parentPath: number[]) => {
     list.forEach((block, index) => {
       const path = [...parentPath, index];
       entries.push({ block, ancestors, depth: ancestors.length, order: entries.length, path });
-      if (isGroup(block)) visit(block.blocks, [...ancestors, block], path);
+      if (isContainer(block)) visit(block.blocks, [...ancestors, block], path);
     });
   };
   visit(blocks, [], []);
@@ -646,8 +894,9 @@ export function findBlock(blocks: readonly Block[], id: string): TreeEntry | und
 }
 
 /**
- * Question numbers, 1…n in reading order across the whole tree. Only answerable
- * questions are numbered; numbers never shift when something is hidden.
+ * Question numbers, 1…n in reading order across the whole tree, pages
+ * included. Only answerable questions are numbered; numbers never shift when
+ * something is hidden.
  */
 export function questionNumbers(blocks: readonly Block[]): Map<string, number> {
   const numbers = new Map<string, number>();
@@ -659,23 +908,26 @@ export function questionNumbers(blocks: readonly Block[]): Map<string, number> {
 
 /*
  * Tree edits. Each returns a new tree and leaves its input untouched. They
- * rebuild only the chain of groups from the root down to the edited list — a
- * single path, found by walkBlocks — so they aren't another walk of the tree.
+ * rebuild only the chain of pages and groups from the root down to the edited
+ * list — a single path, found by walkBlocks — so they aren't another walk of
+ * the tree.
  */
 
-/** Replace the children of the group at `parentPath` ([] = the root list). */
+/** Replace the children of the page or group at `parentPath` ([] = the root list). */
 function editChildren(
   blocks: readonly Block[],
   parentPath: readonly number[],
   edit: (children: Block[]) => Block[],
 ): Block[] {
-  const spine: GroupBlock[] = [];
+  const spine: ContainerBlock[] = [];
   let level: readonly Block[] = blocks;
   for (const index of parentPath) {
-    const group = level[index];
-    if (!group || !isGroup(group)) throw new Error(`No group at path [${parentPath.join(", ")}]`);
-    spine.push(group);
-    level = group.blocks;
+    const container = level[index];
+    if (!container || !isContainer(container)) {
+      throw new Error(`No page or group at path [${parentPath.join(", ")}]`);
+    }
+    spine.push(container);
+    level = container.blocks;
   }
   let rebuilt = edit([...level]);
   for (let k = spine.length - 1; k >= 0; k -= 1) {
@@ -692,11 +944,11 @@ function entryOrThrow(blocks: readonly Block[], id: string): TreeEntry {
   return entry;
 }
 
-/** The path of a group's children list: [] for the root (`parentId` null). */
+/** The path of a page's or group's children list: [] for the root (`parentId` null). */
 function childrenPath(blocks: readonly Block[], parentId: string | null): number[] {
   if (parentId === null) return [];
   const entry = entryOrThrow(blocks, parentId);
-  if (!isGroup(entry.block)) throw new Error(`Block "${parentId}" is not a group`);
+  if (!isContainer(entry.block)) throw new Error(`Block "${parentId}" is not a page or group`);
   return entry.path;
 }
 
@@ -714,7 +966,7 @@ export function updateBlockInTree(
   });
 }
 
-/** Insert `block` into group `parentId` (null = the root) at `index`. */
+/** Insert `block` into page or group `parentId` (null = the root) at `index`. */
 export function insertBlockIntoTree(
   blocks: readonly Block[],
   parentId: string | null,
@@ -727,7 +979,7 @@ export function insertBlockIntoTree(
   });
 }
 
-/** Remove the block with `id` — for a group, together with everything inside it. */
+/** Remove the block with `id` — for a page or group, together with everything inside it. */
 export function removeBlockFromTree(blocks: readonly Block[], id: string): Block[] {
   const { path } = entryOrThrow(blocks, id);
   const at = path[path.length - 1];
@@ -753,10 +1005,10 @@ export function unwrapGroup(blocks: readonly Block[], groupId: string): Block[] 
 }
 
 /**
- * Move the block with `id` — a group with its whole subtree — into group
- * `toParentId` (null = the root) at `toIndex`, counted among that group's
- * children after the block has been taken out. Refuses to move a group into
- * itself or into one of its own descendants.
+ * Move the block with `id` — a group with its whole subtree — into page or
+ * group `toParentId` (null = the root) at `toIndex`, counted among that
+ * container's children after the block has been taken out. Refuses to move a
+ * container into itself or into one of its own descendants.
  */
 export function moveBlockInTree(
   blocks: readonly Block[],
@@ -768,10 +1020,153 @@ export function moveBlockInTree(
   if (toParentId !== null) {
     const target = entryOrThrow(blocks, toParentId);
     if (target.block.id === id || target.ancestors.some((a) => a.id === id)) {
-      throw new Error(`Can't move "${moving.label}" into itself.`);
+      throw new Error(`Can't move "${blockName(moving)}" into itself.`);
     }
   }
   return insertBlockIntoTree(removeBlockFromTree(blocks, id), toParentId, toIndex, moving);
+}
+
+/* ---------- pages ---------- */
+
+/**
+ * The result of a page edit that a rule can refuse: the new tree, or why not
+ * and which blocks are in the way (for the editor's jump links).
+ */
+export type PageEdit =
+  | { ok: true; blocks: Block[] }
+  | { ok: false; message: string; dependents: Block[] };
+
+function refuse(message: string, dependents: Block[] = []): PageEdit {
+  return { ok: false, message, dependents };
+}
+
+/** The root index of page `pageId`; throws if it isn't a page at the root. */
+function rootPageIndex(blocks: readonly Block[], pageId: string): number {
+  const at = blocks.findIndex((b) => b.id === pageId);
+  if (at < 0 || !isPage(blocks[at])) throw new Error(`No page with id "${pageId}" at the top level`);
+  return at;
+}
+
+/**
+ * "Make paged": wrap every root block of a form without pages into one page,
+ * titled "Untitled page". Pass every id in the form as `taken` (defaults to them).
+ */
+export function makePaged(blocks: readonly Block[], taken: Iterable<string> = allBlockIds(blocks)): Block[] {
+  if (isPaged(blocks)) throw new Error("This form already has pages.");
+  return [{ ...newPage(taken), blocks: [...blocks] }];
+}
+
+/** Insert `page` directly after page `afterPageId`. */
+export function insertPageAfter(blocks: readonly Block[], afterPageId: string, page: PageBlock): Block[] {
+  const at = rootPageIndex(blocks, afterPageId);
+  const next = [...blocks];
+  next.splice(at + 1, 0, page);
+  return next;
+}
+
+/** Where "Page only" puts a page's contents: the previous page, or the next if it's the first. */
+export function pageContentsDestination(blocks: readonly Block[], pageId: string): PageBlock | undefined {
+  const at = rootPageIndex(blocks, pageId);
+  const destination = blocks[at > 0 ? at - 1 : at + 1];
+  return destination && isPage(destination) ? destination : undefined;
+}
+
+/**
+ * A page becoming the first page must have no conditions: nothing comes before
+ * it, so no condition on it can hold (contract §3.2). Says why and what to do.
+ */
+function firstPageRefusal(action: string, page: PageBlock): PageEdit {
+  return refuse(
+    `${action}: "${page.title}" would become the first page, and the first page can't have conditions — it is always shown. Remove the conditions on "${page.title}" first.`,
+    [page],
+  );
+}
+
+/**
+ * Delete a page but keep its contents: they move to the end of the previous
+ * page, or to the start of the next page if it was the first. The page's own
+ * conditions go with it. Refused when it is the only page (remove paging
+ * instead), or when the move would break the ordering rule.
+ */
+export function deletePageKeepingContents(blocks: readonly Block[], pageId: string): PageEdit {
+  const at = rootPageIndex(blocks, pageId);
+  const page = blocks[at] as PageBlock;
+  const action = `Can't delete "${page.title}" and keep its contents`;
+  const destination = pageContentsDestination(blocks, pageId);
+  if (!destination) return refuse(`${action}: it's the only page. Remove pages instead.`);
+  const intoPrevious = at > 0;
+  if (!intoPrevious && destination.enableWhen?.length) return firstPageRefusal(action, destination);
+  const merged: PageBlock = {
+    ...destination,
+    blocks: intoPrevious ? [...destination.blocks, ...page.blocks] : [...page.blocks, ...destination.blocks],
+  };
+  const next = [...blocks];
+  next[intoPrevious ? at - 1 : at + 1] = merged;
+  next.splice(at, 1);
+  const broken = moveBreaks(blocks, next);
+  if (broken.length) {
+    return refuse(
+      `${action} — these questions would end up before a question their conditions depend on:`,
+      broken,
+    );
+  }
+  return { ok: true, blocks: next };
+}
+
+/**
+ * Delete a page with everything inside it. Refused while anything outside it
+ * depends on something inside it, or when it is the only page.
+ */
+export function deletePageWithContents(blocks: readonly Block[], pageId: string): PageEdit {
+  const page = blocks[rootPageIndex(blocks, pageId)] as PageBlock;
+  const action = `Can't delete "${page.title}" and its contents`;
+  if (blocks.filter(isPage).length === 1) return refuse(`${action}: it's the only page. Remove pages instead.`);
+  const blockers = deletionBlockers(blocks, pageId);
+  if (blockers.length) {
+    return refuse(
+      `${action} — these questions outside it have conditions that depend on something inside it:`,
+      blockers,
+    );
+  }
+  return { ok: true, blocks: removeBlockFromTree(blocks, pageId) };
+}
+
+/**
+ * "Remove paging": only when exactly one page remains. Its contents become the
+ * form's root blocks.
+ */
+export function removePaging(blocks: readonly Block[]): Block[] {
+  if (blocks.length !== 1 || !isPage(blocks[0])) {
+    throw new Error("Pages can only be removed when exactly one page is left.");
+  }
+  return [...blocks[0].blocks];
+}
+
+/**
+ * Move a page, with everything in it, one place up (-1) or down (1). Refused at
+ * either end, when a conditional page would become the first page, or when it
+ * would break the ordering rule.
+ */
+export function movePage(blocks: readonly Block[], pageId: string, direction: -1 | 1): PageEdit {
+  const at = rootPageIndex(blocks, pageId);
+  const page = blocks[at] as PageBlock;
+  const to = at + direction;
+  const action = `Can't move "${page.title}" ${direction === -1 ? "up" : "down"}`;
+  if (to < 0 || to >= blocks.length || !isPage(blocks[to])) {
+    return refuse(`${action}: it's already the ${direction === -1 ? "first" : "last"} page.`);
+  }
+  const next = [...blocks];
+  [next[at], next[to]] = [next[to], next[at]];
+  const first = next[0] as PageBlock;
+  if (first.enableWhen?.length) return firstPageRefusal(action, first);
+  const broken = moveBreaks(blocks, next);
+  if (broken.length) {
+    return refuse(
+      `${action} — these questions would end up before a question their conditions depend on:`,
+      broken,
+    );
+  }
+  return { ok: true, blocks: next };
 }
 
 /* ---------- save rules ---------- */
@@ -784,25 +1179,67 @@ export type ConditionProblem = {
   detail: string;
 };
 
-/** How a message names a block: by label, never by id. */
-function subject(entry: TreeEntry): string {
-  const { block, ancestors } = entry;
-  if (!isGroup(block)) return `Block "${block.label}"`;
-  if (block.label.trim()) return `Group "${block.label}"`;
-  const parent = ancestors[ancestors.length - 1];
-  return parent ? `An unlabelled group inside "${parent.label}"` : "An unlabelled group at the top level";
+/** Anything a save message can name, before or after parsing: it may have no usable name. */
+export type NamedNode = { type?: unknown; label?: unknown; title?: unknown };
+
+function nodeName(node: NamedNode | undefined): string | null {
+  const name = node?.type === "page" ? node.title : node?.label;
+  return typeof name === "string" && name.trim() ? name : null;
+}
+
+/** One step of a path: the block's name, or a stand-in when it has none. */
+function pathSegment(node: NamedNode, index: number): string {
+  const name = nodeName(node);
+  if (name) return name;
+  if (node.type === "page") return `Page ${index + 1} (untitled)`;
+  if (node.type === "group") return "(unlabelled group)";
+  return `block ${index + 1}`;
 }
 
 /**
- * Every way the form breaks the save rules, each naming the offending block.
- * Empty means valid. The API rejects a save with any problem; the editor shows
- * them inline. Covers the whole tree:
+ * How a save message names a block: its kind and its path of names, page title
+ * first — e.g. `Block "Medication › Dosage › How often?"`. `chain` is the
+ * block's pages and groups, outermost first, then the block; `indices` gives
+ * each one's position in its parent's list. Unnamed blocks are placed by
+ * position instead ("An unlabelled group inside …"). Shared by the save rules
+ * and the API's schema errors, so both name blocks the same way.
+ */
+export function describeBlockPath(chain: readonly NamedNode[], indices: readonly number[]): string {
+  const block = chain[chain.length - 1];
+  const index = indices[indices.length - 1];
+  const parents = chain.slice(0, -1).map((node, k) => pathSegment(node, indices[k]));
+  const within = parents.join(" › ");
+  const name = nodeName(block);
+  if (!name) {
+    if (block.type === "group") {
+      return within ? `An unlabelled group inside "${within}"` : "An unlabelled group at the top level";
+    }
+    if (block.type === "page") {
+      return within ? `An untitled page inside "${within}"` : `Page ${index + 1} (untitled)`;
+    }
+    return within ? `Block ${index + 1} inside "${within}"` : `Block ${index + 1}`;
+  }
+  const kind = block.type === "page" ? "Page" : block.type === "group" ? "Group" : "Block";
+  return `${kind} "${[...parents, name].join(" › ")}"`;
+}
+
+function subject(entry: TreeEntry): string {
+  return describeBlockPath([...entry.ancestors, entry.block], entry.path);
+}
+
+/**
+ * Every way the form breaks the save rules, each naming the offending block by
+ * its path. Empty means valid. The API rejects a save with any problem; the
+ * editor shows them inline. Covers the whole tree:
  *
- *  - block ids unique across the tree, groups included (contract §2.4);
- *  - a group has a non-blank label and at least one block (§2.5, §2.6);
+ *  - block ids unique across the tree, pages and groups included (contract §2.4);
+ *  - a page only at the root, and no mixed root: if any root item is a page,
+ *    every root item is (§2.2, §2.3);
+ *  - a group has a non-blank label, a page a non-blank title, and each at
+ *    least one block (§2.5, §2.6);
  *  - every condition refers to a block in the form that comes BEFORE its
- *    dependent in reading order (§3.2) — so a group can never depend on its own
- *    contents, and cycles are impossible;
+ *    dependent in reading order (§3.2) — so a container can never depend on its
+ *    own contents, cycles are impossible, and the first page has no conditions;
  *  - the source is a type that can be a source (§3.3), with an operator and an
  *    answer that type supports.
  */
@@ -811,6 +1248,7 @@ export function formProblems(form: { blocks: readonly Block[] }): ConditionProbl
   const problems: ConditionProblem[] = [];
   const add = (entry: TreeEntry, detail: string) =>
     problems.push({ blockId: entry.block.id, message: `${subject(entry)}: ${detail}`, detail });
+  const paged = isPaged(form.blocks);
 
   const position = new Map<string, number>();
   for (const entry of entries) {
@@ -819,14 +1257,29 @@ export function formProblems(form: { blocks: readonly Block[] }): ConditionProbl
       add(entry, `another block has the same id "${block.id}". Block ids must be unique.`);
     } else position.set(block.id, entry.order);
 
-    if (isGroup(block)) {
+    if (isPage(block)) {
+      if (entry.depth > 0) {
+        add(entry, "a page can only be at the top level of the form, not inside a group or another page.");
+      }
+      if (!block.title.trim()) add(entry, "a page needs a title.");
+      if (block.blocks.length === 0) add(entry, "a page must contain at least one block.");
+    } else if (isGroup(block)) {
       if (!block.label.trim()) add(entry, "a group needs a label.");
       if (block.blocks.length === 0) add(entry, "a group must contain at least one block.");
     }
+    if (paged && entry.depth === 0 && !isPage(block)) {
+      add(entry, "this form has pages, so every block must be inside a page.");
+    }
   }
 
+  const firstPage = paged && isPage(form.blocks[0]) ? form.blocks[0] : undefined;
   for (const entry of entries) {
-    for (const c of entry.block.enableWhen ?? []) {
+    const conditions = entry.block.enableWhen ?? [];
+    if (entry.block === firstPage && conditions.length) {
+      add(entry, "the first page can't have conditions — it is always shown.");
+      continue;
+    }
+    for (const c of conditions) {
       const detail = conditionProblem(entries, position, entry, c);
       if (detail) add(entry, detail);
     }
@@ -847,18 +1300,20 @@ function conditionProblem(
   }
   const sourceEntry = entries[from];
   const source = sourceEntry.block;
+  const sourceName = blockName(source);
   if (from > dependent.order) {
     if (sourceEntry.ancestors.some((a) => a.id === dependent.block.id)) {
-      return `a condition depends on "${source.label}", which is inside this group. A group can't depend on its own questions.`;
+      const noun = isPage(dependent.block) ? "page" : "group";
+      return `a condition depends on "${sourceName}", which is inside this ${noun}. A ${noun} can't depend on its own questions.`;
     }
-    return `a condition depends on "${source.label}", which comes after it. A condition can only use a question that comes before it.`;
+    return `a condition depends on "${sourceName}", which comes after it. A condition can only use a question that comes before it.`;
   }
   const allowed = sourceOperators(source);
   if (!allowed) {
-    return `"${source.label}" is a ${source.type} block, which can't be used in a condition.`;
+    return `"${sourceName}" is a ${source.type} block, which can't be used in a condition.`;
   }
   if (!allowed.includes(c.operator)) {
-    return `the operator "${c.operator}" can't be used with "${source.label}" (a ${source.type} question). Allowed: ${allowed.join(", ")}.`;
+    return `the operator "${c.operator}" can't be used with "${sourceName}" (a ${source.type} question). Allowed: ${allowed.join(", ")}.`;
   }
   if (ORDERING.includes(c.operator) && !(typeof c.answer === "number" && Number.isFinite(c.answer))) {
     return `the operator "${c.operator}" needs a number as its answer, but got ${JSON.stringify(c.answer)}.`;
@@ -869,7 +1324,7 @@ function conditionProblem(
     c.answer !== undefined &&
     !(typeof c.answer === "string" && answers.includes(c.answer))
   ) {
-    return `the answer "${c.answer}" isn't one of the options of "${source.label}".`;
+    return `the answer "${c.answer}" isn't one of the options of "${sourceName}".`;
   }
   return null;
 }
@@ -896,9 +1351,9 @@ export function dependentsOf(
 }
 
 /**
- * Deleting `id` — with everything inside it, for a group — would leave these
- * blocks depending on something that no longer exists. A condition between two
- * deleted blocks doesn't count: both go.
+ * Deleting `id` — with everything inside it, for a page or group — would leave
+ * these blocks depending on something that no longer exists. A condition
+ * between two deleted blocks doesn't count: both go.
  */
 export function deletionBlockers(blocks: readonly Block[], id: string): Block[] {
   const target = findBlock(blocks, id);

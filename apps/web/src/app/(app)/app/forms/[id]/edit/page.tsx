@@ -36,6 +36,7 @@ import {
   CreditCard,
   Download,
   ExternalLink,
+  FileText,
   EyeOff,
   Film,
   Gauge,
@@ -70,18 +71,35 @@ import {
 import {
   allBlockIds,
   BLOCK_META,
+  blockName,
   conditionAnswerOptions,
+  DEFAULT_DRAFT_MODE,
+  deletePageKeepingContents,
+  deletePageWithContents,
   deletionBlockers,
   dependentsOf,
+  draftModeAvailable,
+  draftsWithoutDefault,
   findBlock,
   formProblems,
   insertBlockIntoTree,
+  insertPageAfter,
   isAnswerable,
+  isContainer,
   isGroup,
+  isPage,
+  isPaged,
+  makePaged,
   moveBlockInTree,
   moveBreaks,
+  movePage,
+  NAVIGATION_DEFAULTS,
+  navigationWithoutDefaults,
   newBlock,
   newGroup,
+  newPage,
+  pageContentsDestination,
+  removePaging,
   NUMERIC_SOURCE_TYPES,
   OPTION_SOURCE_TYPES,
   OPTION_TYPES,
@@ -97,8 +115,13 @@ import {
   type Block,
   type Condition,
   type ConditionOperator,
+  type ContainerBlock,
+  type DraftMode,
   type FormSchema,
   type GroupBlock,
+  type Navigation,
+  type PageBlock,
+  type PageEdit,
   type TreeEntry,
 } from "@formbuilder/form-schema";
 import {
@@ -125,6 +148,7 @@ type AiMsg = { role: "user" | "assistant"; text: string; changes?: string[] };
 
 const ICONS: Record<AnyBlockType, typeof Type> = {
   group: Layers,
+  page: FileText,
   short: Type,
   long: AlignLeft,
   choice: CircleDot,
@@ -159,7 +183,8 @@ const ICONS: Record<AnyBlockType, typeof Type> = {
 };
 
 type CatalogItem = {
-  type: AnyBlockType;
+  // Pages are added with their own control, never from the block menu.
+  type: Exclude<AnyBlockType, "page">;
   label?: string;
   keywords?: string;
   level?: number;
@@ -566,11 +591,12 @@ function DropLine({ at }: { at: "top" | "bottom" }) {
 /**
  * A group on the canvas: a box holding its header card, its contents and the
  * "Add to" row. Nested boxes alternate background so adjacent levels stay
- * distinct; past MAX_INDENT_LEVELS they stop adding padding.
+ * distinct; past MAX_INDENT_LEVELS they stop adding padding. `level` counts
+ * from the page, so a group looks the same with or without pages.
  */
 function GroupBox({
   group,
-  depth,
+  level: depth,
   selected,
   dropTarget,
   dimmed,
@@ -579,7 +605,7 @@ function GroupBox({
   children,
 }: {
   group: GroupBlock;
-  depth: number;
+  level: number;
   selected: boolean;
   /** The box a dragged block will be dropped into. */
   dropTarget: boolean;
@@ -609,6 +635,161 @@ function GroupBox({
       {header}
       {children && <div className="flex flex-col gap-2.5">{children}</div>}
     </div>
+  );
+}
+
+/**
+ * A page on the canvas: a stronger container than a group box, with a header
+ * bar reading "Page 2 · <title>" (the title edits in place) and its blocks
+ * below. The header is where blocks can be dropped at the page's start; the
+ * page itself is never dragged — it moves with Move page up / down.
+ */
+function PageBox({
+  item,
+  pageNumber,
+  selected,
+  dropTarget,
+  canMoveUp,
+  canMoveDown,
+  onlyPage,
+  onSelect,
+  onTitle,
+  onToggle,
+  onMove,
+  onDelete,
+  onRemovePages,
+  children,
+}: {
+  item: FlatItem;
+  pageNumber: number;
+  selected: boolean;
+  dropTarget: boolean;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  /** The last page left: offer "Remove pages" instead of delete. */
+  onlyPage: boolean;
+  onSelect: () => void;
+  onTitle: (title: string) => void;
+  onToggle: () => void;
+  onMove: (direction: -1 | 1) => void;
+  onDelete: () => void;
+  onRemovePages: () => void;
+  children: React.ReactNode;
+}) {
+  // A drop target (a block dropped on the header lands inside), never dragged itself.
+  const { setNodeRef } = useSortable({ id: item.id, disabled: { draggable: true, droppable: false } });
+  const page = item.block as PageBlock;
+  const name = page.title.trim() || `Page ${pageNumber}`;
+  const hiddenCount = item.collapsed ? walkBlocks(page.blocks).length : 0;
+  const iconButton =
+    "grid h-7 w-7 flex-none place-items-center rounded-md text-muted hover:bg-surface hover:text-ink disabled:opacity-30";
+  return (
+    <section
+      data-page-box={page.id}
+      data-drop-target={dropTarget || undefined}
+      className={`relative rounded-2xl border-2 bg-surface transition-[border-color,box-shadow] ${
+        dropTarget
+          ? "border-accent ring-2 ring-accent/30"
+          : selected
+            ? "border-accent ring-2 ring-accent-weak"
+            : "border-ink/15"
+      }`}
+    >
+      <div
+        ref={setNodeRef}
+        data-block-id={page.id}
+        data-depth={0}
+        onClick={onSelect}
+        className={`flex cursor-pointer items-center gap-2 bg-ink/[0.045] px-3 py-2 ${
+          item.collapsed ? "rounded-[14px]" : "rounded-t-[14px] border-b border-ink/10"
+        } ${dropTarget ? "bg-accent-weak" : ""}`}
+      >
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggle();
+          }}
+          aria-expanded={!item.collapsed}
+          aria-label={item.collapsed ? `Expand page "${name}"` : `Collapse page "${name}"`}
+          className={iconButton}
+        >
+          {item.collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </button>
+        <span className="flex-none text-[12px] font-bold uppercase tracking-wider text-muted">
+          Page {pageNumber}
+        </span>
+        <span aria-hidden="true" className="flex-none text-faint">
+          ·
+        </span>
+        <input
+          value={page.title}
+          aria-label={`Page ${pageNumber} title`}
+          placeholder="Untitled page"
+          onChange={(e) => onTitle(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+          onFocus={onSelect}
+          className="min-w-0 flex-1 truncate rounded-md bg-transparent px-1 py-0.5 text-[15px] font-semibold outline-none hover:bg-surface focus:bg-surface"
+          spellCheck={false}
+        />
+        {!!page.enableWhen?.length && (
+          <span className="flex-none rounded-full bg-accent-weak px-2 py-0.5 text-[11px] font-semibold text-accent-2">
+            Conditional
+          </span>
+        )}
+        {item.collapsed && (
+          <span className="flex-none text-xs text-muted">
+            {hiddenCount} {hiddenCount === 1 ? "block" : "blocks"} inside
+          </span>
+        )}
+        <div className="flex flex-none items-center gap-0.5">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onMove(-1);
+            }}
+            disabled={!canMoveUp}
+            className={iconButton}
+            aria-label="Move page up"
+          >
+            <ArrowUp className="h-4 w-4" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onMove(1);
+            }}
+            disabled={!canMoveDown}
+            className={iconButton}
+            aria-label="Move page down"
+          >
+            <ArrowDown className="h-4 w-4" />
+          </button>
+          {onlyPage ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onRemovePages();
+              }}
+              className="rounded-md px-2 py-1 text-xs font-medium text-muted hover:bg-surface hover:text-ink"
+            >
+              Remove pages
+            </button>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className={`${iconButton} hover:!bg-[#FCECEC] hover:!text-red`}
+              aria-label="Delete page"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </div>
+      {children && <div className="flex flex-col gap-2.5 p-3">{children}</div>}
+    </section>
   );
 }
 
@@ -642,6 +823,7 @@ function CanvasCard({
   const block = item.block;
   const group = isGroup(block) ? block : null;
   const depth = item.depth;
+  const level = item.level;
   const Icon = ICONS[block.type];
   const hiddenCount = group && item.collapsed ? walkBlocks(group.blocks).length : 0;
 
@@ -693,7 +875,7 @@ function CanvasCard({
           <span className="flex-none text-[13px] font-semibold tabular-nums text-muted">{number}.</span>
         )}
         <span className={`min-w-0 truncate font-semibold ${group && !group.label.trim() ? "italic text-faint" : ""}`}>
-          {group && !group.label.trim() ? "Unlabelled group" : block.label}
+          {group && !group.label.trim() ? "Unlabelled group" : blockName(block)}
         </span>
         {block.required && <span className="text-red">*</span>}
         {!!block.enableWhen?.length && (
@@ -701,9 +883,9 @@ function CanvasCard({
             Conditional
           </span>
         )}
-        {depth > MAX_INDENT_LEVELS && (
+        {level > MAX_INDENT_LEVELS && (
           <span className="flex-none rounded-full bg-surface-3 px-2 py-0.5 text-[11px] font-semibold text-muted">
-            Level {depth + 1}
+            Level {level + 1}
           </span>
         )}
         {group && item.collapsed && (
@@ -753,18 +935,18 @@ function CanvasCard({
   );
 }
 
-/** The last row inside an open group's box: a way to add to it. */
-function GroupEnd({
-  group,
+/** The last row inside an open page or group: a way to add to it. */
+function ContainerEnd({
+  container: group,
   dropLine,
   onAdd,
 }: {
-  group: GroupBlock;
-  /** A block dropped now would land at the end of this group. */
+  container: ContainerBlock;
+  /** A block dropped now would land at the end of this page or group. */
   dropLine: boolean;
   onAdd: (anchor: HTMLElement) => void;
 }) {
-  const name = group.label.trim() || "this group";
+  const name = blockName(group).trim() || (isPage(group) ? "this page" : "this group");
   return (
     <div className="relative">
       {dropLine && <DropLine at="top" />}
@@ -790,7 +972,7 @@ function DragGhost({ block }: { block: Block }) {
       <span className="grid h-[22px] w-[22px] flex-none place-items-center rounded-md bg-accent-weak text-accent-2">
         <Icon className="h-3.5 w-3.5" />
       </span>
-      <span className="min-w-0 truncate font-semibold">{block.label.trim() || "Unlabelled group"}</span>
+      <span className="min-w-0 truncate font-semibold">{blockName(block).trim() || "Unlabelled group"}</span>
       {isGroup(block) && (
         <span className="flex-none pt-0.5 text-xs text-muted">
           {inside} {inside === 1 ? "block" : "blocks"} inside
@@ -800,11 +982,36 @@ function DragGhost({ block }: { block: Block }) {
   );
 }
 
-/** "Show when <question> <condition> <answer>", as the author would say it. */
-function describeCondition(c: Condition, blocks: readonly Block[]): string {
+/** "<question> <condition> <answer>", as the author would say it. */
+function conditionPhrase(c: Condition, blocks: readonly Block[]): string {
   const source = findBlock(blocks, c.question)?.block;
   const answer = c.operator === "exists" ? "" : ` ${c.answer}`;
-  return `Show when ${source ? source.label : "a missing question"} ${OPERATOR_TEXT[c.operator]}${answer}`;
+  return `${source ? blockName(source) : "a missing question"} ${OPERATOR_TEXT[c.operator]}${answer}`;
+}
+
+/** "Show when <question> <condition> <answer>". */
+function describeCondition(c: Condition, blocks: readonly Block[]): string {
+  return `Show when ${conditionPhrase(c, blocks)}`;
+}
+
+/**
+ * What deleting a container "but keeping its contents" costs, in words: the
+ * container's own conditions no longer apply to what it held. Null when it
+ * has no conditions.
+ */
+function lostConditionsNote(container: ContainerBlock, blocks: readonly Block[], whom: string): string | null {
+  const conditions = container.enableWhen ?? [];
+  if (!conditions.length) return null;
+  const quoted = conditions.map((c) => `'${describeCondition(c, blocks)}'`);
+  return `The ${conditions.length === 1 ? "condition" : "conditions"} ${quoted.join(
+    container.enableBehavior === "any" ? " or " : " and ",
+  )} will no longer apply to ${whom}.`;
+}
+
+/** "this question", "these 3 questions", or "its contents" when none are questions. */
+function questionsWhom(blocks: readonly Block[]): string {
+  const questions = walkBlocks(blocks).filter((e) => isAnswerable(e.block)).length;
+  return questions === 0 ? "its contents" : questions === 1 ? "this question" : `these ${questions} questions`;
 }
 
 /**
@@ -826,18 +1033,8 @@ function DeleteGroupDialog({
   onClose: () => void;
 }) {
   const inside = walkBlocks(group.blocks);
-  const questions = inside.filter((e) => isAnswerable(e.block)).length;
   const name = group.label.trim() || "this group";
-  const conditions = group.enableWhen ?? [];
-  const whom =
-    questions === 0 ? "its contents" : questions === 1 ? "this question" : `these ${questions} questions`;
-  const quoted = conditions.map((c) => `'${describeCondition(c, blocks)}'`);
-  const conditionNote =
-    conditions.length === 0
-      ? null
-      : `The ${conditions.length === 1 ? "condition" : "conditions"} ${quoted.join(
-          group.enableBehavior === "any" ? " or " : " and ",
-        )} will no longer apply to ${whom}.`;
+  const conditionNote = lostConditionsNote(group, blocks, questionsWhom(group.blocks));
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4" onClick={onClose}>
@@ -892,20 +1089,146 @@ function DeleteGroupDialog({
 }
 
 /**
- * Keyboard-friendly moving: up, down (stepping out of a group at its ends) and
- * straight into any group. Every move goes through the same dependency guard as
- * dragging.
+ * The two ways to delete a page. "Page only" moves its contents to the end of
+ * the previous page (or the start of the next, for the first page). The dialog
+ * says what that changes: the page's own conditions stop applying, and moving
+ * into a conditional page makes the contents conditional on it. Both notes show
+ * when both apply. Refusals come back through the standard banner.
+ */
+function DeletePageDialog({
+  page,
+  blocks,
+  onKeep,
+  onDeleteAll,
+  onClose,
+}: {
+  page: PageBlock;
+  blocks: readonly Block[];
+  onKeep: () => void;
+  onDeleteAll: () => void;
+  onClose: () => void;
+}) {
+  const inside = walkBlocks(page.blocks);
+  const first = blocks[0]?.id === page.id;
+  const name = page.title.trim() || "this page";
+  const whom = questionsWhom(page.blocks);
+  const lostNote = lostConditionsNote(page, blocks, whom);
+  const destination = pageContentsDestination(blocks, page.id);
+  // Into the previous page only: moving the first page's contents into a
+  // conditional next page is refused (it would become a conditional first page).
+  const destinationConditions = !first ? (destination?.enableWhen ?? []) : [];
+  const gainedNote = destinationConditions.length
+    ? `${whom.charAt(0).toUpperCase()}${whom.slice(1)} will move to '${destination!.title}' and will only show when ${destinationConditions
+        .map((c) => conditionPhrase(c, blocks))
+        .join(destination!.enableBehavior === "any" ? " or " : " and ")}.`
+    : null;
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="delete-page-title"
+        className="w-full max-w-md rounded-2xl bg-surface p-5 shadow-pop"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.key === "Escape" && onClose()}
+      >
+        <h2 id="delete-page-title" className="text-base font-semibold">
+          Delete the page &quot;{name}&quot;?
+        </h2>
+        <p className="mt-1 text-sm text-muted">
+          It contains {inside.length} {inside.length === 1 ? "block" : "blocks"}. Choose what happens to them.
+        </p>
+        <div className="mt-4 flex flex-col gap-2">
+          <button
+            autoFocus
+            onClick={onKeep}
+            className="rounded-xl border border-line-2 px-4 py-3 text-left hover:border-accent hover:bg-accent-weak"
+          >
+            <span className="block text-sm font-semibold">
+              Page only (move contents to the {first ? "next" : "previous"} page)
+            </span>
+            <span className="mt-0.5 block text-[13px] text-muted">
+              {first
+                ? `Its contents move to the start of "${destination?.title ?? "the next page"}", in the same order.`
+                : `Its contents move to the end of "${destination?.title ?? "the previous page"}", in the same order.`}
+            </span>
+            {[lostNote, gainedNote].filter(Boolean).map((note) => (
+              <span key={note} className="mt-1.5 block rounded-md bg-[#FBF0D9] px-2 py-1.5 text-[13px] text-ink-2">
+                {note}
+              </span>
+            ))}
+          </button>
+          <button
+            onClick={onDeleteAll}
+            className="rounded-xl border border-line-2 px-4 py-3 text-left hover:border-red hover:bg-[#FCECEC]"
+          >
+            <span className="block text-sm font-semibold text-red">Page and its contents</span>
+            <span className="mt-0.5 block text-[13px] text-muted">
+              Deletes the page and all {inside.length} {inside.length === 1 ? "block" : "blocks"} on it.
+            </span>
+          </button>
+        </div>
+        <div className="mt-4 flex justify-end">
+          <button onClick={onClose} className="btn btn-outline btn-sm">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** The confirm before a single-page form becomes a paged one. */
+function PagingDialog({ onConfirm, onClose }: { onConfirm: () => void; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="paging-title"
+        className="w-full max-w-sm rounded-2xl bg-surface p-5 shadow-pop"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.key === "Escape" && onClose()}
+      >
+        <h2 id="paging-title" className="text-base font-semibold">
+          Split this form into pages?
+        </h2>
+        <p className="mt-1.5 text-sm text-muted">
+          Your questions will move to Page 1, and a new, empty Page 2 is added after it.
+        </p>
+        <div className="mt-4 flex justify-end gap-2">
+          <button onClick={onClose} className="btn btn-outline btn-sm">
+            Cancel
+          </button>
+          <button autoFocus onClick={onConfirm} className="btn btn-primary btn-sm">
+            Add pages
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Keyboard-friendly moving: up, down (stepping out of a group at its ends, or
+ * into the neighbouring page at a page's ends) and straight into any page or
+ * group with "Move to…". Every move goes through the same dependency guard as
+ * dragging. A page moves only up or down, as a whole.
  */
 function PositionPanel({
   blocks,
   blockId,
   onMove,
+  onMovePage,
 }: {
   blocks: readonly Block[];
   blockId: string;
   onMove: (target: MoveTarget) => void;
+  onMovePage: (direction: -1 | 1) => void;
 }) {
   const [destination, setDestination] = useState("");
+  const pageAt = blocks.findIndex((b) => b.id === blockId && isPage(b));
   const up = stepMove(blocks, blockId, -1);
   const down = stepMove(blocks, blockId, 1);
   const destinations = moveDestinations(blocks, blockId);
@@ -916,9 +1239,33 @@ function PositionPanel({
     const parentId = destination === ROOT ? null : destination;
     const target = parentId ? findBlock(blocks, parentId)?.block : null;
     // Appended at the end: the moving block isn't among the destination's children.
-    const index = target && isGroup(target) ? target.blocks.length : blocks.length;
+    const index = target && isContainer(target) ? target.blocks.length : blocks.length;
     onMove({ parentId, index });
     setDestination("");
+  }
+
+  if (pageAt >= 0) {
+    return (
+      <div className="mt-3 border-t border-line pt-3">
+        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-faint">Position</h4>
+        <div className="flex gap-1.5">
+          <button
+            onClick={() => onMovePage(-1)}
+            disabled={pageAt === 0}
+            className="btn btn-outline btn-sm flex-1 disabled:opacity-40"
+          >
+            <ArrowUp className="h-3.5 w-3.5" /> Move up
+          </button>
+          <button
+            onClick={() => onMovePage(1)}
+            disabled={pageAt === blocks.length - 1}
+            className="btn btn-outline btn-sm flex-1 disabled:opacity-40"
+          >
+            <ArrowDown className="h-3.5 w-3.5" /> Move down
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -942,12 +1289,12 @@ function PositionPanel({
       </div>
       <div className="flex gap-1.5">
         <select
-          aria-label="Move to group"
+          aria-label="Move to"
           value={destination}
           onChange={(e) => setDestination(e.target.value)}
           className="min-w-0 flex-1 rounded-lg border border-line-2 bg-surface px-2 py-1.5 text-[13px] outline-none focus:border-accent"
         >
-          <option value="">Move to group…</option>
+          <option value="">Move to…</option>
           {destinations.map((d) => (
             <option key={d.id ?? ROOT} value={d.id ?? ROOT}>
               {d.id === null ? "Top level (outside any group)" : d.path.join(" › ")}
@@ -1078,7 +1425,7 @@ function ConditionsPanel({
   // Only questions before it in reading order can be used, which also rules out cycles.
   const sources = entries.filter((e) => e.order < at && sourceOperators(e.block));
   const numbers = questionNumbers(blocks);
-  const noun = isGroup(block) ? "group" : "question";
+  const noun = isPage(block) ? "page" : isGroup(block) ? "group" : "question";
   const conditions = block.enableWhen ?? [];
   const problems = formProblems({ blocks })
     .filter((p) => p.blockId === block.id)
@@ -1087,7 +1434,7 @@ function ConditionsPanel({
   // Consecutive sources in the same group share one <optgroup> labelled with its path.
   const runs: { path: string; entries: TreeEntry[] }[] = [];
   for (const e of sources) {
-    const path = e.ancestors.map((a) => a.label).join(" › ");
+    const path = e.ancestors.map(blockName).join(" › ");
     const last = runs[runs.length - 1];
     if (last && last.path === path) last.entries.push(e);
     else runs.push({ path, entries: [e] });
@@ -1095,7 +1442,7 @@ function ConditionsPanel({
   const sourceOptions = runs.map((run, r) => {
     const options = run.entries.map((e) => (
       <option key={e.block.id} value={e.block.id}>
-        {numbers.get(e.block.id)}. {e.block.label}
+        {numbers.get(e.block.id)}. {blockName(e.block)}
       </option>
     ));
     return run.path ? (
@@ -1108,13 +1455,23 @@ function ConditionsPanel({
   });
 
   // No conditions -> drop both fields; "all" is the default, so it's left implicit.
-  const commit = (next: Condition[], behavior = block.enableBehavior) =>
+  const commit = (next: Condition[], behavior: "all" | "any" | undefined = block.enableBehavior) =>
     onChange(
       next.length
         ? { enableWhen: next, enableBehavior: behavior === "any" ? "any" : undefined }
         : { enableWhen: undefined, enableBehavior: undefined },
     );
   const setAt = (i: number, c: Condition) => commit(conditions.map((x, k) => (k === i ? c : x)));
+
+  // Nothing comes before the first page, so it's always shown (contract §3.2).
+  if (isPage(block) && blocks[0]?.id === block.id && !conditions.length) {
+    return (
+      <div className="border-t border-line pt-3">
+        <h4 className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-faint">Logic</h4>
+        <p className="text-xs text-muted">The first page can&apos;t have conditions — it is always shown.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="border-t border-line pt-3">
@@ -1159,7 +1516,7 @@ function ConditionsPanel({
                   className={logicField}
                 >
                   {!eligible && (
-                    <option value={c.question}>{source ? source.label : "Missing question"}</option>
+                    <option value={c.question}>{source ? blockName(source) : "Missing question"}</option>
                   )}
                   {sourceOptions}
                 </select>
@@ -1235,7 +1592,8 @@ export default function EditorPage() {
   const [saving, setSaving] = useState(false);
   const [downloading, setDownloading] = useState(false);
   // A message under the header; `blocks` are questions to offer "jump to" links for.
-  const [notice, setNotice] = useState<{ text: string; blocks?: Block[] } | null>(null);
+  // `info` notes are neutral (e.g. a setting switched for the author); the rest are refusals.
+  const [notice, setNotice] = useState<{ text: string; blocks?: Block[]; tone?: "info" } | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [copied, setCopied] = useState(false);
   const [embedOpen, setEmbedOpen] = useState(false);
@@ -1258,6 +1616,10 @@ export default function EditorPage() {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   // The group whose delete dialog is open.
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
+  // The page whose delete dialog is open.
+  const [deletingPageId, setDeletingPageId] = useState<string | null>(null);
+  // The "Your questions will move to Page 1" confirm is open.
+  const [confirmPaging, setConfirmPaging] = useState(false);
   // A drag in progress: the block, the row it's over, and how far it has moved sideways.
   const [drag, setDrag] = useState<{ activeId: string; overId: string; offsetX: number } | null>(null);
   const insertRowRef = useRef<HTMLDivElement>(null);
@@ -1273,6 +1635,8 @@ export default function EditorPage() {
           description: s?.description || undefined,
           settings: s?.settings,
           blocks: s?.blocks ?? [],
+          navigation: s?.navigation,
+          drafts: s?.drafts,
         };
         setSchema(latest);
         setSaved(latest);
@@ -1399,13 +1763,18 @@ export default function EditorPage() {
 
   /**
    * Where a new block goes when no explicit target was chosen: inside the
-   * selected group (at its end), or just after the selected block in its group,
-   * or at the end of the form.
+   * selected page or group (at its end), or just after the selected block in
+   * its container, or at the end of the form — the end of the last page, in a
+   * paged form, where nothing may sit outside a page.
    */
   function selectionInsertTarget(): MoveTarget {
     const entry = schema && selectedId ? findBlock(schema.blocks, selectedId) : undefined;
-    if (!schema || !entry) return { parentId: null, index: schema?.blocks.length ?? 0 };
-    if (isGroup(entry.block)) return { parentId: entry.block.id, index: entry.block.blocks.length };
+    if (!schema || !entry) {
+      const last = schema?.blocks[schema.blocks.length - 1];
+      if (last && isPage(last)) return { parentId: last.id, index: last.blocks.length };
+      return { parentId: null, index: schema?.blocks.length ?? 0 };
+    }
+    if (isContainer(entry.block)) return { parentId: entry.block.id, index: entry.block.blocks.length };
     const parent = entry.ancestors[entry.ancestors.length - 1];
     return { parentId: parent?.id ?? null, index: entry.path[entry.path.length - 1] + 1 };
   }
@@ -1459,7 +1828,7 @@ export default function EditorPage() {
         const deps = dependentsOf(schema.blocks, bid);
         if (deps.length) {
           setNotice({
-            text: `Can't change the type of "${current.label}" — these questions have conditions that depend on it:`,
+            text: `Can't change the type of "${blockName(current)}" — these questions have conditions that depend on it:`,
             blocks: deps,
           });
           return;
@@ -1477,7 +1846,7 @@ export default function EditorPage() {
               .map((c) => `"${c.answer}"`)),
           ];
           setNotice({
-            text: `Can't change or remove the option ${answers.join(", ")} of "${current.label}" — it's the answer in conditions on:`,
+            text: `Can't change or remove the option ${answers.join(", ")} of "${blockName(current)}" — it's the answer in conditions on:`,
             blocks: deps,
           });
           return;
@@ -1490,11 +1859,15 @@ export default function EditorPage() {
     }));
   };
 
-  /** Delete a question or layout block. A group opens the two-choice dialog instead. */
+  /** Delete a question or layout block. A page or group opens its two-choice dialog instead. */
   const removeBlock = (bid: string) => {
     if (!schema) return;
     const current = findBlock(schema.blocks, bid)?.block;
     if (!current) return;
+    if (isPage(current)) {
+      setDeletingPageId(bid);
+      return;
+    }
     if (isGroup(current)) {
       setDeletingGroupId(bid);
       return;
@@ -1502,7 +1875,7 @@ export default function EditorPage() {
     const deps = deletionBlockers(schema.blocks, bid);
     if (deps.length) {
       setNotice({
-        text: `Can't delete "${current.label}" — these questions have conditions that depend on it:`,
+        text: `Can't delete "${blockName(current)}" — these questions have conditions that depend on it:`,
         blocks: deps,
       });
       return;
@@ -1537,7 +1910,7 @@ export default function EditorPage() {
     const deps = deletionBlockers(schema.blocks, gid);
     if (deps.length) {
       setNotice({
-        text: `Can't delete "${group?.label ?? "the group"}" and its questions — these questions outside it have conditions that depend on something inside it:`,
+        text: `Can't delete "${group ? blockName(group) : "the group"}" and its questions — these questions outside it have conditions that depend on something inside it:`,
         blocks: deps,
       });
       return;
@@ -1565,7 +1938,7 @@ export default function EditorPage() {
     const broken = moveBreaks(schema.blocks, next);
     if (broken.length) {
       setNotice({
-        text: `Can't move "${moving.label}" there — these questions would end up before a question their conditions depend on:`,
+        text: `Can't move "${blockName(moving)}" there — these questions would end up before a question their conditions depend on:`,
         blocks: broken,
       });
       return;
@@ -1573,6 +1946,99 @@ export default function EditorPage() {
     if (target.parentId) expand(target.parentId);
     patch((s) => ({ ...s, blocks: next }));
   }
+
+  /*
+   * Pages. The edits themselves, and their refusals, live in form-schema; a
+   * refusal shows in the standard banner with links to the blocks in the way.
+   */
+  function applyPageEdit(edit: PageEdit): boolean {
+    if (!edit.ok) {
+      setNotice({ text: edit.message, blocks: edit.dependents.length ? edit.dependents : undefined });
+      return false;
+    }
+    patch((s) => ({ ...s, blocks: edit.blocks }));
+    return true;
+  }
+
+  /** The page holding the selection, or the selected page; else the last page. */
+  function currentPageId(): string | null {
+    if (!schema) return null;
+    const entry = selectedId ? findBlock(schema.blocks, selectedId) : undefined;
+    if (entry && isPage(entry.block)) return entry.block.id;
+    if (entry?.ancestors[0] && isPage(entry.ancestors[0])) return entry.ancestors[0].id;
+    const pages = schema.blocks.filter(isPage);
+    return pages[pages.length - 1]?.id ?? null;
+  }
+
+  /** "Add page": after the current page — or, on a form without pages, convert it first. */
+  function addPage() {
+    if (!schema) return;
+    if (!isPaged(schema.blocks)) {
+      if (schema.blocks.length) setConfirmPaging(true);
+      else convertToPages(); // nothing to move, so nothing to confirm
+      return;
+    }
+    const after = currentPageId();
+    if (!after) return;
+    const page = newPage(allBlockIds(schema.blocks));
+    patch((s) => ({ ...s, blocks: insertPageAfter(s.blocks, after, page) }));
+    setSelectedId(page.id);
+  }
+
+  /** Wrap everything into Page 1 and add an empty Page 2 after it. */
+  function convertToPages() {
+    if (!schema) return;
+    setConfirmPaging(false);
+    const wrapped = makePaged(schema.blocks);
+    const second = newPage(allBlockIds(wrapped));
+    patch((s) => ({ ...s, blocks: insertPageAfter(wrapped, wrapped[0].id, second) }));
+    setSelectedId(second.id);
+  }
+
+  function movePageBy(pageId: string, direction: -1 | 1) {
+    if (schema) applyPageEdit(movePage(schema.blocks, pageId, direction));
+  }
+
+  function deletePageKeeping(pageId: string) {
+    if (!schema) return;
+    setDeletingPageId(null);
+    if (applyPageEdit(deletePageKeepingContents(schema.blocks, pageId))) {
+      setSelectedId((cur) => (cur === pageId ? null : cur));
+    }
+  }
+
+  function deletePageAll(pageId: string) {
+    if (!schema) return;
+    setDeletingPageId(null);
+    if (applyPageEdit(deletePageWithContents(schema.blocks, pageId))) setSelectedId(null);
+  }
+
+  /** "Remove pages": only offered with one page left; its contents become the form. */
+  function removePages() {
+    if (!schema) return;
+    const blocks = removePaging(schema.blocks);
+    // "On the app's server" needs pages (drafts contract §2): switch back, and say so.
+    const mode = schema.drafts?.mode ?? DEFAULT_DRAFT_MODE;
+    const switchDrafts = !draftModeAvailable(mode, blocks);
+    patch((s) => ({ ...s, blocks, ...(switchDrafts ? { drafts: undefined } : {}) }));
+    setSelectedId(null);
+    if (switchDrafts) {
+      setNotice({
+        tone: "info",
+        text: "Saving progress on the server needs pages, so it's been switched to 'Only while the form is open'.",
+      });
+    }
+  }
+
+  /** The default mode isn't stored, as with navigation. */
+  const updateDrafts = (mode: DraftMode) =>
+    patch((s) => ({ ...s, drafts: draftsWithoutDefault({ mode }) }));
+
+  /** Values equal to the default aren't stored, so toggling back leaves the form unchanged. */
+  const updateNavigation = (p: Navigation) =>
+    patch((s) => ({ ...s, navigation: navigationWithoutDefaults({ ...s.navigation, ...p }) }));
+  const showProgress = schema?.navigation?.showProgress ?? NAVIGATION_DEFAULTS.showProgress;
+  const progressStyle = schema?.navigation?.progressStyle ?? NAVIGATION_DEFAULTS.progressStyle;
 
   const updateSettings = (p: {
     submitLabel?: string;
@@ -1694,12 +2160,17 @@ export default function EditorPage() {
     ? getProjection(rows, drag.activeId, drag.overId, drag.offsetX, DRAG_INDENT)
     : null;
   const deletingGroup = deletingGroupId ? findBlock(schema.blocks, deletingGroupId)?.block : undefined;
+  const deletingPage = deletingPageId ? findBlock(schema.blocks, deletingPageId)?.block : undefined;
   const autoTarget = selectionInsertTarget();
   const autoTargetGroup = autoTarget.parentId ? findBlock(schema.blocks, autoTarget.parentId)?.block : undefined;
+  const paged = isPaged(schema.blocks);
+  const pages = schema.blocks.filter(isPage);
+  const pageNumbers = new Map(pages.map((pg, i) => [pg.id, i + 1]));
+  const addPageAfter = paged ? pages.find((pg) => pg.id === currentPageId()) : undefined;
 
   // Where a drop would land: before one of the target's visible children, or at its end.
   let dropBefore: string | null = null;
-  let dropAtEndOfGroup: string | null = null;
+  let dropAtEndOfGroup: string | null = null; // a page's or group's id
   let dropAtEndOfForm = false;
   if (drag && projection) {
     const siblings = rows.filter((r) => r.parentId === projection.parentId && r.id !== drag.activeId);
@@ -1710,8 +2181,8 @@ export default function EditorPage() {
 
   /**
    * The canvas as nested boxes, built from the flat row list with a stack of
-   * open groups: each group's box holds its header card, its contents and an
-   * "Add to" row.
+   * open pages and groups: each page or group box holds its header, its
+   * contents and an "Add to" row.
    */
   function canvasTree() {
     const card = (item: FlatItem) => {
@@ -1724,59 +2195,85 @@ export default function EditorPage() {
           selected={item.id === selectedId}
           canMoveUp={!!step.up}
           canMoveDown={!!step.down}
-          dropLine={!item.isGroup && dropBefore === item.id ? "top" : undefined}
+          dropLine={!item.isContainer && dropBefore === item.id ? "top" : undefined}
           onSelect={() => setSelectedId(item.id)}
           onDelete={() => removeBlock(item.id)}
           onMove={(direction) => {
             const target = direction === -1 ? step.up : step.down;
             if (target) tryMove(item.id, target);
           }}
-          onToggle={() =>
-            setCollapsed((c) => {
-              const next = new Set(c);
-              if (next.has(item.id)) next.delete(item.id);
-              else next.add(item.id);
-              return next;
-            })
-          }
+          onToggle={() => toggle(item.id)}
         />
       );
     };
     type Frame = { item: FlatItem | null; children: React.ReactNode[] };
     const stack: Frame[] = [{ item: null, children: [] }];
+    const toggle = (cid: string) =>
+      setCollapsed((c) => {
+        const next = new Set(c);
+        if (next.has(cid)) next.delete(cid);
+        else next.add(cid);
+        return next;
+      });
     const close = () => {
       const { item, children } = stack.pop()!;
-      const g = item!.block as GroupBlock;
+      const c = item!.block as ContainerBlock;
       // Collapsed, or being dragged: a single closed box.
       const open = !item!.collapsed && item!.id !== drag?.activeId;
+      const contents = open
+        ? [
+            ...children,
+            <ContainerEnd
+              key={`end-${c.id}`}
+              container={c}
+              dropLine={dropAtEndOfGroup === c.id}
+              onAdd={(anchor) => openMenu(anchor, { parentId: c.id, index: c.blocks.length })}
+            />,
+          ]
+        : null;
+      const dropTarget = !!drag && projection?.parentId === c.id;
+      if (isPage(c)) {
+        const at = schema!.blocks.indexOf(c);
+        stack[stack.length - 1].children.push(
+          <PageBox
+            key={c.id}
+            item={item!}
+            pageNumber={pageNumbers.get(c.id) ?? at + 1}
+            selected={c.id === selectedId}
+            dropTarget={dropTarget}
+            canMoveUp={at > 0}
+            canMoveDown={at < schema!.blocks.length - 1}
+            onlyPage={pages.length === 1}
+            onSelect={() => setSelectedId(c.id)}
+            onTitle={(title) => updateBlock(c.id, { title })}
+            onToggle={() => toggle(c.id)}
+            onMove={(direction) => movePageBy(c.id, direction)}
+            onDelete={() => removeBlock(c.id)}
+            onRemovePages={removePages}
+          >
+            {contents}
+          </PageBox>,
+        );
+        return;
+      }
       stack[stack.length - 1].children.push(
         <GroupBox
-          key={g.id}
-          group={g}
-          depth={item!.depth}
-          selected={g.id === selectedId}
-          dropTarget={!!drag && projection?.parentId === g.id}
-          dimmed={drag?.activeId === g.id}
-          dropLine={dropBefore === g.id ? "top" : undefined}
+          key={c.id}
+          group={c}
+          level={item!.level}
+          selected={c.id === selectedId}
+          dropTarget={dropTarget}
+          dimmed={drag?.activeId === c.id}
+          dropLine={dropBefore === c.id ? "top" : undefined}
           header={card(item!)}
         >
-          {open
-            ? [
-                ...children,
-                <GroupEnd
-                  key={`end-${g.id}`}
-                  group={g}
-                  dropLine={dropAtEndOfGroup === g.id}
-                  onAdd={(anchor) => openMenu(anchor, { parentId: g.id, index: g.blocks.length })}
-                />,
-              ]
-            : null}
+          {contents}
         </GroupBox>,
       );
     };
     for (const item of rows) {
       while (stack.length > 1 && stack[stack.length - 1].item!.depth >= item.depth) close();
-      if (item.isGroup) stack.push({ item, children: [] });
+      if (item.isContainer) stack.push({ item, children: [] });
       else stack[stack.length - 1].children.push(card(item));
     }
     while (stack.length > 1) close();
@@ -1881,10 +2378,25 @@ export default function EditorPage() {
         />
       )}
 
+      {deletingPage && isPage(deletingPage) && (
+        <DeletePageDialog
+          page={deletingPage}
+          blocks={schema.blocks}
+          onKeep={() => deletePageKeeping(deletingPage.id)}
+          onDeleteAll={() => deletePageAll(deletingPage.id)}
+          onClose={() => setDeletingPageId(null)}
+        />
+      )}
+      {confirmPaging && <PagingDialog onConfirm={convertToPages} onClose={() => setConfirmPaging(false)} />}
+
       {notice && (
         <div
-          role="alert"
-          className="flex flex-none items-center gap-3 border-b border-[#F5C2C2] bg-[#FCECEC] px-4 py-2 text-sm text-red"
+          role={notice.tone === "info" ? "status" : "alert"}
+          className={`flex flex-none items-center gap-3 border-b px-4 py-2 text-sm ${
+            notice.tone === "info"
+              ? "border-[#EAD9AE] bg-[#FBF0D9] text-ink-2"
+              : "border-[#F5C2C2] bg-[#FCECEC] text-red"
+          }`}
         >
           <span className="flex flex-1 flex-wrap items-center gap-x-2 gap-y-1">
             {notice.text}
@@ -1894,7 +2406,7 @@ export default function EditorPage() {
                 onClick={() => jumpTo(b.id)}
                 className="rounded-md border border-[#F5C2C2] bg-white px-2 py-0.5 text-xs font-medium text-ink-2 hover:border-red"
               >
-                {b.label} →
+                {blockName(b)} →
               </button>
             ))}
           </span>
@@ -1972,13 +2484,23 @@ export default function EditorPage() {
                   }}
                   placeholder={
                     autoTargetGroup
-                      ? `Type / to add a block to "${autoTargetGroup.label.trim() || "this group"}", or click +`
+                      ? `Type / to add a block to "${
+                          blockName(autoTargetGroup).trim() || (isPage(autoTargetGroup) ? "this page" : "this group")
+                        }", or click +`
                       : "Type / to insert a block, or click +"
                   }
                   className="flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
                   spellCheck={false}
                 />
               </div>
+
+              <button
+                onClick={addPage}
+                className="mt-2 flex items-center gap-1.5 rounded-lg px-1 py-1 text-sm font-medium text-muted hover:text-accent-2"
+              >
+                <FileText className="h-4 w-4" />
+                {addPageAfter ? `Add page after "${addPageAfter.title.trim() || "Untitled page"}"` : "Add page"}
+              </button>
 
               {schema.blocks.length === 0 && (
                 <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-dashed border-line-2 py-10 text-center">
@@ -2020,19 +2542,21 @@ export default function EditorPage() {
           {selected ? (
             <div key={selected.id}>
               <h4 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-faint">
-                {isGroup(selected) ? "Group" : "Question"}
+                {isPage(selected) ? "Page" : isGroup(selected) ? "Group" : "Question"}
               </h4>
               <label htmlFor="block-label" className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">
-                Label
+                {isPage(selected) ? "Title" : "Label"}
               </label>
               <input
                 id="block-label"
-                value={selected.label}
-                onChange={(e) => updateBlock(selected.id, { label: e.target.value })}
+                value={blockName(selected)}
+                onChange={(e) =>
+                  updateBlock(selected.id, isPage(selected) ? { title: e.target.value } : { label: e.target.value })
+                }
                 className={`${fieldCls} mb-3`}
               />
-              {/* Groups have no help text (contract §1). */}
-              {!isGroup(selected) && (
+              {/* Pages and groups have no help text (contract §1). */}
+              {!isContainer(selected) && (
                 <>
                   <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Help text</label>
                   <input
@@ -2181,7 +2705,28 @@ export default function EditorPage() {
                 blocks={schema.blocks}
                 onChange={(p) => updateBlock(selected.id, p)}
               />
-              <PositionPanel blocks={schema.blocks} blockId={selected.id} onMove={(t) => tryMove(selected.id, t)} />
+              <PositionPanel
+                blocks={schema.blocks}
+                blockId={selected.id}
+                onMove={(t) => tryMove(selected.id, t)}
+                onMovePage={(direction) => movePageBy(selected.id, direction)}
+              />
+              {isPage(selected) &&
+                (pages.length === 1 ? (
+                  <button
+                    onClick={removePages}
+                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line-2 px-3 py-1.5 text-sm font-medium text-ink-2 hover:bg-surface-3"
+                  >
+                    Remove pages
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setDeletingPageId(selected.id)}
+                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line-2 px-3 py-1.5 text-sm font-medium text-red hover:bg-[#FCECEC]"
+                  >
+                    <Trash2 className="h-4 w-4" /> Delete page…
+                  </button>
+                ))}
               {isGroup(selected) && (
                 <button
                   onClick={() => setDeletingGroupId(selected.id)}
@@ -2264,6 +2809,116 @@ export default function EditorPage() {
               <p className="mt-1.5 text-xs text-muted">
                 Comma-separated. We&apos;ll email these addresses on every new response.
               </p>
+
+              {paged && (
+                <>
+                  <h4 className="mb-2 mt-5 text-[12.5px] font-semibold text-ink-2">Navigation</h4>
+                  <label className="flex items-start gap-2.5">
+                    <input
+                      type="checkbox"
+                      checked={schema.navigation?.showProgress ?? NAVIGATION_DEFAULTS.showProgress}
+                      onChange={(e) => updateNavigation({ showProgress: e.target.checked })}
+                      className="mt-0.5 h-4 w-4 accent-[#6D5EFA]"
+                    />
+                    <span>
+                      <span className="block text-[12.5px] font-semibold text-ink-2">Show progress</span>
+                      <span className="block text-xs text-muted">
+                        Shows &lsquo;Step 2 of 5&rsquo; above each page title
+                      </span>
+                    </span>
+                  </label>
+                  {/* Kept (not reset) while progress is off, so it comes back as it was. */}
+                  <fieldset disabled={!showProgress} className="ml-[26px] mt-2.5 disabled:opacity-50">
+                    <legend className="text-[12.5px] font-semibold text-ink-2">Progress style</legend>
+                    {(
+                      [
+                        ["caption", "Text only (“Step 2 of 5”)"],
+                        ["bar", "Bar and text"],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <label key={value} className="mt-1.5 flex items-center gap-2 text-[12.5px] text-ink-2">
+                        <input
+                          type="radio"
+                          name="progress-style"
+                          value={value}
+                          checked={progressStyle === value}
+                          onChange={() => updateNavigation({ progressStyle: value })}
+                          className="h-3.5 w-3.5 accent-[#6D5EFA]"
+                        />
+                        {label}
+                      </label>
+                    ))}
+                    <span className="mt-1 block text-xs text-muted">
+                      The client&apos;s app can override this with its own setting.
+                    </span>
+                  </fieldset>
+                  <label className="mt-3 flex items-start gap-2.5">
+                    <input
+                      type="checkbox"
+                      checked={schema.navigation?.reviewPage ?? NAVIGATION_DEFAULTS.reviewPage}
+                      onChange={(e) => updateNavigation({ reviewPage: e.target.checked })}
+                      className="mt-0.5 h-4 w-4 accent-[#6D5EFA]"
+                    />
+                    <span>
+                      <span className="block text-[12.5px] font-semibold text-ink-2">Review page before submit</span>
+                      <span className="block text-xs text-muted">
+                        Respondents check their answers before submitting
+                      </span>
+                    </span>
+                  </label>
+                </>
+              )}
+
+              {/* Where unfinished answers are kept: docs/DRAFTS-CONTRACT.md §2. */}
+              <fieldset className="mt-5">
+                <legend className="mb-2 text-[12.5px] font-semibold text-ink-2">Save progress</legend>
+                {(
+                  [
+                    ["session", "Only while the form is open", "Answers survive a page refresh, but not closing the tab."],
+                    [
+                      "device",
+                      "On this device",
+                      "Answers are saved, encrypted, on the respondent's device and can be continued later. Needs setup by the developer of the app the form is used in.",
+                    ],
+                    [
+                      "server",
+                      "On the app's server",
+                      "Answers are saved by the app the form is used in, at each page change. Needs setup by that app's developer.",
+                    ],
+                  ] as const
+                ).map(([mode, label, help]) => {
+                  const available = draftModeAvailable(mode, schema.blocks);
+                  return (
+                    <label
+                      key={mode}
+                      className={`mt-2 flex items-start gap-2.5 ${available ? "" : "opacity-50"}`}
+                    >
+                      <input
+                        type="radio"
+                        name="draft-mode"
+                        value={mode}
+                        checked={(schema.drafts?.mode ?? DEFAULT_DRAFT_MODE) === mode}
+                        disabled={!available}
+                        onChange={() => updateDrafts(mode)}
+                        className="mt-0.5 h-4 w-4 accent-[#6D5EFA]"
+                      />
+                      <span>
+                        <span className="block text-[12.5px] font-semibold text-ink-2">{label}</span>
+                        <span className="block text-xs text-muted">{help}</span>
+                        {!available && (
+                          <span className="mt-0.5 block text-xs font-medium text-ink-2">
+                            Available for forms with pages
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  );
+                })}
+                <p className="mt-2.5 text-xs text-muted">
+                  If the app hasn&apos;t been set up for the option chosen, the form falls back to &lsquo;Only while
+                  the form is open&rsquo;.
+                </p>
+              </fieldset>
 
               <h4 className="mb-3 mt-6 border-t border-line pt-4 text-[11px] font-bold uppercase tracking-wider text-faint">
                 AI tools

@@ -105,7 +105,7 @@ describe("group schema", () => {
   });
 
   it("rejects an unknown block type", () => {
-    const result = FormSchema.safeParse({ title: "t", blocks: [{ id: "x", type: "page", title: "P", blocks: [] }] });
+    const result = FormSchema.safeParse({ title: "t", blocks: [{ id: "x", type: "carousel", label: "C" }] });
     expect(result.success).toBe(false);
   });
 
@@ -254,12 +254,12 @@ describe("formProblems over the tree", () => {
   it("rejects an empty group at any depth", () => {
     expect(problemsOf(group("g", []))).toEqual(['Group "G": a group must contain at least one block.']);
     const nested = group("l1", [group("l2", [group("l3", [group("l4", [])])])]);
-    expect(problemsOf(nested)).toEqual(['Group "L4": a group must contain at least one block.']);
+    expect(problemsOf(nested)).toEqual(['Group "L1 › L2 › L3 › L4": a group must contain at least one block.']);
   });
 
   it("keeps the existing condition rules for questions inside groups", () => {
     const [message] = problemsOf(group("g", [choice("c"), when(leaf("b"), on("c", "=", "Maybe"))]));
-    expect(message).toBe('Block "B": the answer "Maybe" isn\'t one of the options of "C".');
+    expect(message).toBe('Block "G › B": the answer "Maybe" isn\'t one of the options of "C".');
   });
 
   it("gives each problem a detail without the block's name, for inline display", () => {

@@ -18,9 +18,9 @@ Both implementations must follow this file exactly. Change it here first, then i
 
 // Form level (new, optional)
 navigation?: {
-  showProgress?: boolean;          // default true
-  allowJumpToCompleted?: boolean;  // default false
-  reviewPage?: boolean;            // default false
+  showProgress?: boolean;               // default true
+  progressStyle?: "caption" | "bar";    // default "caption"; used only when showProgress is true
+  reviewPage?: boolean;                 // default false
 }
 ```
 
@@ -80,7 +80,7 @@ The builder rejects these at save (400 naming the block). The renderer throws at
 
 - Group → `<fieldset>` with a `<legend>` containing the label as a heading.
 - Heading level: in a single-page form, root-level groups use `h2`; in a paged form the page title is `h2` and its root-level groups `h3`. Each nesting level adds one, **capped at `h6`** (nesting continues; only the level stops rising). Author heading blocks keep their own `level`.
-- New public class names: `yf-group`, `yf-group-legend`, `yf-page`, `yf-page-title`, `yf-nav`, `yf-next`, `yf-back`, `yf-progress`, `yf-steps`, `yf-review` (additive under the existing class-name policy).
+- Public class names include `yf-group`, `yf-group-legend`, `yf-page`, `yf-page-title`, `yf-nav`, `yf-next`, `yf-back`, `yf-progress`, `yf-progress-bar`, `yf-review` (additive under the existing class-name policy, which starts at the first release to a client). This list is not exhaustive; the renderer's `classNames` constant and its contract test are the complete, authoritative list.
 
 ## 8. Paged behaviour (renderer only)
 
@@ -93,6 +93,8 @@ The builder rejects these at save (400 naming the block). The renderer throws at
 - sessionStorage (same key) stores answers, idempotency key and the current **page id** (not index — indexes shift as pages hide). If the stored page is hidden or missing on restore, open the nearest preceding visible page, else the first.
 - One idempotency key per form fill, across all pages.
 - **Completed page:** visited **and** currently passes validation. It becomes incomplete again if a later change reveals a required question on it.
-- **Progress** (`showProgress`): "Step x of y" over visible pages only; `y` may change as answers change.
-- **Step jumping** (`allowJumpToCompleted`): the step list is clickable for completed pages and the furthest page reached.
-- **Review page** (`reviewPage`): lists every visible question on every visible page, grouped by page; unanswered ones show "Not answered"; each page has an Edit link back to it. Submit lives on the review page.
+- **Progress** (`showProgress`): a caption "Step x of y" over displayed pages, shown above the page title and part of its heading, so it is announced when focus moves to the title. When `reviewPage` is on, the review step is the last step and is counted. `y` may change as answers change. There is no step list and no navigation from the progress indicator.
+- **Progress bar:** when `progressStyle` is `"bar"`, a display-only segmented bar appears above the caption — one segment per step: completed, current, pending — hidden from assistive technology, never clickable. The caption always stays. The host can override the author's choice either way with `data-yf-progress-style="bar"` or `"caption"` on any wrapper; the host's attribute wins. The bar is only shown when the package stylesheet is loaded.
+- **No step jumping.** Respondents return to earlier pages with Back, or with Change on the review page.
+- **Review page** (`reviewPage`): lists every visible question on every displayed page, grouped by page, with group labels as subheadings; unanswered ones show "Not answered"; each page has a **Change** button (a `<button>`, not a link) that opens it. A page opened from review shows **Return to review**. Pressing it first validates the current page: if it has errors, stay there and show its error summary, as Next does. Otherwise go to the first displayed page that isn't completed, if any (with its summary if it has errors), otherwise back to review. Submit lives on the review page.
+- **Unvisited pages open clean.** Whenever Return to review lands on a page the respondent has never visited, it opens without an error summary or flagged errors, even if it has unanswered required questions. Its errors appear only when the respondent presses that page's primary button. "With its error summary" elsewhere in this section applies to visited pages only.
