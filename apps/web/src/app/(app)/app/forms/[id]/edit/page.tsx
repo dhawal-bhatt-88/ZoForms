@@ -2883,7 +2883,7 @@ export default function EditorPage() {
                     [
                       "server",
                       "On the app's server",
-                      "Answers are saved by the app the form is used in, at each page change. Needs setup by that app's developer.",
+                      "Answers are saved by the app the form is used in, at each page change. Needs setup by that app's developer. Visit this page for documentation on set up.",
                     ],
                   ] as const
                 ).map(([mode, label, help]) => {
