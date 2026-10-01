@@ -78,6 +78,7 @@ import {
   deletePageWithContents,
   deletionBlockers,
   dependentsOf,
+  displayBlockProblem,
   draftModeAvailable,
   draftsWithoutDefault,
   findBlock,
@@ -86,6 +87,7 @@ import {
   insertPageAfter,
   isAnswerable,
   isContainer,
+  isValidImageSource,
   isGroup,
   isPage,
   isPaged,
@@ -386,26 +388,45 @@ function BlockPreview({ block }: { block: Block }) {
   const box = "rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-faint";
 
   // ---- layout / static ----
+  // These show what the renderer shows: a heading's label at its level; a title's
+  // or label's content, falling back to the block's label.
   if (block.type === "divider") return <hr className="my-1 border-line-2" />;
+  if (block.type === "heading") {
+    const size = block.level === 1 ? "text-2xl" : block.level === 3 ? "text-base" : "text-lg";
+    return <div className={`${size} font-bold tracking-tight text-ink`}>{block.label}</div>;
+  }
   if (block.type === "text")
-    return <p className="text-sm text-muted">{block.content || "Descriptive text…"}</p>;
+    // Line breaks kept, as the renderer shows them (contract §9).
+    return <p className="whitespace-pre-line text-sm text-muted">{block.content?.trim() ? block.content : "Descriptive text…"}</p>;
   if (block.type === "title")
-    return <div className="text-xl font-bold tracking-tight text-ink">{block.content || "Title"}</div>;
+    return <div className="text-xl font-bold tracking-tight text-ink">{block.content || block.label}</div>;
   if (block.type === "label")
     return (
       <div className="text-[11px] font-bold uppercase tracking-wider text-muted">
-        {block.content || "Label"}
+        {block.content || block.label}
       </div>
     );
-  if (block.type === "image")
-    return block.content ? (
+  if (block.type === "image") {
+    const src = (block.content ?? "").trim();
+    if (!isValidImageSource(src))
+      return (
+        <div className={`${box} flex items-center gap-2`}>
+          <ImageIcon className="h-4 w-4" /> Add an image address
+        </div>
+      );
+    // A root-relative path lives on the client's server, not ours: don't try to load it.
+    if (src.startsWith("/"))
+      return (
+        <div className={`${box} flex items-center gap-2`}>
+          <ImageIcon className="h-4 w-4 flex-none" />
+          <span className="min-w-0 truncate">Shown from the app&apos;s own server: {src}</span>
+        </div>
+      );
+    return (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={block.content} alt="" className="max-h-40 rounded-lg" />
-    ) : (
-      <div className={`${box} flex items-center gap-2`}>
-        <ImageIcon className="h-4 w-4" /> Add an image URL…
-      </div>
+      <img src={src} alt="" referrerPolicy="no-referrer" className="max-h-40 rounded-lg" />
     );
+  }
   if (block.type === "video" || block.type === "audio" || block.type === "embed")
     return (
       <div className={`${box} flex items-center gap-2`}>
@@ -2152,7 +2173,10 @@ export default function EditorPage() {
       </div>
     );
 
-  const selected = selectedId ? (findBlock(schema.blocks, selectedId)?.block ?? null) : null;
+  const selectedEntry = selectedId ? findBlock(schema.blocks, selectedId) : undefined;
+  const selected = selectedEntry?.block ?? null;
+  // The same rule and message as the save (displayBlockProblem in form-schema).
+  const selectedDisplayProblem = selectedEntry ? (displayBlockProblem(selectedEntry)?.message ?? null) : null;
   const numbers = questionNumbers(schema.blocks);
   // While a group is dragged, its contents travel with it as one row.
   const rows = flattenVisible(schema.blocks, collapsed, drag?.activeId ?? null);
@@ -2553,15 +2577,24 @@ export default function EditorPage() {
                 onChange={(e) =>
                   updateBlock(selected.id, isPage(selected) ? { title: e.target.value } : { label: e.target.value })
                 }
-                className={`${fieldCls} mb-3`}
+                className={`${fieldCls} ${selected.type === "image" ? "mb-1.5" : "mb-3"}`}
               />
-              {/* Pages and groups have no help text (contract §1). */}
-              {!isContainer(selected) && (
+              {selected.type === "image" && (
+                <p className="mb-3 text-xs text-muted">
+                  Also read aloud to screen-reader users — describe what the image shows.
+                </p>
+              )}
+              {/*
+                Help text only where the renderer shows it: on questions. Not on pages,
+                groups or display blocks (contract §1, §9); a value already stored on one
+                is left alone. Cleared help text is removed, never stored as "".
+              */}
+              {isAnswerable(selected) && (
                 <>
                   <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Help text</label>
                   <input
                     value={selected.description ?? ""}
-                    onChange={(e) => updateBlock(selected.id, { description: e.target.value })}
+                    onChange={(e) => updateBlock(selected.id, { description: e.target.value || undefined })}
                     placeholder="Optional"
                     className={`${fieldCls} mb-4`}
                   />
@@ -2577,18 +2610,36 @@ export default function EditorPage() {
                     rows={selected.type === "text" ? 3 : 1}
                     className={`${fieldCls} resize-none`}
                   />
+                  {selectedDisplayProblem && (
+                    <p role="alert" className="mt-1.5 text-xs text-red">
+                      {selectedDisplayProblem}
+                    </p>
+                  )}
                 </div>
               )}
 
               {["image", "video", "audio", "embed"].includes(selected.type) && (
                 <div className="mb-4">
-                  <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">URL</label>
+                  <label htmlFor="block-url" className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">
+                    URL
+                  </label>
                   <input
+                    id="block-url"
                     value={selected.content ?? ""}
                     onChange={(e) => updateBlock(selected.id, { content: e.target.value })}
-                    placeholder="https://…"
+                    placeholder={
+                      selected.type === "image"
+                        ? "https://… or a path on your app's server, e.g. /images/logo.png"
+                        : "https://…"
+                    }
+                    aria-invalid={selected.type === "image" && !!selectedDisplayProblem}
                     className={`${fieldCls} font-mono text-xs`}
                   />
+                  {selected.type === "image" && selectedDisplayProblem && (
+                    <p role="alert" className="mt-1.5 text-xs text-red">
+                      {selectedDisplayProblem}
+                    </p>
+                  )}
                 </div>
               )}
 

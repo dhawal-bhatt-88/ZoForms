@@ -90,6 +90,15 @@ const enableBehavior = z
   .optional()
   .transform((b): "any" | undefined => (b === "any" ? "any" : undefined));
 
+/**
+ * Help text. Cleared help text means none: an empty string is normalised away,
+ * so `description: ""` is never stored or exported.
+ */
+const helpText = z
+  .string()
+  .optional()
+  .transform((d) => (d === "" ? undefined : d));
+
 const shownWhen = {
   /** Show this block only when these conditions hold. Absent = always shown. */
   enableWhen: z.array(Condition).optional(),
@@ -100,7 +109,7 @@ export const QuestionBlock = z.object({
   id: z.string(),
   type: QuestionType,
   label: z.string().min(1),
-  description: z.string().optional(),
+  description: helpText,
   placeholder: z.string().optional(),
   required: z.boolean().default(false),
   /** for choice / checkbox / dropdown / multiselect / ranking / matrix (rows) */
@@ -122,7 +131,7 @@ export const PresentationalBlock = z.object({
   id: z.string(),
   type: z.enum(PRESENTATIONAL_TYPES),
   label: z.string().min(1),
-  description: z.string().optional(),
+  description: helpText,
   /** heading level 1–3 */
   level: z.number().int().min(1).max(3).optional(),
   /** title/label copy */
@@ -218,7 +227,10 @@ interface PageBlockInput {
  */
 export type Block = LeafBlock | GroupBlock | PageBlock;
 export type BlockInput =
-  | z.input<typeof QuestionBlock>
+  // Split like the parser (image vs the rest): TypeScript can't distribute a
+  // ~26-member type union across two object types when checking assignability.
+  | z.input<typeof ImageBlock>
+  | z.input<typeof OtherQuestionBlock>
   | z.input<typeof PresentationalBlock>
   | GroupBlockInput
   | PageBlockInput;
@@ -246,12 +258,27 @@ export const PageBlock = z.object({
   blocks: childBlocks,
 });
 
+/*
+ * Parsed separately from the other questions only so an image's source is
+ * stored trimmed (contract §9); its shape and TypeScript type are QuestionBlock's.
+ */
+const ImageBlock = QuestionBlock.extend({
+  type: z.literal("image"),
+  /** The image source; validity is `isValidImageSource`. */
+  content: z
+    .string()
+    .optional()
+    .transform((src) => src?.trim()),
+});
+const OtherQuestionBlock = QuestionBlock.extend({ type: QuestionType.exclude(["image"]) });
+
 // A discriminated union reports errors from the one branch matching `type`, so
 // a bad leaf keeps its precise message instead of a generic "invalid input".
 const BlockUnion = z.discriminatedUnion("type", [
   GroupBlock,
   PageBlock,
-  QuestionBlock,
+  ImageBlock,
+  OtherQuestionBlock,
   PresentationalBlock,
 ]);
 /*
@@ -1227,6 +1254,63 @@ function subject(entry: TreeEntry): string {
   return describeBlockPath([...entry.ancestors, entry.block], entry.path);
 }
 
+/* ---------- display blocks: text and image (contract §9) ---------- */
+
+type UrlLike = { protocol: string; origin: string };
+// The global URL exists in every browser and in Node; this package compiles without DOM types.
+const URLImpl = (globalThis as unknown as { URL: new (input: string, base?: string) => UrlLike }).URL;
+const PLACEHOLDER_BASE = "https://base.invalid";
+
+/**
+ * Contract §9: after trimming, a valid image source is either an absolute
+ * `https://` URL (prefix checked case-insensitively, and it must parse to the
+ * https protocol), or a root-relative path that, resolved against a fixed
+ * placeholder base, keeps that base's origin — which rejects `//cdn…`,
+ * `/\evil.com` and `/<tab>/evil.com`. Validity is this resolution rule, not a
+ * string prefix alone; the renderer implements the same rule and test table.
+ */
+export function isValidImageSource(raw: string | undefined): boolean {
+  const src = (raw ?? "").trim();
+  try {
+    if (/^https:\/\//i.test(src)) return new URLImpl(src).protocol === "https:";
+    if (src.startsWith("/")) return new URLImpl(src, PLACEHOLDER_BASE).origin === new URLImpl(PLACEHOLDER_BASE).origin;
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+/** A block's path of names, page title first, e.g. "About you › Logo". */
+function pathText(entry: TreeEntry): string {
+  const chain = [...entry.ancestors, entry.block];
+  return chain.map((node, k) => pathSegment(node, entry.path[k])).join(" › ");
+}
+
+/**
+ * The save rule for a display block's own content, or null when it's fine: an
+ * image needs a valid source, a text block some text. Shared by the save rules
+ * and the editor's inline message, so both say exactly the same thing.
+ */
+export function displayBlockProblem(entry: TreeEntry): ConditionProblem | null {
+  const { block } = entry;
+  if (block.type === "image" && !isValidImageSource(block.content)) {
+    const detail = "Add an image address starting with https:// or a path on your app's server such as /images/logo.png.";
+    return {
+      blockId: block.id,
+      message: `Image "${pathText(entry)}": add an image address starting with https:// or a path on your app's server such as /images/logo.png.`,
+      detail,
+    };
+  }
+  if (block.type === "text" && !(block.content ?? "").trim()) {
+    return {
+      blockId: block.id,
+      message: `Text block "${pathText(entry)}" is empty — add some text or delete it.`,
+      detail: "This text block is empty — add some text or delete it.",
+    };
+  }
+  return null;
+}
+
 /**
  * Every way the form breaks the save rules, each naming the offending block by
  * its path. Empty means valid. The API rejects a save with any problem; the
@@ -1270,6 +1354,8 @@ export function formProblems(form: { blocks: readonly Block[] }): ConditionProbl
     if (paged && entry.depth === 0 && !isPage(block)) {
       add(entry, "this form has pages, so every block must be inside a page.");
     }
+    const display = displayBlockProblem(entry);
+    if (display) problems.push(display);
   }
 
   const firstPage = paged && isPage(form.blocks[0]) ? form.blocks[0] : undefined;
