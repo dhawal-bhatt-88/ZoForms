@@ -30,7 +30,7 @@ describe("image source rule (contract §9, the shared table)", () => {
   const contractInvalid = [
     "", "   ", "http://example.com/a.png", "https:example.com/a.png", "//cdn.example.com/a.png",
     "/\\evil.com/a.png", "/\t/evil.com/a.png", "data:image/png;base64,AAAA", "javascript:alert(1)",
-    "images/a.png", "<img src=x>",
+    "images/a.png", "<img src=x>", "https://user@cdn.example.com/a.png", "https://user:pass@cdn.example.com/a.png",
   ];
   it.each(contractValid)("valid: %j", (src) => expect(isValidImageSource(src)).toBe(true));
   it.each(contractInvalid)("invalid: %j", (src) => expect(isValidImageSource(src)).toBe(false));

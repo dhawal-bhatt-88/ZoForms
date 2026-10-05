@@ -134,6 +134,7 @@ import {
   type FlatItem,
   type MoveTarget,
 } from "@/lib/tree-dnd";
+import { videoPreviewText } from "@/lib/video-preview";
 import {
   ApiError,
   downloadArtifact,
@@ -237,7 +238,7 @@ const CATALOG: { group: string; items: CatalogItem[] }[] = [
     group: "Embed",
     items: [
       { type: "image", keywords: "picture photo" },
-      { type: "video", keywords: "youtube" },
+      { type: "video", keywords: "youtube vimeo mp4 webm" },
       { type: "audio", keywords: "sound" },
       { type: "embed", keywords: "iframe anything" },
     ],
@@ -427,7 +428,15 @@ function BlockPreview({ block }: { block: Block }) {
       <img src={src} alt="" referrerPolicy="no-referrer" className="max-h-40 rounded-lg" />
     );
   }
-  if (block.type === "video" || block.type === "audio" || block.type === "embed")
+  if (block.type === "video")
+    // Names what the renderer will play (contract §10) without loading anything third-party.
+    return (
+      <div className={`${box} flex items-center gap-2`}>
+        <Film className="h-4 w-4 flex-none" />
+        <span className="min-w-0 truncate">{videoPreviewText(block.content)}</span>
+      </div>
+    );
+  if (block.type === "audio" || block.type === "embed")
     return (
       <div className={`${box} flex items-center gap-2`}>
         {BLOCK_META[block.type].label} · {block.content || "paste a URL"}
@@ -2577,16 +2586,21 @@ export default function EditorPage() {
                 onChange={(e) =>
                   updateBlock(selected.id, isPage(selected) ? { title: e.target.value } : { label: e.target.value })
                 }
-                className={`${fieldCls} ${selected.type === "image" ? "mb-1.5" : "mb-3"}`}
+                className={`${fieldCls} ${selected.type === "image" || selected.type === "video" ? "mb-1.5" : "mb-3"}`}
               />
               {selected.type === "image" && (
                 <p className="mb-3 text-xs text-muted">
                   Also read aloud to screen-reader users — describe what the image shows.
                 </p>
               )}
+              {selected.type === "video" && (
+                <p className="mb-3 text-xs text-muted">
+                  Read aloud to screen-reader users — describe what the video is about.
+                </p>
+              )}
               {/*
                 Help text only where the renderer shows it: on questions. Not on pages,
-                groups or display blocks (contract §1, §9); a value already stored on one
+                groups or display blocks (contract §1, §9, §10); a value already stored on one
                 is left alone. Cleared help text is removed, never stored as "".
               */}
               {isAnswerable(selected) && (
@@ -2630,12 +2644,14 @@ export default function EditorPage() {
                     placeholder={
                       selected.type === "image"
                         ? "https://… or a path on your app's server, e.g. /images/logo.png"
-                        : "https://…"
+                        : selected.type === "video"
+                          ? "YouTube or Vimeo link, or an .mp4 / .webm address"
+                          : "https://…"
                     }
-                    aria-invalid={selected.type === "image" && !!selectedDisplayProblem}
+                    aria-invalid={(selected.type === "image" || selected.type === "video") && !!selectedDisplayProblem}
                     className={`${fieldCls} font-mono text-xs`}
                   />
-                  {selected.type === "image" && selectedDisplayProblem && (
+                  {(selected.type === "image" || selected.type === "video") && selectedDisplayProblem && (
                     <p role="alert" className="mt-1.5 text-xs text-red">
                       {selectedDisplayProblem}
                     </p>

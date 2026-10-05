@@ -227,9 +227,9 @@ interface PageBlockInput {
  */
 export type Block = LeafBlock | GroupBlock | PageBlock;
 export type BlockInput =
-  // Split like the parser (image vs the rest): TypeScript can't distribute a
+  // Split like the parser (image/video vs the rest): TypeScript can't distribute a
   // ~26-member type union across two object types when checking assignability.
-  | z.input<typeof ImageBlock>
+  | z.input<typeof SourceBlock>
   | z.input<typeof OtherQuestionBlock>
   | z.input<typeof PresentationalBlock>
   | GroupBlockInput
@@ -259,25 +259,27 @@ export const PageBlock = z.object({
 });
 
 /*
- * Parsed separately from the other questions only so an image's source is
- * stored trimmed (contract §9); its shape and TypeScript type are QuestionBlock's.
+ * Parsed separately from the other questions only so an image's or a video's
+ * source is stored trimmed (contract §9, §10); its shape and TypeScript type
+ * are QuestionBlock's.
  */
-const ImageBlock = QuestionBlock.extend({
-  type: z.literal("image"),
-  /** The image source; validity is `isValidImageSource`. */
+const SOURCE_BLOCK_TYPES = ["image", "video"] as const;
+const SourceBlock = QuestionBlock.extend({
+  type: z.enum(SOURCE_BLOCK_TYPES),
+  /** The source; validity is `isValidImageSource` / `parseVideoSource`. */
   content: z
     .string()
     .optional()
     .transform((src) => src?.trim()),
 });
-const OtherQuestionBlock = QuestionBlock.extend({ type: QuestionType.exclude(["image"]) });
+const OtherQuestionBlock = QuestionBlock.extend({ type: QuestionType.exclude([...SOURCE_BLOCK_TYPES]) });
 
 // A discriminated union reports errors from the one branch matching `type`, so
 // a bad leaf keeps its precise message instead of a generic "invalid input".
 const BlockUnion = z.discriminatedUnion("type", [
   GroupBlock,
   PageBlock,
-  ImageBlock,
+  SourceBlock,
   OtherQuestionBlock,
   PresentationalBlock,
 ]);
@@ -1254,30 +1256,153 @@ function subject(entry: TreeEntry): string {
   return describeBlockPath([...entry.ancestors, entry.block], entry.path);
 }
 
-/* ---------- display blocks: text and image (contract §9) ---------- */
+/* ---------- display blocks: text, image and video (contract §9, §10) ---------- */
 
-type UrlLike = { protocol: string; origin: string };
+type UrlLike = {
+  protocol: string;
+  origin: string;
+  host: string;
+  hostname: string;
+  pathname: string;
+  username: string;
+  password: string;
+  searchParams: { get(name: string): string | null };
+};
 // The global URL exists in every browser and in Node; this package compiles without DOM types.
 const URLImpl = (globalThis as unknown as { URL: new (input: string, base?: string) => UrlLike }).URL;
 const PLACEHOLDER_BASE = "https://base.invalid";
 
 /**
- * Contract §9: after trimming, a valid image source is either an absolute
- * `https://` URL (prefix checked case-insensitively, and it must parse to the
- * https protocol), or a root-relative path that, resolved against a fixed
- * placeholder base, keeps that base's origin — which rejects `//cdn…`,
- * `/\evil.com` and `/<tab>/evil.com`. Validity is this resolution rule, not a
- * string prefix alone; the renderer implements the same rule and test table.
+ * Contract §9: the source, trimmed, when it is valid, otherwise null. Valid is
+ * either an absolute `https://` URL (prefix checked case-insensitively; it must
+ * parse to the https protocol, with no `user@` or `user:pass@` credentials), or
+ * a root-relative path that, resolved against a fixed placeholder base, keeps
+ * that base's origin — which rejects `//cdn…`, `/\evil.com` and
+ * `/<tab>/evil.com`. Validity is this resolution rule, not a string prefix
+ * alone; the renderer implements the same rule and test table. Images use it
+ * directly; video files build on it (§10).
  */
-export function isValidImageSource(raw: string | undefined): boolean {
+function validSource(raw: string | undefined): string | null {
   const src = (raw ?? "").trim();
   try {
-    if (/^https:\/\//i.test(src)) return new URLImpl(src).protocol === "https:";
-    if (src.startsWith("/")) return new URLImpl(src, PLACEHOLDER_BASE).origin === new URLImpl(PLACEHOLDER_BASE).origin;
+    if (/^https:\/\//i.test(src)) {
+      const url = new URLImpl(src);
+      return url.protocol === "https:" && url.username === "" && url.password === "" ? src : null;
+    }
+    if (src.startsWith("/")) {
+      return new URLImpl(src, PLACEHOLDER_BASE).origin === new URLImpl(PLACEHOLDER_BASE).origin ? src : null;
+    }
   } catch {
-    return false;
+    return null;
   }
-  return false;
+  return null;
+}
+
+/** Whether an image source is valid (contract §9). */
+export function isValidImageSource(raw: string | undefined): boolean {
+  return validSource(raw) !== null;
+}
+
+/** A recognised video source (contract §10). */
+export type VideoSource =
+  /** `id`: 11 characters of A–Z a–z 0–9 _ -. `start`: whole seconds, never 0. */
+  | { kind: "youtube"; id: string; start?: number }
+  /** `id`: digits only. `hash`: an unlisted video's hash, alphanumeric. */
+  | { kind: "vimeo"; id: string; hash?: string }
+  /** `src`: the trimmed source, absolute https or root-relative. */
+  | { kind: "file"; src: string };
+
+const YOUTUBE_SHORT_HOST = "youtu.be";
+const YOUTUBE_HOSTS: readonly string[] = [
+  "youtube.com",
+  "www.youtube.com",
+  "m.youtube.com",
+  "youtube-nocookie.com",
+  "www.youtube-nocookie.com",
+];
+const VIMEO_PLAYER_HOST = "player.vimeo.com";
+/** Hosts that only ever mean a player link: never a video file (§10). */
+const PLAYER_HOSTS: readonly string[] = [
+  YOUTUBE_SHORT_HOST,
+  ...YOUTUBE_HOSTS,
+  "vimeo.com",
+  "www.vimeo.com",
+  VIMEO_PLAYER_HOST,
+];
+
+const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/;
+const YOUTUBE_PATH = /^\/(?:embed|shorts|live)\/([A-Za-z0-9_-]{11})$/;
+const YOUTUBE_SHORT_PATH = /^\/([A-Za-z0-9_-]{11})$/;
+const VIMEO_PATH = /^\/(\d+)(?:\/([A-Za-z0-9]+))?$/;
+const VIMEO_PLAYER_PATH = /^\/video\/(\d+)$/;
+const VIMEO_HASH = /^[A-Za-z0-9]+$/;
+const BARE_SECONDS = /^\d+$/;
+const HMS = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/;
+const VIDEO_FILE_EXTENSION = /\.(?:mp4|webm)$/i;
+
+/**
+ * A YouTube start time in whole seconds, from `90` or `NhNmNs` with any parts
+ * present (`90s`, `1m30s`, `1h2m3s`). Null when missing or malformed; 0 is valid.
+ */
+function parseStart(value: string | null): number | null {
+  if (value === null || value === "") return null;
+  let seconds: number;
+  if (BARE_SECONDS.test(value)) seconds = Number(value);
+  else {
+    const match = HMS.exec(value);
+    if (!match || (match[1] === undefined && match[2] === undefined && match[3] === undefined)) return null;
+    const [, h = "0", m = "0", s = "0"] = match;
+    seconds = Number(h) * 3600 + Number(m) * 60 + Number(s);
+  }
+  return Number.isSafeInteger(seconds) ? seconds : null;
+}
+
+function parseYouTube(url: UrlLike): VideoSource | null {
+  let id: string | null;
+  if (url.host === YOUTUBE_SHORT_HOST) id = YOUTUBE_SHORT_PATH.exec(url.pathname)?.[1] ?? null;
+  else if (url.pathname === "/watch") {
+    const v = url.searchParams.get("v");
+    id = v !== null && YOUTUBE_ID.test(v) ? v : null;
+  } else id = YOUTUBE_PATH.exec(url.pathname)?.[1] ?? null;
+  if (id === null) return null;
+  // The first valid of t= then start= (so t=abc&start=20 is 20, t=0&start=20 is
+  // none). A start of 0 is omitted; a malformed one drops the start, not the video.
+  const start = parseStart(url.searchParams.get("t")) ?? parseStart(url.searchParams.get("start"));
+  return start !== null && start > 0 ? { kind: "youtube", id, start } : { kind: "youtube", id };
+}
+
+function parseVimeo(url: UrlLike): VideoSource | null {
+  const match = (url.host === VIMEO_PLAYER_HOST ? VIMEO_PLAYER_PATH : VIMEO_PATH).exec(url.pathname);
+  if (!match) return null;
+  const [, id, pathHash] = match;
+  // A path hash wins over ?h=; a malformed ?h= is ignored and the video kept.
+  const queryHash = url.searchParams.get("h");
+  const hash = pathHash ?? (queryHash !== null && VIMEO_HASH.test(queryHash) ? queryHash : undefined);
+  return hash === undefined ? { kind: "vimeo", id } : { kind: "vimeo", id, hash };
+}
+
+/**
+ * Contract §10: what a video block's source is, recognised by parsing the URL —
+ * never by substring search — or null when it isn't recognised.
+ *  - https only; the host must match exactly, with no port and no credentials;
+ *    the path must match exactly, with no trailing slash;
+ *  - YouTube and Vimeo hosts are exclusive: a link on one is a player link or
+ *    nothing, never a video file;
+ *  - a video file is a valid source per §9 whose path ends in .mp4 or .webm.
+ * The renderer implements the same rule and shares the same test table.
+ */
+export function parseVideoSource(raw: string | undefined): VideoSource | null {
+  const src = validSource(raw);
+  if (src === null) return null;
+  const url = new URLImpl(src, PLACEHOLDER_BASE);
+  if (!src.startsWith("/") && PLAYER_HOSTS.includes(url.hostname)) {
+    // `host` keeps a non-default port; `:443` is dropped by parsing. Credentials
+    // never get this far: validSource rejects them.
+    if (url.host !== url.hostname) return null;
+    if (url.host === YOUTUBE_SHORT_HOST || YOUTUBE_HOSTS.includes(url.host)) return parseYouTube(url);
+    return parseVimeo(url);
+  }
+  return VIDEO_FILE_EXTENSION.test(url.pathname) ? { kind: "file", src } : null;
 }
 
 /** A block's path of names, page title first, e.g. "About you › Logo". */
@@ -1288,11 +1413,21 @@ function pathText(entry: TreeEntry): string {
 
 /**
  * The save rule for a display block's own content, or null when it's fine: an
- * image needs a valid source, a text block some text. Shared by the save rules
- * and the editor's inline message, so both say exactly the same thing.
+ * image needs a valid source, a video a recognised one, a text block some text.
+ * Shared by the save rules and the editor's inline message, so both say
+ * exactly the same thing.
  */
 export function displayBlockProblem(entry: TreeEntry): ConditionProblem | null {
   const { block } = entry;
+  if (block.type === "video" && !parseVideoSource(block.content)) {
+    const rule =
+      "paste a YouTube or Vimeo link, or the address of an .mp4 or .webm file (https:// or a path on your app's server such as /videos/intro.mp4).";
+    return {
+      blockId: block.id,
+      message: `Video "${pathText(entry)}": ${rule}`,
+      detail: rule.charAt(0).toUpperCase() + rule.slice(1),
+    };
+  }
   if (block.type === "image" && !isValidImageSource(block.content)) {
     const detail = "Add an image address starting with https:// or a path on your app's server such as /images/logo.png.";
     return {
