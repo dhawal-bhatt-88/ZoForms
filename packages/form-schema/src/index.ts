@@ -99,6 +99,15 @@ const helpText = z
   .optional()
   .transform((d) => (d === "" ? undefined : d));
 
+/**
+ * A group's (or, wrongly, a page's) `repeats`. `false` never reaches this —
+ * `withoutIdleRepeatSettings` drops it — so it is stored as `true` or not at all.
+ */
+const repeats = z
+  .boolean()
+  .optional()
+  .transform((r): true | undefined => (r === true ? true : undefined));
+
 const shownWhen = {
   /** Show this block only when these conditions hold. Absent = always shown. */
   enableWhen: z.array(Condition).optional(),
@@ -162,6 +171,18 @@ export interface GroupBlock extends NoLeafFields {
   id: string;
   type: "group";
   label: string;
+  /**
+   * A repeating group (contract §12): the respondent fills `blocks` once per
+   * entry. Only ever `true` when present; the three settings below exist only
+   * while it is (see `withoutIdleRepeatSettings`).
+   */
+  repeats?: true;
+  /** The singular noun for one entry, used mid-sentence: "Add another patient". */
+  repeatLabel?: string;
+  /** Fewest entries; a whole number, 0 or more. Absent means 1. */
+  minOccurs?: number;
+  /** Most entries; a whole number, 1 or more and at least `minOccurs`. Absent means no limit. */
+  maxOccurs?: number;
   enableWhen?: Condition[];
   enableBehavior?: "any";
   blocks: Block[];
@@ -194,6 +215,8 @@ export interface PageBlock extends NoLeafFields {
    * those features come back into scope, and make this `label?: never`.
    */
   label: never;
+  /** Pages never repeat (contract §12.1). Kept when sent only so the save rules can reject it by name. */
+  repeats?: true;
   enableWhen?: Condition[];
   enableBehavior?: "any";
   blocks: Block[];
@@ -208,6 +231,10 @@ interface GroupBlockInput {
   id: string;
   type: "group";
   label: string;
+  repeats?: boolean;
+  repeatLabel?: string;
+  minOccurs?: number;
+  maxOccurs?: number;
   enableWhen?: z.input<typeof Condition>[];
   enableBehavior?: "all" | "any";
   blocks: BlockInput[];
@@ -216,6 +243,7 @@ interface PageBlockInput {
   id: string;
   type: "page";
   title: string;
+  repeats?: boolean;
   enableWhen?: z.input<typeof Condition>[];
   enableBehavior?: "all" | "any";
   blocks: BlockInput[];
@@ -245,6 +273,12 @@ export const GroupBlock = z.object({
   // Blank labels parse, so the save rules can reject them with a message that
   // names the group, rather than a generic schema error.
   label: z.string(),
+  repeats,
+  // Any string or number parses, as a blank label does, so the save rules can
+  // reject a bad one by name (`repeatSettingsProblems`).
+  repeatLabel: z.string().optional(),
+  minOccurs: z.number().optional(),
+  maxOccurs: z.number().optional(),
   ...shownWhen,
   blocks: childBlocks,
 });
@@ -254,9 +288,28 @@ export const PageBlock = z.object({
   type: z.literal("page"),
   // Blank titles parse too, for the same reason as blank group labels.
   title: z.string(),
+  repeats,
   ...shownWhen,
   blocks: childBlocks,
 });
+
+/**
+ * Contract §6, §12.1: repeat settings on a group that doesn't repeat do
+ * nothing, so they're dropped before parsing — never stored, exported or
+ * rejected, whatever their value. `repeats: false` goes too, so turning Repeats
+ * on and off again leaves the form unchanged. On a page only `repeats: true` is
+ * kept, so the save rules can refuse it by name; a page's other repeat settings
+ * are dropped the same way.
+ */
+function withoutIdleRepeatSettings(raw: unknown): unknown {
+  if (typeof raw !== "object" || raw === null) return raw;
+  const node = raw as Record<string, unknown>;
+  if (node.type !== "group" && node.type !== "page") return raw;
+  if (node.type === "group" && node.repeats === true) return raw;
+  const { repeats, repeatLabel: _label, minOccurs: _min, maxOccurs: _max, ...rest } = node;
+  // Anything but true or false is left for the parser to reject.
+  return repeats === false || repeats === undefined ? rest : { ...rest, repeats };
+}
 
 /*
  * Parsed separately from the other questions only so an image's, a video's or
@@ -297,10 +350,19 @@ export type _BlockShapesMatch = [
   Expect<Assignable<Extract<Parsed, { type: "page" }>, Omit<PageBlock, "label">>>,
   Expect<Assignable<BlockInput, z.input<typeof BlockUnion>>>,
 ];
-export const Block = BlockUnion as unknown as z.ZodType<Block, z.ZodTypeDef, BlockInput>;
+export const Block = z.preprocess(withoutIdleRepeatSettings, BlockUnion) as unknown as z.ZodType<
+  Block,
+  z.ZodTypeDef,
+  BlockInput
+>;
 
 export function isGroup(block: Block): block is GroupBlock {
   return block.type === "group";
+}
+
+/** A group with `repeats: true` (contract §12). Pages never repeat. */
+export function isRepeatingGroup(block: Block): block is GroupBlock & { repeats: true } {
+  return isGroup(block) && block.repeats === true;
 }
 
 export function isPage(block: Block): block is PageBlock {
@@ -747,6 +809,9 @@ export const DEFAULT_GROUP_LABEL = "Untitled group";
 export function newGroup(taken?: Iterable<string>, label = DEFAULT_GROUP_LABEL): GroupBlock {
   return { id: newBlockId(taken), type: "group", label, blocks: [] };
 }
+
+/** What turning "Repeats" on writes (contract §12.1); the author can change both. */
+export const REPEAT_DEFAULTS = { repeatLabel: "item", minOccurs: 1 } as const;
 
 /** The title a new page gets (contract §2.5). */
 export const DEFAULT_PAGE_TITLE = "Untitled page";
@@ -1472,6 +1537,67 @@ export function displayBlockProblem(entry: TreeEntry): ConditionProblem | null {
   return null;
 }
 
+/* ---------- repeating groups (contract §12) ---------- */
+
+export type RepeatSetting = "repeatLabel" | "minOccurs" | "maxOccurs";
+
+/**
+ * The save rules for a repeating group's own settings (contract §6), one per
+ * field at fault. `rule` reads mid-sentence, after the group's name in a save
+ * message; `detail` is the same text to show under that field. Empty for a
+ * group that doesn't repeat: its settings are dropped, never checked.
+ */
+export function repeatSettingsProblems(
+  block: Block,
+): { field: RepeatSetting; rule: string; detail: string }[] {
+  if (!isRepeatingGroup(block)) return [];
+  const found: { field: RepeatSetting; rule: string }[] = [];
+  if (!block.repeatLabel?.trim()) {
+    found.push({ field: "repeatLabel", rule: 'a repeating group needs a name for one entry, such as "patient".' });
+  }
+  const min = block.minOccurs;
+  const minValid = min === undefined || (Number.isInteger(min) && min >= 0);
+  if (!minValid) {
+    found.push({ field: "minOccurs", rule: "the minimum number of entries must be a whole number, 0 or more." });
+  }
+  const max = block.maxOccurs;
+  if (max !== undefined) {
+    if (!(Number.isInteger(max) && max >= 1)) {
+      found.push({
+        field: "maxOccurs",
+        rule: "the maximum number of entries must be a whole number, 1 or more, or left blank for no limit.",
+      });
+    } else if (minValid && max < (min ?? REPEAT_DEFAULTS.minOccurs)) {
+      found.push({
+        field: "maxOccurs",
+        rule: `the maximum number of entries (${max}) can't be less than the minimum (${min ?? REPEAT_DEFAULTS.minOccurs}).`,
+      });
+    }
+  }
+  return found.map((p) => ({ ...p, detail: p.rule.charAt(0).toUpperCase() + p.rule.slice(1) }));
+}
+
+/** The repeating groups enclosing an entry, outermost first — never the block itself (contract §12.3). */
+export function repeatChain(entry: TreeEntry): GroupBlock[] {
+  return entry.ancestors.filter(isRepeatingGroup);
+}
+
+/**
+ * The prefix rule (contract §3.7, §12.3): a condition's source is allowed only
+ * if every repeating group enclosing the source also encloses the dependent —
+ * so the source's chain of repeating groups is a prefix of the dependent's,
+ * and the dependent's own entry decides which entry's answer is read. Returns
+ * the outermost repeating group that encloses `source` but not `dependent`, or
+ * undefined when the rule holds. It applies alongside the ordering rule.
+ *
+ * THE prefix check: the save rules, the editor's source picker and its guards
+ * all use it.
+ */
+export function prefixRuleBreaker(source: TreeEntry, dependent: TreeEntry): GroupBlock | undefined {
+  // By id, so entries from separate walks of the same tree compare correctly.
+  return repeatChain(source).find((group) => !dependent.ancestors.some((a) => a.id === group.id));
+}
+
 /**
  * Every way the form breaks the save rules, each naming the offending block by
  * its path. Empty means valid. The API rejects a save with any problem; the
@@ -1486,23 +1612,27 @@ export function displayBlockProblem(entry: TreeEntry): ConditionProblem | null {
  *    dependent in reading order (§3.2) — so a container can never depend on its
  *    own contents, cycles are impossible, and the first page has no conditions;
  *  - the source is a type that can be a source (§3.3), with an operator and an
- *    answer that type supports.
+ *    answer that type supports;
+ *  - the source is not inside a repeating group that doesn't also enclose the
+ *    dependent (the prefix rule, §3.7);
+ *  - only groups repeat, and a repeating group's settings are valid (§6, §12.1).
  */
 export function formProblems(form: { blocks: readonly Block[] }): ConditionProblem[] {
   return collectProblems(form, true);
 }
 
 /**
- * The save problems on one block other than its own content rule
- * (`displayBlockProblem`) — what the editor's Logic section lists. A display
- * block's content message is shown once, inline under the field it is about,
- * not again here. The save itself still checks everything (`formProblems`).
+ * The save problems on one block other than its own field rules — a display
+ * block's content (`displayBlockProblem`) and a repeating group's settings
+ * (`repeatSettingsProblems`). This is what the editor's Logic section lists:
+ * those messages are shown once, inline under the field they are about, not
+ * again here. The save itself still checks everything (`formProblems`).
  */
 export function problemsBesideContent(form: { blocks: readonly Block[] }, blockId: string): ConditionProblem[] {
   return collectProblems(form, false).filter((p) => p.blockId === blockId);
 }
 
-function collectProblems(form: { blocks: readonly Block[] }, withContent: boolean): ConditionProblem[] {
+function collectProblems(form: { blocks: readonly Block[] }, withFieldRules: boolean): ConditionProblem[] {
   const entries = walkBlocks(form.blocks);
   const problems: ConditionProblem[] = [];
   const add = (entry: TreeEntry, detail: string) =>
@@ -1522,14 +1652,18 @@ function collectProblems(form: { blocks: readonly Block[] }, withContent: boolea
       }
       if (!block.title.trim()) add(entry, "a page needs a title.");
       if (block.blocks.length === 0) add(entry, "a page must contain at least one block.");
+      if (block.repeats) {
+        add(entry, "a page can't repeat — only groups can. Put its questions in a repeating group on the page instead.");
+      }
     } else if (isGroup(block)) {
       if (!block.label.trim()) add(entry, "a group needs a label.");
       if (block.blocks.length === 0) add(entry, "a group must contain at least one block.");
+      if (withFieldRules) for (const { rule } of repeatSettingsProblems(block)) add(entry, rule);
     }
     if (paged && entry.depth === 0 && !isPage(block)) {
       add(entry, "this form has pages, so every block must be inside a page.");
     }
-    const display = withContent ? displayBlockProblem(entry) : null;
+    const display = withFieldRules ? displayBlockProblem(entry) : null;
     if (display) problems.push(display);
   }
 
@@ -1572,6 +1706,17 @@ function conditionProblem(
   const allowed = sourceOperators(source);
   if (!allowed) {
     return `"${sourceName}" is a ${source.type} block, which can't be used in a condition.`;
+  }
+  const across = prefixRuleBreaker(sourceEntry, dependent);
+  if (across) {
+    const noun = isPage(dependent.block) ? "page" : isGroup(dependent.block) ? "group" : "block";
+    const one = across.repeatLabel?.trim() || "entry";
+    const name = nodeName(across) ?? "(unlabelled group)";
+    // A page can't go inside a group, so it is only told to change the condition.
+    const fix = isPage(dependent.block)
+      ? "Base the condition on a different question."
+      : `Move the ${noun} into "${name}", or base the condition on a different question.`;
+    return `its condition uses "${sourceName}", which is inside the repeating group "${name}". This ${noun} isn't inside "${name}", so it can't tell which ${one}'s answer to use. ${fix}`;
   }
   if (!allowed.includes(c.operator)) {
     return `the operator "${c.operator}" can't be used with "${sourceName}" (a ${source.type} question). Allowed: ${allowed.join(", ")}.`;
@@ -1651,4 +1796,57 @@ export function misorderedDependents(blocks: readonly Block[]): Block[] {
 export function moveBreaks(before: readonly Block[], after: readonly Block[]): Block[] {
   const alreadyBroken = new Set(misorderedDependents(before).map((b) => b.id));
   return misorderedDependents(after).filter((b) => !alreadyBroken.has(b.id));
+}
+
+/**
+ * Blocks with a condition whose source is inside a repeating group that
+ * doesn't enclose them — the prefix rule (contract §3.7), checked with
+ * `prefixRuleBreaker`.
+ */
+export function prefixBrokenDependents(blocks: readonly Block[]): Block[] {
+  const entries = walkBlocks(blocks);
+  const byId = new Map<string, TreeEntry>();
+  for (const entry of entries) if (!byId.has(entry.block.id)) byId.set(entry.block.id, entry);
+  return entries
+    .filter((entry) =>
+      (entry.block.enableWhen ?? []).some((c) => {
+        const source = byId.get(c.question);
+        return !!source && source !== entry && !!prefixRuleBreaker(source, entry);
+      }),
+    )
+    .map((entry) => entry.block);
+}
+
+/**
+ * What an edit of the tree's structure (`before` → `after`) would newly break,
+ * by rule: `order` — a condition's source no longer comes before it — and
+ * `prefix` — a source now sits in a repeating group its dependent isn't in.
+ * Only breakage the edit causes counts, so an already-broken form can still be
+ * rearranged. Both empty means the edit is allowed.
+ *
+ * Backs the editor's guards on moves (drag, arrows, "Move to…", in both
+ * directions and between repeats), on removing a group but keeping its
+ * contents, and on turning "Repeats" on (contract §12.8). Page edits use
+ * `moveBreaks` alone: a page never repeats, so they can't change which
+ * repeating groups enclose a block.
+ */
+export function structureBreaks(
+  before: readonly Block[],
+  after: readonly Block[],
+): { order: Block[]; prefix: Block[] } {
+  const alreadyBroken = new Set(prefixBrokenDependents(before).map((b) => b.id));
+  return {
+    order: moveBreaks(before, after),
+    prefix: prefixBrokenDependents(after).filter((b) => !alreadyBroken.has(b.id)),
+  };
+}
+
+/**
+ * Turning "Repeats" on for group `groupId` would leave these blocks — outside
+ * it — with a condition on a question inside it, so it is refused while any
+ * exist (contract §12.8). Turning it off never breaks a condition.
+ */
+export function repeatsOnBlockers(blocks: readonly Block[], groupId: string): Block[] {
+  const after = updateBlockInTree(blocks, groupId, (b) => (isGroup(b) ? { ...b, repeats: true } : b));
+  return structureBreaks(blocks, after).prefix;
 }

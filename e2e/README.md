@@ -61,6 +61,7 @@ Run suites one at a time, not in parallel. They share the dev server and the dat
 | `verify-display-blocks.js` | yes | `text` and `image`: the image-source and blank-text save rules (the editor's inline message matches the API's and is shown once), the inspector's heading, previews, Help text visibility, trimming, no `description: ""`. |
 | `verify-video.js` | yes | `video`: the recognised-source save rule (the editor's inline message matches the API's and is shown once), the inspector's heading, previews for YouTube, Vimeo and files with nothing loaded from either site, no Help text or Required, not a condition source, trimming, the artifact. |
 | `verify-audio.js` | yes | `audio`: the recognised-source save rule (the editor's inline message matches the API's and is shown once), the inspector's heading and hints, a preview that loads nothing, no Help text or Required, not a condition source, trimming, the artifact. |
+| `verify-repeats.js` | yes | Repeating groups: every save rule's message through the API (repeat settings, pages, the prefix rule), stripping and no-change detection; in the editor the Repeats switch, its defaults, preview, inline errors and badge, the source picker inside nested repeats, the turn-on and move guards (Move to, Move down, drag) with jump links, and the artifact. With `E2E_EXTERNAL_APP_URL` set, it also renders the download in the external test app: adds and removes entries, submits, and checks the payload. |
 | `verify-groups-api.js` | no | Groups through the API: save, download, restore, no-change detection and every save rule's message. |
 | `verify-pages-api.js` | no | Pages and navigation through the API: page shape, navigation defaults in the artifact, and every page rule's message. |
 | `verify-versions.js` | no | Append-only versions and the read-only artifact endpoint, including another user's access. |
@@ -74,5 +75,6 @@ Run suites one at a time, not in parallel. They share the dev server and the dat
 | `E2E_BROWSER_CHANNEL` | `msedge` | Playwright channel; empty for its bundled Chromium. |
 | `E2E_OUTPUT_DIR` | `e2e/output` | Where screenshots and downloaded artifacts go (git-ignored). |
 | `E2E_EXTERNAL_FORMS_DIR` | not set | If set, e.g. `D:\ZoworkProjects\external-test-app\src\forms`, the artifacts the suites download are also copied there, ready to render. |
+| `E2E_EXTERNAL_APP_URL` | not set | If set, e.g. `http://localhost:5173/external-test-app/`, `verify-repeats.js` renders its download in the external test app (`?form=builder-repeats`) and submits it. Needs `E2E_EXTERNAL_FORMS_DIR` as well, and the test app running there (`npm run dev:all`). When unset, that step is skipped. |
 
 Screenshots and artifacts in `e2e/output/` are overwritten on each run.

@@ -90,9 +90,9 @@ import {
   isGroup,
   isPage,
   isPaged,
+  isRepeatingGroup,
   makePaged,
   moveBlockInTree,
-  moveBreaks,
   movePage,
   NAVIGATION_DEFAULTS,
   navigationWithoutDefaults,
@@ -100,6 +100,7 @@ import {
   newGroup,
   newPage,
   pageContentsDestination,
+  prefixRuleBreaker,
   problemsBesideContent,
   removePaging,
   NUMERIC_SOURCE_TYPES,
@@ -107,9 +108,13 @@ import {
   OPTION_TYPES,
   questionNumbers,
   removeBlockFromTree,
+  REPEAT_DEFAULTS,
+  repeatsOnBlockers,
+  repeatSettingsProblems,
   resolveTheme,
   sameContent,
   sourceOperators,
+  structureBreaks,
   unwrapGroup,
   updateBlockInTree,
   walkBlocks,
@@ -136,6 +141,7 @@ import {
 } from "@/lib/tree-dnd";
 import { audioPreviewText } from "@/lib/audio-preview";
 import { inspectorHeading, logicNoun } from "@/lib/inspector";
+import { parseCount, repeatBadgeText, repeatPreviewText } from "@/lib/repeat-settings";
 import { videoPreviewText } from "@/lib/video-preview";
 import {
   ApiError,
@@ -918,6 +924,15 @@ function CanvasCard({
           {group && !group.label.trim() ? "Unlabelled group" : blockName(block)}
         </span>
         {block.required && <span className="text-red">*</span>}
+        {group && isRepeatingGroup(group) && (
+          <span
+            data-repeat-badge
+            // Bordered: group boxes alternate shading, and a filled pill vanished on the grey ones.
+            className="flex-none rounded-full border border-line-2 bg-surface px-2 py-0.5 text-[11px] font-semibold text-ink-2"
+          >
+            {repeatBadgeText(group)}
+          </span>
+        )}
         {!!block.enableWhen?.length && (
           <span className="flex-none rounded-full bg-accent-weak px-2 py-0.5 text-[11px] font-semibold text-accent-2">
             Conditional
@@ -1461,9 +1476,13 @@ function ConditionsPanel({
   onChange: (p: Partial<Block>) => void;
 }) {
   const entries = walkBlocks(blocks);
-  const at = entries.find((e) => e.block.id === block.id)?.order ?? entries.length;
+  const self = entries.find((e) => e.block.id === block.id);
+  const at = self?.order ?? entries.length;
   // Only questions before it in reading order can be used, which also rules out cycles.
-  const sources = entries.filter((e) => e.order < at && sourceOperators(e.block));
+  const earlier = entries.filter((e) => e.order < at && sourceOperators(e.block));
+  // And none inside a repeating group it isn't in: there'd be no telling which entry to read (contract §12.3).
+  const sources = self ? earlier.filter((e) => !prefixRuleBreaker(e, self)) : earlier;
+  const hiddenByRepeats = earlier.length > sources.length;
   const numbers = questionNumbers(blocks);
   const noun = logicNoun(block);
   const conditions = block.enableWhen ?? [];
@@ -1610,8 +1629,15 @@ function ConditionsPanel({
           <Plus className="h-4 w-4" /> Add condition
         </button>
       ) : (
-        <p className="text-xs text-muted">
-          Only questions before this {noun} can be used. Add or move a question before it first.
+        !hiddenByRepeats && (
+          <p className="text-xs text-muted">
+            Only questions before this {noun} can be used. Add or move a question before it first.
+          </p>
+        )
+      )}
+      {hiddenByRepeats && (
+        <p className="mt-2 text-xs text-muted">
+          Some questions aren&apos;t listed because they&apos;re inside a repeating group this block isn&apos;t in.
         </p>
       )}
     </div>
@@ -1928,15 +1954,9 @@ export default function EditorPage() {
     if (!schema) return;
     setDeletingGroupId(null);
     const next = unwrapGroup(schema.blocks, gid);
-    // Unwrapping never changes reading order, but it goes through the same guard as any move.
-    const broken = moveBreaks(schema.blocks, next);
-    if (broken.length) {
-      setNotice({
-        text: "Can't remove that group — these questions would end up before a question their conditions depend on:",
-        blocks: broken,
-      });
-      return;
-    }
+    // Unwrapping changes neither reading order nor which repeats enclose a block, but it
+    // goes through the same guard as any move.
+    if (refuseStructureEdit(structureBreaks(schema.blocks, next), "remove that group")) return;
     patch((s) => ({ ...s, blocks: unwrapGroup(s.blocks, gid) }));
     setSelectedId((cur) => (cur === gid ? null : cur));
   }
@@ -1959,9 +1979,34 @@ export default function EditorPage() {
   }
 
   /**
+   * Refuse a change to the tree's structure that would break conditions
+   * (`structureBreaks`), naming the blocks it would break. `action` completes
+   * "Can't …". Returns true when refused.
+   */
+  function refuseStructureEdit(breaks: { order: Block[]; prefix: Block[] }, action: string): boolean {
+    if (breaks.order.length) {
+      setNotice({
+        text: `Can't ${action} — these questions would end up before a question their conditions depend on:`,
+        blocks: breaks.order,
+      });
+      return true;
+    }
+    if (breaks.prefix.length) {
+      setNotice({
+        text: `Can't ${action} — these blocks would have conditions on a question inside a repeating group they aren't in:`,
+        blocks: breaks.prefix,
+      });
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Every move — drag, the arrow buttons, "Move to group…" — comes through here.
    * A group moves with everything inside it. Refused if afterwards any condition
-   * in the form would use a question that no longer comes before it.
+   * in the form would use a question that no longer comes before it, or one
+   * inside a repeating group the dependent isn't in — into, out of or between
+   * repeats (contract §12.8).
    */
   function tryMove(bid: string, target: MoveTarget) {
     if (!schema) return;
@@ -1974,16 +2019,34 @@ export default function EditorPage() {
       setNotice({ text: (e as Error).message });
       return;
     }
-    const broken = moveBreaks(schema.blocks, next);
-    if (broken.length) {
-      setNotice({
-        text: `Can't move "${blockName(moving)}" there — these questions would end up before a question their conditions depend on:`,
-        blocks: broken,
-      });
-      return;
-    }
+    if (refuseStructureEdit(structureBreaks(schema.blocks, next), `move "${blockName(moving)}" there`)) return;
     if (target.parentId) expand(target.parentId);
     patch((s) => ({ ...s, blocks: next }));
+  }
+
+  /**
+   * The group inspector's "Repeats" toggle (contract §12.8). Turning it on writes
+   * the defaults, and is refused while a condition outside the group uses a
+   * question inside it. Turning it off is always allowed and clears the settings,
+   * so turning it on again starts from the defaults.
+   */
+  function setRepeats(gid: string, on: boolean) {
+    if (!schema) return;
+    const group = findBlock(schema.blocks, gid)?.block;
+    if (!group || !isGroup(group)) return;
+    if (on) {
+      const deps = repeatsOnBlockers(schema.blocks, gid);
+      if (deps.length) {
+        setNotice({
+          text: `Can't make "${blockName(group)}" repeat — these blocks outside it have conditions that use a question inside it:`,
+          blocks: deps,
+        });
+        return;
+      }
+      updateBlock(gid, { repeats: true, ...REPEAT_DEFAULTS, maxOccurs: undefined });
+    } else {
+      updateBlock(gid, { repeats: undefined, repeatLabel: undefined, minOccurs: undefined, maxOccurs: undefined });
+    }
   }
 
   /*
@@ -2195,6 +2258,10 @@ export default function EditorPage() {
   const selected = selectedEntry?.block ?? null;
   // The same rule and message as the save (displayBlockProblem in form-schema).
   const selectedDisplayProblem = selectedEntry ? (displayBlockProblem(selectedEntry)?.message ?? null) : null;
+  // A repeating group's settings: the save's rules and messages (repeatSettingsProblems), each under its field.
+  const selectedRepeatProblems = selected ? repeatSettingsProblems(selected) : [];
+  const repeatProblem = (field: "repeatLabel" | "minOccurs" | "maxOccurs") =>
+    selectedRepeatProblems.find((p) => p.field === field)?.detail;
   const numbers = questionNumbers(schema.blocks);
   // While a group is dragged, its contents travel with it as one row.
   const rows = flattenVisible(schema.blocks, collapsed, drag?.activeId ?? null);
@@ -2611,6 +2678,99 @@ export default function EditorPage() {
                 <p className="mb-3 text-xs text-muted">
                   Read aloud to screen-reader users — say what the recording is.
                 </p>
+              )}
+
+              {/* Repeating groups (contract §12): groups only, never pages. */}
+              {isGroup(selected) && (
+                <div className="mb-4 border-t border-line pt-3">
+                  <div className="flex items-center justify-between text-[13.5px]">
+                    <span id="repeats-label">Repeats</span>
+                    <button
+                      role="switch"
+                      aria-checked={!!selected.repeats}
+                      aria-labelledby="repeats-label"
+                      aria-describedby="repeats-help"
+                      onClick={() => setRepeats(selected.id, !selected.repeats)}
+                      className={`relative h-5 w-9 rounded-full transition-colors ${selected.repeats ? "bg-accent" : "bg-line-2"}`}
+                    >
+                      <span
+                        className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-soft transition-transform ${selected.repeats ? "translate-x-[18px]" : "translate-x-0.5"}`}
+                      />
+                    </button>
+                  </div>
+                  <p id="repeats-help" className="mt-1 text-xs text-muted">
+                    Respondents fill this group&apos;s questions once per entry, and can add and remove entries.
+                  </p>
+
+                  {isRepeatingGroup(selected) && (
+                    <div className="mt-3 flex flex-col gap-3">
+                      <div>
+                        <label htmlFor="repeat-label" className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">
+                          Name for one entry
+                        </label>
+                        <input
+                          id="repeat-label"
+                          value={selected.repeatLabel ?? ""}
+                          onChange={(e) => updateBlock(selected.id, { repeatLabel: e.target.value })}
+                          aria-invalid={!!repeatProblem("repeatLabel")}
+                          aria-describedby="repeat-label-help repeat-label-preview repeat-label-error"
+                          className={fieldCls}
+                        />
+                        <p id="repeat-label-help" className="mt-1.5 text-xs text-muted">
+                          Write it as it would appear mid-sentence, e.g. <em>patient</em>. Use lower case unless
+                          it&apos;s a name or acronym.
+                        </p>
+                        {repeatPreviewText(selected.repeatLabel) && (
+                          <p
+                            id="repeat-label-preview"
+                            className="mt-1.5 rounded-md bg-surface-3 px-2 py-1 text-xs text-ink-2"
+                          >
+                            {repeatPreviewText(selected.repeatLabel)}
+                          </p>
+                        )}
+                        {repeatProblem("repeatLabel") && (
+                          <p id="repeat-label-error" role="alert" className="mt-1.5 text-xs text-red">
+                            {repeatProblem("repeatLabel")}
+                          </p>
+                        )}
+                      </div>
+
+                      {(
+                        [
+                          ["minOccurs", "Minimum entries", "1", "0 lets the respondent remove every entry."],
+                          ["maxOccurs", "Maximum entries", "No limit", "Leave blank for no limit."],
+                        ] as const
+                      ).map(([field, label, placeholder, help]) => (
+                        <div key={field}>
+                          <label htmlFor={`repeat-${field}`} className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">
+                            {label}
+                          </label>
+                          <input
+                            id={`repeat-${field}`}
+                            type="number"
+                            inputMode="numeric"
+                            min={field === "minOccurs" ? 0 : 1}
+                            step={1}
+                            value={selected[field] ?? ""}
+                            placeholder={placeholder}
+                            onChange={(e) => updateBlock(selected.id, { [field]: parseCount(e.target.value) })}
+                            aria-invalid={!!repeatProblem(field)}
+                            aria-describedby={`repeat-${field}-help repeat-${field}-error`}
+                            className={fieldCls}
+                          />
+                          <p id={`repeat-${field}-help`} className="mt-1.5 text-xs text-muted">
+                            {help}
+                          </p>
+                          {repeatProblem(field) && (
+                            <p id={`repeat-${field}-error`} role="alert" className="mt-1.5 text-xs text-red">
+                              {repeatProblem(field)}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
               {/*
                 Help text only where the renderer shows it: on questions. Not on pages,
