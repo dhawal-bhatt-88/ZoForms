@@ -58,8 +58,9 @@ Run suites one at a time, not in parallel. They share the dev server and the dat
 | `verify-pages-ui.js` | yes | Pages in the editor: page containers, converting to pages, conditions on pages, "Move to…", deleting pages, Remove pages, navigation settings. |
 | `verify-progress-style.js` | yes | The Progress style setting: default, disabled while progress is off, defaults not stored, saved and exported as `progressStyle`. |
 | `verify-drafts-builder.js` | yes | The Save progress (drafts) setting: API rules and artifact for each mode, the settings UI, the switch back when pages are removed. |
-| `verify-display-blocks.js` | yes | `text` and `image`: the image-source and blank-text save rules (the editor's inline message matches the API's), previews, Help text visibility, trimming, no `description: ""`. |
-| `verify-video.js` | yes | `video`: the recognised-source save rule (the editor's inline message matches the API's), previews for YouTube, Vimeo and files with nothing loaded from either site, no Help text or Required, not a condition source, trimming, the artifact. |
+| `verify-display-blocks.js` | yes | `text` and `image`: the image-source and blank-text save rules (the editor's inline message matches the API's and is shown once), the inspector's heading, previews, Help text visibility, trimming, no `description: ""`. |
+| `verify-video.js` | yes | `video`: the recognised-source save rule (the editor's inline message matches the API's and is shown once), the inspector's heading, previews for YouTube, Vimeo and files with nothing loaded from either site, no Help text or Required, not a condition source, trimming, the artifact. |
+| `verify-audio.js` | yes | `audio`: the recognised-source save rule (the editor's inline message matches the API's and is shown once), the inspector's heading and hints, a preview that loads nothing, no Help text or Required, not a condition source, trimming, the artifact. |
 | `verify-groups-api.js` | no | Groups through the API: save, download, restore, no-change detection and every save rule's message. |
 | `verify-pages-api.js` | no | Pages and navigation through the API: page shape, navigation defaults in the artifact, and every page rule's message. |
 | `verify-versions.js` | no | Append-only versions and the read-only artifact endpoint, including another user's access. |

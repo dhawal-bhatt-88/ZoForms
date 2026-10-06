@@ -1,6 +1,6 @@
 # Drafts — Contract
 
-Status: agreed 29 Sep 2026; amended 29 Sep 2026 after renderer Checkpoint 0. Shared by the builder repo and the `@yourco/forms` renderer repo.
+Status: agreed 29 Sep 2026; amended 29 Sep 2026 after renderer Checkpoint 0; amended 5 Oct 2026 for repeating groups (§5, §8). Shared by the builder repo and the `@yourco/forms` renderer repo.
 Change it here first, then in both repos.
 
 ## 1. Purpose
@@ -87,11 +87,16 @@ type DraftProblem = {
 ```ts
 type Draft = {
   formId: string; formVersionId: string; schemaVersion: number;
-  answers: Record<string, BlockValue>;      // including hidden answers, as today
+  answers: DraftAnswers;                     // including hidden answers, as today
   idempotencyKey: string;                    // so a resumed form cannot create a duplicate
   currentPageId?: string; visitedPageIds?: string[]; onReview?: boolean;
   savedAt: string;                           // UTC ISO-8601
 };
+
+// A repeating group (GROUPS-AND-PAGES-CONTRACT §12) is stored as an array of instances,
+// in display order, each with its own answers. Instance ids are not stored; they are
+// regenerated on restore.
+type DraftAnswers = Record<string, BlockValue | DraftAnswers[]>;
 ```
 
 ### Device storage format
@@ -141,6 +146,7 @@ A draft is deleted on:
 - Start over;
 - a version mismatch (§7);
 - expiry (device mode);
+- nothing left worth keeping: at the next save point, if no question is answered anywhere (hidden answers and nested instances included) and the respondent is still on the first displayed page, the draft and the tab's `sessionStorage` entry are deleted rather than saved empty. Empty starting instances of repeating groups don't count as answers;
 - `clearDrafts` from the host, e.g. `clearDrafts({ owner })` on logout. It deletes the matching device drafts and the matching `sessionStorage` entries in the current tab; it does not touch server drafts. In server mode, deleting the server draft on logout is the host's own decision.
 
 ## 9. Known limits (v1)

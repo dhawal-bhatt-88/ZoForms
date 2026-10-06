@@ -72,6 +72,11 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     const rename = (label) => labelInput.fill(label);
     const inline = () => P.locator("aside").getByRole("alert");
     const helpField = () => P.locator("aside").getByText("Help text", { exact: true });
+    // The inspector's heading (textContent: the CSS upper-cases it), and how often a phrase appears in it.
+    const inspectorHeading = () => P.locator("aside h4").first().textContent();
+    const timesShown = async (phrase) => (await P.locator("aside").innerText()).toLowerCase().split(phrase.toLowerCase()).length - 1;
+    const redMessages = () => P.locator("aside .text-red").count();
+    const logicSays = (noun) => P.locator("aside").getByText(`Show this ${noun} only when…`, { exact: true }).isVisible();
     const cardOf = (label) => cards.filter({ has: P.locator("span.truncate", { hasText: new RegExp(`^${label.replace(/[?()]/g, "\\$&")}$`) }) }).first();
     const select = (label) => cardOf(label).locator("span.truncate").click();
     const notice = P.getByRole("alert").filter({ hasText: /Couldn't save/ });
@@ -87,6 +92,8 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     await inputs().nth(0).fill("Yes"); await inputs().nth(1).fill("No");
 
     await add("Text"); await rename("Welcome");
+    check("text: the inspector calls it a Text block, not a Question", (await inspectorHeading()) === "Text", await inspectorHeading());
+    check("text: the Logic section says 'this text block', not 'this question'", await logicSays("text block"));
     check("help text hidden on a text block", (await helpField().count()) === 0);
     await content.fill("Welcome to the clinic.\nPlease arrive 10 minutes early.");
     const textPreview = cardOf("Welcome").locator("p.whitespace-pre-line");
@@ -94,6 +101,8 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
       (await textPreview.evaluate((e) => getComputedStyle(e).whiteSpace)) === "pre-line" && (await textPreview.innerText()).includes("\n"), await textPreview.innerText());
 
     await add("Image");
+    check("image: the inspector calls it an Image block, not a Question", (await inspectorHeading()) === "Image", await inspectorHeading());
+    check("image: the Logic section says 'this image block', not 'this question'", await logicSays("image block"));
     check("help text hidden on an image block", (await helpField().count()) === 0);
     check("image: the screen-reader note sits under Label",
       await P.locator("aside").getByText("Also read aloud to screen-reader users — describe what the image shows.").isVisible());
@@ -104,6 +113,8 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
       (await inline().innerText()) === IMAGE_MSG("Clinic logo") && await cardOf("Clinic logo").getByText("Add an image address").isVisible(), await inline().innerText().catch(() => ""));
     await urlInput.fill("logo");
     check("image: an invalid source keeps the message as the author types", (await inline().innerText()) === IMAGE_MSG("Clinic logo"));
+    check("image: the message is shown once, under the field — not again under Logic",
+      (await timesShown("add an image address")) === 1 && (await redMessages()) === 1, `${await timesShown("add an image address")} / ${await redMessages()}`);
     await P.screenshot({ path: `${OUT}/display-1-invalid-image.png` });
 
     // A save with that invalid image is refused, with the same message as the inline one.
@@ -128,6 +139,8 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     await add("Text"); await rename("Directions");
     await content.fill("   ");
     check("text: a blank text block shows its message inline", (await inline().innerText()) === TEXT_MSG("Directions"));
+    check("text: the message is shown once, under the field — not again under Logic",
+      (await timesShown("add some text or delete it")) === 1 && (await redMessages()) === 1, `${await timesShown("add some text or delete it")} / ${await redMessages()}`);
     await P.getByRole("button", { name: "Save", exact: true }).click();
     await notice.waitFor({ timeout: 10000 });
     check("save refused: blank text, with the message", (await notice.innerText()).includes(TEXT_MSG("Directions")), await notice.innerText());
@@ -140,6 +153,7 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     await P.getByRole("combobox", { name: "Answer" }).first().selectOption("Yes");
 
     await add("Short answer"); await rename("Full name");
+    check("a question is still headed Question, and its Logic says 'this question'", (await inspectorHeading()) === "Question" && await logicSays("question"));
     check("help text shown on a question", await helpField().isVisible());
     const help = P.locator("aside input[placeholder='Optional']");
     await help.fill("As on your ID");

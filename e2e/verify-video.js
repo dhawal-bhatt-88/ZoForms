@@ -85,6 +85,11 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     const rename = (label) => labelInput.fill(label);
     const inline = () => P.locator("aside").getByRole("alert");
     const helpField = () => P.locator("aside").getByText("Help text", { exact: true });
+    // The inspector's heading (textContent: the CSS upper-cases it), and how often a phrase appears in it.
+    const inspectorHeading = () => P.locator("aside h4").first().textContent();
+    const timesShown = async (phrase) => (await P.locator("aside").innerText()).toLowerCase().split(phrase.toLowerCase()).length - 1;
+    const redMessages = () => P.locator("aside .text-red").count();
+    const logicSays = (noun) => P.locator("aside").getByText(`Show this ${noun} only when…`, { exact: true }).isVisible();
     const requiredToggle = () => P.locator("aside").getByRole("switch");
     const cardOf = (label) => cards.filter({ has: P.locator("span.truncate", { hasText: new RegExp(`^${label.replace(/[?()]/g, "\\$&")}$`) }) }).first();
     // The preview is the last truncated span on the card; the first is the card's own label.
@@ -103,6 +108,8 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
 
     // YouTube, with a start time.
     await add("Video");
+    check("video: the inspector calls it a Video block, not a Question", (await inspectorHeading()) === "Video", await inspectorHeading());
+    check("video: the Logic section says 'this video block', not 'this question'", await logicSays("video block"));
     check("video: help text hidden (not answerable)", (await helpField().count()) === 0);
     check("video: no Required toggle", (await requiredToggle().count()) === 0);
     check("video: the screen-reader note sits under Label",
@@ -117,6 +124,8 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     await urlInput.fill(UNRECOGNISED);
     check("video: an unrecognised link keeps the message as the author types, and the canvas still asks for a link",
       (await inline().innerText()) === VIDEO_MSG("Welcome from the team") && (await preview("Welcome from the team").innerText()) === "Add a video link");
+    check("video: the message is shown once, under the field — not again under Logic",
+      (await timesShown("paste a YouTube or Vimeo link")) === 1 && (await redMessages()) === 1, `${await timesShown("paste a YouTube or Vimeo link")} / ${await redMessages()}`);
     await P.screenshot({ path: `${OUT}/video-1-unrecognised.png` });
 
     // A save with that link is refused, with the same message as the inline one.

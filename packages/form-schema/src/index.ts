@@ -227,7 +227,7 @@ interface PageBlockInput {
  */
 export type Block = LeafBlock | GroupBlock | PageBlock;
 export type BlockInput =
-  // Split like the parser (image/video vs the rest): TypeScript can't distribute a
+  // Split like the parser (image/video/audio vs the rest): TypeScript can't distribute a
   // ~26-member type union across two object types when checking assignability.
   | z.input<typeof SourceBlock>
   | z.input<typeof OtherQuestionBlock>
@@ -259,14 +259,14 @@ export const PageBlock = z.object({
 });
 
 /*
- * Parsed separately from the other questions only so an image's or a video's
- * source is stored trimmed (contract §9, §10); its shape and TypeScript type
- * are QuestionBlock's.
+ * Parsed separately from the other questions only so an image's, a video's or
+ * an audio clip's source is stored trimmed (contract §9, §10, §11); its shape
+ * and TypeScript type are QuestionBlock's.
  */
-const SOURCE_BLOCK_TYPES = ["image", "video"] as const;
+const SOURCE_BLOCK_TYPES = ["image", "video", "audio"] as const;
 const SourceBlock = QuestionBlock.extend({
   type: z.enum(SOURCE_BLOCK_TYPES),
-  /** The source; validity is `isValidImageSource` / `parseVideoSource`. */
+  /** The source; validity is `isValidImageSource` / `parseVideoSource` / `parseAudioSource`. */
   content: z
     .string()
     .optional()
@@ -1256,7 +1256,7 @@ function subject(entry: TreeEntry): string {
   return describeBlockPath([...entry.ancestors, entry.block], entry.path);
 }
 
-/* ---------- display blocks: text, image and video (contract §9, §10) ---------- */
+/* ---------- display blocks: text, image, video and audio (contract §9–§11) ---------- */
 
 type UrlLike = {
   protocol: string;
@@ -1280,7 +1280,7 @@ const PLACEHOLDER_BASE = "https://base.invalid";
  * that base's origin — which rejects `//cdn…`, `/\evil.com` and
  * `/<tab>/evil.com`. Validity is this resolution rule, not a string prefix
  * alone; the renderer implements the same rule and test table. Images use it
- * directly; video files build on it (§10).
+ * directly; video files (§10) and audio files (§11) build on it.
  */
 function validSource(raw: string | undefined): string | null {
   const src = (raw ?? "").trim();
@@ -1405,6 +1405,23 @@ export function parseVideoSource(raw: string | undefined): VideoSource | null {
   return VIDEO_FILE_EXTENSION.test(url.pathname) ? { kind: "file", src } : null;
 }
 
+const AUDIO_FILE_EXTENSION = /\.(?:mp3|m4a|ogg|wav)$/i;
+
+/**
+ * Contract §11: an audio block's source, trimmed, when it is recognised,
+ * otherwise null. Recognised is a valid source per §9 (absolute `https://`
+ * with no credentials, or root-relative) whose path, before any `?` or `#`,
+ * ends in .mp3, .m4a, .ogg or .wav, in any case. The path is read from the
+ * parsed URL, so a file name in the query or fragment never counts. No player
+ * links or streaming services. The renderer implements the same rule and
+ * shares the same test table.
+ */
+export function parseAudioSource(raw: string | undefined): string | null {
+  const src = validSource(raw);
+  if (src === null) return null;
+  return AUDIO_FILE_EXTENSION.test(new URLImpl(src, PLACEHOLDER_BASE).pathname) ? src : null;
+}
+
 /** A block's path of names, page title first, e.g. "About you › Logo". */
 function pathText(entry: TreeEntry): string {
   const chain = [...entry.ancestors, entry.block];
@@ -1413,12 +1430,21 @@ function pathText(entry: TreeEntry): string {
 
 /**
  * The save rule for a display block's own content, or null when it's fine: an
- * image needs a valid source, a video a recognised one, a text block some text.
- * Shared by the save rules and the editor's inline message, so both say
- * exactly the same thing.
+ * image needs a valid source, a video or an audio clip a recognised one, a
+ * text block some text. Shared by the save rules and the editor's inline
+ * message, so both say exactly the same thing.
  */
 export function displayBlockProblem(entry: TreeEntry): ConditionProblem | null {
   const { block } = entry;
+  if (block.type === "audio" && parseAudioSource(block.content) === null) {
+    const rule =
+      "add the address of an .mp3, .m4a, .ogg or .wav file (https:// or a path on your app's server such as /audio/welcome.mp3).";
+    return {
+      blockId: block.id,
+      message: `Audio "${pathText(entry)}": ${rule}`,
+      detail: rule.charAt(0).toUpperCase() + rule.slice(1),
+    };
+  }
   if (block.type === "video" && !parseVideoSource(block.content)) {
     const rule =
       "paste a YouTube or Vimeo link, or the address of an .mp4 or .webm file (https:// or a path on your app's server such as /videos/intro.mp4).";
@@ -1463,6 +1489,20 @@ export function displayBlockProblem(entry: TreeEntry): ConditionProblem | null {
  *    answer that type supports.
  */
 export function formProblems(form: { blocks: readonly Block[] }): ConditionProblem[] {
+  return collectProblems(form, true);
+}
+
+/**
+ * The save problems on one block other than its own content rule
+ * (`displayBlockProblem`) — what the editor's Logic section lists. A display
+ * block's content message is shown once, inline under the field it is about,
+ * not again here. The save itself still checks everything (`formProblems`).
+ */
+export function problemsBesideContent(form: { blocks: readonly Block[] }, blockId: string): ConditionProblem[] {
+  return collectProblems(form, false).filter((p) => p.blockId === blockId);
+}
+
+function collectProblems(form: { blocks: readonly Block[] }, withContent: boolean): ConditionProblem[] {
   const entries = walkBlocks(form.blocks);
   const problems: ConditionProblem[] = [];
   const add = (entry: TreeEntry, detail: string) =>
@@ -1489,7 +1529,7 @@ export function formProblems(form: { blocks: readonly Block[] }): ConditionProbl
     if (paged && entry.depth === 0 && !isPage(block)) {
       add(entry, "this form has pages, so every block must be inside a page.");
     }
-    const display = displayBlockProblem(entry);
+    const display = withContent ? displayBlockProblem(entry) : null;
     if (display) problems.push(display);
   }
 

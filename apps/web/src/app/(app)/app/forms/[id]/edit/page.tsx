@@ -82,7 +82,6 @@ import {
   draftModeAvailable,
   draftsWithoutDefault,
   findBlock,
-  formProblems,
   insertBlockIntoTree,
   insertPageAfter,
   isAnswerable,
@@ -101,6 +100,7 @@ import {
   newGroup,
   newPage,
   pageContentsDestination,
+  problemsBesideContent,
   removePaging,
   NUMERIC_SOURCE_TYPES,
   OPTION_SOURCE_TYPES,
@@ -134,6 +134,8 @@ import {
   type FlatItem,
   type MoveTarget,
 } from "@/lib/tree-dnd";
+import { audioPreviewText } from "@/lib/audio-preview";
+import { inspectorHeading, logicNoun } from "@/lib/inspector";
 import { videoPreviewText } from "@/lib/video-preview";
 import {
   ApiError,
@@ -436,7 +438,15 @@ function BlockPreview({ block }: { block: Block }) {
         <span className="min-w-0 truncate">{videoPreviewText(block.content)}</span>
       </div>
     );
-  if (block.type === "audio" || block.type === "embed")
+  if (block.type === "audio")
+    // Names the file the renderer will play (contract §11); nothing is loaded.
+    return (
+      <div className={`${box} flex items-center gap-2`}>
+        <AudioLines className="h-4 w-4 flex-none" />
+        <span className="min-w-0 truncate">{audioPreviewText(block.content)}</span>
+      </div>
+    );
+  if (block.type === "embed")
     return (
       <div className={`${box} flex items-center gap-2`}>
         {BLOCK_META[block.type].label} · {block.content || "paste a URL"}
@@ -1455,11 +1465,10 @@ function ConditionsPanel({
   // Only questions before it in reading order can be used, which also rules out cycles.
   const sources = entries.filter((e) => e.order < at && sourceOperators(e.block));
   const numbers = questionNumbers(blocks);
-  const noun = isPage(block) ? "page" : isGroup(block) ? "group" : "question";
+  const noun = logicNoun(block);
   const conditions = block.enableWhen ?? [];
-  const problems = formProblems({ blocks })
-    .filter((p) => p.blockId === block.id)
-    .map((p) => p.detail);
+  // A display block's own content message is shown once, under its field, not here.
+  const problems = problemsBesideContent({ blocks }, block.id).map((p) => p.detail);
 
   // Consecutive sources in the same group share one <optgroup> labelled with its path.
   const runs: { path: string; entries: TreeEntry[] }[] = [];
@@ -2575,7 +2584,7 @@ export default function EditorPage() {
           {selected ? (
             <div key={selected.id}>
               <h4 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-faint">
-                {isPage(selected) ? "Page" : isGroup(selected) ? "Group" : "Question"}
+                {inspectorHeading(selected)}
               </h4>
               <label htmlFor="block-label" className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">
                 {isPage(selected) ? "Title" : "Label"}
@@ -2586,7 +2595,7 @@ export default function EditorPage() {
                 onChange={(e) =>
                   updateBlock(selected.id, isPage(selected) ? { title: e.target.value } : { label: e.target.value })
                 }
-                className={`${fieldCls} ${selected.type === "image" || selected.type === "video" ? "mb-1.5" : "mb-3"}`}
+                className={`${fieldCls} ${["image", "video", "audio"].includes(selected.type) ? "mb-1.5" : "mb-3"}`}
               />
               {selected.type === "image" && (
                 <p className="mb-3 text-xs text-muted">
@@ -2598,9 +2607,14 @@ export default function EditorPage() {
                   Read aloud to screen-reader users — describe what the video is about.
                 </p>
               )}
+              {selected.type === "audio" && (
+                <p className="mb-3 text-xs text-muted">
+                  Read aloud to screen-reader users — say what the recording is.
+                </p>
+              )}
               {/*
                 Help text only where the renderer shows it: on questions. Not on pages,
-                groups or display blocks (contract §1, §9, §10); a value already stored on one
+                groups or display blocks (contract §1, §9–§11); a value already stored on one
                 is left alone. Cleared help text is removed, never stored as "".
               */}
               {isAnswerable(selected) && (
@@ -2646,12 +2660,20 @@ export default function EditorPage() {
                         ? "https://… or a path on your app's server, e.g. /images/logo.png"
                         : selected.type === "video"
                           ? "YouTube or Vimeo link, or an .mp4 / .webm address"
-                          : "https://…"
+                          : selected.type === "audio"
+                            ? "An .mp3, .m4a, .ogg or .wav address"
+                            : "https://…"
                     }
-                    aria-invalid={(selected.type === "image" || selected.type === "video") && !!selectedDisplayProblem}
+                    aria-invalid={selected.type !== "embed" && !!selectedDisplayProblem}
                     className={`${fieldCls} font-mono text-xs`}
                   />
-                  {(selected.type === "image" || selected.type === "video") && selectedDisplayProblem && (
+                  {/* Audio-only content needs a text alternative (contract §11, WCAG 1.2.1). */}
+                  {selected.type === "audio" && (
+                    <p className="mt-1.5 text-xs text-muted">
+                      Add a transcript in a Text block next to it so everyone can follow.
+                    </p>
+                  )}
+                  {selected.type !== "embed" && selectedDisplayProblem && (
                     <p role="alert" className="mt-1.5 text-xs text-red">
                       {selectedDisplayProblem}
                     </p>
