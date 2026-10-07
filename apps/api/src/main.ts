@@ -12,6 +12,8 @@ import { AppModule } from "./app.module";
 import { env } from "./config/env";
 import { AllExceptionsFilter } from "./common/all-exceptions.filter";
 import { LoggingInterceptor } from "./common/logging.interceptor";
+import { JwtService } from "@nestjs/jwt";
+import { configureBodyParsing } from "./common/body-parsing";
 
 /**
  * Allow the deployment's own host (web + admin + api share it, any port),
@@ -37,11 +39,13 @@ function corsAllowed(origin: string, reqHost: string | undefined): boolean {
 }
 
 async function bootstrap() {
-  // rawBody keeps the raw buffer available for Stripe webhook signature checks.
+  // Bodies are parsed by configureBodyParsing: the Stripe webhook's raw bytes,
+  // a larger limit for saving a form, 100 KB for everything else.
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    rawBody: true,
+    bodyParser: false,
   });
   app.disable("x-powered-by");
+  configureBodyParsing(app, app.get(JwtService));
 
   // Security headers. CSP is disabled here (the API serves JSON + uploaded
   // assets, not app HTML); crossOriginResourcePolicy stays "cross-origin" so

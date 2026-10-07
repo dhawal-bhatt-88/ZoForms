@@ -462,8 +462,8 @@ function Field({
         >
           <option value="">Choose…</option>
           {(block.options ?? []).map((o) => (
-            <option key={o} value={o}>
-              {o}
+            <option key={o.code} value={o.code}>
+              {o.label}
             </option>
           ))}
         </select>
@@ -471,18 +471,18 @@ function Field({
         <div className="flex flex-col gap-2">
           {(block.options ?? []).map((o) => (
             <label
-              key={o}
+              key={o.code}
               className="flex cursor-pointer items-center gap-3 border border-line-2 px-3.5 py-2.5 text-[15px] transition-colors hover:border-line"
-              style={optStyle(value === o)}
+              style={optStyle(value === o.code)}
             >
               <input
                 type="radio"
                 name={block.id}
-                checked={value === o}
-                onChange={() => onChange(o)}
+                checked={value === o.code}
+                onChange={() => onChange(o.code)}
                 style={{ accentColor: accent }}
               />
-              {o}
+              {o.label}
             </label>
           ))}
         </div>
@@ -490,20 +490,20 @@ function Field({
         <div className="flex flex-col gap-2">
           {(block.options ?? []).map((o) => {
             const arr = Array.isArray(value) ? (value as string[]) : [];
-            const on = arr.includes(o);
+            const on = arr.includes(o.code);
             return (
               <label
-                key={o}
+                key={o.code}
                 className="flex cursor-pointer items-center gap-3 border border-line-2 px-3.5 py-2.5 text-[15px] transition-colors hover:border-line"
                 style={optStyle(on)}
               >
                 <input
                   type="checkbox"
                   checked={on}
-                  onChange={() => onChange(on ? arr.filter((x) => x !== o) : [...arr, o])}
+                  onChange={() => onChange(on ? arr.filter((x) => x !== o.code) : [...arr, o.code])}
                   style={{ accentColor: accent }}
                 />
-                {o}
+                {o.label}
               </label>
             );
           })}
@@ -529,13 +529,13 @@ function Field({
         <div className="flex flex-col gap-2">
           {(block.options ?? []).map((o) => {
             const arr = Array.isArray(value) ? (value as string[]) : [];
-            const rank = arr.indexOf(o);
+            const rank = arr.indexOf(o.code);
             return (
               <button
-                key={o}
+                key={o.code}
                 type="button"
                 onClick={() =>
-                  onChange(rank >= 0 ? arr.filter((x) => x !== o) : [...arr, o])
+                  onChange(rank >= 0 ? arr.filter((x) => x !== o.code) : [...arr, o.code])
                 }
                 className="flex items-center gap-3 border border-line-2 px-3.5 py-2.5 text-left text-[15px] transition-colors hover:border-line"
                 style={optStyle(rank >= 0)}
@@ -550,7 +550,7 @@ function Field({
                 >
                   {rank >= 0 ? rank + 1 : ""}
                 </span>
-                {o}
+                {o.label}
               </button>
             );
           })}
@@ -562,8 +562,8 @@ function Field({
               <tr>
                 <th />
                 {(block.columns ?? []).map((c) => (
-                  <th key={c} className="px-2 pb-2 text-center font-medium" style={{ color: mutedText }}>
-                    {c}
+                  <th key={c.code} className="px-2 pb-2 text-center font-medium" style={{ color: mutedText }}>
+                    {c.label}
                   </th>
                 ))}
               </tr>
@@ -572,15 +572,15 @@ function Field({
               {(block.options ?? []).map((r) => {
                 const map = (value as Record<string, string>) || {};
                 return (
-                  <tr key={r} style={{ borderTop: `1px solid ${border}` }}>
-                    <td className="py-2 pr-2 font-medium">{r}</td>
+                  <tr key={r.code} style={{ borderTop: `1px solid ${border}` }}>
+                    <td className="py-2 pr-2 font-medium">{r.label}</td>
                     {(block.columns ?? []).map((c) => (
-                      <td key={c} className="py-2 text-center">
+                      <td key={c.code} className="py-2 text-center">
                         <input
                           type="radio"
-                          name={`${block.id}_${r}`}
-                          checked={map[r] === c}
-                          onChange={() => onChange({ ...map, [r]: c })}
+                          name={`${block.id}_${r.code}`}
+                          checked={map[r.code] === c.code}
+                          onChange={() => onChange({ ...map, [r.code]: c.code })}
                           style={{ accentColor: accent }}
                         />
                       </td>

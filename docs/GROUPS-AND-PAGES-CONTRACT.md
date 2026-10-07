@@ -1,6 +1,6 @@
 # Groups and Pages — Schema Contract
 
-Status: agreed 25 Sep 2026; amended 5 Oct 2026 for repeating groups (§12, with matching changes in §1–§8). Shared by the builder repo and the `@yourco/forms` renderer repo.
+Status: agreed 25 Sep 2026; amended 5 Oct 2026 for repeating groups (§12, with matching changes in §1–§8); amended 6 Oct 2026 for coded options and option import (§13). Shared by the builder repo and the `@yourco/forms` renderer repo.
 Both implementations must follow this file exactly. Change it here first, then in both repos.
 
 ## 1. Shapes
@@ -288,3 +288,122 @@ Question values keep the existing `BlockValue` wire format (`{ state, value }`);
   - refuse turning **on** "Repeats" when a condition outside the group uses a source inside it;
   - refuse a move (into, out of, or between repeating groups) that would break the prefix rule.
   Turning "Repeats" **off** never breaks a condition and is always allowed.
+
+## 13. Coded options and option import
+
+Agreed 6 Oct 2026. Every option has a stable **code** and a display **label**. Answers, conditions and stored data use the code; respondents see the label. Modelled on FHIR's coded answer options (code + display).
+
+### 13.1 Shape
+
+```ts
+type Option = { code: string; label: string };
+```
+
+- Applies to `options` on `choice`, `checkbox`, `multiselect`, `dropdown` and `ranking`, and to `matrix` `options` (its rows) and `columns`. It replaces the plain-string lists.
+- `country`, `scale` and `rating` are unchanged.
+- In an exported schema every option has a non-blank `code` and `label`. Codes are filled in by the builder (§13.3); the renderer never generates them.
+
+### 13.2 Rules
+
+- **Code:** trimmed first; a whitespace-only code counts as empty and is generated (§13.3). It then matches `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$` — letters, digits, `.`, `-`, `_`; starts with a letter or digit; at most 64 characters. This fits clinical codes such as `F32.1`, `LA6568-5` and `44054006`. Restricting codes to this set protects every system codes travel into (client databases, logs, CSV exports).
+- **Label:** any text, trimmed, not blank. Always displayed as **plain text, never HTML**, in both the builder and the renderer (the same rule as `text` blocks, §9). `<script>` in a label simply shows as those characters.
+- **Uniqueness, within one list:** no two codes may be equal ignoring case, and no two labels may be equal ignoring case and surrounding whitespace. Matrix rows and matrix columns are separate lists. The same code in two different blocks is fine. Codes are stored as written.
+
+### 13.3 Generating codes (builder only)
+
+A code is generated for an option whose code is **empty**:
+
+- in the editor, when the author leaves the option's label field **after changing it** (tabbing past an untouched placeholder such as "Option 3" generates nothing; leaving an empty code field generates nothing);
+- in the editor, when an option whose code is empty is chosen as a condition answer (so the condition has a code to store);
+- in the editor, when the author leaves a code field empty **and a condition uses that option**: the code is regenerated from the label straight away and the conditions follow it (§13.8), so a condition never points at a code that no longer exists;
+- when imported rows are previewed (§13.9), so the preview shows real codes;
+- at save, for any code still empty (e.g. a form created through the API).
+
+**New options start with an empty code** — both the placeholder options a new block is created with ("Option 1", "Column 1", …) and options added with "Add option" — so the code is made from the label the author actually types, not from the placeholder. Options created from real labels (templates, import) are filled straight away.
+
+The generated value only fills an empty field; the author can overwrite it at any time (§13.8). Every path uses one shared function in `packages/form-schema`, applying these steps:
+
+1. Take the label; normalise it (Unicode NFKD) and remove accents (`Sí` → `Si`).
+2. Lower-case it.
+3. Replace each run of whitespace with `_`.
+4. Remove every character other than `a–z`, `0–9`, `.`, `-`, `_`; collapse repeated `_`.
+5. Remove leading and trailing `.`, `-`, `_`; cut to 64 characters (then trim trailing `.`, `-`, `_` again).
+6. If nothing is left, use `option_{n}`, where `n` is the option's 1-based position in the list.
+7. If the result equals an existing code in the list (ignoring case), append `_2`, `_3`, … — the first free one — shortening the base so the whole stays within 64 characters.
+
+- Codes the author typed, and codes already saved, are reserved first; generated codes never take them.
+- **A code is generated once and never regenerated.** Editing a label later never changes its code. Only empty codes are ever filled.
+- The builder shows each option's code next to its label as soon as it exists.
+
+| Label | Generated code |
+|---|---|
+| `Not applicable` | `not_applicable` |
+| `Married, separated` | `married_separated` |
+| `Sí` | `si` |
+| `F32.1 Major depressive disorder` | `f32.1_major_depressive_disorder` |
+| `--Yes--` | `yes` |
+| `<script>alert(1)</script>` | `scriptalert1script` |
+| `焦虑` (3rd option) | `option_3` |
+| `Other!` when `other` is already a code | `other_2` |
+
+### 13.4 Answers and conditions
+
+- The answer value is the **code**: a string for `choice` and `dropdown`; an array of codes for `checkbox`, `multiselect` and `ranking`; `Record<rowCode, columnCode>` for `matrix`.
+- `enableWhen.answer` holds the source option's **code**. The builder's condition editor shows labels and stores codes.
+- Option membership (validation, conditions) compares codes exactly as stored.
+- The browser's payload carries **codes only**.
+- The review page, error messages and the builder show labels.
+
+### 13.5 `prepareSubmission` returns labels
+
+`prepareSubmission` (server side) returns each coded answer with its label **looked up from the schema it was given**, never from the request:
+
+| Type | `value` in the returned answers |
+|---|---|
+| `choice`, `dropdown` | `{ code, label }` |
+| `checkbox`, `multiselect`, `ranking` | `[{ code, label }, …]`, in the submitted order |
+| `matrix` | `[{ row: { code, label }, column: { code, label } }, …]`, answered rows only, in row order |
+
+- `state` and every other answer type are unchanged. Inside repeating groups (§12.4) the same applies per instance.
+- A submitted value that is not a code of the list (including an object with a `label`) is rejected with the existing membership messages (vague by design, since the UI cannot produce it).
+
+### 13.6 Integrity checks
+
+The builder refuses these at save (400 naming the block); the renderer throws at mount:
+
+- a missing or empty option list (for `matrix`, both rows and columns must be non-empty);
+- an option that is not `{ code, label }`, or has a blank code or label;
+- a code outside the allowed characters (§13.2);
+- duplicate codes, or duplicate labels, within one list (§13.2);
+- a condition `answer` that is not a string exactly equal to a code of its source's list (a number such as `44054006` does not match the code `"44054006"`);
+- a condition on a coded source using an operator other than `exists`, `=` and `!=` (single-choice types) or `exists` and `contains` (`checkbox`, `multiselect`, `ranking`). Ordering operators (`>`, `<`, `>=`, `<=`) have no meaning on codes.
+
+### 13.7 Rendering (renderer only)
+
+- Labels are rendered as text nodes only. Input `value` attributes carry codes.
+- If codes are used inside element ids, any CSS selector built from them is escaped (`CSS.escape`), since codes may contain `.`.
+- Both repos test that a label such as `<img src=x onerror=alert(1)>` appears as literal text everywhere it is shown (builder canvas and inspector; renderer form, review page and error summary).
+
+### 13.8 Builder editing
+
+- The option editor shows each option's **code first, then its label**, the same order as import files (§13.9). Tab order follows the visual order.
+- Labels can always be edited; their codes stay.
+- **Codes can always be edited** (checked against §13.2 inline and at save). When a code changes, every condition in the form whose `answer` uses the old code is updated to the new one automatically, and the editor says how many were updated.
+- A standing note under the code fields reads: "Changing a code after the form is in use will not match answers already stored under the old code." (The builder does not know whether a form has been downloaded.)
+- **Removing** an option whose code a condition uses is still refused, naming the dependents with jump links.
+
+### 13.9 Import from a file (builder only)
+
+- Offered on every list in §13.1; for `matrix`, rows and columns are imported separately.
+- Accepts `.csv` and `.txt`. **The file is read in the browser and never uploaded.** UTF-8; a leading byte-order mark (added by Excel's "CSV UTF-8") is ignored.
+- **`.txt`:** each non-blank line is one label.
+- **`.csv`:** parsed per RFC 4180 (quoted values may contain commas and quotes).
+  - One column: the label.
+  - Two columns: code, then label. An empty code is generated in the preview (§13.3).
+  - More than two columns: the file is refused with a message.
+  - A first row that is exactly `label` or `code,label` (ignoring case and spaces) is a header and skipped.
+  - Blank rows are ignored.
+- **No size limit.**
+- **Preview before applying:** every row is shown with its code (as given, or generated per §13.3 — for **Add**, the existing codes are reserved first) and label, and flagged if it has a missing label, an invalid code, or a duplicate code or label — within the file, and, for **Add**, against the existing options. **Apply is disabled while any row is flagged**; the author fixes the file and chooses it again. Nothing is skipped silently.
+- **Add to existing** appends the rows in file order. **Replace all** replaces the list and is refused if it would remove a code used in a condition, naming the dependents. An option whose code appears in the new file keeps its conditions.
+- Import changes the editor only; nothing is stored until the author saves.

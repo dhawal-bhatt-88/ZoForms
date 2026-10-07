@@ -70,6 +70,8 @@ import {
 } from "lucide-react";
 import {
   allBlockIds,
+  answerCode,
+  applyImport,
   BLOCK_META,
   blockName,
   conditionAnswerOptions,
@@ -81,6 +83,9 @@ import {
   displayBlockProblem,
   draftModeAvailable,
   draftsWithoutDefault,
+  CODE_PATTERN,
+  COMPLETE_REQUIRED_LABELS,
+  fillCodeAt,
   findBlock,
   insertBlockIntoTree,
   insertPageAfter,
@@ -106,8 +111,13 @@ import {
   NUMERIC_SOURCE_TYPES,
   OPTION_SOURCE_TYPES,
   OPTION_TYPES,
+  optionListProblems,
+  parseOptionFile,
+  placeholderOptions,
   questionNumbers,
   removeBlockFromTree,
+  renameOptionCode,
+  replaceBlockers,
   REPEAT_DEFAULTS,
   repeatsOnBlockers,
   repeatSettingsProblems,
@@ -124,7 +134,12 @@ import {
   type ConditionOperator,
   type ContainerBlock,
   type DraftMode,
-  type FormSchema,
+  FormSchema,
+  type ImportMode,
+  type ImportPreviewRow,
+  type Option,
+  type ParsedImport,
+  type OptionListName,
   type GroupBlock,
   type Navigation,
   type PageBlock,
@@ -142,6 +157,8 @@ import {
 import { audioPreviewText } from "@/lib/audio-preview";
 import { inspectorHeading, logicNoun } from "@/lib/inspector";
 import { parseCount, repeatBadgeText, repeatPreviewText } from "@/lib/repeat-settings";
+import { OptionImportDialog } from "@/components/option-import-dialog";
+import { OptionListEditor } from "@/components/option-list-editor";
 import { videoPreviewText } from "@/lib/video-preview";
 import {
   ApiError,
@@ -225,7 +242,7 @@ const CATALOG: { group: string; items: CatalogItem[] }[] = [
       { type: "date" },
       { type: "time" },
       { type: "scale", keywords: "linear nps" },
-      { type: "matrix", keywords: "grid table", soon: true },
+      { type: "matrix", keywords: "grid table" },
       { type: "rating", keywords: "stars" },
       { type: "ranking", keywords: "order rank" },
     ],
@@ -532,13 +549,13 @@ function BlockPreview({ block }: { block: Block }) {
           <div className="flex-[1.2] p-1.5" />
           {cols.map((c, i) => (
             <div key={i} className="flex-1 p-1.5 text-center font-medium text-muted">
-              {c}
+              {c.label}
             </div>
           ))}
         </div>
         {rows.map((r, ri) => (
           <div key={ri} className="flex border-t border-line">
-            <div className="flex-[1.2] p-1.5 text-ink-2">{r}</div>
+            <div className="flex-[1.2] p-1.5 text-ink-2">{r.label}</div>
             {cols.map((_, ci) => (
               <div key={ci} className="flex-1 p-1.5 text-center">
                 <span className="inline-block h-3.5 w-3.5 rounded-full border border-line-2" />
@@ -554,7 +571,7 @@ function BlockPreview({ block }: { block: Block }) {
     if (block.type === "dropdown")
       return (
         <div className={`${box} flex items-center justify-between`}>
-          <span>{opts[0] ?? "Choose…"}</span>
+          <span>{opts[0]?.label ?? "Choose…"}</span>
           <ChevronDown className="h-4 w-4" />
         </div>
       );
@@ -566,7 +583,7 @@ function BlockPreview({ block }: { block: Block }) {
               <span className="grid h-5 w-5 place-items-center rounded-md bg-surface-3 text-xs font-semibold text-muted">
                 {i + 1}
               </span>
-              {o}
+              {o.label}
             </div>
           ))}
         </div>
@@ -577,7 +594,7 @@ function BlockPreview({ block }: { block: Block }) {
         {opts.map((o, i) => (
           <div key={i} className="flex items-center gap-2.5 text-sm text-ink/80">
             <span className={`h-4 w-4 border border-line-2 ${square ? "rounded" : "rounded-full"}`} />
-            {o}
+            {o.label}
           </div>
         ))}
       </div>
@@ -923,7 +940,8 @@ function CanvasCard({
         <span className={`min-w-0 truncate font-semibold ${group && !group.label.trim() ? "italic text-faint" : ""}`}>
           {group && !group.label.trim() ? "Unlabelled group" : blockName(block)}
         </span>
-        {block.required && <span className="text-red">*</span>}
+        {/* "Answer every row" / "Rank every option" make the question required too (the renderer's rule). */}
+        {(block.required || block.completeRequired) && <span className="text-red">*</span>}
         {group && isRepeatingGroup(group) && (
           <span
             data-repeat-badge
@@ -1037,10 +1055,11 @@ function DragGhost({ block }: { block: Block }) {
   );
 }
 
-/** "<question> <condition> <answer>", as the author would say it. */
+/** "<question> <condition> <answer>", as the author would say it: an option's label, not its code (contract §13.4). */
 function conditionPhrase(c: Condition, blocks: readonly Block[]): string {
   const source = findBlock(blocks, c.question)?.block;
-  const answer = c.operator === "exists" ? "" : ` ${c.answer}`;
+  const label = source ? conditionAnswerOptions(source)?.find((o) => o.code === c.answer)?.label : undefined;
+  const answer = c.operator === "exists" ? "" : ` ${label ?? c.answer}`;
   return `${source ? blockName(source) : "a missing question"} ${OPERATOR_TEXT[c.operator]}${answer}`;
 }
 
@@ -1380,16 +1399,25 @@ const OPERATOR_TEXT: Record<ConditionOperator, string> = {
 /** A starting answer that satisfies the rules for `source`. */
 function defaultAnswer(source: Block): string | number {
   const answers = conditionAnswerOptions(source);
-  if (answers) return answers[0] ?? "";
+  if (answers) return answers[0]?.code ?? "";
   if (NUMERIC_SOURCE_TYPES.includes(source.type)) return source.type === "scale" ? (source.min ?? 1) : 1;
   return "";
 }
 
-/** `c` pointed at `source` with `operator`; the answer is kept only if it still applies. */
-function retarget(c: Condition, source: Block, operator: ConditionOperator): Condition {
+/**
+ * `c` pointed at `source` with `operator`; the answer is kept only if it still
+ * applies. `firstAnswer` gives a coded source's starting answer, which may need
+ * its code generated first (contract §13.3).
+ */
+function retarget(
+  c: Condition,
+  source: Block,
+  operator: ConditionOperator,
+  firstAnswer: (source: Block) => string | number,
+): Condition {
   if (operator === "exists") return { question: source.id, operator };
   const keep = c.question === source.id && c.answer !== undefined;
-  return { question: source.id, operator, answer: keep ? c.answer : defaultAnswer(source) };
+  return { question: source.id, operator, answer: keep ? c.answer : firstAnswer(source) };
 }
 
 const logicField =
@@ -1422,25 +1450,37 @@ function NumberAnswer({ value, onChange }: { value?: number; onChange: (n: numbe
   );
 }
 
-/** Answer input matched to the source: a fixed list (options or countries), a number, or free text. */
+/**
+ * Answer input matched to the source: a fixed list (options or countries), a
+ * number, or free text. A list shows labels and stores codes (contract §13.4);
+ * `pick` gives the code for the chosen entry, generating it if it is empty.
+ */
 function AnswerInput({
   source,
   value,
   onChange,
+  pick,
 }: {
   source: Block;
   value: Condition["answer"];
   onChange: (v: string | number) => void;
+  pick: (source: Block, index: number) => string;
 }) {
   const options = conditionAnswerOptions(source);
   if (options) {
-    const current = typeof value === "string" ? value : "";
+    // Entries are told apart by position: an option's code may still be empty.
+    const current = typeof value === "string" && value ? options.findIndex((o) => o.code === value) : -1;
     return (
-      <select aria-label="Answer" value={current} onChange={(e) => onChange(e.target.value)} className={logicField}>
-        {!options.includes(current) && <option value={current}>{current || "Choose…"}</option>}
+      <select
+        aria-label="Answer"
+        value={current >= 0 ? String(current) : ""}
+        onChange={(e) => onChange(pick(source, Number(e.target.value)))}
+        className={logicField}
+      >
+        {current < 0 && <option value="">{typeof value === "string" && value ? value : "Choose…"}</option>}
         {options.map((o, k) => (
-          <option key={k} value={o}>
-            {o}
+          <option key={k} value={String(k)}>
+            {o.label}
           </option>
         ))}
       </select>
@@ -1470,11 +1510,18 @@ function ConditionsPanel({
   block,
   blocks,
   onChange,
+  pickAnswer,
 }: {
   block: Block;
   blocks: Block[];
   onChange: (p: Partial<Block>) => void;
+  /** The code to store for option `index` of a coded source, generated if empty (contract §13.3). */
+  pickAnswer: (sourceId: string, index: number) => string;
 }) {
+  // A coded source's entries are its options; a country source's are names, already codes.
+  const pick = (source: Block, index: number) =>
+    OPTION_SOURCE_TYPES.includes(source.type) ? pickAnswer(source.id, index) : (conditionAnswerOptions(source)?.[index]?.code ?? "");
+  const firstAnswer = (source: Block) => (conditionAnswerOptions(source) ? pick(source, 0) : defaultAnswer(source));
   const entries = walkBlocks(blocks);
   const self = entries.find((e) => e.block.id === block.id);
   const at = self?.order ?? entries.length;
@@ -1569,7 +1616,7 @@ function ConditionsPanel({
                   onChange={(e) => {
                     const next = findBlock(blocks, e.target.value)!.block;
                     const ops = sourceOperators(next) ?? [];
-                    setAt(i, retarget(c, next, ops.includes(c.operator) ? c.operator : "exists"));
+                    setAt(i, retarget(c, next, ops.includes(c.operator) ? c.operator : "exists", firstAnswer));
                   }}
                   className={logicField}
                 >
@@ -1591,7 +1638,7 @@ function ConditionsPanel({
                   aria-label="Condition"
                   value={c.operator}
                   disabled={!source}
-                  onChange={(e) => source && setAt(i, retarget(c, source, e.target.value as ConditionOperator))}
+                  onChange={(e) => source && setAt(i, retarget(c, source, e.target.value as ConditionOperator, firstAnswer))}
                   className={logicField}
                 >
                   {!operators.includes(c.operator) && (
@@ -1604,7 +1651,7 @@ function ConditionsPanel({
                   ))}
                 </select>
                 {c.operator !== "exists" && source && (
-                  <AnswerInput source={source} value={c.answer} onChange={(a) => setAt(i, { ...c, answer: a })} />
+                  <AnswerInput source={source} value={c.answer} onChange={(a) => setAt(i, { ...c, answer: a })} pick={pick} />
                 )}
               </div>
             </div>
@@ -1744,11 +1791,18 @@ export default function EditorPage() {
     setSaving(true);
     setNotice(null);
     try {
-      await saveSchema(id, sent);
-      setSaved(sent);
+      // The save fills empty option codes and trims labels (contract §13.3): adopt
+      // what was stored, unless the author edited while the request was in flight.
+      const { schema: stored } = await saveSchema(id, sent);
+      setSaved(stored);
+      setSchema((s) => (s === sent ? stored : s));
     } catch (e) {
       if (e instanceof ApiError && e.code === "NO_CHANGES") {
-        setSaved(sent); // identical to the current version: nothing to save
+        // Identical to the current version: nothing to save. Its empty codes get
+        // the codes the saved version has — the same rule, applied here.
+        const filled = FormSchema.parse(sent);
+        setSaved(filled);
+        setSchema((s) => (s === sent ? filled : s));
       } else if (e instanceof ApiError && e.code === "VERSION_CONFLICT") {
         // Keep the unsaved edits; the author decides whether to reload.
         setNotice({ text: e.message });
@@ -1882,9 +1936,11 @@ export default function EditorPage() {
 
   /*
    * Dependency guards: other blocks' conditions reference a source block by id,
-   * by reading order (sources must come first) and by option text. These edits
+   * by reading order (sources must come first) and by option code. These edits
    * would silently break those conditions, so they're refused, naming the
-   * dependents — wherever in the tree they are.
+   * dependents — wherever in the tree they are. Option lists have their own
+   * handlers below: a code change carries its conditions with it, and removing
+   * an option a condition uses is refused.
    */
   const updateBlock = (bid: string, p: Partial<Block>) => {
     const current = schema ? findBlock(schema.blocks, bid)?.block : undefined;
@@ -1899,30 +1955,186 @@ export default function EditorPage() {
           return;
         }
       }
-      if (p.options && OPTION_SOURCE_TYPES.includes(current.type)) {
-        const before = current.options ?? [];
-        const after = p.options;
-        const lost = (c: Condition) =>
-          typeof c.answer === "string" && before.includes(c.answer) && !after.includes(c.answer);
-        const deps = dependentsOf(schema.blocks, bid, lost);
-        if (deps.length) {
-          const answers = [
-            ...new Set(deps.flatMap((d) => (d.enableWhen ?? []).filter((c) => c.question === bid && lost(c)))
-              .map((c) => `"${c.answer}"`)),
-          ];
-          setNotice({
-            text: `Can't change or remove the option ${answers.join(", ")} of "${blockName(current)}" — it's the answer in conditions on:`,
-            blocks: deps,
-          });
-          return;
-        }
-      }
     }
     patch((s) => ({
       ...s,
       blocks: updateBlockInTree(s.blocks, bid, (b) => ({ ...b, ...p }) as Block),
     }));
   };
+
+  /*
+   * Coded option lists (contract §13.3, §13.8). A code typed in the editor is
+   * stored as typed, so its inline message shows; the conditions using the old
+   * code follow it when the author leaves the field with a valid, unique code.
+   * A code field left empty is regenerated from the label at once if a condition
+   * uses the option (and the conditions follow); otherwise it stays empty until
+   * the label is changed and its field left, or the save fills it. Until then
+   * `codeOrigins` remembers the code they still use, by block, list and
+   * position, so a detour through an empty, invalid or clashing code can't
+   * strand them.
+   */
+  const codeOrigins = useRef(new Map<string, string>());
+  const [codeStatus, setCodeStatus] = useState<{ blockId: string; list: OptionListName; text: string } | null>(null);
+  const originKey = (bid: string, list: OptionListName, index: number) => `${bid}|${list}|${index}`;
+  const listOf = (bid: string, list: OptionListName): Option[] => {
+    const block = schema ? findBlock(schema.blocks, bid)?.block : undefined;
+    return [...((list === "options" ? block?.options : block?.columns) ?? [])];
+  };
+  const setList = (bid: string, list: OptionListName, options: Option[]) =>
+    patch((s) => ({ ...s, blocks: updateBlockInTree(s.blocks, bid, (b) => ({ ...b, [list]: options }) as Block) }));
+  const forgetOrigins = (bid: string) => {
+    for (const key of [...codeOrigins.current.keys()]) if (key.startsWith(`${bid}|`)) codeOrigins.current.delete(key);
+  };
+  const optionHandlers = (bid: string, list: OptionListName, noun: "Option" | "Column") => {
+    /**
+     * Store option `i`'s new, non-empty code — typed, or generated on leaving the
+     * label. A valid, unique code takes the conditions with it, from the code they
+     * still use; otherwise the inline message explains and they wait for a fix.
+     */
+    const commitCode = (options: Option[], i: number) => {
+      if (!schema) return;
+      const key = originKey(bid, list, i);
+      const to = options[i].code;
+      const from = codeOrigins.current.get(key) ?? to;
+      const unique = !options.some((o, k) => k !== i && o.code.trim().toLowerCase() === to.toLowerCase());
+      if (!CODE_PATTERN.test(to) || !unique) {
+        setList(bid, list, options); // conditions keep `from`
+        return;
+      }
+      codeOrigins.current.delete(key);
+      const withList = updateBlockInTree(schema.blocks, bid, (b) => ({ ...b, [list]: options }) as Block);
+      // Only a block's options can be condition answers; a matrix is never a source.
+      const { blocks, updated } =
+        list === "options" ? renameOptionCode(withList, bid, from, to) : { blocks: withList, updated: 0 };
+      patch((s) => ({ ...s, blocks }));
+      if (updated) {
+        setCodeStatus({
+          blockId: bid,
+          list,
+          text: `${updated} ${updated === 1 ? "condition" : "conditions"} updated to use "${to}".`,
+        });
+      }
+    };
+    return {
+      onLabel: (i: number, label: string) => {
+        const options = listOf(bid, list);
+        options[i] = { ...options[i], label };
+        setList(bid, list, options);
+      },
+      // Leaving the label field after changing it fills an empty code from it (the row
+      // calls this only then); an existing code never changes.
+      onLabelLeave: (i: number) => {
+        const options = listOf(bid, list);
+        if (options[i] && !options[i].code.trim()) commitCode(fillCodeAt(options, i), i);
+      },
+      onCodeFocus: (i: number) => {
+        const key = originKey(bid, list, i);
+        if (!codeOrigins.current.has(key)) codeOrigins.current.set(key, listOf(bid, list)[i]?.code.trim() ?? "");
+      },
+      onCode: (i: number, code: string) => {
+        const options = listOf(bid, list);
+        options[i] = { ...options[i], code };
+        setList(bid, list, options);
+      },
+      onCodeLeave: (i: number) => {
+        const options = listOf(bid, list);
+        if (!options[i]) return;
+        options[i] = { ...options[i], code: options[i].code.trim() };
+        if (!options[i].code) {
+          // Left empty while a condition uses the option: regenerate it from the current
+          // label straight away, and the conditions follow, so none points at a code that
+          // no longer exists (contract §13.3). Otherwise it stays empty: the code comes from
+          // the label the author types, or from the save — never from a placeholder.
+          const inUse = codeOrigins.current.get(originKey(bid, list, i));
+          const used = list === "options" && !!inUse && !!schema && dependentsOf(schema.blocks, bid, (c) => c.answer === inUse).length > 0;
+          if (used) commitCode(fillCodeAt(options, i), i);
+          else setList(bid, list, options);
+          return;
+        }
+        commitCode(options, i);
+      },
+      // Refused while a condition uses the option's code — the one the conditions still hold.
+      onRemove: (i: number) => {
+        if (!schema) return;
+        const options = listOf(bid, list);
+        const option = options[i];
+        if (!option) return;
+        const inUse = codeOrigins.current.get(originKey(bid, list, i)) ?? option.code.trim();
+        const deps = list === "options" && inUse ? dependentsOf(schema.blocks, bid, (c) => c.answer === inUse) : [];
+        if (deps.length) {
+          setNotice({
+            text: `Can't remove "${option.label}" — these blocks have conditions that use it:`,
+            blocks: deps,
+          });
+          return;
+        }
+        forgetOrigins(bid);
+        setList(bid, list, options.filter((_, k) => k !== i));
+      },
+      onAdd: () => {
+        const options = listOf(bid, list);
+        setList(bid, list, [...options, ...placeholderOptions(noun, 1, options)]);
+      },
+    };
+  };
+
+  /*
+   * Import from a file (contract §13.9). The file is read here, in the browser,
+   * and never sent anywhere; the preview dialog shows every row before anything
+   * changes, and nothing is stored until Save.
+   */
+  const [importing, setImporting] = useState<{
+    blockId: string;
+    list: OptionListName;
+    plural: string;
+    fileName: string;
+    parsed: ParsedImport;
+    /** The list when the file was chosen; it can't change while the preview is open. */
+    existing: Option[];
+  } | null>(null);
+  async function readImportFile(bid: string, list: OptionListName, plural: string, file: File) {
+    const kind = file.name.toLowerCase().match(/\.(csv|txt)$/)?.[1] as "csv" | "txt" | undefined;
+    if (!kind) {
+      setNotice({ text: `Choose a .csv or .txt file — "${file.name}" isn't one.` });
+      return;
+    }
+    const text = await file.text(); // UTF-8; a leading byte-order mark is dropped by the parser
+    setImporting({ blockId: bid, list, plural, fileName: file.name, parsed: parseOptionFile(text, kind), existing: listOf(bid, list) });
+  }
+  function applyImportedOptions(mode: ImportMode, preview: ImportPreviewRow[]) {
+    if (!importing || !schema) return;
+    const { blockId: bid, list, plural, existing } = importing;
+    const next = applyImport(existing, preview, mode);
+    setImporting(null);
+    // Replacing a source's options can't drop a code a condition uses; codes in the file keep theirs.
+    const deps =
+      mode === "replace" && list === "options" ? replaceBlockers(schema.blocks, bid, next.map((o) => o.code)) : [];
+    if (deps.length) {
+      setNotice({
+        text: `Can't replace the ${plural} — these blocks have conditions that use a code that isn't in the file:`,
+        blocks: deps,
+      });
+      return;
+    }
+    forgetOrigins(bid);
+    setList(bid, list, next);
+    setCodeStatus({
+      blockId: bid,
+      list,
+      text:
+        mode === "add"
+          ? `Added ${preview.length} ${preview.length === 1 ? plural.replace(/s$/, "") : plural} from the file.`
+          : `Replaced the ${plural} with ${preview.length} from the file.`,
+    });
+  }
+
+  /** For the condition editor: the code of option `index` of `sourceId`, generated first if empty. */
+  function pickAnswer(sourceId: string, index: number): string {
+    if (!schema) return "";
+    const { code } = answerCode(schema.blocks, sourceId, index);
+    patch((s) => ({ ...s, blocks: answerCode(s.blocks, sourceId, index).blocks }));
+    return code;
+  }
 
   /** Delete a question or layout block. A page or group opens its two-choice dialog instead. */
   const removeBlock = (bid: string) => {
@@ -2497,6 +2709,16 @@ export default function EditorPage() {
         />
       )}
       {confirmPaging && <PagingDialog onConfirm={convertToPages} onClose={() => setConfirmPaging(false)} />}
+      {importing && (
+        <OptionImportDialog
+          fileName={importing.fileName}
+          plural={importing.plural}
+          parsed={importing.parsed}
+          existing={importing.existing}
+          onApply={applyImportedOptions}
+          onClose={() => setImporting(null)}
+        />
+      )}
 
       {notice && (
         <div
@@ -2885,74 +3107,84 @@ export default function EditorPage() {
                 </div>
               )}
 
-              {OPTION_TYPES.includes(selected.type) && (
-                <div className="mb-4">
-                  <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">
-                    {selected.type === "matrix" ? "Rows" : "Options"}
-                  </label>
-                  <div className="flex flex-col gap-2">
-                    {(selected.options ?? []).map((o, i) => (
-                      <div key={i} className="flex items-center gap-1.5">
-                        <input
-                          value={o}
-                          onChange={(e) => {
-                            const options = [...(selected.options ?? [])];
-                            options[i] = e.target.value;
-                            updateBlock(selected.id, { options });
-                          }}
-                          className="w-full rounded-lg border border-line-2 px-3 py-1.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent-weak"
-                        />
-                        <button
-                          onClick={() =>
-                            updateBlock(selected.id, {
-                              options: (selected.options ?? []).filter((_, k) => k !== i),
-                            })
-                          }
-                          className="grid h-8 w-8 flex-none place-items-center rounded-lg text-faint hover:bg-surface-3 hover:text-ink"
-                          aria-label="Remove option"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ))}
-                    <button
-                      onClick={() =>
-                        updateBlock(selected.id, {
-                          options: [
-                            ...(selected.options ?? []),
-                            `Option ${(selected.options?.length ?? 0) + 1}`,
-                          ],
-                        })
-                      }
-                      className="flex items-center gap-1.5 text-sm font-medium text-accent-2 hover:underline"
-                    >
-                      <Plus className="h-4 w-4" /> Add option
-                    </button>
-                  </div>
-                </div>
-              )}
+              {/* Coded lists (contract §13): options, or a matrix's rows and columns. */}
+              {OPTION_TYPES.includes(selected.type) &&
+                ([
+                  ["options", selected.type === "matrix" ? "Rows" : "Options", selected.type === "matrix" ? "row" : "option", "Option"],
+                  ...(selected.type === "matrix" ? [["columns", "Columns", "column", "Column"]] : []),
+                ] as [OptionListName, string, string, "Option" | "Column"][]).map(([list, heading, noun, placeholder]) => (
+                  <OptionListEditor
+                    key={list}
+                    idPrefix={list}
+                    heading={heading}
+                    noun={noun}
+                    options={(list === "options" ? selected.options : selected.columns) ?? []}
+                    problems={optionListProblems(selected).filter((p) => p.list === list)}
+                    status={codeStatus?.blockId === selected.id && codeStatus.list === list ? codeStatus.text : null}
+                    {...optionHandlers(selected.id, list, placeholder)}
+                    onImportFile={(file) => readImportFile(selected.id, list, heading.toLowerCase(), file)}
+                  />
+                ))}
 
-              {/* Only questions can be required: not presentational blocks or groups. */}
-              {isAnswerable(selected) && (
-                <div className="flex items-center justify-between border-t border-line py-3 text-[13.5px]">
-                  <span>Required</span>
-                  <button
-                    role="switch"
-                    aria-checked={selected.required}
-                    onClick={() => updateBlock(selected.id, { required: !selected.required })}
-                    className={`relative h-5 w-9 rounded-full transition-colors ${selected.required ? "bg-accent" : "bg-line-2"}`}
-                  >
-                    <span
-                      className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-soft transition-transform ${selected.required ? "translate-x-[18px]" : "translate-x-0.5"}`}
-                    />
-                  </button>
-                </div>
-              )}
+              {/*
+                Only questions can be required: not presentational blocks or groups.
+                A matrix or ranking can also require a complete answer (completeRequired).
+                The renderer then requires an answer whatever Required says, so Required
+                shows as on, and can't be turned off, while it is set.
+              */}
+              {isAnswerable(selected) && (() => {
+                const completeLabel = COMPLETE_REQUIRED_LABELS[selected.type as keyof typeof COMPLETE_REQUIRED_LABELS];
+                const complete = !!completeLabel && !!selected.completeRequired;
+                const required = !!selected.required || complete;
+                const knob = (on: boolean) =>
+                  `absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-soft transition-transform ${on ? "translate-x-[18px]" : "translate-x-0.5"}`;
+                return (
+                  <>
+                    <div className="flex items-center justify-between border-t border-line py-3 text-[13.5px]">
+                      <span id="required-label">Required</span>
+                      <button
+                        role="switch"
+                        aria-checked={required}
+                        aria-labelledby="required-label"
+                        aria-describedby={complete ? "complete-help" : undefined}
+                        disabled={complete}
+                        onClick={() => updateBlock(selected.id, { required: !selected.required })}
+                        className={`relative h-5 w-9 rounded-full transition-colors disabled:opacity-60 ${required ? "bg-accent" : "bg-line-2"}`}
+                      >
+                        <span className={knob(required)} />
+                      </button>
+                    </div>
+                    {completeLabel && (
+                      <div className="border-t border-line py-3 text-[13.5px]">
+                        <div className="flex items-center justify-between">
+                          <span id="complete-label">{completeLabel}</span>
+                          <button
+                            role="switch"
+                            aria-checked={complete}
+                            aria-labelledby="complete-label"
+                            aria-describedby="complete-help"
+                            onClick={() => updateBlock(selected.id, { completeRequired: complete ? undefined : true })}
+                            className={`relative h-5 w-9 rounded-full transition-colors ${complete ? "bg-accent" : "bg-line-2"}`}
+                          >
+                            <span className={knob(complete)} />
+                          </button>
+                        </div>
+                        <p id="complete-help" className="mt-1 text-xs text-muted">
+                          {selected.type === "matrix"
+                            ? "Respondents must answer every row. This also makes the question required."
+                            : "Respondents must rank every option. This also makes the question required."}
+                        </p>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
 
               <ConditionsPanel
                 block={selected}
                 blocks={schema.blocks}
                 onChange={(p) => updateBlock(selected.id, p)}
+                pickAnswer={pickAnswer}
               />
               <PositionPanel
                 blocks={schema.blocks}

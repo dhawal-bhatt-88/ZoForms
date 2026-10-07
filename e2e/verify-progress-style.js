@@ -1,6 +1,6 @@
 // progressStyle: the Navigation settings UI, then Save + Download with "Bar and text".
 const fs = require("fs");
-const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact } = require("./_setup");
+const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, opts } = require("./_setup");
 const prisma = new PrismaClient();
 
 const results = [];
@@ -16,12 +16,12 @@ async function waitFor(url) {
 
 const leaf = (id, label, type = "short", extra = {}) => ({ id, type, label, required: false, ...extra });
 const page = (id, title, blocks, extra = {}) => ({ id, type: "page", title, blocks, ...extra });
-const YN = { options: ["Yes", "No"] };
+const YN = { options: opts("Yes", "No") };
 const PAGED = {
   title: "Progress style",
   blocks: [
     page("p1", "About you", [leaf("name", "Full name", "short", { required: true }), leaf("meds", "Do you take any regular medication?", "choice", { ...YN, required: true })]),
-    page("p2", "Medication", [leaf("drug", "Medication name")], { enableWhen: [{ question: "meds", operator: "=", answer: "Yes" }] }),
+    page("p2", "Medication", [leaf("drug", "Medication name")], { enableWhen: [{ question: "meds", operator: "=", answer: "yes" }] }),
     page("p3", "Lifestyle", [leaf("smoke", "Do you smoke?", "choice", YN)]),
   ],
 };

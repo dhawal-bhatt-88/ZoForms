@@ -395,7 +395,7 @@ function MiniField({ block, accent }: { block: Block; accent: string }) {
     case "multiselect":
       return (
         <div className="space-y-1.5">
-          {(block.options ?? ["Option", "Option"]).slice(0, 2).map((o, i) => (
+          {(block.options ?? [{ code: "a", label: "Option" }, { code: "b", label: "Option" }]).slice(0, 2).map((o, i) => (
             <div key={i} className="flex items-center gap-1.5">
               <span className="h-3 w-3 flex-none rounded-[4px] border border-line-2" />
               <span className="h-2 rounded-full bg-line" style={{ width: `${45 + i * 20}%` }} />
@@ -547,7 +547,7 @@ function PreviewField({ block, accent }: { block: Block; accent: string }) {
                 className="h-4 w-4 flex-none border border-line-2"
                 style={{ borderRadius: block.type === "choice" ? "9999px" : "4px" }}
               />
-              {o}
+              {o.label}
             </div>
           ))}
         </div>
@@ -555,7 +555,7 @@ function PreviewField({ block, accent }: { block: Block; accent: string }) {
     case "dropdown":
       return (
         <div className={`${base} flex items-center justify-between`}>
-          {block.options?.[0] ?? "Select…"}
+          {block.options?.[0]?.label ?? "Select…"}
           <ChevronDown className="h-4 w-4" />
         </div>
       );

@@ -14,6 +14,7 @@ import {
   type PageBlock,
   type VideoSource,
 } from "./index";
+import { opts } from "./test-utils/options";
 
 // docs/GROUPS-AND-PAGES-CONTRACT.md §10: the `video` display block.
 
@@ -144,7 +145,7 @@ describe("parseVideoSource — the contract's other rules", () => {
 
 const video = (id: string, content: string | undefined, label = id.toUpperCase(), extra: object = {}): Block =>
   ({ id, type: "video", label, required: false, ...(content === undefined ? {} : { content }), ...extra }) as Block;
-const choice = (id: string): Block => ({ id, type: "choice", label: id.toUpperCase(), required: false, options: ["Yes", "No"] }) as Block;
+const choice = (id: string): Block => ({ id, type: "choice", label: id.toUpperCase(), required: false, options: opts("Yes", "No") }) as Block;
 const page = (id: string, blocks: Block[]): PageBlock => ({ id, type: "page", title: id.toUpperCase(), blocks }) as unknown as PageBlock;
 const group = (id: string, blocks: Block[]): Block => ({ id, type: "group", label: id.toUpperCase(), blocks }) as Block;
 const messages = (...blocks: Block[]) => formProblems({ blocks }).map((p) => p.message);
@@ -197,7 +198,7 @@ describe("video is presentational (§10, §3.3, §4)", () => {
   });
 
   it("may carry its own condition", () => {
-    const v = video("v", "https://youtu.be/dQw4w9WgXcQ", "Intro", { enableWhen: [{ question: "q", operator: "=", answer: "Yes" }] });
+    const v = video("v", "https://youtu.be/dQw4w9WgXcQ", "Intro", { enableWhen: [{ question: "q", operator: "=", answer: "yes" }] });
     expect(messages(choice("q"), v)).toEqual([]);
   });
 });

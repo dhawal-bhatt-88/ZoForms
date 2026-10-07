@@ -61,7 +61,10 @@ function describeSchemaError(
   if (consumed === 0) {
     return `Invalid form schema${issue.path.length ? ` (${issue.path.join(".")})` : ""}: ${issue.message}`;
   }
-  const rest = issue.path.slice(consumed);
+  // A matrix's `options` are its rows (contract §13.1); name them as the author sees them.
+  const rest = issue.path.slice(consumed).map((step, k) =>
+    k === 0 && step === "options" && chain[chain.length - 1]?.type === "matrix" ? "rows" : step,
+  );
   const where = rest.length ? ` (${rest.join(".")})` : "";
   return `${describeBlockPath(chain, indices)}${where}: ${issue.message}`;
 }
@@ -229,7 +232,9 @@ export class FormsService {
     if (draftsIssue) throw new BadRequestException(draftsIssue);
     const form = await this.get(user, id);
     const created = await this.appendVersion(form, parsed.data);
-    return { ok: true, versionId: created.id, version: created.version };
+    // The content as stored: empty option codes are filled and labels trimmed by the
+    // parse (contract §13.3), so the editor adopts these rather than what it sent.
+    return { ok: true, versionId: created.id, version: created.version, schema: parsed.data };
   }
 
   /**

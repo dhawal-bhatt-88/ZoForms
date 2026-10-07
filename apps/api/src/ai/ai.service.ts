@@ -2,11 +2,22 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import Anthropic from "@anthropic-ai/sdk";
 import {
   FormSchema,
+  optionsFromLabels,
   type Block,
   type BlockType,
   type FormSchema as TFormSchema,
 } from "@formbuilder/form-schema";
 import { env } from "../config/env";
+
+/*
+ * Coded options (contract §13): the model is asked for plain option labels. Each
+ * becomes { code: "", label }, and the parse generates its code. Out of scope for
+ * the coded-options work, so only kept working — see KNOWN-ISSUES.md.
+ */
+function withCodedOptions(b: Record<string, unknown>): Record<string, unknown> {
+  if (!Array.isArray(b.options)) return b;
+  return { ...b, options: b.options.map((o) => (typeof o === "string" ? { code: "", label: o } : o)) };
+}
 
 @Injectable()
 export class AiService {
@@ -86,7 +97,7 @@ export class AiService {
     if (!raw) throw new Error("No tool output");
     const withIds = {
       ...raw,
-      blocks: (raw.blocks || []).map((b, i) => ({ id: "b_" + i, required: false, ...b })),
+      blocks: (raw.blocks || []).map((b, i) => ({ id: "b_" + i, required: false, ...withCodedOptions(b) })),
     };
     return FormSchema.parse(withIds);
   }
@@ -100,7 +111,7 @@ export class AiService {
         type,
         label,
         required,
-        ...(options ? { options } : {}),
+        ...(options ? { options: optionsFromLabels(...options) } : {}),
       } as Block);
     const has = (re: RegExp) => re.test(p);
 
@@ -247,7 +258,7 @@ export class AiService {
       | undefined;
     const raw = tool?.input;
     if (!raw) throw new Error("No tool output");
-    const blocks = (raw.blocks || []).map((b, i) => ({ id: "b_" + i, required: false, ...b }));
+    const blocks = (raw.blocks || []).map((b, i) => ({ id: "b_" + i, required: false, ...withCodedOptions(b) }));
     const schema = FormSchema.parse({
       title: raw.title || current.title,
       description: raw.description ?? current.description,
@@ -328,7 +339,7 @@ export class AiService {
     if (apiKey) {
       try {
         const digest = schema.blocks
-          .map((b, i) => `${i + 1}. [${b.type}] ${b.label}${b.options ? ` (${b.options.join(", ")})` : ""}`)
+          .map((b, i) => `${i + 1}. [${b.type}] ${b.label}${b.options ? ` (${b.options.map((o) => o.label).join(", ")})` : ""}`)
           .join("\n");
         const text = await this.claudeText(
           apiKey,
@@ -482,7 +493,7 @@ export class AiService {
     for (const b of choices.slice(0, 5)) {
       const opt = b.options![0];
       out.push({
-        when: `“${b.label}” is “${opt}”`,
+        when: `“${b.label}” is “${opt.label}”`,
         then: "show a relevant follow-up question",
         rationale: "Branch on the most common answer to ask targeted follow-ups.",
       });

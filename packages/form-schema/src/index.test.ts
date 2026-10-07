@@ -15,6 +15,7 @@ import {
   type LeafBlock as TBlock,
   type Condition,
 } from "./index";
+import { opts } from "./test-utils/options";
 
 describe("emptyForm", () => {
   it("returns a titled form with no blocks", () => {
@@ -24,8 +25,8 @@ describe("emptyForm", () => {
 });
 
 describe("newBlock", () => {
-  it("seeds options for option-type blocks", () => {
-    expect(newBlock("choice").options).toEqual(["Option 1", "Option 2", "Option 3"]);
+  it("seeds placeholder options, with empty codes, for option-type blocks", () => {
+    expect(newBlock("choice").options).toEqual(opts("Option 1", "Option 2", "Option 3").map((o) => ({ ...o, code: "" })));
   });
 
   it("seeds columns for a matrix and min/max for a scale", () => {
@@ -104,27 +105,27 @@ describe("Condition schema", () => {
     const parsed = FormSchema.parse({
       title: "t",
       blocks: [
-        q("a", "choice", { options: ["Yes", "No"] }),
+        q("a", "choice", { options: opts("Yes", "No") }),
         {
           ...q("b", "short"),
           enableBehavior: "any",
-          enableWhen: [{ answer: "Yes", operator: "=", question: "a" }],
+          enableWhen: [{ answer: "yes", operator: "=", question: "a" }],
         },
       ],
     });
     expect(JSON.stringify(parsed.blocks[1].enableWhen)).toBe(
-      '[{"question":"a","operator":"=","answer":"Yes"}]',
+      '[{"question":"a","operator":"=","answer":"yes"}]',
     );
     expect(parsed.blocks[1].enableBehavior).toBe("any");
   });
 });
 
 describe("formProblems", () => {
-  const choice = q("a", "choice", { options: ["Yes", "No"] });
+  const choice = q("a", "choice", { options: opts("Yes", "No") });
   const problems = (...blocks: TBlock[]) => formProblems({ blocks }).map((p) => p.message);
 
   it("accepts a valid condition on a question above", () => {
-    expect(problems(choice, when(q("b", "short"), { question: "a", operator: "=", answer: "Yes" }))).toEqual([]);
+    expect(problems(choice, when(q("b", "short"), { question: "a", operator: "=", answer: "yes" }))).toEqual([]);
   });
 
   it("rejects a reference to a block that isn't in the form", () => {
@@ -147,7 +148,9 @@ describe("formProblems", () => {
 
   it("rejects ineligible source types: matrix and layout blocks", () => {
     for (const type of ["matrix", "divider", "heading", "title", "label", "hidden"] as const) {
-      expect(problems(q("a", type), when(q("b", "short"), { question: "a", operator: "exists" }))[0]).toMatch(
+      // A matrix with rows and columns, so its only problem is the condition.
+      const source = type === "matrix" ? q("a", type, { options: opts("Row"), columns: opts("Column") }) : q("a", type);
+      expect(problems(source, when(q("b", "short"), { question: "a", operator: "exists" }))[0]).toMatch(
         new RegExp(`"A" is a ${type} block, which can't be used in a condition`),
       );
     }
@@ -155,7 +158,7 @@ describe("formProblems", () => {
 
   it("enforces the operator table per source type", () => {
     const cond = (type: TBlock["type"], operator: Condition["operator"], answer?: string | number) =>
-      problems(q("a", type, { options: ["x"] }), when(q("b", "short"), { question: "a", operator, answer }));
+      problems(q("a", type, { options: opts("x") }), when(q("b", "short"), { question: "a", operator, answer }));
     expect(cond("short", ">", 1)[0]).toMatch(/operator ">" can't be used with "A" \(a short question\)/);
     expect(cond("short", "contains", "x")[0]).toMatch(/operator "contains"/);
     expect(cond("number", ">=", 3)).toEqual([]);
@@ -167,9 +170,9 @@ describe("formProblems", () => {
 
   it("requires choice-type answers to be one of the source's options", () => {
     expect(problems(choice, when(q("b", "short"), { question: "a", operator: "=", answer: "Maybe" }))[0]).toMatch(
-      /answer "Maybe" isn't one of the options of "A"/,
+      /answer "Maybe" isn't the code of any option of "A"/,
     );
-    const multi = q("m", "checkbox", { options: ["Red"] });
+    const multi = q("m", "checkbox", { options: opts("Red") });
     expect(problems(multi, when(q("b", "short"), { question: "m", operator: "contains", answer: "Blue" }))[0]).toMatch(
       /answer "Blue"/,
     );
@@ -206,8 +209,8 @@ describe("formProblems", () => {
 });
 
 describe("dependency guards", () => {
-  const a = q("a", "choice", { options: ["Yes", "No"] });
-  const b = when(q("b", "short"), { question: "a", operator: "=", answer: "Yes" });
+  const a = q("a", "choice", { options: opts("Yes", "No") });
+  const b = when(q("b", "short"), { question: "a", operator: "=", answer: "yes" });
   const c = when(q("c", "short"), { question: "a", operator: "exists" });
 
   it("dependentsOf lists blocks with conditions on a source (the type-change and delete guards)", () => {
@@ -216,7 +219,7 @@ describe("dependency guards", () => {
   });
 
   it("dependentsOf can narrow to conditions whose answer an options change would break", () => {
-    const newOptions = ["Yes please", "No"]; // "Yes" renamed
+    const newOptions = ["yes_please", "no"]; // the code "yes" changed
     const broken = dependentsOf([a, b, c], "a", (x) => typeof x.answer === "string" && !newOptions.includes(x.answer));
     expect(broken.map((x) => x.id)).toEqual(["b"]);
   });

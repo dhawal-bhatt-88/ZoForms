@@ -36,6 +36,7 @@ import {
   type PageBlock,
   type PageEdit,
 } from "./index";
+import { opts } from "./test-utils/options";
 
 /* ---------- fixtures ---------- */
 
@@ -47,7 +48,7 @@ const leaf = (id: string, type: LeafBlock["type"] = "short", extra: Partial<Leaf
     ...(isPresentationalType(type) ? {} : { required: false }),
     ...extra,
   }) as LeafBlock;
-const choice = (id: string) => leaf(id, "choice", { options: ["Yes", "No"] });
+const choice = (id: string) => leaf(id, "choice", { options: opts("Yes", "No") });
 const group = (id: string, blocks: Block[], extra: Partial<GroupBlock> = {}): GroupBlock => ({
   id,
   type: "group",
@@ -78,7 +79,7 @@ const refusal = (edit: PageEdit) => {
 /** Three pages: P1 has the source; P2 is conditional on it; P3 has nested groups. */
 const threePages = (): Block[] => [
   page("p1", [leaf("name"), choice("meds")]),
-  when(page("p2", [leaf("drug")]), on("meds", "=", "Yes")),
+  when(page("p2", [leaf("drug")]), on("meds", "=", "yes")),
   page("p3", [group("g", [leaf("dose"), group("h", [leaf("freq")])]), leaf("notes")]),
 ];
 
@@ -236,7 +237,7 @@ describe("error naming: the full path, page title first", () => {
       page("p1", [choice("c")]),
       page("medication", [group("dosage", [when(leaf("how", "short", { label: "How often?" }), on("c", "=", "Maybe"))])], { title: "Medication" }),
     );
-    expect(message).toBe('Block "Medication › DOSAGE › How often?": the answer "Maybe" isn\'t one of the options of "C".');
+    expect(message).toBe('Block "Medication › DOSAGE › How often?": the answer "Maybe" isn\'t the code of any option of "C".');
   });
 
   it("names groups by path too, with and without pages", () => {

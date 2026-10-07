@@ -1,6 +1,6 @@
 // Checkpoint 1: groups through the real API and database — save, download,
 // restore, no-change detection, and every save-time rule with its message.
-const { API, PrismaClient } = require("./_setup");
+const { API, PrismaClient, opts } = require("./_setup");
 const prisma = new PrismaClient();
 
 const results = [];
@@ -14,14 +14,14 @@ const group = (id, blocks, extra = {}) => ({ id, type: "group", label: id.toUppe
 const valid = {
   title: "Groups verify",
   blocks: [
-    leaf("attend", "choice", { options: ["Yes", "No"] }),
+    leaf("attend", "choice", { options: opts("Yes", "No") }),
     group("med", [
       leaf("drug"),
       group("dose", [group("timing", [group("detail", [leaf("mg", "number", { required: true })])])]),
-    ], { enableWhen: [{ question: "attend", operator: "=", answer: "Yes" }] }),
+    ], { enableWhen: [{ question: "attend", operator: "=", answer: "yes" }] }),
     group("follow", [leaf("why")], {
       enableBehavior: "any",
-      enableWhen: [{ question: "attend", operator: "=", answer: "No" }, { question: "mg", operator: ">", answer: 5 }],
+      enableWhen: [{ question: "attend", operator: "=", answer: "no" }, { question: "mg", operator: ">", answer: 5 }],
     }),
     leaf("after", "email"),
   ],
@@ -74,7 +74,7 @@ const valid = {
     const before = await rows();
     const clone = () => JSON.parse(JSON.stringify(valid));
     const cases = [
-      ["ordering: source deep in a later group", (() => { const s = clone(); s.blocks[0] = leaf("attend", "choice", { options: ["Yes", "No"], enableWhen: [{ question: "mg", operator: "exists" }] }); return s; })(),
+      ["ordering: source deep in a later group", (() => { const s = clone(); s.blocks[0] = leaf("attend", "choice", { options: opts("Yes", "No"), enableWhen: [{ question: "mg", operator: "exists" }] }); return s; })(),
         /^Block "ATTEND": a condition depends on "MG", which comes after it\./],
       ["group depends on its own descendant", (() => { const s = clone(); s.blocks[1].enableWhen = [{ question: "mg", operator: "exists" }]; return s; })(),
         /^Group "MED": a condition depends on "MG", which is inside this group\./],
@@ -89,7 +89,7 @@ const valid = {
       ["empty group four deep", (() => { const s = clone(); s.blocks[1].blocks[1].blocks[0].blocks[0].blocks = []; return s; })(),
         /^Group "MED › DOSE › TIMING › DETAIL": a group must contain at least one block\./],
       ["existing rule inside a group: answer not an option", (() => { const s = clone(); s.blocks[1].enableWhen = [{ question: "attend", operator: "=", answer: "Maybe" }]; return s; })(),
-        /^Group "MED": the answer "Maybe" isn't one of the options of "ATTEND"\./],
+        /^Group "MED": the answer "Maybe" isn't the code of any option of "ATTEND"\./],
       ["schema error names the nested question, not the group", (() => { const s = clone(); s.blocks[1].blocks[0].label = ""; return s; })(),
         /^Block 1 inside "MED" \(label\):/],
       ["schema error deep inside, with a label", (() => { const s = clone(); s.blocks[1].blocks[1].blocks[0].blocks[0].blocks[0].options = "x"; return s; })(),

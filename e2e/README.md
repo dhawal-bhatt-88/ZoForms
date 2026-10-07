@@ -62,9 +62,11 @@ Run suites one at a time, not in parallel. They share the dev server and the dat
 | `verify-video.js` | yes | `video`: the recognised-source save rule (the editor's inline message matches the API's and is shown once), the inspector's heading, previews for YouTube, Vimeo and files with nothing loaded from either site, no Help text or Required, not a condition source, trimming, the artifact. |
 | `verify-audio.js` | yes | `audio`: the recognised-source save rule (the editor's inline message matches the API's and is shown once), the inspector's heading and hints, a preview that loads nothing, no Help text or Required, not a condition source, trimming, the artifact. |
 | `verify-repeats.js` | yes | Repeating groups: every save rule's message through the API (repeat settings, pages, the prefix rule), stripping and no-change detection; in the editor the Repeats switch, its defaults, preview, inline errors and badge, the source picker inside nested repeats, the turn-on and move guards (Move to, Move down, drag) with jump links, and the artifact. With `E2E_EXTERNAL_APP_URL` set, it also renders the download in the external test app: adds and removes entries, submits, and checks the payload. |
+| `verify-options.js` | yes | Coded options and import: every save rule through the API (codes filled at save, HTML labels kept as data); in the editor every coded type built (matrix rows and columns included), codes generated on leaving a label, a code change carrying its condition, the refused removal, imports of a `.csv` with codes, a `.txt` and files with errors (Add, Replace, a refused Replace), "Answer every row" / "Rank every option", and the artifact. With `E2E_EXTERNAL_APP_URL` set, it renders the download in the external test app, submits it, and checks the stored record holds `{ code, label }` values. |
 | `verify-groups-api.js` | no | Groups through the API: save, download, restore, no-change detection and every save rule's message. |
 | `verify-pages-api.js` | no | Pages and navigation through the API: page shape, navigation defaults in the artifact, and every page rule's message. |
 | `verify-versions.js` | no | Append-only versions and the read-only artifact endpoint, including another user's access. |
+| `verify-body-limits.js` | no | Request body limits: 100 KB on every route, 10 MB only for a signed-in author saving a form, 413 with the limit named. The two Stripe webhook checks (a correctly signed webhook accepted, a tampered one refused) run only with `E2E_STRIPE_WEBHOOK_SECRET`. |
 
 ## Settings
 
@@ -75,6 +77,7 @@ Run suites one at a time, not in parallel. They share the dev server and the dat
 | `E2E_BROWSER_CHANNEL` | `msedge` | Playwright channel; empty for its bundled Chromium. |
 | `E2E_OUTPUT_DIR` | `e2e/output` | Where screenshots and downloaded artifacts go (git-ignored). |
 | `E2E_EXTERNAL_FORMS_DIR` | not set | If set, e.g. `D:\ZoworkProjects\external-test-app\src\forms`, the artifacts the suites download are also copied there, ready to render. |
-| `E2E_EXTERNAL_APP_URL` | not set | If set, e.g. `http://localhost:5173/external-test-app/`, `verify-repeats.js` renders its download in the external test app (`?form=builder-repeats`) and submits it. Needs `E2E_EXTERNAL_FORMS_DIR` as well, and the test app running there (`npm run dev:all`). When unset, that step is skipped. |
+| `E2E_STRIPE_WEBHOOK_SECRET` | not set | If set, `verify-body-limits.js` also checks the Stripe webhook. Start the API with the same secret and a test key: `STRIPE_SECRET_KEY=sk_test_e2e STRIPE_WEBHOOK_SECRET=whsec_e2e_test pnpm --filter api dev`, then run with `E2E_STRIPE_WEBHOOK_SECRET=whsec_e2e_test`. |
+| `E2E_EXTERNAL_APP_URL` | not set | If set, e.g. `http://localhost:5173/external-test-app/`, `verify-repeats.js` and `verify-options.js` render their downloads in the external test app (`?form=builder-repeats`, `?form=builder-options`) and submit them. Needs `E2E_EXTERNAL_FORMS_DIR` as well, and the test app running there (`npm run dev:all`). When unset, that step is skipped. |
 
 Screenshots and artifacts in `e2e/output/` are overwritten on each run.

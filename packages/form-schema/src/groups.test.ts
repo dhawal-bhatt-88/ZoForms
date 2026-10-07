@@ -26,6 +26,7 @@ import {
   type GroupBlock,
   type LeafBlock,
 } from "./index";
+import { opts } from "./test-utils/options";
 
 /* ---------- fixtures ---------- */
 
@@ -38,7 +39,7 @@ const leaf = (id: string, type: LeafBlock["type"] = "short", extra: Partial<Leaf
     ...(isPresentationalType(type) ? {} : { required: false }),
     ...extra,
   }) as LeafBlock;
-const choice = (id: string) => leaf(id, "choice", { options: ["Yes", "No"] });
+const choice = (id: string) => leaf(id, "choice", { options: opts("Yes", "No") });
 const group = (id: string, blocks: Block[], extra: Partial<GroupBlock> = {}): GroupBlock => ({
   id,
   type: "group",
@@ -84,9 +85,9 @@ describe("group schema", () => {
   it("accepts conditions and 'any' on a group", () => {
     const parsed = FormSchema.parse({
       title: "t",
-      blocks: [choice("c"), when(group("g", [leaf("a")], { enableBehavior: "any" }), on("c", "=", "Yes"))],
+      blocks: [choice("c"), when(group("g", [leaf("a")], { enableBehavior: "any" }), on("c", "=", "yes"))],
     });
-    expect(parsed.blocks[1]).toMatchObject({ enableBehavior: "any", enableWhen: [{ question: "c", operator: "=", answer: "Yes" }] });
+    expect(parsed.blocks[1]).toMatchObject({ enableBehavior: "any", enableWhen: [{ question: "c", operator: "=", answer: "yes" }] });
   });
 
   it("reports a bad block inside a group at its own path, not as a generic union error", () => {
@@ -191,7 +192,7 @@ describe("questionNumbers", () => {
       leaf("a"),
       group("g", [leaf("b", "email"), leaf("div", "divider"), group("h", [leaf("ref", "hidden"), leaf("c", "number")])]),
       leaf("note", "label"),
-      leaf("d", "choice", { options: ["x"] }),
+      leaf("d", "choice", { options: opts("x") }),
     ];
     expect([...questionNumbers(blocks)]).toEqual([["a", 1], ["b", 2], ["c", 3], ["d", 4]]);
   });
@@ -213,7 +214,7 @@ describe("formProblems over the tree", () => {
     expect(
       problemsOf(
         choice("c"),
-        when(group("g", [leaf("a"), when(leaf("b"), on("a"))]), on("c", "=", "Yes")),
+        when(group("g", [leaf("a"), when(leaf("b"), on("a"))]), on("c", "=", "yes")),
         group("h", [group("i", [when(leaf("d"), on("b"))])]),
         when(leaf("e"), on("d")),
       ),
@@ -259,7 +260,7 @@ describe("formProblems over the tree", () => {
 
   it("keeps the existing condition rules for questions inside groups", () => {
     const [message] = problemsOf(group("g", [choice("c"), when(leaf("b"), on("c", "=", "Maybe"))]));
-    expect(message).toBe('Block "G › B": the answer "Maybe" isn\'t one of the options of "C".');
+    expect(message).toBe('Block "G › B": the answer "Maybe" isn\'t the code of any option of "C".');
   });
 
   it("gives each problem a detail without the block's name, for inline display", () => {
@@ -276,9 +277,9 @@ describe("formProblems over the tree", () => {
 
 describe("dependency guards over the tree", () => {
   it("finds dependents anywhere in the tree (delete, type change and option guards)", () => {
-    const blocks = [choice("c"), group("l1", [group("l2", [group("l3", [when(leaf("deep"), on("c", "=", "Yes"))])])])];
+    const blocks = [choice("c"), group("l1", [group("l2", [group("l3", [when(leaf("deep"), on("c", "=", "yes"))])])])];
     expect(dependentsOf(blocks, "c").map((b) => b.id)).toEqual(["deep"]);
-    const renamingYes = (c: Condition) => c.answer === "Yes";
+    const renamingYes = (c: Condition) => c.answer === "yes";
     expect(dependentsOf(blocks, "c", renamingYes).map((b) => b.id)).toEqual(["deep"]);
   });
 

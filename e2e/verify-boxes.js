@@ -1,6 +1,6 @@
 // Boxed groups on the editor canvas (Edge): boxes, shades, collapse, empty group,
 // drop highlight while dragging, deep nesting, narrow widths.
-const { OUT, API, WEB, PrismaClient, launchBrowser } = require("./_setup");
+const { OUT, API, WEB, PrismaClient, launchBrowser, opts } = require("./_setup");
 const prisma = new PrismaClient();
 
 const results = [];
@@ -16,7 +16,7 @@ async function waitFor(url) {
 
 const leaf = (id, label, type = "short", extra = {}) => ({ id, type, label, required: false, ...extra });
 const group = (id, label, blocks, extra = {}) => ({ id, type: "group", label, blocks, ...extra });
-const YN = { options: ["Yes", "No"] };
+const YN = { options: opts("Yes", "No") };
 const MAIN = {
   title: "Health intake",
   blocks: [
@@ -25,9 +25,9 @@ const MAIN = {
       leaf("med_name", "Medication name"),
       group("g_dose", "Dosage", [
         leaf("dose", "Dose (mg)", "number"),
-        group("g_sched", "Schedule", [leaf("freq", "How often?", "dropdown", { options: ["Once daily", "Twice daily"] }), leaf("food", "Taken with food?", "choice", YN)]),
+        group("g_sched", "Schedule", [leaf("freq", "How often?", "dropdown", { options: opts("Once daily", "Twice daily") }), leaf("food", "Taken with food?", "choice", YN)]),
       ]),
-    ], { enableWhen: [{ question: "meds", operator: "=", answer: "Yes" }] }),
+    ], { enableWhen: [{ question: "meds", operator: "=", answer: "yes" }] }),
     group("g_all", "Allergies", [leaf("allergy", "Allergy"), leaf("reaction", "Reaction")]),
     leaf("notes", "Notes"),
   ],

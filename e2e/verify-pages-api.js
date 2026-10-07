@@ -1,5 +1,5 @@
 // Phase 7, checkpoint 1: pages and navigation through the real API and database.
-const { API, PrismaClient } = require("./_setup");
+const { API, PrismaClient, opts } = require("./_setup");
 const prisma = new PrismaClient();
 
 const results = [];
@@ -9,7 +9,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const leaf = (id, type = "short", extra = {}) => ({ id, type, label: id.toUpperCase(), ...extra });
 const group = (id, blocks, extra = {}) => ({ id, type: "group", label: id.toUpperCase(), blocks, ...extra });
 const page = (id, blocks, extra = {}) => ({ id, type: "page", title: id.toUpperCase(), blocks, ...extra });
-const YN = { options: ["Yes", "No"] };
+const YN = { options: opts("Yes", "No") };
 // Postgres jsonb reorders object keys, so compare stored objects by content.
 const sameNav = (a, b) => JSON.stringify(Object.entries(a ?? {}).sort()) === JSON.stringify(Object.entries(b).sort());
 
@@ -17,10 +17,10 @@ const valid = {
   title: "Pages verify",
   blocks: [
     page("p1", [leaf("name"), leaf("meds", "choice", YN)]),
-    page("p2", [leaf("drug")], { enableWhen: [{ question: "meds", operator: "=", answer: "Yes" }] }),
+    page("p2", [leaf("drug")], { enableWhen: [{ question: "meds", operator: "=", answer: "yes" }] }),
     page("p3", [
-      group("dosage", [leaf("dose", "number"), group("sched", [leaf("freq", "dropdown", { options: ["Daily", "Weekly"], required: true })])],
-        { enableWhen: [{ question: "meds", operator: "=", answer: "Yes" }, { question: "name", operator: "exists" }], enableBehavior: "all" }),
+      group("dosage", [leaf("dose", "number"), group("sched", [leaf("freq", "dropdown", { options: opts("Daily", "Weekly"), required: true })])],
+        { enableWhen: [{ question: "meds", operator: "=", answer: "yes" }, { question: "name", operator: "exists" }], enableBehavior: "all" }),
       leaf("notes"),
     ]),
   ],
@@ -92,7 +92,7 @@ const valid = {
       ["page depends on its own question", (() => { const s = clone(); s.blocks[2].enableWhen = [{ question: "dose", operator: "exists" }]; return s; })(),
         /^Page "P3": a condition depends on "DOSE", which is inside this page\. A page can't depend on its own questions\./],
       ["error naming: page title first, then groups", (() => { const s = clone(); s.blocks[2].blocks[0].blocks[1].blocks[0].enableWhen = [{ question: "meds", operator: "=", answer: "Maybe" }]; return s; })(),
-        /^Block "P3 › DOSAGE › SCHED › FREQ": the answer "Maybe" isn't one of the options of "MEDS"\./],
+        /^Block "P3 › DOSAGE › SCHED › FREQ": the answer "Maybe" isn't the code of any option of "MEDS"\./],
       ["schema error inside a page names the path", (() => { const s = clone(); s.blocks[2].blocks[0].blocks[1].blocks[0].options = "x"; return s; })(),
         /^Block "P3 › DOSAGE › SCHED › FREQ" \(options\):/],
       ["schema error, unlabelled question in a page", (() => { const s = clone(); s.blocks[0].blocks[1].label = ""; return s; })(),

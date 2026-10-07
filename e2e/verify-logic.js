@@ -2,7 +2,7 @@
 // save/reload/download it, exercise the refusal guards, and hit the API directly
 // with every invalid case.
 const fs = require("fs");
-const { API, WEB, PrismaClient, launchBrowser } = require("./_setup");
+const { API, WEB, PrismaClient, launchBrowser, opts } = require("./_setup");
 const prisma = new PrismaClient();
 
 const results = [];
@@ -22,10 +22,10 @@ const seed = {
   title: "Logic verify",
   blocks: [
     { id: IDS.intro, type: "heading", label: "Intro", required: false, level: 2 },
-    { id: IDS.attend, type: "choice", label: "Attending?", required: false, options: ["Yes", "No", "Maybe"] },
+    { id: IDS.attend, type: "choice", label: "Attending?", required: false, options: opts("Yes", "No", "Maybe") },
     { id: IDS.guests, type: "number", label: "Guests", required: false },
     { id: IDS.diet, type: "short", label: "Dietary needs", required: false },
-    { id: IDS.sessions, type: "checkbox", label: "Sessions", required: false, options: ["A", "B"] },
+    { id: IDS.sessions, type: "checkbox", label: "Sessions", required: false, options: opts("A", "B") },
   ],
 };
 
@@ -107,14 +107,14 @@ const seed = {
     await select(IDS.diet);
     check("condition survives reload",
       (await qSel.nth(0).inputValue()) === IDS.attend && (await opSel.nth(0).inputValue()) === "=" &&
-      (await ansSel.first().inputValue()) === "Yes" && (await qSel.nth(1).inputValue()) === IDS.guests &&
+      (await ansSel.first().locator("option:checked").textContent()) === "Yes" && (await qSel.nth(1).inputValue()) === IDS.guests &&
       (await opSel.nth(1).inputValue()) === ">" && (await numBox.inputValue()) === "2");
     check("All/Any survives reload", (await page.getByRole("button", { name: "Any", exact: true }).getAttribute("class")).includes("bg-ink"));
 
     const [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download", exact: true }).click()]);
     const art = JSON.parse(fs.readFileSync(await dl.path(), "utf8"));
     const diet = art.blocks.find((b) => b.id === IDS.diet);
-    const expected = `[{"question":"${IDS.attend}","operator":"=","answer":"Yes"},{"question":"${IDS.guests}","operator":">","answer":2}]`;
+    const expected = `[{"question":"${IDS.attend}","operator":"=","answer":"yes"},{"question":"${IDS.guests}","operator":">","answer":2}]`;
     check("artifact enableWhen exactly as specified", JSON.stringify(diet.enableWhen) === expected, JSON.stringify(diet.enableWhen));
     check("artifact enableBehavior 'any'", diet.enableBehavior === "any");
     check("blocks without conditions carry no enableWhen", art.blocks.filter((b) => b.id !== IDS.diet).every((b) => !("enableWhen" in b) && !("enableBehavior" in b)));
@@ -167,20 +167,22 @@ const seed = {
     check("move source below its dependent -> refused, dependent named", down && JSON.stringify(await order()) === JSON.stringify(o1), down ?? "");
     await dismiss();
 
-    // (c) rename / remove an option used as an answer
+    // (c) rename / remove an option used as an answer. Conditions store the code (contract §13.4),
+    // so renaming the label is always allowed; removing the option is still refused.
     await select(IDS.attend);
-    const optYes = page.locator('aside input[value="Yes"]');
-    await optYes.press("End");
-    await optYes.press("!");
-    const ren = await refused(/Can't change or remove the option "Yes" of "Attending\?"/);
-    check("rename option used as an answer -> refused", ren && (await page.locator('aside input[value="Yes"]').count()) === 1, ren ?? "");
+    await page.locator("#options-0-label").press("End");
+    await page.locator("#options-0-label").press("!");
+    await page.locator("#options-0-label").blur();
+    check("rename an option used as an answer -> allowed; its code stays",
+      (await page.locator("#options-0-label").inputValue()) === "Yes!" && (await page.locator("#options-0-code").inputValue()) === "yes" && (await alert.count()) === 0);
+    await page.getByRole("button", { name: "Remove option 1" }).click(); // "Yes!"
+    const rem = await refused(/Can't remove "Yes!" — these blocks have conditions that use it:/);
+    check("remove an option used as an answer -> refused", rem && (await page.locator("#options-0-label").inputValue()) === "Yes!", rem ?? "");
     await dismiss();
-    await page.getByRole("button", { name: "Remove option" }).first().click(); // "Yes"
-    const rem = await refused(/Can't change or remove the option "Yes"/);
-    check("remove option used as an answer -> refused", rem && (await page.locator('aside input[value="Yes"]').count()) === 1, rem ?? "");
-    await dismiss();
-    await page.getByRole("button", { name: "Remove option" }).nth(1).click(); // "No" — unused
+    await page.getByRole("button", { name: "Remove option 2" }).click(); // "No" — unused
     check("removing an unused option is allowed", (await page.locator('aside input[value="No"]').count()) === 0 && (await alert.count()) === 0);
+    await select(IDS.diet);
+    check("the condition shows the renamed label", (await page.getByRole("combobox", { name: "Answer" }).first().locator("option:checked").textContent()) === "Yes!");
 
     // ---------- API rejects every invalid case directly ----------
     const clone = () => JSON.parse(JSON.stringify(seed));
@@ -196,12 +198,12 @@ const seed = {
       ["self-reference", withCond(IDS.diet, { question: IDS.diet, operator: "exists" }), /Block "Dietary needs": .*itself/],
       ["layout source (heading)", withCond(IDS.diet, { question: IDS.intro, operator: "exists" }), /"Intro" is a heading block/],
       ["matrix source", withCond(IDS.diet, { question: "b_matrix01", operator: "exists" }, (s) =>
-        s.blocks.splice(1, 0, { id: "b_matrix01", type: "matrix", label: "Grid", required: false, options: ["r"], columns: ["c"] })), /"Grid" is a matrix block/],
+        s.blocks.splice(1, 0, { id: "b_matrix01", type: "matrix", label: "Grid", required: false, options: opts("r"), columns: opts("c") })), /"Grid" is a matrix block/],
       ["hidden source", withCond(IDS.diet, { question: "b_hidden01", operator: "exists" }, (s) =>
         s.blocks.splice(1, 0, { id: "b_hidden01", type: "hidden", label: "Ref", required: false })), /"Ref" is a hidden block/],
       ["operator not allowed", withCond(IDS.diet, { question: IDS.attend, operator: ">", answer: "Yes" }), /operator ">" can't be used with "Attending\?"/],
       ["contains on a single choice", withCond(IDS.diet, { question: IDS.attend, operator: "contains", answer: "Yes" }), /operator "contains"/],
-      ["answer not an option", withCond(IDS.diet, { question: IDS.attend, operator: "=", answer: "Perhaps" }), /answer "Perhaps" isn't one of the options of "Attending\?"/],
+      ["answer not an option", withCond(IDS.diet, { question: IDS.attend, operator: "=", answer: "Perhaps" }), /answer "Perhaps" isn't the code of any option of "Attending\?"/],
       ["exists with an answer", withCond(IDS.diet, { question: IDS.attend, operator: "exists", answer: "Yes" }), /^Block "Dietary needs" \(enableWhen\.0\.answer\): "exists" takes no answer/],
       ["= without an answer", withCond(IDS.diet, { question: IDS.attend, operator: "=" }), /^Block "Dietary needs" \(enableWhen\.0\.answer\)/],
       ["duplicate block ids", (() => { const s = clone(); s.blocks[4].id = IDS.diet; return s; })(), /same id "b_diet0001"/],

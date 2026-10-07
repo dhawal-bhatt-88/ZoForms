@@ -114,6 +114,118 @@ const shownWhen = {
   enableBehavior,
 };
 
+/* ---------- coded options (contract §13) ---------- */
+
+/** What a code may look like (contract §13.2). */
+export const CODE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
+const CODE_MAX = 64;
+
+/**
+ * One option of a list: a stable `code`, stored in answers and conditions, and
+ * the `label` respondents see (contract §13.1). Both are trimmed. A missing,
+ * empty or whitespace-only code is filled when its list is parsed (`fillCodes`).
+ */
+export const Option = z.object(
+  {
+    code: z
+      .string()
+      .optional()
+      .transform((c) => (c ?? "").trim()),
+    label: z.string().transform((l) => l.trim()),
+  },
+  { invalid_type_error: "each option must be an object with a code and a label" },
+);
+export type Option = z.infer<typeof Option>;
+
+/** A list of options, its empty codes filled (contract §13.3) as part of parsing. */
+const optionList = z.array(Option).transform((list) => fillCodes(list));
+
+/**
+ * Contract §13.3: the code generated for `label`, the option at 1-based
+ * `position` in its list, avoiding every code in `taken` (compared ignoring
+ * case). The one generator: the editor (on leaving a label field), the import
+ * preview and the save all use it, through `fillCodes`.
+ */
+export function generateCode(label: string, taken: Iterable<string>, position: number): string {
+  return generateCodeAvoiding(label, new Set([...taken].map((c) => c.toLowerCase())), position);
+}
+
+/** `generateCode` against an already lower-cased set, so filling a long list stays linear. */
+function generateCodeAvoiding(label: string, used: ReadonlySet<string>, position: number): string {
+  const trimSeparators = (s: string) => s.replace(/^[._-]+|[._-]+$/g, "");
+  let base = label
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "") // accents: "Sí" → "Si"
+    .toLowerCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^a-z0-9._-]/g, "")
+    .replace(/_+/g, "_");
+  base = trimSeparators(trimSeparators(base).slice(0, CODE_MAX));
+  if (!base) base = `option_${position}`;
+  if (!used.has(base.toLowerCase())) return base;
+  for (let n = 2; ; n += 1) {
+    const suffix = `_${n}`;
+    const candidate = base.slice(0, CODE_MAX - suffix.length) + suffix;
+    if (!used.has(candidate.toLowerCase())) return candidate;
+  }
+}
+
+/**
+ * Fill every empty code in `options`, in list order (contract §13.3). Codes
+ * already in the list — typed or saved — and `reserved` (for an import that
+ * adds to a list, its existing codes) are taken first, so a generated code
+ * never takes one. Codes are trimmed first; a code is never regenerated.
+ */
+export function fillCodes(options: readonly Option[], reserved: Iterable<string> = []): Option[] {
+  const trimmed = options.map((o) => ({ code: o.code.trim(), label: o.label }));
+  const used = new Set([...reserved, ...trimmed.map((o) => o.code).filter(Boolean)].map((c) => c.toLowerCase()));
+  return trimmed.map((o, i) => {
+    if (o.code) return o;
+    const code = generateCodeAvoiding(o.label, used, i + 1);
+    used.add(code.toLowerCase());
+    return { code, label: o.label };
+  });
+}
+
+/**
+ * Coded options from real labels, codes generated straight away:
+ * `optionsFromLabels("Yes", "No")`. For templates and imports — not for
+ * placeholders, which start with an empty code (`placeholderOptions`).
+ */
+export function optionsFromLabels(...labels: string[]): Option[] {
+  return fillCodes(labels.map((label) => ({ code: "", label })));
+}
+
+/**
+ * Placeholder options for a new block or a new row — "Option 1", "Option 2"
+ * … — with empty codes (contract §13.3), so each code is made from the label
+ * the author types, not from the placeholder.
+ */
+export function placeholderOptions(noun: string, count: number, existing: readonly Option[] = []): Option[] {
+  const labels = new Set(existing.map((o) => o.label.trim().toLowerCase()));
+  const added: Option[] = [];
+  for (let n = existing.length + 1; added.length < count; n += 1) {
+    const label = `${noun} ${n}`;
+    if (!labels.has(label.toLowerCase())) added.push({ code: "", label });
+  }
+  return added;
+}
+
+/**
+ * Fill the code of the option at `index` if it is empty (contract §13.3): the
+ * editor does this when the author leaves its label field, and when it is
+ * picked as a condition answer. The other codes in the list are reserved. A
+ * code that is already there is never changed.
+ */
+export function fillCodeAt(options: readonly Option[], index: number): Option[] {
+  const next = [...options];
+  const option = options[index];
+  if (!option || option.code.trim()) return next;
+  const taken = options.flatMap((o, k) => (k !== index && o.code.trim() ? [o.code.trim()] : []));
+  next[index] = { code: generateCode(option.label, taken, index + 1), label: option.label };
+  return next;
+}
+
 export const QuestionBlock = z.object({
   id: z.string(),
   type: QuestionType,
@@ -121,10 +233,19 @@ export const QuestionBlock = z.object({
   description: helpText,
   placeholder: z.string().optional(),
   required: z.boolean().default(false),
-  /** for choice / checkbox / dropdown / multiselect / ranking / matrix (rows) */
-  options: z.array(z.string()).optional(),
-  /** for matrix (columns) */
-  columns: z.array(z.string()).optional(),
+  /**
+   * Matrix: every row must be answered. Ranking: every option must be ranked.
+   * Implies `required`: the renderer requires an answer when either is set.
+   * Only ever `true` when present, and only on those two types.
+   */
+  completeRequired: z
+    .boolean()
+    .optional()
+    .transform((c): true | undefined => (c === true ? true : undefined)),
+  /** for choice / checkbox / dropdown / multiselect / ranking, and matrix rows (contract §13.1) */
+  options: optionList.optional(),
+  /** for matrix: its columns (contract §13.1) */
+  columns: optionList.optional(),
   /** Unused by question types (headings are presentational); kept so their shape is unchanged. */
   level: z.number().int().min(1).max(3).optional(),
   /** static content: text copy, or the URL for image/video/audio/embed */
@@ -304,11 +425,32 @@ export const PageBlock = z.object({
 function withoutIdleRepeatSettings(raw: unknown): unknown {
   if (typeof raw !== "object" || raw === null) return raw;
   const node = raw as Record<string, unknown>;
-  if (node.type !== "group" && node.type !== "page") return raw;
+  if (node.type !== "group" && node.type !== "page") return withoutIdleCompleteRequired(node);
   if (node.type === "group" && node.repeats === true) return raw;
   const { repeats, repeatLabel: _label, minOccurs: _min, maxOccurs: _max, ...rest } = node;
   // Anything but true or false is left for the parser to reject.
   return repeats === false || repeats === undefined ? rest : { ...rest, repeats };
+}
+
+/** The question types `completeRequired` applies to, and how the inspector names it. */
+export const COMPLETE_REQUIRED_LABELS: Partial<Record<BlockType, string>> = {
+  matrix: "Answer every row",
+  ranking: "Rank every option",
+};
+
+/**
+ * `completeRequired` means something only on a matrix (every row answered) or
+ * a ranking (every option ranked), as the renderer applies it. Anywhere else
+ * the renderer would still treat it as "required", without saying so, so it is
+ * dropped there; `false` is dropped everywhere, so turning it on and off again
+ * leaves the form unchanged.
+ */
+function withoutIdleCompleteRequired(node: Record<string, unknown>): Record<string, unknown> {
+  if (!("completeRequired" in node)) return node;
+  const { completeRequired, ...rest } = node;
+  const applies = typeof node.type === "string" && node.type in COMPLETE_REQUIRED_LABELS;
+  // Anything but true or false on a matrix or ranking is left for the parser to reject.
+  return applies && completeRequired !== false && completeRequired !== undefined ? node : rest;
 }
 
 /*
@@ -781,10 +923,9 @@ export function newBlock(
   const block: Record<string, unknown> = { id, type, label: BLOCK_META[type].question };
   // Presentational blocks have no `required` at all (contract §1).
   if (!isPresentationalType(type)) block.required = false;
-  if (OPTION_TYPES.includes(type)) {
-    block.options = ["Option 1", "Option 2", "Option 3"];
-  }
-  if (type === "matrix") block.columns = ["Column 1", "Column 2", "Column 3"];
+  // Placeholders start with empty codes; each is generated from the label the author types (§13.3).
+  if (OPTION_TYPES.includes(type)) block.options = placeholderOptions("Option", 3);
+  if (type === "matrix") block.columns = placeholderOptions("Column", 3);
   if (type === "scale") {
     block.min = 1;
     block.max = 5;
@@ -922,16 +1063,19 @@ export function sourceOperators(block: Block): readonly ConditionOperator[] | un
 }
 
 /**
- * The fixed set of answers a condition on `source` may use: the source's own
- * options for choice-type questions, the country list for country questions,
- * or null when any answer of the right kind is allowed.
+ * The fixed set of answers a condition on `source` may use, or null when any
+ * answer of the right kind is allowed. For a choice-type question these are its
+ * options: a condition stores the `code` and the editor shows the `label`
+ * (contract §13.4). A country question's answers are the country names
+ * themselves, so each is its own code and label.
  */
-export function conditionAnswerOptions(source: Block): readonly string[] | null {
+export function conditionAnswerOptions(source: Block): readonly Option[] | null {
   if (isContainer(source)) return null;
   if (OPTION_SOURCE_TYPES.includes(source.type)) return source.options ?? [];
-  if (source.type === "country") return COUNTRY_OPTIONS;
+  if (source.type === "country") return COUNTRY_ANSWERS;
   return null;
 }
+const COUNTRY_ANSWERS: readonly Option[] = COUNTRY_OPTIONS.map((c) => ({ code: c, label: c }));
 
 /**
  * Collects an answer, so it is numbered (contract §4). Groups, pages,
@@ -1537,6 +1681,86 @@ export function displayBlockProblem(entry: TreeEntry): ConditionProblem | null {
   return null;
 }
 
+/* ---------- coded option lists (contract §13.6) ---------- */
+
+/** Which list of a block: its options (a matrix's rows), or a matrix's columns. */
+export type OptionListName = "options" | "columns";
+
+/** The coded lists a block carries, with how messages name one entry of each. */
+export function optionLists(
+  block: Block,
+): { list: OptionListName; noun: string; options: readonly Option[] | undefined }[] {
+  if (isContainer(block) || !OPTION_TYPES.includes(block.type)) return [];
+  if (block.type !== "matrix") return [{ list: "options", noun: "option", options: block.options }];
+  return [
+    { list: "options", noun: "row", options: block.options },
+    { list: "columns", noun: "column", options: block.columns },
+  ];
+}
+
+export type OptionProblem = {
+  list: OptionListName;
+  /** The option at fault, from 0; absent when the whole list is. */
+  index?: number;
+  field?: "code" | "label";
+  /** Reads after the block's name in a save message. */
+  rule: string;
+  /** The same text, to show inline. */
+  detail: string;
+};
+
+/**
+ * The save rules for a block's coded lists (contract §13.6): each list has an
+ * option, every option a label, a valid code, and no code or label used twice
+ * (ignoring case; labels also ignoring surrounding whitespace). A matrix's rows
+ * and columns are checked as separate lists. An empty code is not a problem: it
+ * is generated (§13.3). Shared by the save and the editor's inline messages.
+ */
+export function optionListProblems(block: Block): OptionProblem[] {
+  const found: Omit<OptionProblem, "detail">[] = [];
+  for (const { list, noun, options } of optionLists(block)) {
+    if (!options?.length) {
+      found.push({ list, rule: `it needs at least one ${noun}.` });
+      continue;
+    }
+    const codes = new Map<string, number>();
+    const labels = new Map<string, number>();
+    options.forEach((o, index) => {
+      const code = o.code.trim();
+      const label = o.label.trim();
+      if (!label) {
+        found.push({ list, index, field: "label", rule: `${noun} ${index + 1}${code ? ` (code "${code}")` : ""} needs a label.` });
+      } else {
+        const first = labels.get(label.toLowerCase());
+        if (first === undefined) labels.set(label.toLowerCase(), index);
+        else {
+          found.push({
+            list, index, field: "label",
+            rule: `the label "${label}" is used by more than one ${noun}. Labels must be unique, ignoring case.`,
+          });
+        }
+      }
+      if (!code) return;
+      if (!CODE_PATTERN.test(code)) {
+        found.push({
+          list, index, field: "code",
+          rule: `the code "${code}" of ${noun} "${label}" can only use letters, digits, ".", "-" and "_", must start with a letter or digit, and can be at most 64 characters.`,
+        });
+        return;
+      }
+      const first = codes.get(code.toLowerCase());
+      if (first === undefined) codes.set(code.toLowerCase(), index);
+      else {
+        found.push({
+          list, index, field: "code",
+          rule: `the code "${code}" is used by more than one ${noun} ("${options[first].label.trim()}" and "${label}"). Codes must be unique, ignoring case.`,
+        });
+      }
+    });
+  }
+  return found.map((p) => ({ ...p, detail: p.rule.charAt(0).toUpperCase() + p.rule.slice(1) }));
+}
+
 /* ---------- repeating groups (contract §12) ---------- */
 
 export type RepeatSetting = "repeatLabel" | "minOccurs" | "maxOccurs";
@@ -1615,7 +1839,10 @@ export function prefixRuleBreaker(source: TreeEntry, dependent: TreeEntry): Grou
  *    answer that type supports;
  *  - the source is not inside a repeating group that doesn't also enclose the
  *    dependent (the prefix rule, §3.7);
- *  - only groups repeat, and a repeating group's settings are valid (§6, §12.1).
+ *  - only groups repeat, and a repeating group's settings are valid (§6, §12.1);
+ *  - every coded list has options, each with a label and a valid code, none
+ *    repeated (§13.6). Empty codes are already filled when the form is parsed
+ *    (§13.3), and a condition on a coded source must use one of its codes.
  */
 export function formProblems(form: { blocks: readonly Block[] }): ConditionProblem[] {
   return collectProblems(form, true);
@@ -1623,8 +1850,8 @@ export function formProblems(form: { blocks: readonly Block[] }): ConditionProbl
 
 /**
  * The save problems on one block other than its own field rules — a display
- * block's content (`displayBlockProblem`) and a repeating group's settings
- * (`repeatSettingsProblems`). This is what the editor's Logic section lists:
+ * block's content (`displayBlockProblem`), a repeating group's settings
+ * (`repeatSettingsProblems`) and its option lists (`optionListProblems`). This is what the editor's Logic section lists:
  * those messages are shown once, inline under the field they are about, not
  * again here. The save itself still checks everything (`formProblems`).
  */
@@ -1665,6 +1892,7 @@ function collectProblems(form: { blocks: readonly Block[] }, withFieldRules: boo
     }
     const display = withFieldRules ? displayBlockProblem(entry) : null;
     if (display) problems.push(display);
+    if (withFieldRules) for (const { rule } of optionListProblems(block)) add(entry, rule);
   }
 
   const firstPage = paged && isPage(form.blocks[0]) ? form.blocks[0] : undefined;
@@ -1725,12 +1953,15 @@ function conditionProblem(
     return `the operator "${c.operator}" needs a number as its answer, but got ${JSON.stringify(c.answer)}.`;
   }
   const answers = conditionAnswerOptions(source);
+  // Codes compare exactly as stored: the number 44054006 is not the code "44054006" (§13.6).
   if (
     answers &&
     c.answer !== undefined &&
-    !(typeof c.answer === "string" && answers.includes(c.answer))
+    !(typeof c.answer === "string" && answers.some((o) => o.code === c.answer))
   ) {
-    return `the answer "${c.answer}" isn't one of the options of "${sourceName}".`;
+    return OPTION_SOURCE_TYPES.includes(source.type)
+      ? `the answer ${JSON.stringify(c.answer)} isn't the code of any option of "${sourceName}".`
+      : `the answer "${c.answer}" isn't one of the options of "${sourceName}".`;
   }
   return null;
 }
@@ -1754,6 +1985,53 @@ export function dependentsOf(
         b.id !== sourceId &&
         (b.enableWhen ?? []).some((c) => c.question === sourceId && matching(c)),
     );
+}
+
+/**
+ * The code to store when option `index` of `sourceId` is picked as a condition
+ * answer (contract §13.3, §13.4). An option whose code is still empty gets one
+ * now, so the condition has something to store; `blocks` comes back with it.
+ */
+export function answerCode(
+  blocks: readonly Block[],
+  sourceId: string,
+  index: number,
+): { blocks: Block[]; code: string } {
+  const source = findBlock(blocks, sourceId)?.block;
+  const options = source && !isContainer(source) ? source.options : undefined;
+  if (!options?.[index]) return { blocks: [...blocks], code: "" };
+  const filled = fillCodeAt(options, index);
+  const code = filled[index].code;
+  if (code === options[index].code) return { blocks: [...blocks], code };
+  return { blocks: updateBlockInTree(blocks, sourceId, (b) => ({ ...b, options: filled }) as Block), code };
+}
+
+/**
+ * An option's code changed from `from` to `to` (contract §13.8): every
+ * condition in the form on `sourceId` whose answer is `from` now uses `to` —
+ * on any page, in any group or repeating group, since conditions name their
+ * source by id. Returns the new tree and how many conditions changed.
+ */
+export function renameOptionCode(
+  blocks: readonly Block[],
+  sourceId: string,
+  from: string,
+  to: string,
+): { blocks: Block[]; updated: number } {
+  let updated = 0;
+  let next = [...blocks];
+  if (!from || from === to) return { blocks: next, updated };
+  for (const dependent of dependentsOf(blocks, sourceId, (c) => c.answer === from)) {
+    next = updateBlockInTree(next, dependent.id, (b) => ({
+      ...b,
+      enableWhen: (b.enableWhen ?? []).map((c) => {
+        if (c.question !== sourceId || c.answer !== from) return c;
+        updated += 1;
+        return { ...c, answer: to };
+      }),
+    }) as Block);
+  }
+  return { blocks: next, updated };
 }
 
 /**
@@ -1849,4 +2127,236 @@ export function structureBreaks(
 export function repeatsOnBlockers(blocks: readonly Block[], groupId: string): Block[] {
   const after = updateBlockInTree(blocks, groupId, (b) => (isGroup(b) ? { ...b, repeats: true } : b));
   return structureBreaks(blocks, after).prefix;
+}
+
+/* ---------- importing options from a file (contract §13.9) ---------- */
+
+/** One row read from an import file, before codes are generated. `line` is where it starts (1-based). */
+export type ImportRow = { line: number; code: string; label: string };
+
+export type ParsedImport =
+  | {
+      ok: true;
+      rows: ImportRow[];
+      /** Not a refusal: shown beside the preview, e.g. when the file looks semicolon-separated. */
+      hint?: string;
+    }
+  | { ok: false; message: string };
+
+/**
+ * Read an option file (contract §13.9). Runs in the browser; the file is never
+ * uploaded. A leading byte-order mark is ignored, and so are blank rows.
+ *
+ * `.txt`: each non-blank line is one label.
+ *
+ * `.csv`, per RFC 4180: values are separated by commas and rows by CRLF, LF or
+ * CR. A value that starts with `"` is quoted: it may hold commas, line breaks
+ * and doubled quotes (`""` is one `"`), and ends at the next lone `"`, which
+ * must be followed by a comma or the end of the row. Beyond the RFC:
+ *  - a quote inside a value that does *not* start with one (`5" screen`) is an
+ *    ordinary character, kept as written — the way spreadsheet apps read it;
+ *  - text after a closing quote (`"a"b`) refuses the file, naming the line;
+ *  - a quoted value never closed refuses the file, naming the line it opens on.
+ * A row with one value is a label; two values are a code and a label; more
+ * than two refuses the file. A first row of exactly `label` or `code,label`
+ * (ignoring case and spaces) is a header and skipped. Values are trimmed.
+ * When every row is a single value containing `;`, the file probably uses
+ * semicolons as separators, and a hint says so.
+ */
+export function parseOptionFile(text: string, kind: "csv" | "txt"): ParsedImport {
+  const body = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+  if (kind === "txt") {
+    const rows: ImportRow[] = [];
+    body.split(/\r\n|\n|\r/).forEach((raw, k) => {
+      const label = raw.trim();
+      if (label) rows.push({ line: k + 1, code: "", label });
+    });
+    return { ok: true, rows };
+  }
+
+  const records = splitCsv(body);
+  if (!records.ok) return records;
+  const rows: ImportRow[] = [];
+  let first = true;
+  let singleWithSemicolon = 0;
+  for (const { line, fields } of records.records) {
+    if (fields.every((f) => !f.trim())) continue; // a blank row
+    if (fields.length > 2) {
+      return {
+        ok: false,
+        message: `Line ${line} has ${fields.length} columns. A file can have one column (labels) or two (code, then label).`,
+      };
+    }
+    const values = fields.map((f) => f.trim());
+    const header = values.map((v) => v.toLowerCase().replace(/\s+/g, "")).join(",");
+    const isHeader = first && (header === "label" || header === "code,label");
+    first = false;
+    if (isHeader) continue;
+    if (values.length === 1) {
+      if (values[0].includes(";")) singleWithSemicolon += 1;
+      rows.push({ line, code: "", label: values[0] });
+    } else {
+      rows.push({ line, code: values[0], label: values[1] });
+    }
+  }
+  if (rows.length > 0 && singleWithSemicolon === rows.length) {
+    return {
+      ok: true,
+      rows,
+      hint: 'This file looks semicolon-separated, so each row was read as one label. If the semicolons separate a code from a label, save the file as comma-separated (in Excel: "CSV UTF-8") and choose it again.',
+    };
+  }
+  return { ok: true, rows };
+}
+
+/** RFC 4180 records, each with the line it starts on, or a refusal naming a line. */
+function splitCsv(
+  text: string,
+): { ok: true; records: { line: number; fields: string[] }[] } | { ok: false; message: string } {
+  const records: { line: number; fields: string[] }[] = [];
+  let fields: string[] = [];
+  let value = "";
+  let started = false; // has the current value begun (a character, or a quoted part)?
+  let line = 1; // the physical line being read
+  let recordLine = 1; // the line the current record starts on
+  let i = 0;
+  const endValue = () => {
+    fields.push(value);
+    value = "";
+    started = false;
+  };
+  const endRecord = () => {
+    endValue();
+    records.push({ line: recordLine, fields });
+    fields = [];
+  };
+  while (i < text.length) {
+    const ch = text[i];
+    if (ch === '"' && !started) {
+      // A quoted value: only when the quote opens the value.
+      const opensOn = line;
+      started = true;
+      i += 1;
+      let closed = false;
+      while (i < text.length) {
+        const c = text[i];
+        if (c === '"') {
+          if (text[i + 1] === '"') {
+            value += '"';
+            i += 2;
+            continue;
+          }
+          closed = true;
+          i += 1;
+          break;
+        }
+        if (c === "\r" || c === "\n") {
+          const pair = c === "\r" && text[i + 1] === "\n";
+          value += pair ? "\r\n" : c;
+          i += pair ? 2 : 1;
+          line += 1;
+          continue;
+        }
+        value += c;
+        i += 1;
+      }
+      if (!closed) {
+        return { ok: false, message: `Line ${opensOn}: a quoted value is never closed. Check the quotes on that line.` };
+      }
+      const next = text[i];
+      if (next !== undefined && next !== "," && next !== "\r" && next !== "\n") {
+        return {
+          ok: false,
+          message: `Line ${line}: there is text after a closing quote. Put the whole value inside the quotes, and write a quote inside it as "".`,
+        };
+      }
+      continue;
+    }
+    if (ch === ",") {
+      endValue();
+      i += 1;
+      continue;
+    }
+    if (ch === "\r" || ch === "\n") {
+      endRecord();
+      i += ch === "\r" && text[i + 1] === "\n" ? 2 : 1;
+      line += 1;
+      recordLine = line;
+      continue;
+    }
+    value += ch; // a stray quote inside an unquoted value lands here: kept as written
+    started = true;
+    i += 1;
+  }
+  if (started || fields.length) endRecord();
+  return { ok: true, records };
+}
+
+export type ImportMode = "add" | "replace";
+
+/** One row of the import preview: its code (as given, or generated) and label, and what is wrong with it. */
+export type ImportPreviewRow = { line: number; code: string; label: string; generated: boolean; flags: string[] };
+
+/**
+ * The import preview (contract §13.9): each row's code — as given, or
+ * generated (§13.3) with the file's codes reserved first and, for "add", the
+ * list's existing codes too — and its flags: a missing label, an invalid code,
+ * a code or label used twice in the file, and, for "add", one already in the
+ * list. Apply is allowed only when no row is flagged (`canApplyImport`).
+ */
+export function previewImport(
+  rows: readonly ImportRow[],
+  existing: readonly Option[],
+  mode: ImportMode,
+): ImportPreviewRow[] {
+  const keep = mode === "add" ? existing : [];
+  const filled = fillCodes(
+    rows.map((r) => ({ code: r.code, label: r.label.trim() })),
+    keep.map((o) => o.code.trim()).filter(Boolean),
+  );
+  const existingCodes = new Map(keep.map((o) => [o.code.trim().toLowerCase(), o.label.trim()]));
+  const existingLabels = new Set(keep.map((o) => o.label.trim().toLowerCase()));
+  const seenCodes = new Map<string, number>();
+  const seenLabels = new Map<string, number>();
+  return rows.map((row, k) => {
+    const { code, label } = filled[k];
+    const flags: string[] = [];
+    if (!label) flags.push("No label.");
+    if (!CODE_PATTERN.test(code)) {
+      flags.push(`The code "${code}" can only use letters, digits, ".", "-" and "_", must start with a letter or digit, and can be at most 64 characters.`);
+    } else {
+      const lower = code.toLowerCase();
+      if (seenCodes.has(lower)) flags.push(`The code "${code}" is also on line ${seenCodes.get(lower)}.`);
+      else if (existingCodes.has(lower)) flags.push(`The code "${code}" is already used by the option "${existingCodes.get(lower)}".`);
+      if (!seenCodes.has(lower)) seenCodes.set(lower, row.line);
+    }
+    if (label) {
+      const lower = label.toLowerCase();
+      if (seenLabels.has(lower)) flags.push(`The label "${label}" is also on line ${seenLabels.get(lower)}.`);
+      else if (existingLabels.has(lower)) flags.push(`The label "${label}" is already an option.`);
+      if (!seenLabels.has(lower)) seenLabels.set(lower, row.line);
+    }
+    return { line: row.line, code, label, generated: !row.code.trim(), flags };
+  });
+}
+
+/** Whether an import preview can be applied: it has rows and none is flagged. */
+export function canApplyImport(preview: readonly ImportPreviewRow[]): boolean {
+  return preview.length > 0 && preview.every((r) => r.flags.length === 0);
+}
+
+/** The list after applying an unflagged preview: appended in file order, or replacing the list. */
+export function applyImport(existing: readonly Option[], preview: readonly ImportPreviewRow[], mode: ImportMode): Option[] {
+  const imported = preview.map(({ code, label }) => ({ code, label }));
+  return mode === "add" ? [...existing, ...imported] : imported;
+}
+
+/**
+ * Replacing a block's options with `codes` would leave these blocks with a
+ * condition on a code that is gone, so "Replace all" is refused while any exist
+ * (contract §13.9). Codes that appear in the new list keep their conditions.
+ */
+export function replaceBlockers(blocks: readonly Block[], sourceId: string, codes: readonly string[]): Block[] {
+  const kept = new Set(codes);
+  return dependentsOf(blocks, sourceId, (c) => typeof c.answer === "string" && !kept.has(c.answer));
 }

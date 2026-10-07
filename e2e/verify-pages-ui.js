@@ -1,6 +1,6 @@
 // Phase 7, checkpoint 2: pages in the real editor (Edge).
 const fs = require("fs");
-const { OUT, API, WEB, PrismaClient, launchBrowser } = require("./_setup");
+const { OUT, API, WEB, PrismaClient, launchBrowser, opts } = require("./_setup");
 const prisma = new PrismaClient();
 
 const results = [];
@@ -17,7 +17,7 @@ async function waitFor(url) {
 const leaf = (id, label, type = "short", extra = {}) => ({ id, type, label, required: false, ...extra });
 const group = (id, label, blocks, extra = {}) => ({ id, type: "group", label, blocks, ...extra });
 const page = (id, title, blocks, extra = {}) => ({ id, type: "page", title, blocks, ...extra });
-const YN = { options: ["Yes", "No"] };
+const YN = { options: opts("Yes", "No") };
 const THREE = {
   title: "Health intake",
   blocks: [
@@ -26,12 +26,12 @@ const THREE = {
       leaf("med_name", "Medication name", "short", { required: true }),
       group("g_dose", "Dosage", [
         leaf("dose", "Dose (mg)", "number"),
-        group("g_sched", "Schedule", [leaf("freq", "How often?", "dropdown", { options: ["Once daily", "Twice daily"], required: true }), leaf("food", "Taken with food?", "choice", YN)]),
+        group("g_sched", "Schedule", [leaf("freq", "How often?", "dropdown", { options: opts("Once daily", "Twice daily"), required: true }), leaf("food", "Taken with food?", "choice", YN)]),
       ]),
-    ], { enableWhen: [{ question: "meds", operator: "=", answer: "Yes" }] }),
+    ], { enableWhen: [{ question: "meds", operator: "=", answer: "yes" }] }),
     page("p3", "Lifestyle", [
       leaf("smoke", "Do you smoke?", "choice", YN),
-      group("g_habits", "Health habits", [leaf("exercise", "How often do you exercise?", "dropdown", { options: ["Rarely", "Weekly", "Daily"] })]),
+      group("g_habits", "Health habits", [leaf("exercise", "How often do you exercise?", "dropdown", { options: opts("Rarely", "Weekly", "Daily") })]),
       leaf("notes", "Anything else?"),
     ], { enableWhen: [{ question: "name", operator: "exists" }] }),
   ],

@@ -3,7 +3,7 @@
 // and — when E2E_EXTERNAL_APP_URL is set — rendering the download with @yourco/forms.
 const fs = require("fs");
 const path = require("path");
-const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact } = require("./_setup");
+const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, opts } = require("./_setup");
 const prisma = new PrismaClient();
 
 const results = [];
@@ -24,7 +24,7 @@ const EXTERNAL_APP = process.env.E2E_EXTERNAL_APP_URL;
 const ARTIFACT = "builder-repeats-schema.json";
 
 const q = (id, type, label, extra = {}) => ({ id, type, label, required: false, ...extra });
-const yn = (id, label, extra = {}) => q(id, "choice", label, { options: ["Yes", "No"], ...extra });
+const yn = (id, label, extra = {}) => q(id, "choice", label, { options: opts("Yes", "No"), ...extra });
 const group = (id, label, blocks, extra = {}) => ({ id, type: "group", label, blocks, ...extra });
 const page = (id, title, blocks, extra = {}) => ({ id, type: "page", title, blocks, ...extra });
 const eq = (question, answer) => ({ question, operator: "=", answer });
@@ -52,7 +52,7 @@ const seed = () => ({
         group("payments", "Payments", [
           q("amount", "number", "Amount"),
           group("items", "Line items", [
-            q("desc", "short", "Description", { enableWhen: [eq("consent", "Yes")] }),
+            q("desc", "short", "Description", { enableWhen: [eq("consent", "yes")] }),
             q("cost", "number", "Cost"),
           ]),
           q("refund", "short", "Refund reason"),
@@ -65,9 +65,9 @@ const seed = () => ({
       group("household", "Household", [
         q("address", "short", "Address"),
         group("kids", "Children", [q("kname", "short", "Child's name"), q("kage", "number", "Child's age"), q("allergy", "short", "Allergies")],
-          { enableWhen: [eq("hasKids", "Yes")] }),
+          { enableWhen: [eq("hasKids", "yes")] }),
       ]),
-      q("final", "short", "Anything else?", { enableWhen: [eq("consent", "Yes")] }),
+      q("final", "short", "Anything else?", { enableWhen: [eq("consent", "yes")] }),
     ]),
   ],
 });
@@ -97,7 +97,7 @@ const seed = () => ({
       Object.assign(find(s.blocks, "items"), { repeats: true, repeatLabel: "line item", minOccurs: 1 });
       Object.assign(find(s.blocks, "kids"), { repeats: true, repeatLabel: "child", minOccurs: 0 });
       delete find(s.blocks, "followup").enableWhen;
-      find(s.blocks, "cost").enableWhen = [eq("insured", "No")];
+      find(s.blocks, "cost").enableWhen = [eq("insured", "no")];
       find(s.blocks, "refund").enableWhen = [{ question: "amount", operator: ">", answer: 100 }];
       find(s.blocks, "pnote").enableWhen = [answered("pname")];
       find(s.blocks, "allergy").enableWhen = [{ question: "kage", operator: "<", answer: 5 }];
@@ -395,15 +395,15 @@ const seed = () => ({
     check("artifact: Payments (no maximum)", JSON.stringify(find(art.blocks, "payments"), ["repeats", "repeatLabel", "minOccurs", "maxOccurs"]) === '{"repeats":true,"repeatLabel":"payment","minOccurs":0}');
     check("artifact: Line items", JSON.stringify(find(art.blocks, "items"), ["repeats", "repeatLabel", "minOccurs", "maxOccurs"]) === '{"repeats":true,"repeatLabel":"line item","minOccurs":1}');
     check("artifact: Children, with its condition", JSON.stringify(find(art.blocks, "kids"), ["repeats", "repeatLabel", "minOccurs", "maxOccurs", "enableWhen", "question", "operator", "answer"])
-      === '{"repeats":true,"repeatLabel":"child","minOccurs":0,"enableWhen":[{"question":"hasKids","operator":"=","answer":"Yes"}]}', keys("kids"));
+      === '{"repeats":true,"repeatLabel":"child","minOccurs":0,"enableWhen":[{"question":"hasKids","operator":"=","answer":"yes"}]}', keys("kids"));
     check("artifact: no repeat settings on the plain group or on pages", keys("household") === "id,type,label,blocks"
       && art.blocks.every((p) => !Object.keys(p).some((k) => /^(repeats|repeatLabel|minOccurs|maxOccurs)$/.test(k))));
     check("artifact: the conditions, of every allowed kind",
-      JSON.stringify(find(art.blocks, "cost").enableWhen) === JSON.stringify([eq("insured", "No")])
+      JSON.stringify(find(art.blocks, "cost").enableWhen) === JSON.stringify([eq("insured", "no")])
       && JSON.stringify(find(art.blocks, "refund").enableWhen) === JSON.stringify([{ question: "amount", operator: ">", answer: 100 }])
       && JSON.stringify(find(art.blocks, "pnote").enableWhen) === JSON.stringify([answered("pname")])
       && JSON.stringify(find(art.blocks, "allergy").enableWhen) === JSON.stringify([{ question: "kage", operator: "<", answer: 5 }])
-      && JSON.stringify(find(art.blocks, "desc").enableWhen) === JSON.stringify([eq("consent", "Yes")])
+      && JSON.stringify(find(art.blocks, "desc").enableWhen) === JSON.stringify([eq("consent", "yes")])
       && !find(art.blocks, "followup").enableWhen);
     saveArtifact(ARTIFACT, raw);
     await remove(formId);
@@ -502,7 +502,7 @@ const seed = () => ({
       check("payload: hidden questions left out per instance", !("cost" in bob.payments[0].items[0]) && v(bob.payments[0].refund) === "Overcharged" && !("refund" in ann.payments[0]), JSON.stringify(bob));
       check("payload: the children, and nothing for groups or instance ids", Array.isArray(answers.kids) && answers.kids.length === 1 && v(answers.kids[0].allergy) === "Peanuts"
         && !("household" in answers) && !JSON.stringify(answers).includes('"id"'), JSON.stringify(answers.kids));
-      check("payload: questions outside repeats stay flat at the root", v(answers.consent) === "Yes" && v(answers.final) === "No" && v(answers.address) === "1 High St");
+      check("payload: questions outside repeats stay flat at the root", v(answers.consent) === "yes" && v(answers.final) === "No" && v(answers.address) === "1 High St");
       fs.writeFileSync(path.join(OUT, "repeats-submitted-payload.json"), req.postData());
       await R.close();
     }

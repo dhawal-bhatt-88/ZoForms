@@ -33,4 +33,14 @@ function saveArtifact(file, raw) {
   if (external) fs.writeFileSync(path.join(external, file), raw);
 }
 
-module.exports = { ROOT, OUT, API, WEB, PrismaClient, chromium, launchBrowser, saveArtifact };
+/*
+ * Coded options (contract §13) for fixtures: opts("Yes", "Not sure") →
+ * [{ code: "yes", label: "Yes" }, { code: "not_sure", label: "Not sure" }].
+ * code() is a simplified form of the builder's rule (lower case, whitespace to
+ * "_", anything outside a–z 0–9 . - _ dropped) — the same helper the renderer's
+ * and the schema package's tests use.
+ */
+const code = (label) => label.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9._-]/g, "");
+const opts = (...labels) => labels.map((label) => ({ code: code(label), label }));
+
+module.exports = { ROOT, OUT, API, WEB, PrismaClient, chromium, launchBrowser, saveArtifact, code, opts };

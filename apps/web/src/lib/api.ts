@@ -367,7 +367,7 @@ export function getForm(id: string) {
  * another save got there first.
  */
 export function saveSchema(id: string, schema: FormSchema) {
-  return req<{ ok: boolean; versionId: string; version: number }>(`/v1/forms/${id}/schema`, {
+  return req<{ ok: boolean; versionId: string; version: number; schema: FormSchema }>(`/v1/forms/${id}/schema`, {
     method: "PUT",
     body: JSON.stringify(schema),
   });

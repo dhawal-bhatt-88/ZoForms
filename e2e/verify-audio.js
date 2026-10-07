@@ -106,9 +106,10 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     await P.getByText("All changes saved").waitFor();
 
     await add("Multiple choice"); await rename("Would you like a guided breathing exercise?");
-    const inputs = () => P.getByRole("button", { name: "Remove option" }).locator("xpath=preceding-sibling::input");
-    await P.getByRole("button", { name: "Remove option" }).last().click();
-    await inputs().nth(0).fill("Yes"); await inputs().nth(1).fill("No");
+    // Labels only: each code is generated from its label on leaving the field (contract §13.3).
+    await P.getByRole("button", { name: "Remove option 3" }).click();
+    await P.locator("#options-0-label").fill("Yes"); await P.locator("#options-1-label").fill("No");
+    await P.locator("#options-1-label").blur();
 
     // A file on the app's own server.
     await add("Audio");
@@ -198,7 +199,7 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
       JSON.stringify(aAudio.map((b) => b.label)) === JSON.stringify(["Welcome message", "Pharmacy opening hours", "Breathing exercise"]),
       JSON.stringify(aAudio));
     check("artifact: the conditional audio carries its condition",
-      JSON.stringify(aAudio[2].enableWhen) === JSON.stringify([{ question: choiceId, operator: "=", answer: "Yes" }]) && aAudio.slice(0, 2).every((b) => !b.enableWhen));
+      JSON.stringify(aAudio[2].enableWhen) === JSON.stringify([{ question: choiceId, operator: "=", answer: "yes" }]) && aAudio.slice(0, 2).every((b) => !b.enableWhen));
     saveArtifact("builder-audio-schema.json", raw);
     await remove(formId);
   } catch (e) {
