@@ -33,7 +33,6 @@ import {
   Clock,
   Code2,
   Copy,
-  CreditCard,
   Download,
   ExternalLink,
   FileText,
@@ -41,6 +40,7 @@ import {
   Film,
   Gauge,
   Globe,
+  Grid3x3,
   GripVertical,
   Hash,
   Heading as HeadingIcon,
@@ -69,11 +69,14 @@ import {
   Zap,
 } from "lucide-react";
 import {
+  addGridColumn,
   allBlockIds,
   answerCode,
   applyImport,
   BLOCK_META,
   blockName,
+  canBeRequired,
+  columnTypeChangeWarning,
   conditionAnswerOptions,
   DEFAULT_DRAFT_MODE,
   deletePageKeepingContents,
@@ -87,10 +90,13 @@ import {
   COMPLETE_REQUIRED_LABELS,
   fillCodeAt,
   findBlock,
+  gridColumnName,
   insertBlockIntoTree,
   insertPageAfter,
   isAnswerable,
+  isChoiceColumn,
   isContainer,
+  isGrid,
   isValidImageSource,
   isGroup,
   isPage,
@@ -98,6 +104,7 @@ import {
   isRepeatingGroup,
   makePaged,
   moveBlockInTree,
+  moveGridColumn,
   movePage,
   NAVIGATION_DEFAULTS,
   navigationWithoutDefaults,
@@ -111,6 +118,7 @@ import {
   NUMERIC_SOURCE_TYPES,
   OPTION_SOURCE_TYPES,
   OPTION_TYPES,
+  optionListAt,
   optionListProblems,
   parseOptionFile,
   placeholderOptions,
@@ -123,11 +131,15 @@ import {
   repeatSettingsProblems,
   resolveTheme,
   sameContent,
+  sameOptionList,
   sourceOperators,
   structureBreaks,
   unwrapGroup,
   updateBlockInTree,
+  updateGridColumn,
   walkBlocks,
+  withColumnType,
+  withOptionList,
   type AnyBlockType,
   type Block,
   type Condition,
@@ -139,7 +151,10 @@ import {
   type ImportPreviewRow,
   type Option,
   type ParsedImport,
-  type OptionListName,
+  type OptionListRef,
+  type GridBlock,
+  type GridColumn,
+  type GridColumnType,
   type GroupBlock,
   type Navigation,
   type PageBlock,
@@ -158,7 +173,8 @@ import { audioPreviewText } from "@/lib/audio-preview";
 import { inspectorHeading, logicNoun } from "@/lib/inspector";
 import { parseCount, repeatBadgeText, repeatPreviewText } from "@/lib/repeat-settings";
 import { OptionImportDialog } from "@/components/option-import-dialog";
-import { OptionListEditor } from "@/components/option-list-editor";
+import { CodeChangeNote, OptionListEditor } from "@/components/option-list-editor";
+import { GridColumnsEditor } from "@/components/grid-columns-editor";
 import { videoPreviewText } from "@/lib/video-preview";
 import {
   ApiError,
@@ -192,8 +208,8 @@ const ICONS: Record<AnyBlockType, typeof Type> = {
   time: Clock,
   scale: Gauge,
   matrix: Table2,
+  grid: Grid3x3,
   rating: Star,
-  payment: CreditCard,
   signature: PenTool,
   ranking: ListOrdered,
   heading: HeadingIcon,
@@ -242,6 +258,8 @@ const CATALOG: { group: string; items: CatalogItem[] }[] = [
       { type: "date" },
       { type: "time" },
       { type: "scale", keywords: "linear nps" },
+      // Before Matrix, whose keywords include "grid": "grid" + Enter picks the first match.
+      { type: "grid", keywords: "table cells columns" },
       { type: "matrix", keywords: "grid table" },
       { type: "rating", keywords: "stars" },
       { type: "ranking", keywords: "order rank" },
@@ -540,6 +558,7 @@ function BlockPreview({ block }: { block: Block }) {
       </div>
     );
   }
+  if (isGrid(block)) return <GridPreview block={block} />;
   if (block.type === "matrix") {
     const rows = block.options ?? [];
     const cols = block.columns ?? [];
@@ -600,12 +619,6 @@ function BlockPreview({ block }: { block: Block }) {
       </div>
     );
   }
-  if (block.type === "payment")
-    return (
-      <div className={`${box} flex items-center gap-2`}>
-        <CreditCard className="h-4 w-4" /> Card payment (connect Stripe)
-      </div>
-    );
   if (block.type === "signature")
     return (
       <div className="rounded-lg border border-dashed border-line-2 py-6 text-center text-sm text-muted">
@@ -623,6 +636,71 @@ function BlockPreview({ block }: { block: Block }) {
             ? "https://…"
             : "Short answer…";
   return <div className={box}>{ph}</div>;
+}
+
+/** A grid cell's input, as a disabled stand-in: what the renderer will show there (contract §14.5). */
+function GridCellPreview({ column }: { column: GridColumn }) {
+  if (column.type === "radio")
+    return (
+      <span className="flex flex-col gap-1">
+        {(column.options ?? []).map((o, i) => (
+          <span key={i} className="flex items-center gap-1.5 whitespace-nowrap text-muted">
+            <span className="inline-block h-3 w-3 flex-none rounded-full border border-line-2" />
+            {o.label}
+          </span>
+        ))}
+      </span>
+    );
+  if (column.type === "dropdown")
+    return (
+      <span className="flex min-w-[96px] items-center justify-between gap-2 rounded-md border border-line-2 bg-surface px-2 py-1 text-faint">
+        <span className="whitespace-nowrap">Choose…</span>
+        <ChevronDown className="h-3.5 w-3.5 flex-none" />
+      </span>
+    );
+  return <span className="block h-[26px] min-w-[96px] rounded-md border border-line-2 bg-surface" />;
+}
+
+/**
+ * The canvas preview of a grid: the table the renderer shows in its wide
+ * layout — column headers, row headers, and a stand-in input in every cell.
+ * The card's header already shows the grid's label, so it isn't repeated. A
+ * wide grid scrolls sideways inside the card. Labels are text, never markup.
+ */
+function GridPreview({ block }: { block: GridBlock }) {
+  const rows = block.rows ?? [];
+  const columns = block.columns ?? [];
+  return (
+    <div data-grid-preview className="max-w-full overflow-x-auto rounded-lg border border-line">
+      <table className="min-w-full border-collapse text-xs">
+        <thead className="bg-surface-2">
+          <tr>
+            <td className="p-2" />
+            {columns.map((c, i) => (
+              <th key={i} scope="col" className="whitespace-nowrap p-2 text-left align-bottom font-medium text-ink-2">
+                {c.label}
+                {c.required && <span className="text-red"> *</span>}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, ri) => (
+            <tr key={ri} className="border-t border-line">
+              <th scope="row" className="whitespace-nowrap p-2 text-left align-top font-normal text-ink-2">
+                {r.label}
+              </th>
+              {columns.map((c, ci) => (
+                <td key={ci} className="p-2 align-top">
+                  <GridCellPreview column={c} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 /* ---------- canvas: cards, group ends, dialogs ---------- */
@@ -1972,20 +2050,28 @@ export default function EditorPage() {
    * `codeOrigins` remembers the code they still use, by block, list and
    * position, so a detour through an empty, invalid or clashing code can't
    * strand them.
+   *
+   * A list is named by reference (`OptionListRef`): a block's options, a
+   * matrix's columns, or a grid's rows, columns or one column's options. A
+   * grid's columns go through these handlers for their code and label too, so
+   * they behave exactly like options; every other field of a column is kept
+   * (`withOptionList` refuses anything that isn't a column).
    */
   const codeOrigins = useRef(new Map<string, string>());
-  const [codeStatus, setCodeStatus] = useState<{ blockId: string; list: OptionListName; text: string } | null>(null);
-  const originKey = (bid: string, list: OptionListName, index: number) => `${bid}|${list}|${index}`;
-  const listOf = (bid: string, list: OptionListName): Option[] => {
+  const [codeStatus, setCodeStatus] = useState<{ blockId: string; ref: OptionListRef; text: string } | null>(null);
+  const originKey = (bid: string, ref: OptionListRef, index: number) => `${bid}|${ref.list}|${ref.column ?? ""}|${index}`;
+  // Only a block's own options can be condition answers; a matrix or a grid is never a source.
+  const isSourceList = (ref: OptionListRef) => ref.list === "options" && ref.column === undefined;
+  const listOf = (bid: string, ref: OptionListRef): Option[] => {
     const block = schema ? findBlock(schema.blocks, bid)?.block : undefined;
-    return [...((list === "options" ? block?.options : block?.columns) ?? [])];
+    return block ? [...optionListAt(block, ref)] : [];
   };
-  const setList = (bid: string, list: OptionListName, options: Option[]) =>
-    patch((s) => ({ ...s, blocks: updateBlockInTree(s.blocks, bid, (b) => ({ ...b, [list]: options }) as Block) }));
+  const setList = (bid: string, ref: OptionListRef, options: Option[]) =>
+    patch((s) => ({ ...s, blocks: updateBlockInTree(s.blocks, bid, (b) => withOptionList(b, ref, options)) }));
   const forgetOrigins = (bid: string) => {
     for (const key of [...codeOrigins.current.keys()]) if (key.startsWith(`${bid}|`)) codeOrigins.current.delete(key);
   };
-  const optionHandlers = (bid: string, list: OptionListName, noun: "Option" | "Column") => {
+  const optionHandlers = (bid: string, ref: OptionListRef, noun: "Option" | "Column" | "Row") => {
     /**
      * Store option `i`'s new, non-empty code — typed, or generated on leaving the
      * label. A valid, unique code takes the conditions with it, from the code they
@@ -1993,51 +2079,50 @@ export default function EditorPage() {
      */
     const commitCode = (options: Option[], i: number) => {
       if (!schema) return;
-      const key = originKey(bid, list, i);
+      const key = originKey(bid, ref, i);
       const to = options[i].code;
       const from = codeOrigins.current.get(key) ?? to;
       const unique = !options.some((o, k) => k !== i && o.code.trim().toLowerCase() === to.toLowerCase());
       if (!CODE_PATTERN.test(to) || !unique) {
-        setList(bid, list, options); // conditions keep `from`
+        setList(bid, ref, options); // conditions keep `from`
         return;
       }
       codeOrigins.current.delete(key);
-      const withList = updateBlockInTree(schema.blocks, bid, (b) => ({ ...b, [list]: options }) as Block);
-      // Only a block's options can be condition answers; a matrix is never a source.
+      const withList = updateBlockInTree(schema.blocks, bid, (b) => withOptionList(b, ref, options));
       const { blocks, updated } =
-        list === "options" ? renameOptionCode(withList, bid, from, to) : { blocks: withList, updated: 0 };
+        isSourceList(ref) ? renameOptionCode(withList, bid, from, to) : { blocks: withList, updated: 0 };
       patch((s) => ({ ...s, blocks }));
       if (updated) {
         setCodeStatus({
           blockId: bid,
-          list,
+          ref,
           text: `${updated} ${updated === 1 ? "condition" : "conditions"} updated to use "${to}".`,
         });
       }
     };
     return {
       onLabel: (i: number, label: string) => {
-        const options = listOf(bid, list);
+        const options = listOf(bid, ref);
         options[i] = { ...options[i], label };
-        setList(bid, list, options);
+        setList(bid, ref, options);
       },
       // Leaving the label field after changing it fills an empty code from it (the row
       // calls this only then); an existing code never changes.
       onLabelLeave: (i: number) => {
-        const options = listOf(bid, list);
+        const options = listOf(bid, ref);
         if (options[i] && !options[i].code.trim()) commitCode(fillCodeAt(options, i), i);
       },
       onCodeFocus: (i: number) => {
-        const key = originKey(bid, list, i);
-        if (!codeOrigins.current.has(key)) codeOrigins.current.set(key, listOf(bid, list)[i]?.code.trim() ?? "");
+        const key = originKey(bid, ref, i);
+        if (!codeOrigins.current.has(key)) codeOrigins.current.set(key, listOf(bid, ref)[i]?.code.trim() ?? "");
       },
       onCode: (i: number, code: string) => {
-        const options = listOf(bid, list);
+        const options = listOf(bid, ref);
         options[i] = { ...options[i], code };
-        setList(bid, list, options);
+        setList(bid, ref, options);
       },
       onCodeLeave: (i: number) => {
-        const options = listOf(bid, list);
+        const options = listOf(bid, ref);
         if (!options[i]) return;
         options[i] = { ...options[i], code: options[i].code.trim() };
         if (!options[i].code) {
@@ -2045,10 +2130,10 @@ export default function EditorPage() {
           // label straight away, and the conditions follow, so none points at a code that
           // no longer exists (contract §13.3). Otherwise it stays empty: the code comes from
           // the label the author types, or from the save — never from a placeholder.
-          const inUse = codeOrigins.current.get(originKey(bid, list, i));
-          const used = list === "options" && !!inUse && !!schema && dependentsOf(schema.blocks, bid, (c) => c.answer === inUse).length > 0;
+          const inUse = codeOrigins.current.get(originKey(bid, ref, i));
+          const used = isSourceList(ref) && !!inUse && !!schema && dependentsOf(schema.blocks, bid, (c) => c.answer === inUse).length > 0;
           if (used) commitCode(fillCodeAt(options, i), i);
-          else setList(bid, list, options);
+          else setList(bid, ref, options);
           return;
         }
         commitCode(options, i);
@@ -2056,11 +2141,11 @@ export default function EditorPage() {
       // Refused while a condition uses the option's code — the one the conditions still hold.
       onRemove: (i: number) => {
         if (!schema) return;
-        const options = listOf(bid, list);
+        const options = listOf(bid, ref);
         const option = options[i];
         if (!option) return;
-        const inUse = codeOrigins.current.get(originKey(bid, list, i)) ?? option.code.trim();
-        const deps = list === "options" && inUse ? dependentsOf(schema.blocks, bid, (c) => c.answer === inUse) : [];
+        const inUse = codeOrigins.current.get(originKey(bid, ref, i)) ?? option.code.trim();
+        const deps = isSourceList(ref) && inUse ? dependentsOf(schema.blocks, bid, (c) => c.answer === inUse) : [];
         if (deps.length) {
           setNotice({
             text: `Can't remove "${option.label}" — these blocks have conditions that use it:`,
@@ -2069,11 +2154,11 @@ export default function EditorPage() {
           return;
         }
         forgetOrigins(bid);
-        setList(bid, list, options.filter((_, k) => k !== i));
+        setList(bid, ref, options.filter((_, k) => k !== i));
       },
       onAdd: () => {
-        const options = listOf(bid, list);
-        setList(bid, list, [...options, ...placeholderOptions(noun, 1, options)]);
+        const options = listOf(bid, ref);
+        setList(bid, ref, [...options, ...placeholderOptions(noun, 1, options)]);
       },
     };
   };
@@ -2085,30 +2170,32 @@ export default function EditorPage() {
    */
   const [importing, setImporting] = useState<{
     blockId: string;
-    list: OptionListName;
+    ref: OptionListRef;
     plural: string;
+    /** A grid column, for the dialog's title: `column 2 ("Frequency")`. */
+    owner?: string;
     fileName: string;
     parsed: ParsedImport;
     /** The list when the file was chosen; it can't change while the preview is open. */
     existing: Option[];
   } | null>(null);
-  async function readImportFile(bid: string, list: OptionListName, plural: string, file: File) {
+  async function readImportFile(bid: string, ref: OptionListRef, plural: string, file: File, owner?: string) {
     const kind = file.name.toLowerCase().match(/\.(csv|txt)$/)?.[1] as "csv" | "txt" | undefined;
     if (!kind) {
       setNotice({ text: `Choose a .csv or .txt file — "${file.name}" isn't one.` });
       return;
     }
     const text = await file.text(); // UTF-8; a leading byte-order mark is dropped by the parser
-    setImporting({ blockId: bid, list, plural, fileName: file.name, parsed: parseOptionFile(text, kind), existing: listOf(bid, list) });
+    setImporting({ blockId: bid, ref, plural, owner, fileName: file.name, parsed: parseOptionFile(text, kind), existing: listOf(bid, ref) });
   }
   function applyImportedOptions(mode: ImportMode, preview: ImportPreviewRow[]) {
     if (!importing || !schema) return;
-    const { blockId: bid, list, plural, existing } = importing;
+    const { blockId: bid, ref, plural, existing } = importing;
     const next = applyImport(existing, preview, mode);
     setImporting(null);
     // Replacing a source's options can't drop a code a condition uses; codes in the file keep theirs.
     const deps =
-      mode === "replace" && list === "options" ? replaceBlockers(schema.blocks, bid, next.map((o) => o.code)) : [];
+      mode === "replace" && isSourceList(ref) ? replaceBlockers(schema.blocks, bid, next.map((o) => o.code)) : [];
     if (deps.length) {
       setNotice({
         text: `Can't replace the ${plural} — these blocks have conditions that use a code that isn't in the file:`,
@@ -2117,16 +2204,47 @@ export default function EditorPage() {
       return;
     }
     forgetOrigins(bid);
-    setList(bid, list, next);
+    setList(bid, ref, next);
     setCodeStatus({
       blockId: bid,
-      list,
+      ref,
       text:
         mode === "add"
           ? `Added ${preview.length} ${preview.length === 1 ? plural.replace(/s$/, "") : plural} from the file.`
           : `Replaced the ${plural} with ${preview.length} from the file.`,
     });
   }
+
+  /*
+   * A grid's columns (contract §14.6). Their code, label and removal go through
+   * `optionHandlers` like any coded list; adding, moving, the type and Required
+   * are here. Each uses the shared column helpers, which keep every other
+   * column, and every other field of the edited one, as it was.
+   */
+  const updateColumns = (bid: string, edit: (columns: GridColumn[]) => GridColumn[]) =>
+    patch((s) => ({
+      ...s,
+      blocks: updateBlockInTree(s.blocks, bid, (b) => (isGrid(b) ? { ...b, columns: edit(b.columns ?? []) } : b)),
+    }));
+  const columnHandlers = (bid: string) => ({
+    onAdd: () => updateColumns(bid, addGridColumn),
+    onMove: (i: number, direction: -1 | 1) => {
+      forgetOrigins(bid); // remembered codes are by position
+      updateColumns(bid, (columns) => moveGridColumn(columns, i, direction));
+    },
+    onRequired: (i: number, required: boolean) =>
+      updateColumns(bid, (columns) => updateGridColumn(columns, i, { required: required ? true : undefined })),
+    // A choice column turned into text loses its options, so that is asked first; Cancel changes nothing.
+    onType: (i: number, type: GridColumnType) => {
+      const block = schema ? findBlock(schema.blocks, bid)?.block : undefined;
+      const column = block && isGrid(block) ? block.columns?.[i] : undefined;
+      if (!column) return;
+      const warning = columnTypeChangeWarning(column, i, type);
+      if (warning && !window.confirm(warning)) return;
+      forgetOrigins(bid);
+      updateColumns(bid, (columns) => columns.map((c, k) => (k === i ? withColumnType(c, type) : c)));
+    },
+  });
 
   /** For the condition editor: the code of option `index` of `sourceId`, generated first if empty. */
   function pickAnswer(sourceId: string, index: number): string {
@@ -2475,6 +2593,9 @@ export default function EditorPage() {
   const repeatProblem = (field: "repeatLabel" | "minOccurs" | "maxOccurs") =>
     selectedRepeatProblems.find((p) => p.field === field)?.detail;
   const numbers = questionNumbers(schema.blocks);
+  /** The polite status line for one list: "2 conditions updated…", "Added 3 rows from the file." */
+  const listStatus = (bid: string, ref: OptionListRef) =>
+    codeStatus?.blockId === bid && sameOptionList(codeStatus.ref, ref) ? codeStatus.text : null;
   // While a group is dragged, its contents travel with it as one row.
   const rows = flattenVisible(schema.blocks, collapsed, drag?.activeId ?? null);
   const projection = drag
@@ -2713,6 +2834,7 @@ export default function EditorPage() {
         <OptionImportDialog
           fileName={importing.fileName}
           plural={importing.plural}
+          owner={importing.owner}
           parsed={importing.parsed}
           existing={importing.existing}
           onApply={applyImportedOptions}
@@ -3110,29 +3232,88 @@ export default function EditorPage() {
               {/* Coded lists (contract §13): options, or a matrix's rows and columns. */}
               {OPTION_TYPES.includes(selected.type) &&
                 ([
-                  ["options", selected.type === "matrix" ? "Rows" : "Options", selected.type === "matrix" ? "row" : "option", "Option"],
-                  ...(selected.type === "matrix" ? [["columns", "Columns", "column", "Column"]] : []),
-                ] as [OptionListName, string, string, "Option" | "Column"][]).map(([list, heading, noun, placeholder]) => (
+                  [{ list: "options" }, selected.type === "matrix" ? "Rows" : "Options", selected.type === "matrix" ? "row" : "option", "Option"],
+                  ...(selected.type === "matrix" ? [[{ list: "columns" }, "Columns", "column", "Column"]] : []),
+                ] as [OptionListRef, string, string, "Option" | "Column"][]).map(([ref, heading, noun, placeholder]) => (
                   <OptionListEditor
-                    key={list}
-                    idPrefix={list}
+                    key={ref.list}
+                    idPrefix={ref.list}
                     heading={heading}
                     noun={noun}
-                    options={(list === "options" ? selected.options : selected.columns) ?? []}
-                    problems={optionListProblems(selected).filter((p) => p.list === list)}
-                    status={codeStatus?.blockId === selected.id && codeStatus.list === list ? codeStatus.text : null}
-                    {...optionHandlers(selected.id, list, placeholder)}
-                    onImportFile={(file) => readImportFile(selected.id, list, heading.toLowerCase(), file)}
+                    options={optionListAt(selected, ref)}
+                    problems={optionListProblems(selected).filter((p) => sameOptionList(p, ref))}
+                    status={listStatus(selected.id, ref)}
+                    {...optionHandlers(selected.id, ref, placeholder)}
+                    onImportFile={(file) => readImportFile(selected.id, ref, heading.toLowerCase(), file)}
                   />
                 ))}
 
               {/*
-                Only questions can be required: not presentational blocks or groups.
+                A grid (contract §14.6): its rows are a coded list with import, like any
+                other; its columns each have a code, a label, a type, Required and, for
+                radio and dropdown, their own options with import. Columns aren't imported.
+                The note about changing codes is shown once for the whole grid.
+              */}
+              {isGrid(selected) &&
+                (() => {
+                  const problems = optionListProblems(selected);
+                  const problemsOf = (ref: OptionListRef) => problems.filter((p) => sameOptionList(p, ref));
+                  const rowsRef: OptionListRef = { list: "rows" };
+                  const columnsRef: OptionListRef = { list: "columns" };
+                  const columns = selected.columns ?? [];
+                  // The columns' code, label and removal behave as in any coded list; adding is a column's own.
+                  const { onAdd: _optionAdd, ...columnRowHandlers } = optionHandlers(selected.id, columnsRef, "Column");
+                  return (
+                    <>
+                      <OptionListEditor
+                        idPrefix="rows"
+                        heading="Rows"
+                        noun="row"
+                        options={selected.rows ?? []}
+                        problems={problemsOf(rowsRef)}
+                        status={listStatus(selected.id, rowsRef)}
+                        sharedNoteId="grid-code-note"
+                        {...optionHandlers(selected.id, rowsRef, "Row")}
+                        onImportFile={(file) => readImportFile(selected.id, rowsRef, "rows", file)}
+                      />
+                      <GridColumnsEditor
+                        columns={columns}
+                        problems={problemsOf(columnsRef)}
+                        noteId="grid-code-note"
+                        {...columnRowHandlers}
+                        {...columnHandlers(selected.id)}
+                        renderOptions={(k) => {
+                          const ref: OptionListRef = { list: "options", column: k };
+                          const column = columns[k];
+                          return (
+                            <OptionListEditor
+                              idPrefix={`grid-col-${k}-options`}
+                              heading="Options"
+                              noun="option"
+                              owner={`column ${k + 1}`}
+                              options={column && isChoiceColumn(column) ? (column.options ?? []) : []}
+                              problems={problemsOf(ref)}
+                              status={listStatus(selected.id, ref)}
+                              sharedNoteId="grid-code-note"
+                              {...optionHandlers(selected.id, ref, "Option")}
+                              onImportFile={(file) => readImportFile(selected.id, ref, "options", file, gridColumnName(column, k))}
+                            />
+                          );
+                        }}
+                      />
+                      <CodeChangeNote id="grid-code-note" className="-mt-2 mb-4" />
+                    </>
+                  );
+                })()}
+
+              {/*
+                Only questions can be required: not presentational blocks or groups, and
+                not a grid, whose columns are required one by one (canBeRequired).
                 A matrix or ranking can also require a complete answer (completeRequired).
                 The renderer then requires an answer whatever Required says, so Required
                 shows as on, and can't be turned off, while it is set.
               */}
-              {isAnswerable(selected) && (() => {
+              {canBeRequired(selected) && (() => {
                 const completeLabel = COMPLETE_REQUIRED_LABELS[selected.type as keyof typeof COMPLETE_REQUIRED_LABELS];
                 const complete = !!completeLabel && !!selected.completeRequired;
                 const required = !!selected.required || complete;

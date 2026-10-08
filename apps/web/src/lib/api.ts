@@ -188,12 +188,11 @@ export type OrgSettings = {
   dataRegion: "us" | "eu";
   retentionDays: number;
   brandingHidden: boolean;
-  canWhiteLabel: boolean;
 };
 export function getOrgSettings() {
   return req<OrgSettings>("/v1/settings/org");
 }
-export function updateOrgSettings(patch: Partial<Omit<OrgSettings, "canWhiteLabel">>) {
+export function updateOrgSettings(patch: Partial<OrgSettings>) {
   return req<OrgSettings>("/v1/settings/org", {
     method: "PUT",
     body: JSON.stringify(patch),
@@ -203,38 +202,6 @@ export function purgeResponses() {
   return req<{ ok: boolean; purged: number }>("/v1/settings/org/purge", {
     method: "POST",
   });
-}
-
-/* ---------- billing ---------- */
-
-export type PlanId = "free" | "pro" | "business";
-export type PlanDef = {
-  id: PlanId;
-  name: string;
-  price: number;
-  maxForms: number | null;
-  customDomains: boolean;
-  removeBranding: boolean;
-  features: string[];
-};
-export type BillingSummary = {
-  plan: PlanId;
-  managed: boolean;
-  usage: { forms: number };
-  plans: PlanDef[];
-};
-
-export function getBilling() {
-  return req<BillingSummary>("/v1/billing");
-}
-export function checkout(plan: PlanId) {
-  return req<{ url?: string; devMode?: boolean; plan?: PlanId }>("/v1/billing/checkout", {
-    method: "POST",
-    body: JSON.stringify({ plan }),
-  });
-}
-export function billingPortal() {
-  return req<{ url: string }>("/v1/billing/portal", { method: "POST" });
 }
 
 /* ---------- custom domains ---------- */

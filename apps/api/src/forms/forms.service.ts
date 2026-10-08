@@ -11,6 +11,7 @@ import {
   describeBlockPath,
   draftsProblem,
   formProblems,
+  gridColumnName,
   emptyForm,
   sameContent,
   FormSchema,
@@ -21,14 +22,13 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AutomationsService } from "../automations/automations.service";
 import { MailService } from "../mail/mail.service";
 import { SearchService } from "../search/search.service";
-import { assertFormQuota } from "../billing/billing.service";
 import { env } from "../config/env";
 import type { AuthUser } from "../auth/current-user.decorator";
 
 /** Versions are append-only, so a form's current version is its highest `version`. */
 const LATEST_VERSION = { orderBy: { version: "desc" }, take: 1 } as const;
 
-type RawBlock = { type?: unknown; label?: unknown; title?: unknown; blocks?: RawBlock[] };
+type RawBlock = { type?: unknown; label?: unknown; title?: unknown; blocks?: RawBlock[]; columns?: unknown };
 
 /**
  * Turn the first schema validation issue into a message a person can act on,
@@ -39,7 +39,7 @@ type RawBlock = { type?: unknown; label?: unknown; title?: unknown; blocks?: Raw
  */
 function describeSchemaError(
   raw: unknown,
-  error: { issues: { path: (string | number)[]; message: string }[] },
+  error: { issues: { path: (string | number)[]; message: string; code?: string }[] },
 ): string {
   const issue = error.issues[0];
   let list = (raw as { blocks?: RawBlock[] } | null)?.blocks;
@@ -61,12 +61,23 @@ function describeSchemaError(
   if (consumed === 0) {
     return `Invalid form schema${issue.path.length ? ` (${issue.path.join(".")})` : ""}: ${issue.message}`;
   }
+  const block = chain[chain.length - 1];
   // A matrix's `options` are its rows (contract §13.1); name them as the author sees them.
   const rest = issue.path.slice(consumed).map((step, k) =>
-    k === 0 && step === "options" && chain[chain.length - 1]?.type === "matrix" ? "rows" : step,
+    k === 0 && step === "options" && block?.type === "matrix" ? "rows" : step,
   );
+  const subject = describeBlockPath(chain, indices);
+  // Inside a grid column, name the column as the save rules do (contract §14.4). An
+  // unknown type, or a column that isn't an object, reads straight after its name.
+  if (block?.type === "grid" && rest[0] === "columns" && typeof rest[1] === "number") {
+    const column = Array.isArray(block.columns) ? (block.columns[rest[1]] as { label?: unknown } | null) : null;
+    const name = gridColumnName(typeof column === "object" && column !== null ? column : {}, rest[1]);
+    const inner = rest.slice(2);
+    if (issue.code === "invalid_union_discriminator" || inner.length === 0) return `${subject}: ${name} ${issue.message}`;
+    return `${subject}: ${name} (${inner.join(".")}): ${issue.message}`;
+  }
   const where = rest.length ? ` (${rest.join(".")})` : "";
-  return `${describeBlockPath(chain, indices)}${where}: ${issue.message}`;
+  return `${subject}${where}: ${issue.message}`;
 }
 
 function escapeHtml(s: string): string {
@@ -116,7 +127,6 @@ export class FormsService {
 
   async create(user: AuthUser, title: string) {
     await this.assertCanEdit(user);
-    await assertFormQuota(this.prisma, user.orgId);
     return this.prisma.form.create({
       data: {
         title,
@@ -265,7 +275,6 @@ export class FormsService {
 
   async duplicate(user: AuthUser, id: string) {
     await this.assertCanEdit(user);
-    await assertFormQuota(this.prisma, user.orgId);
     const form = await this.get(user, id);
     const schema = form.versions[0]?.schema ?? emptyForm(form.title);
     const title = `${form.title} (copy)`;
@@ -284,7 +293,6 @@ export class FormsService {
 
   async createWithSchema(user: AuthUser, schema: unknown) {
     await this.assertCanEdit(user);
-    await assertFormQuota(this.prisma, user.orgId);
     const parsed = FormSchema.parse(schema);
     return this.prisma.form.create({
       data: {
@@ -411,7 +419,7 @@ export class FormsService {
       title: form.title,
       slug: form.slug,
       schema: form.versions[0]?.schema ?? emptyForm(form.title),
-      // White-label: hide the "Made with Frame" footer for Pro+ orgs that opt in.
+      // White-label: hide the "Made with Frame" footer for orgs that opt in.
       branding: !form.workspace.org.brandingHidden,
     };
   }

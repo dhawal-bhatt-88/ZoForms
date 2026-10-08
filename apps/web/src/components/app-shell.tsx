@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ChevronsUpDown,
-  CreditCard,
   Globe,
   LayoutGrid,
   LayoutTemplate,
@@ -24,7 +23,6 @@ const NAV = [
   { href: "/app/integrations", label: "Integrations", icon: Zap },
   { href: "/app/domains", label: "Domains", icon: Globe },
   { href: "/app/team", label: "Team", icon: Users },
-  { href: "/app/billing", label: "Billing", icon: CreditCard },
   { href: "/app/settings", label: "Settings", icon: Settings },
 ];
 
@@ -80,7 +78,6 @@ export default function AppShell({
               <span className="block truncate text-[13px] font-semibold leading-tight">
                 {user?.name || "My workspace"}
               </span>
-              <span className="block truncate text-[11px] text-muted">Free plan</span>
             </span>
             <ChevronsUpDown className="h-3.5 w-3.5 flex-none text-faint" />
           </button>

@@ -39,8 +39,8 @@ function corsAllowed(origin: string, reqHost: string | undefined): boolean {
 }
 
 async function bootstrap() {
-  // Bodies are parsed by configureBodyParsing: the Stripe webhook's raw bytes,
-  // a larger limit for saving a form, 100 KB for everything else.
+  // Bodies are parsed by configureBodyParsing: a larger limit for saving a form,
+  // 100 KB for everything else.
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bodyParser: false,
   });

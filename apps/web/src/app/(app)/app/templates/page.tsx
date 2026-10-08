@@ -6,7 +6,6 @@ import {
   ArrowRight,
   Calendar,
   ChevronDown,
-  CreditCard,
   Eye,
   LayoutGrid,
   Loader2,
@@ -416,12 +415,6 @@ function MiniField({ block, accent }: { block: Block; accent: string }) {
           <Calendar className="h-3 w-3" /> Pick a {block.type === "time" ? "time" : "date"}
         </div>
       );
-    case "payment":
-      return (
-        <div className="flex items-center gap-1.5 rounded-md border border-line px-2 py-1.5 text-[10.5px] text-muted">
-          <CreditCard className="h-3 w-3" /> Card details
-        </div>
-      );
     case "long":
       return <div className="h-8 rounded-md bg-surface-3" />;
     default:
@@ -570,12 +563,6 @@ function PreviewField({ block, accent }: { block: Block; accent: string }) {
       return (
         <div className={`${base} flex items-center gap-2`}>
           <Calendar className="h-4 w-4" /> Pick a {block.type === "time" ? "time" : "date"}
-        </div>
-      );
-    case "payment":
-      return (
-        <div className={`${base} flex items-center gap-2`}>
-          <CreditCard className="h-4 w-4" /> Card number
         </div>
       );
     default:

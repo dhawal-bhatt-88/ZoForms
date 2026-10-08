@@ -52,14 +52,11 @@ model Organization {
   id              String       @id @default(uuid())
   name            String
   slug            String       @unique
-  plan             String      @default("free") // free | pro | business
   status           String      @default("active") // active | suspended
   createdAt        DateTime    @default(now())
-  stripeCustomerId String?
-  stripeSubId      String?
   dataRegion       String     @default("us") // us | eu — data residency label
   retentionDays    Int        @default(0) // 0 = keep responses forever
-  brandingHidden   Boolean    @default(false) // white-label (Pro+)
+  brandingHidden   Boolean    @default(false) // white-label: hide "Made with Frame"
   anthropicApiKey String?
   aiModel         String?
   workspaces      Workspace[]
@@ -103,7 +100,7 @@ model AuditLog {
   id         String   @id @default(uuid())
   actorId    String // admin user id
   actorEmail String
-  action     String // e.g. org.plan_changed, user.suspended, user.impersonated
+  action     String // e.g. org.suspended, user.suspended, user.impersonated
   targetType String? // org | user | form
   targetId   String?
   meta       Json?

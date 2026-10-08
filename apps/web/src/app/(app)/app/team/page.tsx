@@ -18,7 +18,7 @@ import {
 
 const ROLES: Role[] = ["OWNER", "ADMIN", "EDITOR", "VIEWER"];
 const ROLE_BLURB: Record<Role, string> = {
-  OWNER: "Full access, incl. billing & ownership",
+  OWNER: "Full access, incl. ownership",
   ADMIN: "Manage team, forms & settings",
   EDITOR: "Create and edit forms",
   VIEWER: "Read-only access to forms & responses",

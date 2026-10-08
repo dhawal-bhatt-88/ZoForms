@@ -47,10 +47,6 @@ async function submit(slug, data) { await post(`/v1/public/forms/${slug}/respons
   console.log("Seeding", API);
   await signupOrLogin();
 
-  // Put the demo org on Pro so there's no form quota and the Billing page
-  // shows a paid plan. (No-op cost: dev-mode when Stripe isn't configured.)
-  await post("/v1/billing/checkout", { plan: "pro" }).then(() => console.log("  upgraded demo org → Pro")).catch(() => {});
-
   const nps = await makeForm("Customer Feedback & NPS", { description: "Two quick questions — thank you!", settings: { theme: { accent: "#6D5EFA", radius: "md" }, notifyEmails: [EMAIL] }, blocks: [
     { id: "nps", type: "scale", label: "How likely are you to recommend us?", required: true, min: 0, max: 10 },
     { id: "why", type: "long", label: "What could we improve?", required: false },

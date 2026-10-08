@@ -42,7 +42,7 @@ export class AdminController {
   updateOrg(
     @CurrentAdmin() actor: AdminActor,
     @Param("id") id: string,
-    @Body() body: { plan?: string; status?: string },
+    @Body() body: { status?: string },
   ) {
     return this.admin.updateOrg(actor, id, body || {});
   }

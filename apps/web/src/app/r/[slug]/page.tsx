@@ -605,14 +605,12 @@ function Field({
             </option>
           ))}
         </select>
-      ) : block.type === "payment" || block.type === "signature" ? (
+      ) : block.type === "signature" ? (
         <div
           className="border border-dashed px-3.5 py-4 text-center text-sm"
           style={{ borderRadius: radius, borderColor: border, color: mutedText }}
         >
-          {block.type === "payment"
-            ? "💳 Payment collection — connect Stripe to enable"
-            : "✍️ Signature capture — coming soon"}
+          ✍️ Signature capture — coming soon
         </div>
       ) : block.type === "rating" ? (
         <div className="flex gap-1.5">

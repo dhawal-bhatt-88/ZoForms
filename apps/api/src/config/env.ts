@@ -34,11 +34,6 @@ const EnvSchema = z.object({
   // Resend transactional email. Without a key, emails are logged and skipped.
   RESEND_API_KEY: z.string().optional(),
   MAIL_FROM: z.string().default("Frame <onboarding@resend.dev>"),
-  // Stripe billing. Without keys, upgrades apply immediately in dev mode.
-  STRIPE_SECRET_KEY: z.string().optional(),
-  STRIPE_WEBHOOK_SECRET: z.string().optional(),
-  STRIPE_PRICE_PRO: z.string().optional(),
-  STRIPE_PRICE_BUSINESS: z.string().optional(),
   // Meilisearch for response search. Without it, search falls back to Postgres.
   MEILI_HOST: z.string().optional(),
   MEILI_KEY: z.string().optional(),

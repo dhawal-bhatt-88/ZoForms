@@ -4,7 +4,7 @@ import { memo, useMemo, useRef } from "react";
 import { Plus, Upload, X } from "lucide-react";
 import type { Option, OptionProblem } from "@formbuilder/form-schema";
 
-type RowHandlers = {
+export type RowHandlers = {
   onLabel: (index: number, label: string) => void;
   /** Called only when the label field is left after its label was changed (contract §13.3). */
   onLabelLeave: (index: number) => void;
@@ -16,7 +16,8 @@ type RowHandlers = {
 
 /**
  * The inspector's editor for one coded list (contract §13): a block's options,
- * a matrix's rows, or a matrix's columns. Each option has a code, then a label.
+ * a matrix's rows or columns, a grid's rows, or one grid column's options.
+ * Each option has a code, then a label.
  * The editor page owns the rules: it fills an empty code when the label field
  * is left after a change, rewrites conditions when a code changes, and refuses removing an
  * option a condition uses. Everything shown here is plain text.
@@ -31,11 +32,13 @@ export function OptionListEditor({
   options,
   problems,
   status,
+  owner,
+  sharedNoteId,
   onAdd,
   onImportFile,
   ...handlers
 }: RowHandlers & {
-  /** Unique on the page, for element ids: "options" or "columns". */
+  /** Unique on the page, for element ids: "options", "columns", "rows", or one per grid column. */
   idPrefix: string;
   /** "Options", "Rows" or "Columns". */
   heading: string;
@@ -46,6 +49,18 @@ export function OptionListEditor({
   problems: readonly OptionProblem[];
   /** "2 conditions updated to use …", announced politely. */
   status: string | null;
+  /**
+   * Whose list this is, when the inspector shows several of the same kind — a
+   * grid column's options: "column 2". Added to every control's accessible
+   * name, so each one says which column it belongs to.
+   */
+  owner?: string;
+  /**
+   * The id of a note about changing codes shown elsewhere, once for several
+   * lists (a grid's rows and all its columns). This editor then doesn't show
+   * its own, and its code fields point at that one. Absent: it shows its own.
+   */
+  sharedNoteId?: string;
   onAdd: () => void;
   /** A .csv or .txt file the author chose; it is read in the browser, never uploaded (contract §13.9). */
   onImportFile: (file: File) => void;
@@ -75,7 +90,10 @@ export function OptionListEditor({
   return (
     // min-w-0: a fieldset is min-content wide by default, which pushed the inspector sideways.
     <fieldset className="mb-4 min-w-0">
-      <legend className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">{heading}</legend>
+      <legend className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">
+        {heading}
+        {owner && <span className="sr-only"> for {owner}</span>}
+      </legend>
       {listProblem && (
         <p role="alert" className="mb-1.5 text-xs text-red">
           {listProblem.detail}
@@ -93,6 +111,8 @@ export function OptionListEditor({
             key={i}
             idPrefix={idPrefix}
             noun={noun}
+            owner={owner}
+            noteId={sharedNoteId}
             index={i}
             label={o.label}
             code={o.code}
@@ -108,6 +128,8 @@ export function OptionListEditor({
             className="flex items-center gap-1.5 text-sm font-medium text-accent-2 hover:underline"
           >
             <Plus className="h-4 w-4" /> Add {noun}
+            {/* Words, not punctuation: browsers may put a space before an out-of-flow span. */}
+            {owner && <span className="sr-only"> to {owner}</span>}
           </button>
           <button
             type="button"
@@ -115,7 +137,12 @@ export function OptionListEditor({
             className="flex items-center gap-1.5 text-sm font-medium text-accent-2 hover:underline"
           >
             {/* The visible text starts the accessible name (WCAG 2.5.3); the list tells a matrix's two apart. */}
-            <Upload className="h-4 w-4" /> Import from file<span className="sr-only"> into {heading.toLowerCase()}</span>
+            <Upload className="h-4 w-4" /> Import from file
+            <span className="sr-only">
+              {" "}
+              into {heading.toLowerCase()}
+              {owner ? ` for ${owner}` : ""}
+            </span>
           </button>
           <input
             ref={fileInput}
@@ -132,9 +159,7 @@ export function OptionListEditor({
           />
         </div>
       </div>
-      <p id={`${idPrefix}-note`} className="mt-2 text-xs text-muted">
-        Changing a code after the form is in use will not match answers already stored under the old code.
-      </p>
+      {!sharedNoteId && <CodeChangeNote id={`${idPrefix}-note`} />}
       <p role="status" aria-live="polite" className="mt-1 text-xs text-ink-2">
         {status}
       </p>
@@ -142,13 +167,28 @@ export function OptionListEditor({
   );
 }
 
+/** The standing note under code fields (contract §13.8). */
+export function CodeChangeNote({ id, className = "mt-2" }: { id: string; className?: string }) {
+  return (
+    <p id={id} className={`${className} text-xs text-muted`}>
+      Changing a code after the form is in use will not match answers already stored under the old code.
+    </p>
+  );
+}
+
 const field =
   "min-w-0 rounded-lg border border-line-2 px-2.5 py-1.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent-weak aria-[invalid=true]:border-red";
 
-/** One option: code, label, remove. Re-renders only when its own values or messages change. */
-const OptionRow = memo(function OptionRow({
+/**
+ * One option: code, label, remove. Re-renders only when its own values or
+ * messages change. Also a grid column's code and label (the columns editor),
+ * so both behave the same way.
+ */
+export const OptionRow = memo(function OptionRow({
   idPrefix,
   noun,
+  owner,
+  noteId,
   index: i,
   label,
   code,
@@ -158,6 +198,10 @@ const OptionRow = memo(function OptionRow({
 }: {
   idPrefix: string;
   noun: string;
+  /** See OptionListEditor's `owner`. */
+  owner?: string;
+  /** The note the code field points at; by default the list's own (`{idPrefix}-note`). */
+  noteId?: string;
   index: number;
   label: string;
   code: string;
@@ -167,6 +211,7 @@ const OptionRow = memo(function OptionRow({
 }) {
   const Noun = noun.charAt(0).toUpperCase() + noun.slice(1);
   const base = `${idPrefix}-${i}`;
+  const of = owner ? `, ${owner}` : "";
   // The label when its field gained focus: leaving it generates a code only if the
   // label was changed meanwhile, so tabbing past an untouched placeholder ("Option 3")
   // generates nothing (contract §13.3).
@@ -181,7 +226,7 @@ const OptionRow = memo(function OptionRow({
       <div className="flex items-center gap-1.5">
         <input
           id={`${base}-code`}
-          aria-label={`${Noun} ${i + 1} code`}
+          aria-label={`${Noun} ${i + 1} code${of}`}
           value={code}
           placeholder="auto"
           spellCheck={false}
@@ -194,12 +239,12 @@ const OptionRow = memo(function OptionRow({
             if (e.key === "Enter") e.currentTarget.blur();
           }}
           aria-invalid={!!codeError}
-          aria-describedby={[codeError ? `${base}-code-error` : "", `${idPrefix}-note`].filter(Boolean).join(" ")}
+          aria-describedby={[codeError ? `${base}-code-error` : "", noteId ?? `${idPrefix}-note`].filter(Boolean).join(" ")}
           className={`${field} w-24 flex-none font-mono text-xs`}
         />
         <input
           id={`${base}-label`}
-          aria-label={`${Noun} ${i + 1} label`}
+          aria-label={`${Noun} ${i + 1} label${of}`}
           value={label}
           onChange={(e) => h.onLabel(i, e.target.value)}
           onFocus={() => {
@@ -217,7 +262,7 @@ const OptionRow = memo(function OptionRow({
           type="button"
           onClick={() => h.onRemove(i)}
           className="grid h-8 w-8 flex-none place-items-center rounded-lg text-faint hover:bg-surface-3 hover:text-ink"
-          aria-label={`Remove ${noun} ${i + 1}`}
+          aria-label={`Remove ${noun} ${i + 1}${of}`}
         >
           <X className="h-4 w-4" />
         </button>

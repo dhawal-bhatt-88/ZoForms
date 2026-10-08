@@ -1,19 +1,11 @@
-// Request body limits (apps/api/src/common/body-parsing.ts): 100 KB everywhere, 10 MB
-// only for a signed-in author saving a form, and the Stripe webhook still verified
-// against its raw bytes. API only.
-//
-// The two Stripe checks need the API started with test Stripe settings, e.g.
-//   STRIPE_SECRET_KEY=sk_test_e2e STRIPE_WEBHOOK_SECRET=whsec_e2e_test pnpm --filter api dev
-// and E2E_STRIPE_WEBHOOK_SECRET=whsec_e2e_test here. Without it they're skipped.
-const path = require("path");
-const { ROOT, API, PrismaClient, opts } = require("./_setup");
-const Stripe = require(path.join(ROOT, "apps/api/node_modules/stripe"));
+// Request body limits (apps/api/src/common/body-parsing.ts): 100 KB everywhere, and 10 MB
+// only for a signed-in author saving a form. API only.
+const { API, PrismaClient, opts } = require("./_setup");
 const prisma = new PrismaClient();
 
 const results = [];
 const check = (name, pass, detail = "") => results.push([name, !!pass, detail]);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const WEBHOOK_SECRET = process.env.E2E_STRIPE_WEBHOOK_SECRET;
 const kb = (n) => "x".repeat(n * 1024);
 
 (async () => {
@@ -60,21 +52,10 @@ const kb = (n) => "x".repeat(n * 1024);
     r = await save(JSON.stringify({ title: "Small", blocks: [{ id: "c", type: "choice", label: "C", options: opts("Yes", "No") }] }));
     check("a normal save still works (200)", r.status === 200, `${r.status}`);
 
-    // ---------- the Stripe webhook: raw bytes ----------
-    const webhook = (payload, signature) =>
-      fetch(API + "/v1/billing/webhook", { method: "POST", headers: { ...json, "stripe-signature": signature }, body: payload });
-    if (!WEBHOOK_SECRET) {
-      console.log("  SKIP  Stripe webhook checks (start the API with test Stripe settings and set E2E_STRIPE_WEBHOOK_SECRET; see the top of this file)");
-    } else {
-      // Unusual spacing and key order: re-serialising the parsed JSON would change the bytes and break the signature.
-      const payload = `{ "id":"evt_e2e_1",  "object":"event", "type":"invoice.created",\n "data": {"object": {"id":"in_e2e"}} }`;
-      const stripe = new Stripe("sk_test_e2e");
-      const signature = stripe.webhooks.generateTestHeaderString({ payload, secret: WEBHOOK_SECRET });
-      r = await webhook(payload, signature);
-      check("a correctly signed Stripe webhook is accepted", r.status === 201 && JSON.stringify(await r.json()) === '{"received":true}', `${r.status}`);
-      r = await webhook(payload.replace("in_e2e", "in_e2f"), signature);
-      check("a tampered webhook body is refused (400)", r.status === 400 && /^Webhook signature failed/.test(await message(r)), `${r.status}`);
-    }
+    // ---------- billing is gone ----------
+    r = await fetch(API + "/v1/billing/webhook", { method: "POST", headers: json, body: "{}" });
+    const billing = await fetch(API + "/v1/billing", { headers: H });
+    check("the old billing routes no longer exist (404)", r.status === 404 && billing.status === 404, `${r.status} ${billing.status}`);
   } catch (e) {
     check("script ran without error", false, e.stack);
   } finally {

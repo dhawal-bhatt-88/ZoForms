@@ -16,19 +16,18 @@ export class AdminService {
   async overview() {
     const since = new Date(Date.now() - 13 * 24 * 60 * 60 * 1000);
     since.setHours(0, 0, 0, 0);
-    const [orgs, users, forms, published, responses, planGroups, userRows, recentOrgs] =
+    const [orgs, users, forms, published, responses, userRows, recentOrgs] =
       await Promise.all([
         this.prisma.organization.count(),
         this.prisma.user.count(),
         this.prisma.form.count(),
         this.prisma.form.count({ where: { status: "PUBLISHED" } }),
         this.prisma.response.count(),
-        this.prisma.organization.groupBy({ by: ["plan"], _count: { _all: true } }),
         this.prisma.user.findMany({ where: { createdAt: { gte: since } }, select: { createdAt: true } }),
         this.prisma.organization.findMany({
           orderBy: { createdAt: "desc" },
           take: 6,
-          select: { id: true, name: true, plan: true, status: true, createdAt: true },
+          select: { id: true, name: true, status: true, createdAt: true },
         }),
       ]);
 
@@ -45,12 +44,8 @@ export class AdminService {
       if (k !== undefined) signups[k].count++;
     }
 
-    const plans = { free: 0, pro: 0, business: 0 } as Record<string, number>;
-    for (const g of planGroups) plans[g.plan] = g._count._all;
-
     return {
       totals: { orgs, users, forms, published, responses },
-      plans,
       signups,
       recentOrgs,
     };
@@ -70,7 +65,6 @@ export class AdminService {
         id: true,
         name: true,
         slug: true,
-        plan: true,
         status: true,
         createdAt: true,
         _count: { select: { memberships: true, workspaces: true } },
@@ -104,7 +98,6 @@ export class AdminService {
         id: true,
         name: true,
         slug: true,
-        plan: true,
         status: true,
         createdAt: true,
         anthropicApiKey: true,
@@ -138,7 +131,6 @@ export class AdminService {
       id: org.id,
       name: org.name,
       slug: org.slug,
-      plan: org.plan,
       status: org.status,
       createdAt: org.createdAt,
       hasAiKey: !!org.anthropicApiKey,
@@ -148,18 +140,15 @@ export class AdminService {
     };
   }
 
-  async updateOrg(actor: AdminActor, id: string, dto: { plan?: string; status?: string }) {
-    const org = await this.prisma.organization.findUnique({ where: { id }, select: { plan: true, status: true } });
+  async updateOrg(actor: AdminActor, id: string, dto: { status?: string }) {
+    const org = await this.prisma.organization.findUnique({ where: { id }, select: { status: true } });
     if (!org) throw new NotFoundException("Organization not found");
-    const data: { plan?: string; status?: string } = {};
-    if (dto.plan && ["free", "pro", "business"].includes(dto.plan)) data.plan = dto.plan;
+    const data: { status?: string } = {};
     if (dto.status && ["active", "suspended"].includes(dto.status)) data.status = dto.status;
     const updated = await this.prisma.organization.update({ where: { id }, data });
-    if (data.plan && data.plan !== org.plan)
-      await this.audit(actor, "org.plan_changed", "org", id, { from: org.plan, to: data.plan });
     if (data.status && data.status !== org.status)
       await this.audit(actor, `org.${data.status === "suspended" ? "suspended" : "reactivated"}`, "org", id, {});
-    return { id: updated.id, plan: updated.plan, status: updated.status };
+    return { id: updated.id, status: updated.status };
   }
 
   /* ---------- users ---------- */

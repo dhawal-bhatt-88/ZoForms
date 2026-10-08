@@ -21,12 +21,15 @@ export function OptionImportDialog({
   plural,
   parsed,
   existing,
+  owner,
   onApply,
   onClose,
 }: {
   fileName: string;
   /** The list, lower case: "options", "rows" or "columns". */
   plural: string;
+  /** Whose list, when it isn't the block's own: a grid column, e.g. `column 2 ("Frequency")`. Plain text. */
+  owner?: string;
   parsed: ParsedImport;
   existing: readonly Option[];
   onApply: (mode: ImportMode, preview: ImportPreviewRow[]) => void;
@@ -58,7 +61,8 @@ export function OptionImportDialog({
         onKeyDown={(e) => e.key === "Escape" && onClose()}
       >
         <h2 id="import-title" className="text-base font-semibold">
-          Import {plural} from “{fileName}”
+          Import {plural}
+          {owner ? ` for ${owner}` : ""} from “{fileName}”
         </h2>
 
         {!parsed.ok ? (

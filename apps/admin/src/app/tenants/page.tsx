@@ -6,12 +6,6 @@ import { Building2, Loader2, Search } from "lucide-react";
 import AdminShell from "@/components/admin-shell";
 import { listOrgs, type OrgRow } from "@/lib/api";
 
-const PLAN_CLS: Record<string, string> = {
-  free: "bg-surface-3 text-muted",
-  pro: "bg-accent-weak text-accent-2",
-  business: "bg-[#E7F6ED] text-green",
-};
-
 export default function TenantsPage() {
   const [rows, setRows] = useState<OrgRow[]>([]);
   const [q, setQ] = useState("");
@@ -51,7 +45,6 @@ export default function TenantsPage() {
             <thead>
               <tr className="border-b border-line text-left text-xs font-semibold uppercase tracking-wider text-faint">
                 <th className="px-4 py-3">Tenant</th>
-                <th className="px-4 py-3">Plan</th>
                 <th className="px-4 py-3 text-right">Members</th>
                 <th className="px-4 py-3 text-right">Forms</th>
                 <th className="px-4 py-3">Status</th>
@@ -68,11 +61,6 @@ export default function TenantsPage() {
                       </span>
                       <span className="truncate">{o.name}</span>
                     </Link>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize ${PLAN_CLS[o.plan]}`}>
-                      {o.plan}
-                    </span>
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-muted">{o._count.memberships}</td>
                   <td className="px-4 py-3 text-right tabular-nums text-muted">{o.forms}</td>
@@ -92,7 +80,7 @@ export default function TenantsPage() {
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-muted">
+                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-muted">
                     No tenants found.
                   </td>
                 </tr>

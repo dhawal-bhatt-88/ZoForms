@@ -67,16 +67,14 @@ export async function login(email: string, password: string) {
 
 export type Overview = {
   totals: { orgs: number; users: number; forms: number; published: number; responses: number };
-  plans: { free: number; pro: number; business: number };
   signups: { date: string; count: number }[];
-  recentOrgs: { id: string; name: string; plan: string; status: string; createdAt: string }[];
+  recentOrgs: { id: string; name: string; status: string; createdAt: string }[];
 };
 
 export type OrgRow = {
   id: string;
   name: string;
   slug: string;
-  plan: string;
   status: string;
   createdAt: string;
   forms: number;
@@ -87,7 +85,6 @@ export type OrgDetail = {
   id: string;
   name: string;
   slug: string;
-  plan: string;
   status: string;
   createdAt: string;
   hasAiKey: boolean;
@@ -131,8 +128,8 @@ export type AuditEntry = {
 export const getOverview = () => req<Overview>("/v1/admin/overview");
 export const listOrgs = (q = "") => req<OrgRow[]>(`/v1/admin/orgs${q ? `?q=${encodeURIComponent(q)}` : ""}`);
 export const getOrg = (id: string) => req<OrgDetail>(`/v1/admin/orgs/${id}`);
-export const updateOrg = (id: string, body: { plan?: string; status?: string }) =>
-  req<{ id: string; plan: string; status: string }>(`/v1/admin/orgs/${id}`, {
+export const updateOrg = (id: string, body: { status?: string }) =>
+  req<{ id: string; status: string }>(`/v1/admin/orgs/${id}`, {
     method: "PATCH",
     body: JSON.stringify(body),
   });

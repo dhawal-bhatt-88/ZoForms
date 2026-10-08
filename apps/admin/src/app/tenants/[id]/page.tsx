@@ -32,17 +32,6 @@ export default function TenantDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  async function changePlan(plan: string) {
-    if (!org) return;
-    setBusy(true);
-    try {
-      await updateOrg(id, { plan });
-      setOrg({ ...org, plan });
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function toggleStatus() {
     if (!org) return;
     const next = org.status === "suspended" ? "active" : "suspended";
@@ -109,27 +98,6 @@ export default function TenantDetail() {
             <Info label="Responses" value={org.responses} />
             <Info label="Created" value={new Date(org.createdAt).toLocaleDateString()} />
           </div>
-
-          {/* plan */}
-          <section className="rounded-2xl border border-line bg-surface p-5 shadow-soft">
-            <h3 className="mb-3 text-sm font-semibold tracking-tight">Plan</h3>
-            <div className="flex gap-2">
-              {(["free", "pro", "business"] as const).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => changePlan(p)}
-                  disabled={busy}
-                  className={`flex-1 rounded-xl border px-3 py-2.5 text-sm font-semibold capitalize transition-colors ${
-                    org.plan === p
-                      ? "border-accent bg-accent-weak text-accent-2"
-                      : "border-line-2 text-ink-2 hover:bg-surface-2"
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-          </section>
 
           {/* members */}
           <section className="rounded-2xl border border-line bg-surface p-5 shadow-soft">

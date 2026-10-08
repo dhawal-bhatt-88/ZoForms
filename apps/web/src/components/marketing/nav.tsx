@@ -27,7 +27,6 @@ const productMenu = [
 const links = [
   { label: "Customers", href: "/#customers" },
   { label: "Security", href: "/#security" },
-  { label: "Pricing", href: "/pricing" },
 ];
 
 export function MarketingNav() {

@@ -31,7 +31,7 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
       PORT: "4000"
-      # Public origins used to build absolute links (uploads / invites / verify / billing).
+      # Public origins used to build absolute links (uploads / invites / verify).
       PUBLIC_API_URL: ${PUBLIC_API_URL}
       PUBLIC_TENANT_URL: ${PUBLIC_TENANT_URL:-}
       # Extra CORS origins (the deployment host is always allowed automatically).
@@ -42,10 +42,6 @@ services:
       # --- Optional integrations (features degrade gracefully when unset) ---
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       MAIL_FROM: ${MAIL_FROM:-}
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
-      STRIPE_PRICE_PRO: ${STRIPE_PRICE_PRO:-}
-      STRIPE_PRICE_BUSINESS: ${STRIPE_PRICE_BUSINESS:-}
       TURNSTILE_SECRET: ${TURNSTILE_SECRET:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       MEILI_HOST: ${MEILI_HOST:-}

@@ -46,7 +46,7 @@ const NOTE = "Saving progress on the server needs pages, so it's been switched t
     const create = async (title) => (await (await fetch(API + "/v1/forms", { method: "POST", headers: H, body: JSON.stringify({ title }) })).json()).id;
     const put = (id, schema) => fetch(`${API}/v1/forms/${id}/schema`, { method: "PUT", headers: H, body: JSON.stringify(schema) });
     const artifact = async (id) => (await fetch(`${API}/v1/forms/${id}/artifact`, { headers: H })).json();
-    // The free plan allows 3 forms at once, so forms are deleted once checked.
+    // Forms are deleted once checked.
     const remove = (id) => fetch(`${API}/v1/forms/${id}`, { method: "DELETE", headers: H });
     const stored = async (id) => (await prisma.formVersion.findFirst({ where: { formId: id }, orderBy: { version: "desc" } })).schema;
 

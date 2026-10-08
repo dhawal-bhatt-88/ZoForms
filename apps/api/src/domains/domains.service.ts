@@ -7,7 +7,6 @@ import {
 } from "@nestjs/common";
 import { promises as dns } from "dns";
 import { PrismaService } from "../prisma/prisma.service";
-import { assertFeature } from "../billing/billing.service";
 import { env } from "../config/env";
 import type { AuthUser } from "../auth/current-user.decorator";
 
@@ -30,7 +29,6 @@ export class DomainsService {
 
   async add(user: AuthUser, hostnameRaw: string) {
     await this.assertManager(user);
-    await assertFeature(this.prisma, user.orgId, "customDomains");
     const hostname = (hostnameRaw || "").trim().toLowerCase().replace(/\.$/, "");
     if (!HOSTNAME_RE.test(hostname)) {
       throw new BadRequestException("Enter a valid domain, e.g. forms.acme.com");

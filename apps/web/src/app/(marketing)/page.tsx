@@ -42,7 +42,6 @@ const steps = [
 const comparison = [
   ["Time to first form", "Hours of drag-and-drop", "Seconds — just start typing"],
   ["Logic & branching", "Locked behind add-ons", "Built in, no code"],
-  ["Response limits", "Capped to force upgrades", "Unlimited, free forever"],
   ["Analytics", "Export to a spreadsheet", "Live funnel & drop-off"],
   ["Design control", "Rigid templates", "Colors, fonts, custom CSS"],
 ];
@@ -51,12 +50,6 @@ const security = [
   { icon: ShieldCheck, title: "SOC 2 Type II", body: "Independently audited controls across security, availability, and confidentiality." },
   { icon: Lock, title: "GDPR & encryption", body: "EU data residency, encryption at rest and in transit, and signed webhooks by default." },
   { icon: Users, title: "SSO & roles", body: "SAML single sign-on, SCIM provisioning, and granular role-based access for your org." },
-];
-
-const plans = [
-  { name: "Free", price: "$0", note: "Unlimited forms & responses" },
-  { name: "Pro", price: "$24", note: "Custom domains, no branding, teams", featured: true },
-  { name: "Business", price: "$74", note: "Data controls, verification, more" },
 ];
 
 const testimonials = [
@@ -87,7 +80,7 @@ const testimonials = [
 ];
 
 const logos = ["Northwind", "Brightlabs", "Fieldnotes", "Rakuto", "Glide", "Makeflow", "Airspace", "Lumen"];
-const integrations = ["Google Sheets", "Slack", "Notion", "Airtable", "Zapier", "Webhooks", "Stripe", "HubSpot", "Make", "Mailchimp"];
+const integrations = ["Google Sheets", "Slack", "Notion", "Airtable", "Zapier", "Webhooks", "HubSpot", "Make", "Mailchimp"];
 
 export default function LandingPage() {
   return (
@@ -250,7 +243,7 @@ export default function LandingPage() {
               <p className="mt-5 text-[13px] font-semibold uppercase tracking-wide text-accent-2">Document editor</p>
               <h3 className="mt-1 text-xl font-semibold tracking-tight">Build forms like you write a doc</h3>
               <p className="mt-2 max-w-md leading-relaxed text-muted">
-                Type naturally and hit “/” to drop in any question — short answer, rating, payment. No drag-and-drop maze.
+                Type naturally and hit “/” to drop in any question — short answer, rating, dropdown. No drag-and-drop maze.
               </p>
               {/* mini slash-menu illustration */}
               <div className="mt-6 rounded-xl border border-line bg-surface-2 p-3">
@@ -259,7 +252,7 @@ export default function LandingPage() {
                   <span className="font-mono">/rating</span>
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-1.5">
-                  {[["Short answer", true], ["Rating"], ["Multiple choice"], ["Payment"]].map(([label, active], i) => (
+                  {[["Short answer", true], ["Rating"], ["Multiple choice"], ["Dropdown"]].map(([label, active], i) => (
                     <div key={i} className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[13px] transition-colors ${active ? "bg-accent-weak text-accent-2" : "text-ink-2 group-hover:bg-white"}`}>
                       <span className="h-1.5 w-1.5 rounded-full bg-current opacity-60" />
                       {label as string}
@@ -449,35 +442,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ============ PRICING PREVIEW ============ */}
-      <section className="border-t border-line bg-surface py-24">
-        <div className="mx-auto max-w-6xl px-6">
-          <Reveal className="mx-auto max-w-2xl text-center">
-            <span className="eyebrow">Pricing</span>
-            <h2 className="mt-4 text-4xl font-bold tracking-tight">Generous free plan. Fair paid plans.</h2>
-            <p className="mt-4 text-lg text-muted">99% of features are free — including unlimited forms and responses. Pay only when you need branding, teams, or a custom domain.</p>
-          </Reveal>
-          <div className="mt-14 grid items-start gap-6 md:grid-cols-3">
-            {plans.map((p, i) => (
-              <Reveal key={p.name} delay={i * 90}>
-                <div className={`card-lift rounded-2xl border p-7 ${p.featured ? "relative border-accent bg-gradient-to-b from-accent-weak to-surface shadow-pop md:-translate-y-2" : "border-line bg-bg shadow-soft hover:border-line-2 hover:shadow-pop"}`}>
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold">{p.name}</h3>
-                    {p.featured && <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-semibold text-white">Popular</span>}
-                  </div>
-                  <p className="mt-3"><span className="text-4xl font-bold tracking-tight">{p.price}</span><span className="text-muted">/mo</span></p>
-                  <p className="mt-2 text-sm text-muted">{p.note}</p>
-                  <Link href="/pricing" className={`btn mt-6 w-full transition-transform hover:-translate-y-0.5 ${p.featured ? "btn-accent btn-shine" : "btn-outline"}`}>See what&apos;s included</Link>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-          <p className="mt-8 text-center text-sm text-muted">
-            <Link href="/pricing" className="font-semibold text-accent-2 hover:underline">Compare all plans →</Link>
-          </p>
-        </div>
-      </section>
-
       {/* ============ FINAL CTA ============ */}
       <section className="mx-auto max-w-6xl px-6 py-24">
         <Reveal y={28}>
@@ -489,7 +453,6 @@ export default function LandingPage() {
               <p className="mx-auto mt-4 max-w-xl text-white/70">No credit card. No setup. Just start typing.</p>
               <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 <Link href="/signup" className="btn btn-shine btn-lg w-full bg-white text-primary transition-transform hover:-translate-y-0.5 hover:opacity-95 sm:w-auto">Start for free <ArrowRight className="h-4 w-4" /></Link>
-                <Link href="/pricing" className="btn btn-lg w-full border border-white/25 text-white transition-colors hover:bg-white/10 sm:w-auto">View pricing</Link>
               </div>
               <p className="mt-6 flex items-center justify-center gap-2 text-sm text-white/60"><Check className="h-4 w-4" /> Free forever · Unlimited forms &amp; responses</p>
             </div>

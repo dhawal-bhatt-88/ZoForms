@@ -10,7 +10,7 @@ _Last updated: 2026-07-10_
 - [x] Capacity planning & scaling-design section added to the report
 - [x] Clickable prototype — 15 screens (`frame-prototype.html`)
 - [x] Monorepo scaffold: Next.js `web` + NestJS `api` + `form-schema` (walking skeleton verified end-to-end)
-- [x] Marketing site — landing + `/pricing`; dashboard moved to `/app`
+- [x] Marketing site — landing page; dashboard moved to `/app`
 - [x] Docs & mockup embedded in the app — `/docs`, `/mockup`
 - [x] Mockup typography upgrade — Hanken Grotesk across all 15 screens
 - [x] Deep-polished the form builder — cover-gradient depth + firmer title weight
@@ -31,10 +31,10 @@ _Last updated: 2026-07-10_
 - [ ] Follow-ups: swap local-disk uploads → S3; optional Caddy + domain/HTTPS
 
 ## 🛡️ Admin console (`apps/admin`, port 3002)
-- [x] Platform data model — User.isAdmin/status, Organization.plan/status, AuditLog
-- [x] AdminModule (API) — AdminGuard (isAdmin), overview, tenants (list/detail/plan/suspend), users (list/suspend/impersonate/delete), cross-tenant form moderation (take-down/delete), audit log; every mutation audited
+- [x] Platform data model — User.isAdmin/status, Organization.status, AuditLog
+- [x] AdminModule (API) — AdminGuard (isAdmin), overview, tenants (list/detail/suspend), users (list/suspend/impersonate/delete), cross-tenant form moderation (take-down/delete), audit log; every mutation audited
 - [x] Impersonation — admin issues a 1h token → tenant app /impersonate stores it and enters the app as that user (support login-as)
-- [x] Admin app — separate Next.js app: login (admin-only gate), Overview (metrics/signup-trend/plan mix), Tenants + tenant detail, Users, Forms, Audit log; shares the Frame design system
+- [x] Admin app — separate Next.js app: login (admin-only gate), Overview (metrics/signup-trend), Tenants + tenant detail, Users, Forms, Audit log; shares the Frame design system
 
 ## 🎨 Design system / app shell
 - [x] Enterprise app shell — persistent sidebar (workspace switcher, nav with active states, user menu) + topbar; applied to dashboard / templates / integrations / settings (editor stays full-screen)
@@ -56,7 +56,7 @@ Building the real Frame product. `[x]` = done, `[~]` = partial. Phase 1 is the l
 - [x] Align marketing site typography to Hanken — web already on Hanken; admin brought onto the same next/font setup and the family centralized in the shared preset (`font-sans`), so web ↔ admin ↔ mockup now match
 
 ## Phase 1 — MVP (the core loop, launchable)
-Critical path: **Editor → Runtime → Submit → Responses → Billing.**
+Critical path: **Editor → Runtime → Submit → Responses.**
 - [x] Form editor (React): palette, canvas, reorder (▲▼; drag next), inspector → writes blocks to `FormVersion.schema`
 - [x] Core blocks: short/long, choice, checkbox, dropdown, number, email, phone, date, rating, file
 - [x] Autosave (debounced) + schema persisted to the latest version
@@ -67,18 +67,18 @@ Critical path: **Editor → Runtime → Submit → Responses → Billing.**
 - [x] Drag-drop reorder (dnd-kit) · file uploads _(local-disk driver; S3/R2 swap seam)_ · redirect-on-completion + custom submit label
 - [x] Responses dashboard: table (labels as columns) + detail drawer + CSV export
 - [x] Email notification on new response (Resend) — shared `MailService` (graceful no-op without key) powering per-form notify list, plus invite & email-verification emails; per-form notification emails configured in the editor
-- [x] Billing: Stripe subscriptions (Free / Pro / Business) + plan gating — Checkout + Customer Portal + signature-verified webhook (raw body), with a dev-mode fallback that applies plans instantly when Stripe is unset; plan gating enforced (form quota + custom-domains feature); `/app/billing` plan cards + usage
+- Billing — removed (7 Oct 2026): the product doesn't charge. No Stripe, no plans and no plan gating; every organisation has unlimited forms, custom domains and white-label.
 - [ ] Deploy MVP: Vercel (web) + API host (Fly/Render) + Neon Postgres + staging
 
 ## Phase 2 — V2 (usability & collaboration)
 - [ ] Conditional logic engine (show / hide / jump) + calculations
-- [ ] Advanced blocks: payment (Stripe Connect), signature, matrix, ranking, hidden fields, answer piping, URL pre-fill
+- [ ] Advanced blocks: signature, matrix, ranking, hidden fields, answer piping, URL pre-fill
 - [x] Theme / design customization with live preview
 - [x] Customize panel — accent/background/text/button-text colors (swatch + picker), font (sans/serif/mono/rounded), corners (none→pill), width; luminance-aware runtime (adaptive dark surface, capped card radius)
 - [x] Workspace Settings + Claude API key (real AI generation; per-workspace key, Test connection); AI generate falls back to heuristic without a key
 - [x] Conversational "Ask AI" editor — in-editor chat drawer that edits the live form (POST /v1/ai/edit-form: Claude when keyed, heuristic add/remove/required otherwise); applies + autosaves
 - [x] Notion-style slash (/) block inserter replacing the left palette — searchable, grouped catalog (Questions/Layout/Embed/Advanced), 33 block types; inserts after the selected block
-- [x] Expanded block catalog: multi-select, link, time, linear scale, ranking, matrix, headings H1–H3, text, divider, title, label, image/video/audio/embed, country + payment/signature/hidden/reCAPTCHA (basic); runtime + validation + inspector controls for all
+- [x] Expanded block catalog: multi-select, link, time, linear scale, ranking, matrix, headings H1–H3, text, divider, title, label, image/video/audio/embed, country + signature/hidden/reCAPTCHA (basic); runtime + validation + inspector controls for all
 - [x] Analytics: views, starts, completion rate, funnel (views→starts→submissions), 14-day daily trend, device & source breakdown (Event model + public /events tracking on the runtime + /forms/:id/analytics + dashboard page)
 - [x] Advanced customization: logo, cover image, per-input styling (bg/border), custom CSS injection (scoped .frame-form)
 - [x] Embeds (inline / popup / full-page) + `embed.js` (auto-resize) + editor Embed modal
@@ -90,7 +90,7 @@ Critical path: **Editor → Runtime → Submit → Responses → Billing.**
 
 ## Phase 3 — V3 (enterprise & scale)
 - [ ] SSO / SAML + SCIM (WorkOS); granular RBAC + audit logs
-- [x] Data residency + retention controls; white-label — org-level data region (us/eu), response retention with a daily in-process purge (+ "Purge now"), and white-label (hide "Made with Frame") gated to Pro+; all in Settings → Data & privacy
+- [x] Data residency + retention controls; white-label — org-level data region (us/eu), response retention with a daily in-process purge (+ "Purge now"), and white-label (hide "Made with Frame") for every org; all in Settings → Data & privacy
 - [x] Response search (Typesense / Meilisearch) — full-text search on the responses page; indexes to Meilisearch when configured, with a Postgres `ILIKE` fallback that works out of the box
 - [ ] Async fabric: BullMQ workers (webhooks, exports, emails, integrations)
 - [ ] Scale: read replicas, response-table partitioning, edge-cached form delivery

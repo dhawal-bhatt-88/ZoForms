@@ -25,7 +25,7 @@ Frame is a working product, not a mockup. It has:
 - **Responses & analytics** — a responses table with CSV export, plus per-form analytics (views, starts, completion rate, funnel, 14-day trend, device & source).
 - **Templates, embeds & integrations** — a template gallery, inline/popup/full-page embeds via `embed.js`, and per-form webhook automations that fire on new responses.
 - **Auth & multi-tenancy** — email/password (JWT), org / workspace / membership, and org-scoped queries on every route.
-- **Admin console** — a separate app to manage the platform: tenants (plans, suspend), users (suspend, **impersonate**, delete), cross-tenant form moderation, and an audit log.
+- **Admin console** — a separate app to manage the platform: tenants (suspend), users (suspend, **impersonate**, delete), cross-tenant form moderation, and an audit log.
 
 ---
 

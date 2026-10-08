@@ -5,7 +5,6 @@ import {
 } from "@nestjs/common";
 import Anthropic from "@anthropic-ai/sdk";
 import { PrismaService } from "../prisma/prisma.service";
-import { planOf } from "../billing/plans";
 import { purgeOrg } from "./retention.service";
 import type { AuthUser } from "../auth/current-user.decorator";
 import { env } from "../config/env";
@@ -53,13 +52,12 @@ export class SettingsService {
   async getOrg(user: AuthUser) {
     const org = await this.prisma.organization.findUnique({
       where: { id: user.orgId },
-      select: { plan: true, dataRegion: true, retentionDays: true, brandingHidden: true },
+      select: { dataRegion: true, retentionDays: true, brandingHidden: true },
     });
     return {
       dataRegion: org?.dataRegion ?? "us",
       retentionDays: org?.retentionDays ?? 0,
       brandingHidden: org?.brandingHidden ?? false,
-      canWhiteLabel: planOf(org?.plan).removeBranding,
     };
   }
 
@@ -87,18 +85,7 @@ export class SettingsService {
       }
       data.retentionDays = n;
     }
-    if (dto.brandingHidden !== undefined) {
-      if (dto.brandingHidden) {
-        const org = await this.prisma.organization.findUnique({
-          where: { id: user.orgId },
-          select: { plan: true },
-        });
-        if (!planOf(org?.plan).removeBranding) {
-          throw new ForbiddenException("White-label requires the Pro or Business plan.");
-        }
-      }
-      data.brandingHidden = dto.brandingHidden;
-    }
+    if (dto.brandingHidden !== undefined) data.brandingHidden = dto.brandingHidden;
 
     await this.prisma.organization.update({ where: { id: user.orgId }, data });
     return this.getOrg(user);

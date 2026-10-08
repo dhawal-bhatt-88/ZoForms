@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Eye, EyeOff, Loader2, Lock, Shield, Sparkles, Trash2, X, Zap } from "lucide-react";
+import { Check, Eye, EyeOff, Loader2, Shield, Sparkles, Trash2, X, Zap } from "lucide-react";
 import AppShell from "@/components/app-shell";
 import {
   getOrgSettings,
@@ -333,19 +333,13 @@ function OrgDataControls() {
       <label className="mt-4 flex items-start gap-2.5">
         <input
           type="checkbox"
-          disabled={!org.canWhiteLabel}
           checked={org.brandingHidden}
           onChange={(e) => save({ brandingHidden: e.target.checked })}
-          className="mt-0.5 h-4 w-4 accent-[#6D5EFA] disabled:opacity-40"
+          className="mt-0.5 h-4 w-4 accent-[#6D5EFA]"
         />
         <span>
-          <span className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-2">
-            White-label {!org.canWhiteLabel && <Lock className="h-3 w-3 text-faint" />}
-          </span>
-          <span className="block text-xs text-muted">
-            Remove the “Made with Frame” footer from your forms.
-            {!org.canWhiteLabel && " Requires the Pro or Business plan."}
-          </span>
+          <span className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-2">White-label</span>
+          <span className="block text-xs text-muted">Remove the “Made with Frame” footer from your forms.</span>
         </span>
       </label>
 

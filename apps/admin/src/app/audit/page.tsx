@@ -25,8 +25,6 @@ function iconFor(action: string) {
 function describe(e: AuditEntry): string {
   const m = (e.meta || {}) as Record<string, unknown>;
   switch (e.action) {
-    case "org.plan_changed":
-      return `changed plan ${m.from} → ${m.to}`;
     case "org.suspended":
       return "suspended a tenant";
     case "org.reactivated":

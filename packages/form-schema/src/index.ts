@@ -25,8 +25,8 @@ export const BlockType = z.enum([
   "time",
   "scale",
   "matrix",
+  "grid",
   "rating",
-  "payment",
   "signature",
   "ranking",
   // layout blocks (structure / static content)
@@ -78,8 +78,11 @@ export function isPresentationalType(type: string): type is PresentationalType {
   return (PRESENTATIONAL_TYPES as readonly string[]).includes(type);
 }
 
-/** Every other leaf block — the ones that can be required. */
-export const QuestionType = BlockType.exclude([...PRESENTATIONAL_TYPES]);
+/**
+ * Every other leaf block — the ones that can be required — except a grid,
+ * which has its own shape (`GridBlock`) and is required column by column.
+ */
+export const QuestionType = BlockType.exclude([...PRESENTATIONAL_TYPES, "grid"]);
 
 /**
  * How `enableWhen` combines. Absent means "all". An explicit "all" is accepted
@@ -175,15 +178,17 @@ function generateCodeAvoiding(label: string, used: ReadonlySet<string>, position
  * already in the list — typed or saved — and `reserved` (for an import that
  * adds to a list, its existing codes) are taken first, so a generated code
  * never takes one. Codes are trimmed first; a code is never regenerated.
+ * Anything else an entry carries — a grid column's type, options and
+ * required — is kept as it is.
  */
-export function fillCodes(options: readonly Option[], reserved: Iterable<string> = []): Option[] {
-  const trimmed = options.map((o) => ({ code: o.code.trim(), label: o.label }));
+export function fillCodes<T extends Option>(options: readonly T[], reserved: Iterable<string> = []): T[] {
+  const trimmed = options.map((o) => ({ ...o, code: o.code.trim() }));
   const used = new Set([...reserved, ...trimmed.map((o) => o.code).filter(Boolean)].map((c) => c.toLowerCase()));
   return trimmed.map((o, i) => {
     if (o.code) return o;
     const code = generateCodeAvoiding(o.label, used, i + 1);
     used.add(code.toLowerCase());
-    return { code, label: o.label };
+    return { ...o, code };
   });
 }
 
@@ -215,14 +220,15 @@ export function placeholderOptions(noun: string, count: number, existing: readon
  * Fill the code of the option at `index` if it is empty (contract §13.3): the
  * editor does this when the author leaves its label field, and when it is
  * picked as a condition answer. The other codes in the list are reserved. A
- * code that is already there is never changed.
+ * code that is already there is never changed. As with `fillCodes`, the rest
+ * of each entry (a grid column's type, options, required) is kept.
  */
-export function fillCodeAt(options: readonly Option[], index: number): Option[] {
+export function fillCodeAt<T extends Option>(options: readonly T[], index: number): T[] {
   const next = [...options];
   const option = options[index];
   if (!option || option.code.trim()) return next;
   const taken = options.flatMap((o, k) => (k !== index && o.code.trim() ? [o.code.trim()] : []));
-  next[index] = { code: generateCode(option.label, taken, index + 1), label: option.label };
+  next[index] = { ...option, code: generateCode(option.label, taken, index + 1) };
   return next;
 }
 
@@ -255,7 +261,8 @@ export const QuestionBlock = z.object({
   max: z.number().optional(),
   ...shownWhen,
 });
-export type QuestionBlock = z.infer<typeof QuestionBlock>;
+// `rows` is a grid's own field (contract §14.1), declared `never` so code can read it off any block.
+export type QuestionBlock = z.infer<typeof QuestionBlock> & { rows?: never };
 
 export const PresentationalBlock = z.object({
   id: z.string(),
@@ -274,8 +281,100 @@ export type PresentationalBlock = z.infer<typeof PresentationalBlock> & {
   [K in QuestionOnlyKey]?: never;
 };
 
+/* ---------- grid (contract §14) ---------- */
+
+/** The column types a grid has (contract §14.1), in the order the inspector offers them. */
+export const GRID_COLUMN_TYPES = ["radio", "dropdown", "text"] as const;
+export type GridColumnType = (typeof GRID_COLUMN_TYPES)[number];
+
+/** How the builder names each column type. */
+export const GRID_COLUMN_TYPE_LABELS: Record<GridColumnType, string> = {
+  radio: "Radio",
+  dropdown: "Dropdown",
+  text: "Short text",
+};
+
+/** A column's `required`: stored only when true, so turning it on and off again is no change. */
+const columnRequired = z
+  .boolean()
+  .optional()
+  .transform((r): true | undefined => (r === true ? true : undefined));
+
+/*
+ * One column of a grid: a coded entry (its code and label follow §13.2, among
+ * the grid's columns) with a type. A radio or dropdown column has its own
+ * coded list of options, which may be missing or empty here so the save rules
+ * can refuse it by name. A text column has no options: any sent are dropped.
+ * An unknown type fails parsing; the message reads after the column's name,
+ * which the API puts in front of it (`describeSchemaError`).
+ */
+const columnFields = { code: Option.shape.code, label: Option.shape.label };
+export const GridColumn = z.discriminatedUnion(
+  "type",
+  [
+    z.object({ ...columnFields, type: z.literal("radio"), options: optionList.optional(), required: columnRequired }),
+    z.object({ ...columnFields, type: z.literal("dropdown"), options: optionList.optional(), required: columnRequired }),
+    z.object({ ...columnFields, type: z.literal("text"), required: columnRequired }),
+  ],
+  {
+    errorMap: (issue, ctx) => {
+      if (issue.code === z.ZodIssueCode.invalid_union_discriminator) {
+        const type = (ctx.data as { type?: unknown } | null)?.type;
+        const choices = GRID_COLUMN_TYPES.map((t) => `"${t}"`).join(", ").replace(/, (?=[^,]*$)/, " or ");
+        return {
+          message:
+            type === undefined
+              ? `has no type. A grid column's type is ${choices}.`
+              : `has the type ${JSON.stringify(type)}, which a grid column can't have. A grid column's type is ${choices}.`,
+        };
+      }
+      // Only the union's own issues reach here; a member's fields report through their own schemas.
+      if (issue.code === z.ZodIssueCode.invalid_type) {
+        return { message: "isn't an object with a code, a label and a type." };
+      }
+      return { message: ctx.defaultError };
+    },
+  },
+);
+export type GridColumn = z.infer<typeof GridColumn>;
+/** A radio or dropdown column: one with its own options. */
+export type ChoiceGridColumn = Extract<GridColumn, { type: "radio" | "dropdown" }>;
+
+export function isChoiceColumn(column: GridColumn): column is ChoiceGridColumn {
+  return column.type === "radio" || column.type === "dropdown";
+}
+
+/**
+ * A grid (contract §14): fixed rows and typed columns, every cell its own
+ * input. Rows are a coded list; so are the columns, by code and label. There
+ * is no grid-level `required` (each column has its own), so it is dropped if
+ * sent, and so are the question fields a grid doesn't have. Empty codes in the
+ * rows, the columns and each column's options are filled as part of parsing
+ * (§13.3), like any coded list. Rows and columns may be missing or empty here,
+ * so the save rules can refuse that by name.
+ */
+export const GridBlock = z.object({
+  id: z.string(),
+  type: z.literal("grid"),
+  label: z.string().min(1),
+  description: helpText,
+  ...shownWhen,
+  rows: optionList.optional(),
+  columns: z
+    .array(GridColumn)
+    .transform((columns) => fillCodes(columns))
+    .optional(),
+});
+type GridOnly = z.infer<typeof GridBlock>;
+// Question fields a grid doesn't have are declared `never`, so code can read them off any leaf.
+export type GridBlock = GridOnly & { [K in Exclude<keyof QuestionBlock, keyof GridOnly>]?: never };
+
+export function isGrid(block: Block): block is GridBlock {
+  return block.type === "grid";
+}
+
 /** A question or presentational block — anything that isn't a group. */
-export type LeafBlock = QuestionBlock | PresentationalBlock;
+export type LeafBlock = QuestionBlock | GridBlock | PresentationalBlock;
 
 /*
  * Groups — docs/GROUPS-AND-PAGES-CONTRACT.md §1. A group holds other blocks,
@@ -380,6 +479,7 @@ export type BlockInput =
   // ~26-member type union across two object types when checking assignability.
   | z.input<typeof SourceBlock>
   | z.input<typeof OtherQuestionBlock>
+  | z.input<typeof GridBlock>
   | z.input<typeof PresentationalBlock>
   | GroupBlockInput
   | PageBlockInput;
@@ -476,6 +576,7 @@ const BlockUnion = z.discriminatedUnion("type", [
   PageBlock,
   SourceBlock,
   OtherQuestionBlock,
+  GridBlock,
   PresentationalBlock,
 ]);
 /*
@@ -864,8 +965,8 @@ export const BLOCK_META: Record<BlockType, { label: string; question: string }> 
   time: { label: "Time", question: "Time" },
   scale: { label: "Linear scale", question: "Rate from 1 to 5" },
   matrix: { label: "Matrix", question: "Matrix question" },
+  grid: { label: "Grid", question: "Grid question" },
   rating: { label: "Rating", question: "How would you rate this?" },
-  payment: { label: "Payment", question: "Payment" },
   signature: { label: "Signature", question: "Signature" },
   ranking: { label: "Ranking", question: "Rank these in order" },
   heading: { label: "Heading", question: "Section heading" },
@@ -921,11 +1022,15 @@ export function newBlock(
   const id = newBlockId(taken);
   // Built loosely, then checked as a whole: which fields apply depends on `type`.
   const block: Record<string, unknown> = { id, type, label: BLOCK_META[type].question };
-  // Presentational blocks have no `required` at all (contract §1).
-  if (!isPresentationalType(type)) block.required = false;
+  // Presentational blocks have no `required` at all (contract §1); a grid has one per column (§14.1).
+  if (!isPresentationalType(type) && type !== "grid") block.required = false;
   // Placeholders start with empty codes; each is generated from the label the author types (§13.3).
   if (OPTION_TYPES.includes(type)) block.options = placeholderOptions("Option", 3);
   if (type === "matrix") block.columns = placeholderOptions("Column", 3);
+  if (type === "grid") {
+    block.rows = placeholderOptions("Row", 3);
+    block.columns = addGridColumn([]);
+  }
   if (type === "scale") {
     block.min = 1;
     block.max = 5;
@@ -938,6 +1043,69 @@ export function newBlock(
     block.content = "";
   }
   return { ...block, ...overrides } as LeafBlock;
+}
+
+/*
+ * Editing a grid's columns (contract §14.6). Each returns a new list and
+ * leaves its input untouched; every column it doesn't change comes back as
+ * the same object, so its type, options and required are kept.
+ */
+
+/** The list with one more column at the end: short text, "Column n", an empty code, not required. */
+export function addGridColumn(columns: readonly GridColumn[]): GridColumn[] {
+  const [{ label }] = placeholderOptions("Column", 1, columns);
+  return [...columns, { code: "", label, type: "text" }];
+}
+
+/** The list without the column at `index`. */
+export function removeGridColumn(columns: readonly GridColumn[], index: number): GridColumn[] {
+  return columns.filter((_, k) => k !== index);
+}
+
+/** The column at `index` moved one place up (-1) or down (1); unchanged at either end. */
+export function moveGridColumn(columns: readonly GridColumn[], index: number, direction: -1 | 1): GridColumn[] {
+  const next = [...columns];
+  const to = index + direction;
+  if (!next[index] || to < 0 || to >= next.length) return next;
+  [next[index], next[to]] = [next[to], next[index]];
+  return next;
+}
+
+/** The column at `index` with a new code, label or required; nothing else about it changes. */
+export function updateGridColumn(
+  columns: readonly GridColumn[],
+  index: number,
+  change: { code?: string; label?: string; required?: true | undefined },
+): GridColumn[] {
+  return columns.map((column, k) => (k === index ? { ...column, ...change } : column));
+}
+
+/**
+ * `column` as type `type` (contract §14.6): between radio and dropdown its
+ * options are kept; a text column turned into either gets the placeholder
+ * options a new choice block starts with, codes empty; a choice column turned
+ * into text loses its options — the editor asks first (`columnTypeChangeWarning`).
+ */
+export function withColumnType(column: GridColumn, type: GridColumnType): GridColumn {
+  if (column.type === type) return column;
+  const { code, label } = column;
+  const required = column.required ? { required: column.required } : {};
+  if (type === "text") return { code, label, type, ...required };
+  const options = isChoiceColumn(column) ? column.options : placeholderOptions("Option", 3);
+  return { code, label, type, ...(options ? { options } : {}), ...required };
+}
+
+/**
+ * What the editor asks before changing column `index` to `type`, or null when
+ * nothing would be lost: only a choice column turned into short text loses its
+ * options.
+ */
+export function columnTypeChangeWarning(column: GridColumn, index: number, type: GridColumnType): string | null {
+  if (type !== "text" || !isChoiceColumn(column)) return null;
+  const n = column.options?.length ?? 0;
+  if (n === 0) return null;
+  const name = column.label.trim() || `Column ${index + 1}`;
+  return `Change "${name}" to short text? Its ${n} ${n === 1 ? "option" : "options"} will be removed.`;
 }
 
 /** The label a new group gets (contract §2.5). */
@@ -1085,6 +1253,14 @@ export function isAnswerable(block: Block): boolean {
   return (
     !isContainer(block) && !isPresentationalType(block.type) && !STATIC_TYPES.includes(block.type)
   );
+}
+
+/**
+ * Has the block-level Required setting: every answerable question except a
+ * grid, whose columns are required one by one (contract §14.1).
+ */
+export function canBeRequired(block: Block): boolean {
+  return isAnswerable(block) && !isGrid(block);
 }
 
 /* ---------- the block tree ---------- */
@@ -1683,14 +1859,45 @@ export function displayBlockProblem(entry: TreeEntry): ConditionProblem | null {
 
 /* ---------- coded option lists (contract §13.6) ---------- */
 
-/** Which list of a block: its options (a matrix's rows), or a matrix's columns. */
-export type OptionListName = "options" | "columns";
+/**
+ * Which list of a block: its options (a matrix's rows), a matrix's or a grid's
+ * columns, or a grid's rows. With `column`, "options" is that grid column's
+ * own options.
+ */
+export type OptionListName = "options" | "columns" | "rows";
+export type OptionListRef = { list: OptionListName; column?: number };
 
-/** The coded lists a block carries, with how messages name one entry of each. */
-export function optionLists(
-  block: Block,
-): { list: OptionListName; noun: string; options: readonly Option[] | undefined }[] {
-  if (isContainer(block) || !OPTION_TYPES.includes(block.type)) return [];
+/** How a message names a grid column: by its label, or by position when it has none. */
+export function gridColumnName(column: { label?: unknown }, index: number): string {
+  const label = typeof column.label === "string" ? column.label.trim() : "";
+  return label ? `column "${label}"` : `column ${index + 1}`;
+}
+
+/**
+ * The coded lists a block carries, with how messages name one entry of each.
+ * A grid has three kinds (contract §14.1): its rows, its columns (by code and
+ * label) and each radio or dropdown column's options, which are named
+ * `within` that column.
+ */
+export function optionLists(block: Block): (OptionListRef & {
+  noun: string;
+  options: readonly Option[] | undefined;
+  /** For a column's options: the column, as messages name it. */
+  within?: string;
+})[] {
+  if (isContainer(block)) return [];
+  if (isGrid(block)) {
+    return [
+      { list: "rows", noun: "row", options: block.rows },
+      { list: "columns", noun: "column", options: block.columns },
+      ...(block.columns ?? []).flatMap((column, k) =>
+        isChoiceColumn(column)
+          ? [{ list: "options" as const, column: k, noun: "option", options: column.options, within: gridColumnName(column, k) }]
+          : [],
+      ),
+    ];
+  }
+  if (!OPTION_TYPES.includes(block.type)) return [];
   if (block.type !== "matrix") return [{ list: "options", noun: "option", options: block.options }];
   return [
     { list: "options", noun: "row", options: block.options },
@@ -1698,8 +1905,42 @@ export function optionLists(
   ];
 }
 
-export type OptionProblem = {
-  list: OptionListName;
+/** Whether two list references name the same list. */
+export function sameOptionList(a: OptionListRef, b: OptionListRef): boolean {
+  return a.list === b.list && a.column === b.column;
+}
+
+/** The list `ref` names on `block`, or an empty list when it has none. */
+export function optionListAt(block: Block, ref: OptionListRef): readonly Option[] {
+  const found = optionLists(block).find((l) => sameOptionList(l, ref));
+  return found?.options ?? [];
+}
+
+/**
+ * `block` with the list `ref` names replaced by `options`; everything else —
+ * every other column, with its type, options and required — is kept. A grid's
+ * columns must be columns: an entry without a column type is refused, so a
+ * plain option can never replace one by mistake.
+ */
+export function withOptionList<T extends Option>(block: Block, ref: OptionListRef, options: readonly T[]): Block {
+  if (isGrid(block)) {
+    if (ref.list === "rows") return { ...block, rows: [...options] };
+    if (ref.list === "columns") {
+      if (!options.every((o) => GRID_COLUMN_TYPES.includes((o as { type?: GridColumnType }).type!))) {
+        throw new Error("A grid's columns can only be replaced by columns, each with its type.");
+      }
+      return { ...block, columns: [...options] as unknown as GridColumn[] };
+    }
+    const k = ref.column;
+    const column = k === undefined ? undefined : block.columns?.[k];
+    if (!column || !isChoiceColumn(column)) throw new Error(`No radio or dropdown column at ${k}.`);
+    return { ...block, columns: block.columns!.map((c, i) => (i === k ? { ...column, options: [...options] } : c)) };
+  }
+  if (ref.list === "rows" || ref.column !== undefined) throw new Error(`Only a grid has ${ref.list === "rows" ? "rows" : "column options"}.`);
+  return { ...block, [ref.list]: [...options] } as Block;
+}
+
+export type OptionProblem = OptionListRef & {
   /** The option at fault, from 0; absent when the whole list is. */
   index?: number;
   field?: "code" | "label";
@@ -1713,14 +1954,19 @@ export type OptionProblem = {
  * The save rules for a block's coded lists (contract §13.6): each list has an
  * option, every option a label, a valid code, and no code or label used twice
  * (ignoring case; labels also ignoring surrounding whitespace). A matrix's rows
- * and columns are checked as separate lists. An empty code is not a problem: it
- * is generated (§13.3). Shared by the save and the editor's inline messages.
+ * and columns are checked as separate lists, and so are a grid's rows, its
+ * columns and each column's options; a problem in a column's options names the
+ * column. An empty code is not a problem: it is generated (§13.3). Shared by
+ * the save and the editor's inline messages.
  */
 export function optionListProblems(block: Block): OptionProblem[] {
   const found: Omit<OptionProblem, "detail">[] = [];
-  for (const { list, noun, options } of optionLists(block)) {
+  for (const { list, column, noun, options, within } of optionLists(block)) {
+    const ref = column === undefined ? { list } : { list, column };
+    // Inside a column, the rule follows the column's name: `in column "Frequency", option 2 needs a label.`
+    const inside = (rule: string) => (within ? `in ${within}, ${rule}` : rule);
     if (!options?.length) {
-      found.push({ list, rule: `it needs at least one ${noun}.` });
+      found.push({ ...ref, rule: within ? `${within} needs at least one ${noun}.` : `it needs at least one ${noun}.` });
       continue;
     }
     const codes = new Map<string, number>();
@@ -1729,22 +1975,22 @@ export function optionListProblems(block: Block): OptionProblem[] {
       const code = o.code.trim();
       const label = o.label.trim();
       if (!label) {
-        found.push({ list, index, field: "label", rule: `${noun} ${index + 1}${code ? ` (code "${code}")` : ""} needs a label.` });
+        found.push({ ...ref, index, field: "label", rule: inside(`${noun} ${index + 1}${code ? ` (code "${code}")` : ""} needs a label.`) });
       } else {
         const first = labels.get(label.toLowerCase());
         if (first === undefined) labels.set(label.toLowerCase(), index);
         else {
           found.push({
-            list, index, field: "label",
-            rule: `the label "${label}" is used by more than one ${noun}. Labels must be unique, ignoring case.`,
+            ...ref, index, field: "label",
+            rule: inside(`the label "${label}" is used by more than one ${noun}. Labels must be unique, ignoring case.`),
           });
         }
       }
       if (!code) return;
       if (!CODE_PATTERN.test(code)) {
         found.push({
-          list, index, field: "code",
-          rule: `the code "${code}" of ${noun} "${label}" can only use letters, digits, ".", "-" and "_", must start with a letter or digit, and can be at most 64 characters.`,
+          ...ref, index, field: "code",
+          rule: inside(`the code "${code}" of ${noun} "${label}" can only use letters, digits, ".", "-" and "_", must start with a letter or digit, and can be at most 64 characters.`),
         });
         return;
       }
@@ -1752,8 +1998,8 @@ export function optionListProblems(block: Block): OptionProblem[] {
       if (first === undefined) codes.set(code.toLowerCase(), index);
       else {
         found.push({
-          list, index, field: "code",
-          rule: `the code "${code}" is used by more than one ${noun} ("${options[first].label.trim()}" and "${label}"). Codes must be unique, ignoring case.`,
+          ...ref, index, field: "code",
+          rule: inside(`the code "${code}" is used by more than one ${noun} ("${options[first].label.trim()}" and "${label}"). Codes must be unique, ignoring case.`),
         });
       }
     });

@@ -1,6 +1,6 @@
 # Groups and Pages — Schema Contract
 
-Status: agreed 25 Sep 2026; amended 5 Oct 2026 for repeating groups (§12, with matching changes in §1–§8); amended 6 Oct 2026 for coded options and option import (§13). Shared by the builder repo and the `@yourco/forms` renderer repo.
+Status: agreed 25 Sep 2026; amended 5 Oct 2026 for repeating groups (§12, with matching changes in §1–§8); amended 6 Oct 2026 for coded options and option import (§13); amended 7 Oct 2026 for the grid block (§14). Shared by the builder repo and the `@yourco/forms` renderer repo.
 Both implementations must follow this file exactly. Change it here first, then in both repos.
 
 ## 1. Shapes
@@ -51,7 +51,7 @@ navigation?: {
    - This one rule means a group or page can never depend on its own descendants.
    - It makes cycles impossible, so no separate cycle check is needed.
    - The first page can never have a condition, so at least one page is always visible.
-3. Not allowed as a source: `group`, `page`, `matrix`, `long`, `divider`, `heading`, `title`, `label`, `hidden`, `text`, `image`, `video`, `audio`.
+3. Not allowed as a source: `group`, `page`, `matrix`, `grid`, `long`, `divider`, `heading`, `title`, `label`, `hidden`, `text`, `image`, `video`, `audio`.
 4. **Visibility:** an item is visible if and only if its own conditions pass **and** every ancestor is visible.
 5. A hidden source makes only **that condition** fail (existing rule, matters for `"any"`).
 6. **Hidden answers:** kept in state and sessionStorage, re-shown when visible again, never submitted, never validated (existing rule).
@@ -407,3 +407,73 @@ The builder refuses these at save (400 naming the block); the renderer throws at
 - **Preview before applying:** every row is shown with its code (as given, or generated per §13.3 — for **Add**, the existing codes are reserved first) and label, and flagged if it has a missing label, an invalid code, or a duplicate code or label — within the file, and, for **Add**, against the existing options. **Apply is disabled while any row is flagged**; the author fixes the file and chooses it again. Nothing is skipped silently.
 - **Add to existing** appends the rows in file order. **Replace all** replaces the list and is refused if it would remove a code used in a condition, naming the dependents. An option whose code appears in the new file keeps its conditions.
 - Import changes the editor only; nothing is stored until the author saves.
+
+## 14. Grid block
+
+Agreed 7 Oct 2026. A `grid` is a table of fixed rows and typed columns, where every cell is its own input — e.g. a substance-use history with one row per substance and columns "Age at first use", "Frequency" and "Used in the last 30 days?". It is a separate block type; `matrix` (one choice per row) is unchanged. It corresponds to FHIR's `grid` item control.
+
+### 14.1 Shape
+
+```ts
+{ id: string; type: "grid"; label: string; description?: string;
+  enableWhen?: EnableWhenCondition[]; enableBehavior?: "any";
+  rows: Option[];                 // §13: coded, non-empty
+  columns: GridColumn[] }         // non-empty
+
+type GridColumn =
+  | { code: string; label: string; type: "radio";    options: Option[]; required?: boolean }
+  | { code: string; label: string; type: "dropdown"; options: Option[]; required?: boolean }
+  | { code: string; label: string; type: "text";                       required?: boolean };
+```
+
+- Rows are a coded list (§13). Columns are coded too: each column's `code` and `label` follow §13.2 and are unique within the grid's columns. Each choice column's `options` are their own coded list, unique within that column.
+- `text` is short text, with the same 20,000-character ceiling and whitespace-only-is-empty rule as other free-text answers. More column types (number, date) may be added later.
+- **Required is per column.** A required column must be answered in **every row**. There is no grid-level `required`; `required` and `completeRequired` on the grid block itself are ignored.
+- A grid may sit anywhere a question may, including inside repeating groups (§12), where it is answered per instance.
+- A grid is **not a condition source** (§3.3). It may itself carry `enableWhen`.
+
+### 14.2 Answer and payload
+
+- Browser value (codes only): `Record<rowCode, Record<columnCode, string>>`. A choice cell holds an option code of its column; a text cell holds the text.
+- An empty cell is absent. A row with no answered cell is absent. A grid with no answered cell is `empty`.
+- `prepareSubmission` returns (§13.5):
+
+```ts
+[{ row: { code, label },
+   cells: [{ column: { code, label }, value: { code, label } | string }, …] }, …]
+```
+
+  answered rows only, in row order; answered cells only, in column order. Choice cells carry `{ code, label }` from the schema; text cells carry the text.
+
+### 14.3 Validation
+
+- Unknown row or column codes, a choice cell whose value is not a code of its column, a non-string cell, or a value of the wrong shape are rejected with the existing vague messages.
+- For each required column, every row must have a non-empty cell in that column.
+- `ValidationError.path` ends with `[gridId, rowCode, columnCode]` for a cell error.
+- **Messages:** each missing required cell is marked on the cell itself ("Required."). The error summary has **one entry per required column** with missing cells, linking to the first one: `"Substance use": answer "Frequency" in every row (3 missing).` Inside repeating groups the usual instance prefix applies (§12.5).
+
+### 14.4 Integrity checks
+
+The builder refuses these at save (400 naming the block); the renderer throws at mount:
+
+- missing or empty `rows` or `columns`;
+- a column with an unknown `type`;
+- a `radio` or `dropdown` column with a missing or empty `options` list;
+- any §13.6 option rule broken in `rows`, in `columns` (code, label, uniqueness), or in a column's `options`.
+
+### 14.5 Rendering (renderer only)
+
+- **Wide layout:** a `<table>` with the grid label as its caption, column headers (`scope="col"`) and row headers (`scope="row"`). Required columns show the required marker in their header.
+- Every cell input's accessible name is "{row label}, {column label}" (e.g. "Cannabis, Frequency"). A radio cell is a small radio group with that name; each radio is named by its option label.
+- **Narrow layout:** below the stylesheet's narrow breakpoint, each row is shown as a card — the row label as a heading, then one labelled field per column. Accessible names are the same in both layouts.
+- Labels are plain text (§13.7).
+- **Review page:** each answered row under its row label, with "{column}: {value}" lines; a grid with nothing answered shows "Not answered".
+- Public class names include `yf-grid`, `yf-grid-row`, `yf-grid-cell` and `yf-grid-card` (additive; the `classNames` constant stays authoritative).
+
+### 14.6 Builder
+
+- "Grid" is offered in the insert menu. A new grid starts with placeholder rows ("Row 1–3") and one text column ("Column 1"), all with empty codes (§13.3).
+- The inspector has a rows editor (the §13 option editor, with import) and a columns editor: for each column its code, label, type, a Required switch, and — for radio and dropdown — its own option editor with import.
+- Changing a column between `radio` and `dropdown` keeps its options. Changing a choice column to `text` removes its options, after a confirmation.
+- Columns are not imported from files; rows and each choice column's options are (§13.9).
+- The canvas preview shows the table.

@@ -37,7 +37,6 @@ const columns: { title: string; links: FooterLink[] }[] = [
       { label: "Features", href: "/#features" },
       { label: "Integrations", href: "/#features" },
       { label: "Security", href: "/#security" },
-      { label: "Pricing", href: "/pricing" },
       { label: "Get started", href: "/signup" },
     ],
   },
