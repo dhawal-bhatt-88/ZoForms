@@ -14,6 +14,7 @@ import {
   Trash2,
   Zap,
 } from "lucide-react";
+import { Switch } from "@/components/switch";
 import {
   createAutomation,
   deleteAutomation,
@@ -250,16 +251,12 @@ export default function IntegrationsPage() {
                 key={a.id}
                 className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface-2 px-4 py-3"
               >
-                <button
-                  onClick={() => onToggle(a)}
-                  className={`relative h-5 w-9 flex-none rounded-full transition-colors ${a.enabled ? "bg-accent-2" : "bg-line-2"}`}
-                  aria-label={a.enabled ? "Disable" : "Enable"}
+                <Switch
+                  checked={a.enabled}
+                  onChange={() => onToggle(a)}
+                  aria-label={`Enabled — ${a.name}`}
                   title={a.enabled ? "Enabled" : "Disabled"}
-                >
-                  <span
-                    className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all ${a.enabled ? "left-[18px]" : "left-0.5"}`}
-                  />
-                </button>
+                />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="truncate text-sm font-medium">{a.name}</span>

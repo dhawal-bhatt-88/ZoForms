@@ -11,6 +11,7 @@ import {
   type OptionProblem,
 } from "@formbuilder/form-schema";
 import { OptionRow, type RowHandlers } from "./option-list-editor";
+import { Switch } from "./switch";
 
 /**
  * The inspector's editor for a grid's columns (contract §14.6). Each column
@@ -151,20 +152,12 @@ export function GridColumnsEditor({
                 </select>
                 <span className="flex items-center gap-2 text-[13px]">
                   <span aria-hidden>Required</span>
-                  <button
+                  <Switch
                     id={`${base}-required`}
-                    type="button"
-                    role="switch"
-                    aria-checked={!!column.required}
+                    checked={!!column.required}
                     aria-label={`Required — ${name}`}
-                    onClick={() => onRequired(i, !column.required)}
-                    className={`relative h-5 w-9 rounded-full transition-colors ${column.required ? "bg-accent" : "bg-line-2"}`}
-                  >
-                    <span
-                      // left-0: without it the knob starts from the button's centre and ends up outside the track.
-                      className={`absolute left-0 top-0.5 h-4 w-4 rounded-full bg-white shadow-soft transition-transform ${column.required ? "translate-x-[18px]" : "translate-x-0.5"}`}
-                    />
-                  </button>
+                    onChange={(on) => onRequired(i, on)}
+                  />
                 </span>
               </div>
               {isChoiceColumn(column) && <div className="mt-2.5">{renderOptions(i)}</div>}

@@ -175,6 +175,7 @@ import { parseCount, repeatBadgeText, repeatPreviewText } from "@/lib/repeat-set
 import { OptionImportDialog } from "@/components/option-import-dialog";
 import { CodeChangeNote, OptionListEditor } from "@/components/option-list-editor";
 import { GridColumnsEditor } from "@/components/grid-columns-editor";
+import { Switch } from "@/components/switch";
 import { videoPreviewText } from "@/lib/video-preview";
 import {
   ApiError,
@@ -3029,18 +3030,12 @@ export default function EditorPage() {
                 <div className="mb-4 border-t border-line pt-3">
                   <div className="flex items-center justify-between text-[13.5px]">
                     <span id="repeats-label">Repeats</span>
-                    <button
-                      role="switch"
-                      aria-checked={!!selected.repeats}
+                    <Switch
+                      checked={!!selected.repeats}
                       aria-labelledby="repeats-label"
                       aria-describedby="repeats-help"
-                      onClick={() => setRepeats(selected.id, !selected.repeats)}
-                      className={`relative h-5 w-9 rounded-full transition-colors ${selected.repeats ? "bg-accent" : "bg-line-2"}`}
-                    >
-                      <span
-                        className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-soft transition-transform ${selected.repeats ? "translate-x-[18px]" : "translate-x-0.5"}`}
-                      />
-                    </button>
+                      onChange={(on) => setRepeats(selected.id, on)}
+                    />
                   </div>
                   <p id="repeats-help" className="mt-1 text-xs text-muted">
                     Respondents fill this group&apos;s questions once per entry, and can add and remove entries.
@@ -3317,38 +3312,28 @@ export default function EditorPage() {
                 const completeLabel = COMPLETE_REQUIRED_LABELS[selected.type as keyof typeof COMPLETE_REQUIRED_LABELS];
                 const complete = !!completeLabel && !!selected.completeRequired;
                 const required = !!selected.required || complete;
-                const knob = (on: boolean) =>
-                  `absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-soft transition-transform ${on ? "translate-x-[18px]" : "translate-x-0.5"}`;
                 return (
                   <>
                     <div className="flex items-center justify-between border-t border-line py-3 text-[13.5px]">
                       <span id="required-label">Required</span>
-                      <button
-                        role="switch"
-                        aria-checked={required}
+                      <Switch
+                        checked={required}
                         aria-labelledby="required-label"
                         aria-describedby={complete ? "complete-help" : undefined}
                         disabled={complete}
-                        onClick={() => updateBlock(selected.id, { required: !selected.required })}
-                        className={`relative h-5 w-9 rounded-full transition-colors disabled:opacity-60 ${required ? "bg-accent" : "bg-line-2"}`}
-                      >
-                        <span className={knob(required)} />
-                      </button>
+                        onChange={() => updateBlock(selected.id, { required: !selected.required })}
+                      />
                     </div>
                     {completeLabel && (
                       <div className="border-t border-line py-3 text-[13.5px]">
                         <div className="flex items-center justify-between">
                           <span id="complete-label">{completeLabel}</span>
-                          <button
-                            role="switch"
-                            aria-checked={complete}
+                          <Switch
+                            checked={complete}
                             aria-labelledby="complete-label"
                             aria-describedby="complete-help"
-                            onClick={() => updateBlock(selected.id, { completeRequired: complete ? undefined : true })}
-                            className={`relative h-5 w-9 rounded-full transition-colors ${complete ? "bg-accent" : "bg-line-2"}`}
-                          >
-                            <span className={knob(complete)} />
-                          </button>
+                            onChange={(on) => updateBlock(selected.id, { completeRequired: on || undefined })}
+                          />
                         </div>
                         <p id="complete-help" className="mt-1 text-xs text-muted">
                           {selected.type === "matrix"
