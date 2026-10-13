@@ -1,7 +1,7 @@
 // `text` and `image` authoring in the builder: rules (API + editor, same message), previews,
 // help text, trimming, and the artifact for the end-to-end render.
 const fs = require("fs");
-const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact } = require("./_setup");
+const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, noIds, hasIds } = require("./_setup");
 const prisma = new PrismaClient();
 
 const results = [];
@@ -150,7 +150,7 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     const choiceId = await cardOf("Would you like directions?").getAttribute("data-block-id");
     await P.getByRole("button", { name: "Add condition" }).click();
     await P.getByRole("combobox", { name: "Question" }).first().selectOption(choiceId);
-    await P.getByRole("combobox", { name: "Condition" }).first().selectOption("=");
+    await P.getByRole("combobox", { name: "operator" }).first().selectOption("=");
     await P.getByRole("combobox", { name: "Answer" }).first().selectOption("Yes");
 
     await add("Short answer"); await rename("Full name");
@@ -201,7 +201,8 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     check('artifact: no description: "" anywhere', !raw.includes('"description": ""') && !raw.includes('"description":""'));
     check("artifact: multi-line text kept, conditional text carries its condition",
       aBlocks.find((b) => b.label === "Welcome").content === "Welcome to the clinic.\nPlease arrive 10 minutes early." &&
-      JSON.stringify(aBlocks.find((b) => b.label === "Directions").enableWhen) === JSON.stringify([{ question: choiceId, operator: "=", answer: "yes" }]));
+      JSON.stringify(noIds(aBlocks.find((b) => b.label === "Directions").enableWhen)) === JSON.stringify([{ question: choiceId, operator: "=", answer: "yes" }]) &&
+      hasIds(aBlocks.find((b) => b.label === "Directions").enableWhen));
     saveArtifact("builder-display-blocks-schema.json", raw);
   } catch (e) {
     check("script ran without error", false, e.stack);

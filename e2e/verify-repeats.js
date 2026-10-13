@@ -3,7 +3,7 @@
 // and — when E2E_EXTERNAL_APP_URL is set — rendering the download with @yourco/forms.
 const fs = require("fs");
 const path = require("path");
-const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, opts } = require("./_setup");
+const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, opts, noIds } = require("./_setup");
 const prisma = new PrismaClient();
 
 const results = [];
@@ -197,7 +197,7 @@ const seed = () => ({
       await select(dependent);
       await aside.getByRole("button", { name: "Add condition" }).click();
       await aside.getByRole("combobox", { name: "Question" }).last().selectOption(source);
-      if (operator) await aside.getByRole("combobox", { name: "Condition" }).last().selectOption(operator);
+      if (operator) await aside.getByRole("combobox", { name: "operator" }).last().selectOption(operator);
       if (answer !== undefined) {
         const box = aside.getByRole("combobox", { name: "Answer" });
         if (await box.count()) await box.last().selectOption(String(answer));
@@ -399,11 +399,11 @@ const seed = () => ({
     check("artifact: no repeat settings on the plain group or on pages", keys("household") === "id,type,label,blocks"
       && art.blocks.every((p) => !Object.keys(p).some((k) => /^(repeats|repeatLabel|minOccurs|maxOccurs)$/.test(k))));
     check("artifact: the conditions, of every allowed kind",
-      JSON.stringify(find(art.blocks, "cost").enableWhen) === JSON.stringify([eq("insured", "no")])
-      && JSON.stringify(find(art.blocks, "refund").enableWhen) === JSON.stringify([{ question: "amount", operator: ">", answer: 100 }])
-      && JSON.stringify(find(art.blocks, "pnote").enableWhen) === JSON.stringify([answered("pname")])
-      && JSON.stringify(find(art.blocks, "allergy").enableWhen) === JSON.stringify([{ question: "kage", operator: "<", answer: 5 }])
-      && JSON.stringify(find(art.blocks, "desc").enableWhen) === JSON.stringify([eq("consent", "yes")])
+      JSON.stringify(noIds(find(art.blocks, "cost").enableWhen)) === JSON.stringify([eq("insured", "no")])
+      && JSON.stringify(noIds(find(art.blocks, "refund").enableWhen)) === JSON.stringify([{ question: "amount", operator: ">", answer: 100 }])
+      && JSON.stringify(noIds(find(art.blocks, "pnote").enableWhen)) === JSON.stringify([answered("pname")])
+      && JSON.stringify(noIds(find(art.blocks, "allergy").enableWhen)) === JSON.stringify([{ question: "kage", operator: "<", answer: 5 }])
+      && JSON.stringify(noIds(find(art.blocks, "desc").enableWhen)) === JSON.stringify([eq("consent", "yes")])
       && !find(art.blocks, "followup").enableWhen);
     saveArtifact(ARTIFACT, raw);
     await remove(formId);

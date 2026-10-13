@@ -29,6 +29,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  CircleAlert,
   CircleDot,
   Clock,
   Code2,
@@ -78,6 +79,7 @@ import {
   canBeRequired,
   columnTypeChangeWarning,
   conditionAnswerOptions,
+  conditionNumbersInText,
   DEFAULT_DRAFT_MODE,
   deletePageKeepingContents,
   deletePageWithContents,
@@ -102,6 +104,7 @@ import {
   isPage,
   isPaged,
   isRepeatingGroup,
+  logicTreeToText,
   makePaged,
   moveBlockInTree,
   moveGridColumn,
@@ -109,8 +112,10 @@ import {
   NAVIGATION_DEFAULTS,
   navigationWithoutDefaults,
   newBlock,
+  newConditionId,
   newGroup,
   newPage,
+  normalizeConditions,
   pageContentsDestination,
   prefixRuleBreaker,
   problemsBesideContent,
@@ -120,11 +125,13 @@ import {
   OPTION_TYPES,
   optionListAt,
   optionListProblems,
+  parseLogicText,
   parseOptionFile,
   placeholderOptions,
   questionNumbers,
   removeBlockFromTree,
   renameOptionCode,
+  renumberAfterDelete,
   replaceBlockers,
   REPEAT_DEFAULTS,
   repeatsOnBlockers,
@@ -1148,6 +1155,21 @@ function describeCondition(c: Condition, blocks: readonly Block[]): string {
 }
 
 /**
+ * An item's conditions as one phrase, combined as its logic says (contract
+ * §15): "A and B", "A or (B and C)". Logic text that doesn't parse can't be
+ * put in words, so the conditions are listed with the text as typed.
+ */
+function logicPhrase(item: Block, phrases: readonly string[]): string {
+  if (phrases.length < 2) return phrases[0] ?? "";
+  const parsed = parseLogicText(item.enableLogicText ?? "", phrases.length);
+  if (!parsed.ok) return `${phrases.join(", ")} (combined as "${item.enableLogicText ?? ""}")`;
+  // The tree's own text, in brackets where it nests, with numbers and words replaced in one pass.
+  return logicTreeToText(parsed.tree).replace(/\d+|AND|OR/g, (t) =>
+    t === "AND" ? "and" : t === "OR" ? "or" : phrases[Number(t) - 1],
+  );
+}
+
+/**
  * What deleting a container "but keeping its contents" costs, in words: the
  * container's own conditions no longer apply to what it held. Null when it
  * has no conditions.
@@ -1156,9 +1178,7 @@ function lostConditionsNote(container: ContainerBlock, blocks: readonly Block[],
   const conditions = container.enableWhen ?? [];
   if (!conditions.length) return null;
   const quoted = conditions.map((c) => `'${describeCondition(c, blocks)}'`);
-  return `The ${conditions.length === 1 ? "condition" : "conditions"} ${quoted.join(
-    container.enableBehavior === "any" ? " or " : " and ",
-  )} will no longer apply to ${whom}.`;
+  return `The ${conditions.length === 1 ? "condition" : "conditions"} ${logicPhrase(container, quoted)} will no longer apply to ${whom}.`;
 }
 
 /** "this question", "these 3 questions", or "its contents" when none are questions. */
@@ -1271,9 +1291,10 @@ function DeletePageDialog({
   // conditional next page is refused (it would become a conditional first page).
   const destinationConditions = !first ? (destination?.enableWhen ?? []) : [];
   const gainedNote = destinationConditions.length
-    ? `${whom.charAt(0).toUpperCase()}${whom.slice(1)} will move to '${destination!.title}' and will only show when ${destinationConditions
-        .map((c) => conditionPhrase(c, blocks))
-        .join(destination!.enableBehavior === "any" ? " or " : " and ")}.`
+    ? `${whom.charAt(0).toUpperCase()}${whom.slice(1)} will move to '${destination!.title}' and will only show when ${logicPhrase(
+        destination!,
+        destinationConditions.map((c) => conditionPhrase(c, blocks)),
+      )}.`
     : null;
 
   return (
@@ -1494,9 +1515,11 @@ function retarget(
   operator: ConditionOperator,
   firstAnswer: (source: Block) => string | number,
 ): Condition {
-  if (operator === "exists") return { question: source.id, operator };
+  // The condition stays the same condition: its id (contract §15.1) is kept.
+  const id = c.id === undefined ? {} : { id: c.id };
+  if (operator === "exists") return { ...id, question: source.id, operator };
   const keep = c.question === source.id && c.answer !== undefined;
-  return { question: source.id, operator, answer: keep ? c.answer : firstAnswer(source) };
+  return { ...id, question: source.id, operator, answer: keep ? c.answer : firstAnswer(source) };
 }
 
 const logicField =
@@ -1507,7 +1530,7 @@ const logicField =
  * back. A stored answer that isn't a number shows as empty; the panel's inline
  * problem explains why.
  */
-function NumberAnswer({ value, onChange }: { value?: number; onChange: (n: number) => void }) {
+function NumberAnswer({ label, value, onChange }: { label: string; value?: number; onChange: (n: number) => void }) {
   const [text, setText] = useState(value === undefined ? "" : String(value));
   useEffect(() => {
     if (value === undefined) setText("");
@@ -1516,7 +1539,7 @@ function NumberAnswer({ value, onChange }: { value?: number; onChange: (n: numbe
   }, [value]);
   return (
     <input
-      aria-label="Answer"
+      aria-label={label}
       type="number"
       value={text}
       onChange={(e) => {
@@ -1535,11 +1558,14 @@ function NumberAnswer({ value, onChange }: { value?: number; onChange: (n: numbe
  * `pick` gives the code for the chosen entry, generating it if it is empty.
  */
 function AnswerInput({
+  label,
   source,
   value,
   onChange,
   pick,
 }: {
+  /** The accessible name, e.g. "Condition 2 answer". */
+  label: string;
   source: Block;
   value: Condition["answer"];
   onChange: (v: string | number) => void;
@@ -1551,7 +1577,7 @@ function AnswerInput({
     const current = typeof value === "string" && value ? options.findIndex((o) => o.code === value) : -1;
     return (
       <select
-        aria-label="Answer"
+        aria-label={label}
         value={current >= 0 ? String(current) : ""}
         onChange={(e) => onChange(pick(source, Number(e.target.value)))}
         className={logicField}
@@ -1566,11 +1592,11 @@ function AnswerInput({
     );
   }
   if (NUMERIC_SOURCE_TYPES.includes(source.type)) {
-    return <NumberAnswer value={typeof value === "number" ? value : undefined} onChange={onChange} />;
+    return <NumberAnswer label={label} value={typeof value === "number" ? value : undefined} onChange={onChange} />;
   }
   return (
     <input
-      aria-label="Answer"
+      aria-label={label}
       value={value === undefined ? "" : String(value)}
       onChange={(e) => onChange(e.target.value)}
       placeholder="Answer"
@@ -1579,11 +1605,16 @@ function AnswerInput({
   );
 }
 
+const LOGIC_HINT = "Use condition numbers, AND, OR and brackets, e.g. 1 AND (2 OR 3)";
+/** How long after the author stops typing the logic text is checked. */
+const LOGIC_CHECK_DELAY_MS = 500;
+
 /**
- * "Show this question/group only when…" — edits a block's enableWhen /
- * enableBehavior. Sources are the eligible questions that come before this block
- * in reading order, numbered as on the canvas and listed under the path of
- * groups they sit in.
+ * "Show this question/group only when…" — edits a block's enableWhen and,
+ * with two or more conditions, the logic text that combines them (contract
+ * §15.6). Conditions are numbered 1…n in stored order and can't be reordered.
+ * Sources are the eligible questions that come before this block in reading
+ * order, numbered as on the canvas and listed under the path of groups they sit in.
  */
 function ConditionsPanel({
   block,
@@ -1612,8 +1643,30 @@ function ConditionsPanel({
   const numbers = questionNumbers(blocks);
   const noun = logicNoun(block);
   const conditions = block.enableWhen ?? [];
-  // A display block's own content message is shown once, under its field, not here.
+  const text = block.enableLogicText ?? "";
+  // A display block's own content message is shown once, under its field, not
+  // here; so is the logic text's.
   const problems = problemsBesideContent({ blocks }, block.id).map((p) => p.detail);
+
+  // The logic text is checked once the author pauses typing or leaves the field
+  // (contract §15.6). `checked` is the text as it was then; a change made any
+  // other way (a deletion's renumbering, Cancel, a save) is checked at once.
+  const [checked, setChecked] = useState(text);
+  const typed = useRef(text);
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(timer.current), []);
+  useEffect(() => {
+    if (text !== typed.current) {
+      typed.current = text;
+      setChecked(text);
+    }
+  }, [text]);
+  const parsed = conditions.length >= 2 ? parseLogicText(checked, conditions.length) : null;
+  const logicError = parsed && !parsed.ok ? parsed.error : null;
+  // A refused deletion, shown under its condition: the condition's key and the message.
+  const [refusal, setRefusal] = useState<{ key: string; message: string } | null>(null);
+  const addButton = useRef<HTMLButtonElement>(null);
+  const fieldId = `logic-text-${block.id}`;
 
   // Consecutive sources in the same group share one <optgroup> labelled with its path.
   const runs: { path: string; entries: TreeEntry[] }[] = [];
@@ -1638,14 +1691,47 @@ function ConditionsPanel({
     );
   });
 
-  // No conditions -> drop both fields; "all" is the default, so it's left implicit.
-  const commit = (next: Condition[], behavior: "all" | "any" | undefined = block.enableBehavior) =>
-    onChange(
-      next.length
-        ? { enableWhen: next, enableBehavior: behavior === "any" ? "any" : undefined }
-        : { enableWhen: undefined, enableBehavior: undefined },
-    );
-  const setAt = (i: number, c: Condition) => commit(conditions.map((x, k) => (k === i ? c : x)));
+  // The text exists only with two or more conditions. The tree and
+  // enableBehavior are never stored: the artifact derives them from the text.
+  const commit = (next: Condition[], nextText: string | undefined) =>
+    onChange({
+      enableWhen: next.length ? next : undefined,
+      enableBehavior: undefined,
+      enableLogic: undefined,
+      enableLogicText: next.length >= 2 ? nextText : undefined,
+    });
+  const setAt = (i: number, c: Condition) => commit(conditions.map((x, k) => (k === i ? c : x)), block.enableLogicText);
+  const keyOf = (c: Condition, i: number) => c.id ?? String(i);
+
+  function addCondition() {
+    const taken = conditions.flatMap((c) => (c.id ? [c.id] : []));
+    // Default to the nearest eligible question before it, "is answered".
+    const added: Condition = { id: newConditionId(taken), question: sources[sources.length - 1].block.id, operator: "exists" };
+    // The second condition brings the logic field, pre-filled; after that the text is left alone.
+    commit([...conditions, added], conditions.length === 1 ? "1 AND 2" : block.enableLogicText);
+    setRefusal(null);
+  }
+
+  function removeCondition(i: number) {
+    const n = i + 1;
+    // Refused while the text mentions its number anywhere, even text with errors.
+    if (conditions.length >= 2 && conditionNumbersInText(text).includes(n)) {
+      setRefusal({ key: keyOf(conditions[i], i), message: `Condition ${n} is used in the logic. Remove it from the logic first.` });
+      return;
+    }
+    setRefusal(null);
+    const next = conditions.filter((_, k) => k !== i);
+    commit(next, next.length >= 2 ? renumberAfterDelete(text, n) : undefined);
+    addButton.current?.focus();
+  }
+
+  function typeLogic(value: string) {
+    typed.current = value;
+    onChange({ enableLogicText: value });
+    setRefusal(null);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setChecked(value), LOGIC_CHECK_DELAY_MS);
+  }
 
   // Nothing comes before the first page, so it's always shown (contract §3.2).
   if (isPage(block) && blocks[0]?.id === block.id && !conditions.length) {
@@ -1662,67 +1748,50 @@ function ConditionsPanel({
       <h4 className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-faint">Logic</h4>
       <p className="mb-2 text-[12.5px] font-semibold text-ink-2">Show this {noun} only when…</p>
 
-      {conditions.length >= 2 && (
-        <div className="mb-2 flex items-center gap-2 text-[12.5px] text-muted">
-          <div className="flex rounded-lg border border-line-2 p-0.5">
-            {(["all", "any"] as const).map((v) => (
-              <button
-                key={v}
-                onClick={() => commit(conditions, v)}
-                className={`rounded-md px-2.5 py-0.5 text-xs font-medium ${
-                  (block.enableBehavior ?? "all") === v ? "bg-ink text-white" : "text-muted hover:text-ink"
-                }`}
-              >
-                {v === "all" ? "All" : "Any"}
-              </button>
-            ))}
-          </div>
-          of these are true
-        </div>
-      )}
-
       <div className="flex flex-col gap-2">
         {conditions.map((c, i) => {
+          const n = i + 1;
           const source = findBlock(blocks, c.question)?.block;
           const eligible = !!source && sources.some((e) => e.block.id === source.id);
           const operators = source ? (sourceOperators(source) ?? []) : [];
+          const key = keyOf(c, i);
+          const refused = refusal?.key === key ? refusal.message : null;
+          const refusalId = `condition-refusal-${block.id}-${key}`;
           return (
-            <div key={i} className="rounded-lg border border-line bg-surface-2 p-2">
-              <div className="mb-1.5 flex items-center gap-1.5">
-                <select
-                  aria-label="Question"
-                  value={c.question}
-                  onChange={(e) => {
-                    const next = findBlock(blocks, e.target.value)!.block;
-                    const ops = sourceOperators(next) ?? [];
-                    setAt(i, retarget(c, next, ops.includes(c.operator) ? c.operator : "exists", firstAnswer));
-                  }}
-                  className={logicField}
-                >
-                  {!eligible && (
-                    <option value={c.question}>{source ? blockName(source) : "Missing question"}</option>
-                  )}
-                  {sourceOptions}
-                </select>
+            <div key={key} className="rounded-lg border border-line bg-surface-2 p-2">
+              <div className="mb-1.5 flex items-center justify-between gap-1.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Condition {n}</span>
                 <button
-                  onClick={() => commit(conditions.filter((_, k) => k !== i))}
+                  onClick={() => removeCondition(i)}
                   className="grid h-7 w-7 flex-none place-items-center rounded-md text-faint hover:bg-surface-3 hover:text-ink"
-                  aria-label="Remove condition"
+                  aria-label={`Remove condition ${n}`}
+                  aria-describedby={refused ? refusalId : undefined}
                 >
                   <X className="h-4 w-4" />
                 </button>
               </div>
+              <select
+                aria-label={`Condition ${n} question`}
+                value={c.question}
+                onChange={(e) => {
+                  const next = findBlock(blocks, e.target.value)!.block;
+                  const ops = sourceOperators(next) ?? [];
+                  setAt(i, retarget(c, next, ops.includes(c.operator) ? c.operator : "exists", firstAnswer));
+                }}
+                className={`${logicField} mb-1.5 w-full`}
+              >
+                {!eligible && <option value={c.question}>{source ? blockName(source) : "Missing question"}</option>}
+                {sourceOptions}
+              </select>
               <div className="flex items-center gap-1.5">
                 <select
-                  aria-label="Condition"
+                  aria-label={`Condition ${n} operator`}
                   value={c.operator}
                   disabled={!source}
                   onChange={(e) => source && setAt(i, retarget(c, source, e.target.value as ConditionOperator, firstAnswer))}
                   className={logicField}
                 >
-                  {!operators.includes(c.operator) && (
-                    <option value={c.operator}>{OPERATOR_TEXT[c.operator]}</option>
-                  )}
+                  {!operators.includes(c.operator) && <option value={c.operator}>{OPERATOR_TEXT[c.operator]}</option>}
                   {operators.map((op) => (
                     <option key={op} value={op}>
                       {OPERATOR_TEXT[op]}
@@ -1730,7 +1799,21 @@ function ConditionsPanel({
                   ))}
                 </select>
                 {c.operator !== "exists" && source && (
-                  <AnswerInput source={source} value={c.answer} onChange={(a) => setAt(i, { ...c, answer: a })} pick={pick} />
+                  <AnswerInput
+                    label={`Condition ${n} answer`}
+                    source={source}
+                    value={c.answer}
+                    onChange={(a) => setAt(i, { ...c, answer: a })}
+                    pick={pick}
+                  />
+                )}
+              </div>
+              <div id={refusalId} aria-live="polite">
+                {refused && (
+                  <p className="mt-1.5 flex items-start gap-1 text-xs text-red">
+                    <CircleAlert aria-hidden="true" className="mt-px h-3.5 w-3.5 flex-none" />
+                    {refused}
+                  </p>
                 )}
               </div>
             </div>
@@ -1738,18 +1821,10 @@ function ConditionsPanel({
         })}
       </div>
 
-      {problems.map((p, i) => (
-        <p key={i} className="mt-2 text-xs text-red">
-          {p}
-        </p>
-      ))}
-
       {sources.length ? (
         <button
-          onClick={() =>
-            // Default to the nearest eligible question before it, "is answered".
-            commit([...conditions, { question: sources[sources.length - 1].block.id, operator: "exists" }])
-          }
+          ref={addButton}
+          onClick={addCondition}
           className="mt-2 flex items-center gap-1.5 text-sm font-medium text-accent-2 hover:underline"
         >
           <Plus className="h-4 w-4" /> Add condition
@@ -1761,6 +1836,49 @@ function ConditionsPanel({
           </p>
         )
       )}
+
+      {conditions.length >= 2 && (
+        <div className="mt-3">
+          <label htmlFor={fieldId} className="mb-1 block text-xs font-semibold text-ink-2">
+            Logic
+          </label>
+          <textarea
+            id={fieldId}
+            value={text}
+            rows={2}
+            spellCheck={false}
+            autoComplete="off"
+            aria-invalid={logicError ? true : undefined}
+            aria-describedby={`${fieldId}-hint ${fieldId}-error`}
+            onChange={(e) => typeLogic(e.target.value)}
+            onBlur={(e) => {
+              clearTimeout(timer.current);
+              setChecked(e.target.value);
+            }}
+            className={`block w-full resize-y rounded-lg border bg-surface px-2.5 py-1.5 font-mono text-[13px] outline-none focus:ring-2 focus:ring-accent-weak ${
+              logicError ? "border-red focus:border-red" : "border-line-2 focus:border-accent"
+            }`}
+          />
+          <p id={`${fieldId}-hint`} className="mt-1 text-xs text-muted">
+            {LOGIC_HINT}
+          </p>
+          <div id={`${fieldId}-error`} aria-live="polite">
+            {logicError && (
+              <p className="mt-1 flex items-start gap-1 text-xs text-red">
+                <CircleAlert aria-hidden="true" className="mt-px h-3.5 w-3.5 flex-none" />
+                {logicError}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {problems.map((p, i) => (
+        <p key={i} className="mt-2 text-xs text-red">
+          {p}
+        </p>
+      ))}
+
       {hiddenByRepeats && (
         <p className="mt-2 text-xs text-muted">
           Some questions aren&apos;t listed because they&apos;re inside a repeating group this block isn&apos;t in.
@@ -1825,7 +1943,7 @@ export default function EditorPage() {
           // Same rule on load, so a version saved with `description: ""` starts clean too.
           description: s?.description || undefined,
           settings: s?.settings,
-          blocks: s?.blocks ?? [],
+          blocks: normalizeConditions(s?.blocks ?? []),
           navigation: s?.navigation,
           drafts: s?.drafts,
         };
@@ -3347,6 +3465,7 @@ export default function EditorPage() {
               })()}
 
               <ConditionsPanel
+                key={selected.id}
                 block={selected}
                 blocks={schema.blocks}
                 onChange={(p) => updateBlock(selected.id, p)}

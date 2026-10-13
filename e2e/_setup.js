@@ -43,4 +43,12 @@ function saveArtifact(file, raw) {
 const code = (label) => label.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9._-]/g, "");
 const opts = (...labels) => labels.map((label) => ({ code: code(label), label }));
 
-module.exports = { ROOT, OUT, API, WEB, PrismaClient, chromium, launchBrowser, saveArtifact, code, opts };
+/*
+ * Conditions carry ids the builder generates (contract §15.1). noIds() drops
+ * them so a condition's content can be compared exactly; hasIds() checks that
+ * every condition has one: `c_` and 8 lower-case base-36 characters.
+ */
+const noIds = (conditions) => conditions?.map(({ id, ...rest }) => rest);
+const hasIds = (conditions) => !!conditions?.length && conditions.every((c) => /^c_[0-9a-z]{8}$/.test(c.id));
+
+module.exports = { ROOT, OUT, API, WEB, PrismaClient, chromium, launchBrowser, saveArtifact, code, opts, noIds, hasIds };

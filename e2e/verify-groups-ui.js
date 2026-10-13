@@ -111,7 +111,7 @@ async function waitFor(url) {
     check('panel says "Show this group only when…"', await page.getByText("Show this group only when…").isVisible());
     await page.getByRole("button", { name: "Add condition" }).click();
     await page.getByRole("combobox", { name: "Question" }).first().selectOption(ID.choice);
-    await page.getByRole("combobox", { name: "Condition" }).first().selectOption("=");
+    await page.getByRole("combobox", { name: "operator" }).first().selectOption("=");
     await page.getByRole("combobox", { name: "Answer" }).first().selectOption("Yes");
     check("group gets the Conditional badge", await card(ID.med).getByText("Conditional").isVisible());
 

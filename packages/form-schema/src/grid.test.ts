@@ -580,7 +580,7 @@ describe("grid and conditions", () => {
   it("may carry its own condition", () => {
     const form = parse(choice, when(grid(), { question: "c", operator: "=", answer: "yes" }));
     expect(formProblems(form)).toEqual([]);
-    expect(buildArtifact(form, { formId: "f", formVersionId: "v" }).blocks[1].enableWhen).toEqual([{ question: "c", operator: "=", answer: "yes" }]);
+    expect(buildArtifact(form, { formId: "f", formVersionId: "v" }).blocks[1].enableWhen).toEqual([{ id: "c1", question: "c", operator: "=", answer: "yes" }]);
   });
 
   it("saves cleanly inside a repeating group, conditional on a question in the same entry", () => {

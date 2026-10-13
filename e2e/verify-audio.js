@@ -2,7 +2,7 @@
 // same message, shown once), the inspector's heading and hints, a canvas preview that loads
 // nothing, trimming, and the artifact for the end-to-end render.
 const fs = require("fs");
-const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact } = require("./_setup");
+const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, noIds, hasIds } = require("./_setup");
 const prisma = new PrismaClient();
 
 const results = [];
@@ -167,7 +167,7 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     const sources = await P.getByRole("combobox", { name: "Question" }).first().locator("option").evaluateAll((os) => os.map((o) => o.value));
     check("conditions: earlier audio blocks aren't offered as a condition source", sources.includes(choiceId) && !audioIds.some((id) => sources.includes(id)), JSON.stringify(sources));
     await P.getByRole("combobox", { name: "Question" }).first().selectOption(choiceId);
-    await P.getByRole("combobox", { name: "Condition" }).first().selectOption("=");
+    await P.getByRole("combobox", { name: "operator" }).first().selectOption("=");
     await P.getByRole("combobox", { name: "Answer" }).first().selectOption("Yes");
     check("audio: no Logic problem shown for a valid conditional audio block", (await redMessages()) === 0);
 
@@ -199,7 +199,7 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
       JSON.stringify(aAudio.map((b) => b.label)) === JSON.stringify(["Welcome message", "Pharmacy opening hours", "Breathing exercise"]),
       JSON.stringify(aAudio));
     check("artifact: the conditional audio carries its condition",
-      JSON.stringify(aAudio[2].enableWhen) === JSON.stringify([{ question: choiceId, operator: "=", answer: "yes" }]) && aAudio.slice(0, 2).every((b) => !b.enableWhen));
+      JSON.stringify(noIds(aAudio[2].enableWhen)) === JSON.stringify([{ question: choiceId, operator: "=", answer: "yes" }]) && hasIds(aAudio[2].enableWhen) && aAudio.slice(0, 2).every((b) => !b.enableWhen));
     saveArtifact("builder-audio-schema.json", raw);
     await remove(formId);
   } catch (e) {

@@ -7,7 +7,7 @@
 // record checked for { code, label } values.
 const fs = require("fs");
 const path = require("path");
-const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, opts } = require("./_setup");
+const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, opts, noIds, hasIds } = require("./_setup");
 const prisma = new PrismaClient();
 
 const results = [];
@@ -243,15 +243,15 @@ const file = (name, text) => ({ name, mimeType: name.endsWith(".csv") ? "text/cs
     await deselect(); await add("Short answer"); await rename("Follow-up");
     await aside.getByRole("button", { name: "Add condition" }).click();
     await aside.getByRole("combobox", { name: "Question" }).last().selectOption(ids.dx);
-    check("a single-choice source offers is answered / is / is not", JSON.stringify(await aside.getByRole("combobox", { name: "Condition" }).last().locator("option").allTextContents()) === '["is answered","is","is not"]');
-    await aside.getByRole("combobox", { name: "Condition" }).last().selectOption("=");
+    check("a single-choice source offers is answered / is / is not", JSON.stringify(await aside.getByRole("combobox", { name: "operator" }).last().locator("option").allTextContents()) === '["is answered","is","is not"]');
+    await aside.getByRole("combobox", { name: "operator" }).last().selectOption("=");
     await aside.getByRole("combobox", { name: "Answer" }).last().selectOption({ label: "Depression" });
     check("the answer picker lists labels", JSON.stringify(await aside.getByRole("combobox", { name: "Answer" }).last().locator("option").allTextContents()) === '["Depression","Anxiety","F32.1 Major depressive disorder"]');
     await deselect(); await add("Short answer"); await rename("Sleep note");
     await aside.getByRole("button", { name: "Add condition" }).click();
     await aside.getByRole("combobox", { name: "Question" }).last().selectOption(ids.sym);
-    check("a multi-answer source offers is answered / includes", JSON.stringify(await aside.getByRole("combobox", { name: "Condition" }).last().locator("option").allTextContents()) === '["is answered","includes"]');
-    await aside.getByRole("combobox", { name: "Condition" }).last().selectOption("contains");
+    check("a multi-answer source offers is answered / includes", JSON.stringify(await aside.getByRole("combobox", { name: "operator" }).last().locator("option").allTextContents()) === '["is answered","includes"]');
+    await aside.getByRole("combobox", { name: "operator" }).last().selectOption("contains");
     await aside.getByRole("combobox", { name: "Answer" }).last().selectOption({ label: "Poor sleep" });
     check("the picker can't offer a matrix as a source", !(await aside.getByRole("combobox", { name: "Question" }).last().locator("option").evaluateAll((os) => os.map((x) => x.value))).includes(ids.grid));
 
@@ -344,8 +344,9 @@ const file = (name, text) => ({ name, mimeType: name.endsWith(".csv") ? "text/cs
     check("artifact: multiselect, the placeholder filled at save, the HTML label as data", JSON.stringify(byLabel("Languages").options) === JSON.stringify([o("english", "English"), o("option_2", "Option 2"), o("img_srcx_onerroralert1", HTML)]));
     check("artifact: ranking with completeRequired", JSON.stringify(byLabel("Priorities").options) === JSON.stringify(opts("Cost", "Speed", "Quality")) && byLabel("Priorities").completeRequired === true && byLabel("Priorities").required === false);
     check("artifact: matrix rows, columns and completeRequired", JSON.stringify([byLabel("Sleep").options, byLabel("Sleep").columns]) === JSON.stringify([opts("Weekdays", "Weekends"), opts("Never", "Sometimes", "Always")]) && byLabel("Sleep").completeRequired === true);
-    check("artifact: condition answers are codes", JSON.stringify(byLabel("Follow-up").enableWhen) === JSON.stringify([{ question: ids.dx, operator: "=", answer: "F32.0" }])
-      && JSON.stringify(byLabel("Sleep note").enableWhen) === JSON.stringify([{ question: ids.sym, operator: "contains", answer: "poor_sleep" }]));
+    check("artifact: condition answers are codes", JSON.stringify(noIds(byLabel("Follow-up").enableWhen)) === JSON.stringify([{ question: ids.dx, operator: "=", answer: "F32.0" }])
+      && JSON.stringify(noIds(byLabel("Sleep note").enableWhen)) === JSON.stringify([{ question: ids.sym, operator: "contains", answer: "poor_sleep" }])
+      && hasIds(byLabel("Follow-up").enableWhen) && hasIds(byLabel("Sleep note").enableWhen));
     check("artifact: no completeRequired on other types, schemaVersion still 2", [...walk(art.blocks)].filter((b) => !["ranking", "matrix"].includes(b.type)).every((b) => !("completeRequired" in b)) && art.schemaVersion === 2);
     saveArtifact(ARTIFACT, raw);
     await remove(formId);

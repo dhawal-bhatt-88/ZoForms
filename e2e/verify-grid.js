@@ -14,7 +14,7 @@
 // submit, a filled grid submits, and the stored record is checked.
 const fs = require("fs");
 const path = require("path");
-const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, opts } = require("./_setup");
+const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, opts, noIds, hasIds } = require("./_setup");
 const prisma = new PrismaClient();
 
 const results = [];
@@ -427,19 +427,19 @@ const NOTE = "Changing a code after the form is in use will not match answers al
     await P.locator("#block-label").fill("Uses substances?");
     await insertBySearch("Short answer");
     await aside.getByRole("button", { name: "Add condition" }).click();
-    const sources = await aside.getByLabel("Question", { exact: true }).locator("option").allTextContents();
+    const sources = await aside.getByLabel("Condition 1 question", { exact: true }).locator("option").allTextContents();
     check("the source picker lists the earlier choice question but not the grid", sources.some((x) => x.includes("Uses substances?")) && !sources.some((x) => x.includes("Substance use")), JSON.stringify(sources));
     // The grid's own condition: on a question that now comes after it, so move the grid down first.
     const gridId = await gridCard.getAttribute("data-block-id");
     await gridCard.locator("span.truncate").first().click();
     for (let k = 0; k < 2; k++) await gridCard.getByRole("button", { name: "Move down" }).evaluate((b) => b.click());
     await aside.getByRole("button", { name: "Add condition" }).click();
-    const gridSource = await aside.getByLabel("Question", { exact: true }).inputValue();
+    const gridSource = await aside.getByLabel("Condition 1 question", { exact: true }).inputValue();
     check("a grid can carry its own condition", gridSource.length > 0);
     await saveBtn.click();
     await P.getByText("All changes saved").waitFor({ timeout: 15000 });
     const conditional = (await stored(formId)).blocks.find((b) => b.id === gridId);
-    check("a grid with its own condition saves", JSON.stringify(sorted(conditional?.enableWhen)) === JSON.stringify(sorted([{ question: gridSource, operator: "exists" }])), JSON.stringify(conditional?.enableWhen));
+    check("a grid with its own condition saves", JSON.stringify(sorted(noIds(conditional?.enableWhen))) === JSON.stringify(sorted([{ question: gridSource, operator: "exists" }])) && hasIds(conditional?.enableWhen), JSON.stringify(conditional?.enableWhen));
 
     // ---------- inside a repeating group ----------
     await insertBySearch("group");
@@ -465,7 +465,7 @@ const NOTE = "Changing a code after the form is in use will not match answers al
     const expectedGrid = { id: gridId, type: "grid", label: "Substance use", enableWhen: [{ question: gridSource, operator: "exists" }],
       rows: ROWS.map(([code, label]) => ({ code, label })), columns: model.map(column) };
     const artGrid = art.blocks.find((b) => b.id === gridId);
-    check("download: the grid is exactly the §14.1 shape, key order included", JSON.stringify(artGrid) === JSON.stringify(expectedGrid),
+    check("download: the grid is exactly the §14.1 shape, key order included", JSON.stringify({ ...artGrid, enableWhen: noIds(artGrid?.enableWhen) }) === JSON.stringify(expectedGrid) && hasIds(artGrid?.enableWhen),
       `\n      got      ${JSON.stringify(artGrid)}\n      expected ${JSON.stringify(expectedGrid)}`);
     const artInner = art.blocks.find((b) => b.type === "group").blocks[0];
     check("download: the grid in the repeating group, exactly", JSON.stringify(artInner) === JSON.stringify({ id: artInner.id, type: "grid", label: "Doses",

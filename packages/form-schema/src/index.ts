@@ -1,4 +1,13 @@
 import { z } from "zod";
+import {
+  type LogicNode,
+  logicTreeFromIds,
+  logicTreeToArtifact,
+  logicTreeToText,
+  parseLogicText,
+} from "./logic";
+
+export * from "./logic";
 
 /**
  * The form schema — the single source of truth for what a form *is*.
@@ -55,6 +64,13 @@ export type ConditionOperator = z.infer<typeof ConditionOperator>;
 /** "Show this block only when <question> <operator> <answer>". */
 export const Condition = z
   .object({
+    /**
+     * The condition's own id (contract §15.1): unique within its item, never
+     * shown to authors, referenced by `enableLogic`. Optional here only because
+     * content saved before ids existed has none; `normalizeConditions` fills
+     * them, and the save rules and the artifact require them.
+     */
+    id: z.string().optional(),
     /** Id of the source block. */
     question: z.string(),
     operator: ConditionOperator,
@@ -115,6 +131,20 @@ const shownWhen = {
   /** Show this block only when these conditions hold. Absent = always shown. */
   enableWhen: z.array(Condition).optional(),
   enableBehavior,
+  /**
+   * How the conditions combine, as a tree of condition ids (contract §15.1).
+   * Only in the artifact, derived from `enableLogicText` by `buildArtifact`;
+   * stored content keeps it only when it came without text and isn't valid,
+   * so the save rules can refuse it by name. Checked by `logicTreeFromIds`,
+   * which walks it without recursion, so any value parses here.
+   */
+  enableLogic: z.custom<LogicNode>((value) => value !== undefined).optional(),
+  /**
+   * The author's logic text, exactly as typed (contract §15.6): never trimmed,
+   * and an empty string is kept so the save rules can refuse it. Stored content
+   * only — never in the artifact.
+   */
+  enableLogicText: z.string().optional(),
 };
 
 /* ---------- coded options (contract §13) ---------- */
@@ -384,7 +414,10 @@ export type LeafBlock = QuestionBlock | GridBlock | PresentationalBlock;
  * any block, group or not, and simply get undefined for a group.
  */
 type NoLeafFields = {
-  [K in Exclude<keyof QuestionBlock, "id" | "type" | "label" | "enableWhen" | "enableBehavior">]?: never;
+  [K in Exclude<
+    keyof QuestionBlock,
+    "id" | "type" | "label" | "enableWhen" | "enableBehavior" | "enableLogic" | "enableLogicText"
+  >]?: never;
 };
 
 export interface GroupBlock extends NoLeafFields {
@@ -405,6 +438,8 @@ export interface GroupBlock extends NoLeafFields {
   maxOccurs?: number;
   enableWhen?: Condition[];
   enableBehavior?: "any";
+  enableLogic?: LogicNode;
+  enableLogicText?: string;
   blocks: Block[];
 }
 
@@ -439,6 +474,8 @@ export interface PageBlock extends NoLeafFields {
   repeats?: true;
   enableWhen?: Condition[];
   enableBehavior?: "any";
+  enableLogic?: LogicNode;
+  enableLogicText?: string;
   blocks: Block[];
 }
 
@@ -457,6 +494,8 @@ interface GroupBlockInput {
   maxOccurs?: number;
   enableWhen?: z.input<typeof Condition>[];
   enableBehavior?: "all" | "any";
+  enableLogic?: LogicNode;
+  enableLogicText?: string;
   blocks: BlockInput[];
 }
 interface PageBlockInput {
@@ -466,6 +505,8 @@ interface PageBlockInput {
   repeats?: boolean;
   enableWhen?: z.input<typeof Condition>[];
   enableBehavior?: "all" | "any";
+  enableLogic?: LogicNode;
+  enableLogicText?: string;
   blocks: BlockInput[];
 }
 
@@ -859,6 +900,11 @@ export const FormArtifact = z
     }
     const problem = draftsProblem(artifact);
     if (problem) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["drafts", "mode"], message: problem });
+    // Contract §15.5: what the renderer refuses at mount, it never receives.
+    for (const entry of walkBlocks(artifact.blocks)) {
+      const issue = artifactLogicProblem(entry.block);
+      if (issue) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["blocks"], message: `${subject(entry)}: ${issue}` });
+    }
     if (isPaged(artifact.blocks) !== (artifact.navigation !== undefined)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -911,13 +957,187 @@ export function buildArtifact(
   const { navigation: stored, drafts: storedDrafts, ...form } = FormSchema.parse(content);
   const navigation = artifactNavigation({ blocks: form.blocks, navigation: stored });
   const drafts = draftsWithoutDefault(storedDrafts);
+  // Content saved before condition ids existed gets c1, c2, … by position, so
+  // downloading the same version twice gives the same file.
+  const blocks = withArtifactLogic(normalizeConditions(form.blocks, positionalConditionId));
   return FormArtifact.parse({
     ...form,
+    blocks,
     ...identity,
     schemaVersion: 2,
     ...(navigation ? { navigation } : {}),
     ...(drafts ? { drafts } : {}),
   });
+}
+
+/* ---------- condition logic (contract §15) ---------- */
+
+/**
+ * Picks an id for `condition`, at `position` (from 1) in `block`'s conditions,
+ * which has none. The result must not be in `taken`.
+ */
+export type ConditionIdFiller = (
+  taken: ReadonlySet<string>,
+  position: number,
+  block: Block,
+  condition: Condition,
+) => string;
+
+/**
+ * The save's filler: a condition sent without an id keeps the id the same
+ * condition has in `previous` (the form's current blocks) — same block, same
+ * position, same question, operator and answer — so sending the same content
+ * twice is no change. Any other condition gets a new random id.
+ */
+export function idsFromPrevious(previous: readonly Block[]): ConditionIdFiller {
+  const before = new Map(walkBlocks(previous).map((e) => [e.block.id, e.block.enableWhen ?? []]));
+  return (taken, position, block, condition) => {
+    const old = before.get(block.id)?.[position - 1];
+    const same =
+      old?.id !== undefined &&
+      !taken.has(old.id) &&
+      old.question === condition.question &&
+      old.operator === condition.operator &&
+      old.answer === condition.answer;
+    return same ? old.id! : newConditionId(taken);
+  };
+}
+
+/** The artifact's filler: `c<position>`, or the next free `c<n>` after it. */
+const positionalConditionId: ConditionIdFiller = (taken, position) => {
+  let n = position;
+  while (taken.has(`c${n}`)) n += 1;
+  return `c${n}`;
+};
+
+/**
+ * Every item's conditions brought to the stored shape (contract §15.6), on
+ * any page, in any group or repeating group:
+ * - a condition without an id gets one (random by default; see `newConditionId`).
+ *   An empty, malformed or repeated id is left for the save rules to refuse;
+ * - with fewer than 2 conditions, `enableLogicText`, `enableLogic` and
+ *   `enableBehavior` are dropped: there is nothing to combine;
+ * - with 2 or more and text, the text is the logic: any `enableLogic` or
+ *   `enableBehavior` sent with it is dropped;
+ * - with 2 or more and no text (content saved before logic text existed, or
+ *   sent through the API), text is made from what is stored: `1 AND 2 AND …`,
+ *   `1 OR 2 OR …` for `enableBehavior: "any"`, or `logicTreeToText` of a valid
+ *   `enableLogic`. An invalid one is kept for the save rules to refuse.
+ *
+ * The editor applies this on load and the API at save. It is not part of
+ * parsing because random ids would make every `sameContent` compare unequal.
+ */
+export function normalizeConditions(
+  blocks: readonly Block[],
+  fillId: ConditionIdFiller = (taken) => newConditionId(taken),
+): Block[] {
+  return blocks.map((block) => {
+    const own = normalizeItemConditions(block, fillId);
+    return isContainer(own) ? ({ ...own, blocks: normalizeConditions(own.blocks, fillId) } as Block) : own;
+  });
+}
+
+function normalizeItemConditions(block: Block, fillId: ConditionIdFiller): Block {
+  const has = (key: string) => key in block;
+  if (!block.enableWhen?.length) {
+    if (!has("enableBehavior") && !has("enableLogic") && !has("enableLogicText")) return block;
+    const { enableBehavior: _b, enableLogic: _l, enableLogicText: _t, ...rest } = block;
+    return rest as Block;
+  }
+  const taken = new Set(block.enableWhen.flatMap((c) => (c.id === undefined ? [] : [c.id])));
+  const enableWhen = block.enableWhen.map((c, i): Condition => {
+    if (c.id !== undefined) return c;
+    const id = fillId(taken, i + 1, block, c);
+    taken.add(id);
+    const { id: _missing, ...fields } = c;
+    return { id, ...fields };
+  });
+  const { enableBehavior, enableLogic, enableLogicText, ...rest } = block;
+  const next = { ...rest, enableWhen } as Block;
+  if (enableWhen.length < 2) return next;
+  if (enableLogicText !== undefined) return { ...next, enableLogicText } as Block;
+  if (enableLogic !== undefined) {
+    const tree = enableBehavior === undefined ? logicTreeFromIds(enableLogic, enableWhen.map((c) => c.id!)) : null;
+    if (!tree?.ok) return { ...next, enableBehavior, enableLogic } as Block;
+    return { ...next, enableLogicText: logicTreeToText(tree.tree) } as Block;
+  }
+  const numbers = enableWhen.map((_, i) => i + 1);
+  return { ...next, enableLogicText: numbers.join(enableBehavior === "any" ? " OR " : " AND ") } as Block;
+}
+
+/**
+ * The save rule for an item's logic (contract §15.5), or null: the first text
+ * error, word for word from the contract's table, or — for a tree stored
+ * without text — what is wrong with the tree.
+ */
+export function logicProblem(block: Block): string | null {
+  const conditions = block.enableWhen ?? [];
+  if (conditions.length < 2) return null;
+  if (block.enableLogicText !== undefined) {
+    const parsed = parseLogicText(block.enableLogicText, conditions.length);
+    return parsed.ok ? null : parsed.error;
+  }
+  if (block.enableLogic === undefined) return null;
+  if (block.enableBehavior !== undefined) return "its enableLogic and enableBehavior can't both be set.";
+  const tree = logicTreeFromIds(block.enableLogic, conditions.map((c) => c.id ?? ""));
+  return tree.ok ? null : tree.error;
+}
+
+/**
+ * Problems with an item's condition ids (contract §15.1): malformed or
+ * repeated, and — with `requireIds` — missing. The save fills missing ids
+ * first (`normalizeConditions`), so only the artifact check requires them.
+ */
+export function conditionIdProblems(conditions: readonly Condition[], requireIds = false): string[] {
+  const problems: string[] = [];
+  const first = new Map<string, number>();
+  conditions.forEach((c, i) => {
+    const n = i + 1;
+    if (c.id === undefined) {
+      if (requireIds) problems.push(`condition ${n} has no id.`);
+      return;
+    }
+    if (!CODE_PATTERN.test(c.id)) {
+      problems.push(
+        `condition ${n}'s id ${JSON.stringify(c.id)} isn't allowed. An id is up to 64 letters, numbers, ".", "_" and "-", starting with a letter or number.`,
+      );
+    }
+    const seen = first.get(c.id);
+    if (seen !== undefined) problems.push(`conditions ${seen} and ${n} have the same id ${JSON.stringify(c.id)}.`);
+    else first.set(c.id, n);
+  });
+  return problems;
+}
+
+/**
+ * Stored items with their logic as exported (contract §15.4): the text is
+ * replaced by nothing (flat AND), `enableBehavior: "any"` (flat OR) or
+ * `enableLogic`. Expects `normalizeConditions` output; text that doesn't parse
+ * can't be exported, so it throws, naming the block.
+ */
+function withArtifactLogic(blocks: readonly Block[]): Block[] {
+  return blocks.map((block) => {
+    let own = block;
+    const conditions = block.enableWhen ?? [];
+    if (conditions.length >= 2 && block.enableLogicText !== undefined) {
+      const parsed = parseLogicText(block.enableLogicText, conditions.length);
+      if (!parsed.ok) throw new Error(`Block "${blockName(block)}": ${parsed.error}`);
+      const { enableLogicText: _t, enableBehavior: _b, enableLogic: _l, ...rest } = block;
+      own = { ...rest, ...logicTreeToArtifact(parsed.tree, conditions.map((c) => c.id!)) } as Block;
+    }
+    return isContainer(own) ? ({ ...own, blocks: withArtifactLogic(own.blocks) } as Block) : own;
+  });
+}
+
+/** What the artifact must never carry on an item (contract §15.5 integrity checks), or null. */
+function artifactLogicProblem(block: Block): string | null {
+  if (block.enableLogicText !== undefined) return "the logic text is never part of the artifact.";
+  const conditions = block.enableWhen ?? [];
+  const ids = conditionIdProblems(conditions, true);
+  if (ids.length) return ids[0];
+  if (block.enableLogic === undefined) return null;
+  if (conditions.length < 2) return "enableLogic needs at least 2 conditions.";
+  return logicProblem(block);
 }
 
 /** Block types that carry a list of options. */
@@ -997,6 +1217,19 @@ const ID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
  * blocks by id, so ids must be unique within a form.
  */
 export function newBlockId(taken: Iterable<string> = []): string {
+  return randomId("b_", taken);
+}
+
+/**
+ * A fresh condition id (contract §15.1): `c_` and 8 random lower-case base-36
+ * characters, not in `taken` (pass the item's other condition ids). Random, so
+ * an id is never reused within the item without keeping any history.
+ */
+export function newConditionId(taken: Iterable<string> = []): string {
+  return randomId("c_", taken);
+}
+
+function randomId(prefix: string, taken: Iterable<string>): string {
   const used = new Set(taken);
   // getRandomValues works in browsers (secure context or not) and Node 19+.
   const cryptoApi = (globalThis as { crypto?: { getRandomValues?(a: Uint8Array): Uint8Array } })
@@ -1005,7 +1238,7 @@ export function newBlockId(taken: Iterable<string> = []): string {
     const bytes = new Uint8Array(8);
     if (cryptoApi?.getRandomValues) cryptoApi.getRandomValues(bytes);
     else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
-    const id = "b_" + Array.from(bytes, (b) => ID_ALPHABET[b % ID_ALPHABET.length]).join("");
+    const id = prefix + Array.from(bytes, (b) => ID_ALPHABET[b % ID_ALPHABET.length]).join("");
     if (!used.has(id)) return id;
   }
 }
@@ -2152,6 +2385,11 @@ function collectProblems(form: { blocks: readonly Block[] }, withFieldRules: boo
       const detail = conditionProblem(entries, position, entry, c);
       if (detail) add(entry, detail);
     }
+    for (const detail of conditionIdProblems(conditions)) add(entry, detail);
+    // The logic text's own message is shown under its field (contract §15.6), so
+    // it is a field rule, like a display block's content.
+    const logic = withFieldRules ? logicProblem(entry.block) : null;
+    if (logic) add(entry, logic);
   }
   return problems;
 }

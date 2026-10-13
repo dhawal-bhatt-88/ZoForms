@@ -1,7 +1,7 @@
 // Numeric answers for ordering operators + country conditions as a fixed dropdown,
 // checked in the real editor (Edge) and directly against the API.
 const fs = require("fs");
-const { API, WEB, PrismaClient, launchBrowser } = require("./_setup");
+const { API, WEB, PrismaClient, launchBrowser, noIds, hasIds } = require("./_setup");
 const prisma = new PrismaClient();
 
 const results = [];
@@ -80,7 +80,7 @@ const withCond = (cond) => {
     const card = (id) => page.locator(`[data-block-id="${id}"]`);
     const select = (id) => card(id).click({ position: { x: 60, y: 12 } });
     const qSel = page.getByRole("combobox", { name: "Question" });
-    const opSel = page.getByRole("combobox", { name: "Condition" });
+    const opSel = page.getByRole("combobox", { name: "operator" });
     const ansSel = page.getByRole("combobox", { name: "Answer" });
 
     await page.goto(`${WEB}/app/forms/${form.id}/edit`);
@@ -101,7 +101,7 @@ const withCond = (cond) => {
     const [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Download", exact: true }).click()]);
     const art = JSON.parse(fs.readFileSync(await dl.path(), "utf8"));
     check("country condition saved and downloaded",
-      JSON.stringify(art.blocks[2].enableWhen) === `[{"question":"${IDS.country}","operator":"=","answer":"India"}]`,
+      JSON.stringify(noIds(art.blocks[2].enableWhen)) === `[{"question":"${IDS.country}","operator":"=","answer":"India"}]` && hasIds(art.blocks[2].enableWhen),
       JSON.stringify(art.blocks[2].enableWhen));
 
     // Non-numeric answer on a greater-than condition: the editor's UI can't produce

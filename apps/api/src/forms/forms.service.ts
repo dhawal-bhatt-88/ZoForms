@@ -13,6 +13,8 @@ import {
   formProblems,
   gridColumnName,
   emptyForm,
+  idsFromPrevious,
+  normalizeConditions,
   sameContent,
   FormSchema,
   STATIC_TYPES,
@@ -217,9 +219,13 @@ export class FormsService {
       where: { id: versionId, formId: form.id },
     });
     if (!source) throw new NotFoundException("Version not found");
+    // A version saved before condition ids and logic text gets them now (contract §15.6).
+    const restored = FormSchema.parse(source.schema);
+    const current = FormSchema.safeParse(form.versions[0]?.schema);
+    const previous = current.success ? current.data.blocks : [];
     const created = await this.appendVersion(
       form,
-      FormSchema.parse(source.schema),
+      { ...restored, blocks: normalizeConditions(restored.blocks, idsFromPrevious(previous)) },
       `Restored from v${source.version}`,
     );
     return { ok: true, versionId: created.id, version: created.version };
@@ -229,22 +235,33 @@ export class FormsService {
     await this.assertCanEdit(user);
     const parsed = FormSchema.safeParse(raw);
     if (!parsed.success) throw new BadRequestException(describeSchemaError(raw, parsed.error));
+    const form = await this.get(user, id);
+    // Conditions get their ids and items their logic text before anything is
+    // checked (contract §15.6): the text is the logic, and any tree or
+    // enableBehavior sent with it is dropped. A condition sent without an id
+    // keeps the one it already has, so re-sending the same content is no change.
+    const current = FormSchema.safeParse(form.versions[0]?.schema);
+    const previous = current.success ? current.data.blocks : [];
+    const content: FormSchema = {
+      ...parsed.data,
+      blocks: normalizeConditions(parsed.data.blocks, idsFromPrevious(previous)),
+    };
     // Structure (unique ids, labelled non-empty groups) and conditional logic
     // (sources earlier in reading order, of a usable type, with valid operators
     // and answers) across the whole tree — the same rules the editor checks inline.
-    const problems = formProblems(parsed.data);
+    const problems = formProblems(content);
     if (problems.length) {
       const more = problems.length > 1 ? ` (+${problems.length - 1} more)` : "";
       throw new BadRequestException(problems[0].message + more);
     }
     // Form-level settings: "server" drafts need pages (drafts contract §2).
-    const draftsIssue = draftsProblem(parsed.data);
+    const draftsIssue = draftsProblem(content);
     if (draftsIssue) throw new BadRequestException(draftsIssue);
-    const form = await this.get(user, id);
-    const created = await this.appendVersion(form, parsed.data);
+    const created = await this.appendVersion(form, content);
     // The content as stored: empty option codes are filled and labels trimmed by the
-    // parse (contract §13.3), so the editor adopts these rather than what it sent.
-    return { ok: true, versionId: created.id, version: created.version, schema: parsed.data };
+    // parse (contract §13.3), and conditions have their ids and logic text
+    // (§15.6), so the editor adopts these rather than what it sent.
+    return { ok: true, versionId: created.id, version: created.version, schema: content };
   }
 
   /**

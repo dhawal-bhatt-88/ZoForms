@@ -1,6 +1,6 @@
 # Groups and Pages — Schema Contract
 
-Status: agreed 25 Sep 2026; amended 5 Oct 2026 for repeating groups (§12, with matching changes in §1–§8); amended 6 Oct 2026 for coded options and option import (§13); amended 7 Oct 2026 for the grid block (§14). Shared by the builder repo and the `@yourco/forms` renderer repo.
+Status: agreed 25 Sep 2026; amended 5 Oct 2026 for repeating groups (§12, with matching changes in §1–§8); amended 6 Oct 2026 for coded options and option import (§13); amended 7 Oct 2026 for the grid block (§14); amended 9 Oct 2026 for custom condition logic (§15); amended 13 Oct 2026 for host validators (§16). Shared by the builder repo and the `@yourco/forms` renderer repo.
 Both implementations must follow this file exactly. Change it here first, then in both repos.
 
 ## 1. Shapes
@@ -27,7 +27,7 @@ navigation?: {
 ```
 
 - The children field is `blocks`, the same name as the form's root array.
-- `enableWhen` / `enableBehavior` have the existing contract. The builder stores only `"any"`; absent means all. The renderer also accepts an explicit `"all"`.
+- `enableWhen` / `enableBehavior` have the existing contract, extended by §15: every condition has an `id`, and an item may carry `enableLogic` instead of `enableBehavior`. The builder stores only `"any"`; absent means all. The renderer also accepts an explicit `"all"`.
 - No `mode` field: a form is **paged if and only if its root contains pages**.
 - The page `title` is the wizard step name. There is no separate step-name field.
 - `navigation` is ignored when the form is not paged.
@@ -56,6 +56,7 @@ navigation?: {
 5. A hidden source makes only **that condition** fail (existing rule, matters for `"any"`).
 6. **Hidden answers:** kept in state and sessionStorage, re-shown when visible again, never submitted, never validated (existing rule).
 7. **Prefix rule (repeating groups, §12.3):** a condition's source is allowed only if every repeating group enclosing the source also encloses the dependent. It applies alongside the ordering rule.
+8. **Custom logic (§15):** when an item has `enableLogic`, its conditions are combined by that tree instead of by `enableBehavior`. Rules 2, 3, 5 and 7 apply to every condition, at any depth of the tree.
 
 ## 4. Numbering
 
@@ -84,6 +85,7 @@ The builder rejects these at save (400 naming the block). The renderer throws at
 - `repeats: true` on a page;
 - `repeats: true` with a blank or missing `repeatLabel`;
 - `minOccurs` not a whole number ≥ 0; `maxOccurs` not a whole number ≥ 1, or less than `minOccurs`.
+- any §15.5 logic rule broken.
 
 `repeatLabel`, `minOccurs` and `maxOccurs` on a group without `repeats: true` are ignored, not rejected.
 
@@ -477,3 +479,272 @@ The builder refuses these at save (400 naming the block); the renderer throws at
 - Changing a column between `radio` and `dropdown` keeps its options. Changing a choice column to `text` removes its options, after a confirmation.
 - Columns are not imported from files; rows and each choice column's options are (§13.9).
 - The canvas preview shows the table.
+
+## 15. Custom condition logic
+
+Agreed 9 Oct 2026. An item's conditions can be combined with any mix of AND and OR, nested to any depth, for example `1 OR (2 AND (3 OR 4))`.
+
+- The author types the logic as text in the builder, using condition numbers.
+- The exported form carries a tree, so the renderer never parses text.
+- There is no NOT. A hidden source can therefore never make an item visible (§3.5).
+
+### 15.1 Shape
+
+```ts
+type EnableWhenCondition = {
+  id: string;                    // new: required, unique within this item's enableWhen
+  question: string; operator: Operator; answer?: unknown;   // unchanged
+};
+
+// On any item that may carry enableWhen (§3.1): questions, groups, pages,
+// repeating groups, grid, display blocks
+enableWhen?: EnableWhenCondition[];
+enableBehavior?: "any";          // flat logic, as today
+enableLogic?: LogicNode;         // custom logic; never together with enableBehavior
+
+type LogicNode = { all: LogicItem[] } | { any: LogicItem[] };
+type LogicItem = string /* a condition id */ | LogicNode;
+```
+
+Example. The text `1 OR (2 AND (3 OR 4))` is exported as:
+
+```json
+"enableWhen": [
+  { "id": "c1", "question": "phq9_9", "operator": "!=", "answer": "not_at_all" },
+  { "id": "c2", "question": "age", "operator": "<", "answer": 18 },
+  { "id": "c3", "question": "self_harm_history", "operator": "=", "answer": "yes" },
+  { "id": "c4", "question": "recent_discharge", "operator": "=", "answer": "yes" }
+],
+"enableLogic": { "any": ["c1", { "all": ["c2", { "any": ["c3", "c4"] }] }] }
+```
+
+- **Condition ids** follow the §13.2 code pattern (`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`).
+  - The builder generates them; they are never shown to authors.
+  - They stay stable for the condition's lifetime and are never reused within the item.
+  - They are unique within one item only. The same id on two different items is fine.
+- **The order of `enableWhen` is the condition numbering** the author sees: the first condition is 1. Conditions cannot be reordered (§15.6).
+- `enableLogic` is a tree:
+  - Each node has exactly one key, `all` or `any`, holding a non-empty list.
+  - A list item is either a condition id or another node.
+  - Nesting depth is unlimited.
+  - The same id may appear more than once, e.g. `(1 AND 2) OR (1 AND 3)`.
+- **The builder exports the simplest form** (§15.4):
+  - all-AND logic exports with no `enableLogic` and no `enableBehavior`;
+  - all-OR logic exports as `enableBehavior: "any"`;
+  - only genuinely mixed logic exports `enableLogic`.
+
+  Simple forms therefore keep FHIR's flat `enableWhen` shape. `enableLogic` is this product's extension; FHIR's own route to complex logic is a FHIRPath expression (`enableWhenExpression`), which we don't use.
+- No `schemaVersion` change; nothing has been released.
+
+### 15.2 Evaluation (`/core`)
+
+1. Each condition is evaluated exactly as today. This covers operators, codes (§13.4), a hidden source counting as false (§3.5), and resolution in the dependent's repeat instance (§12.3).
+2. `{ all: [...] }` is true if and only if every item in it is true. `{ any: [...] }` is true if and only if at least one item is true.
+3. With `enableLogic`, the item's own conditions pass if and only if the root node is true. Without it, `enableBehavior` applies as today.
+4. Visibility still also requires every ancestor to be visible (§3.4).
+5. The walk must not fail on deep nesting. Use the shared iterative walker or an equivalent approach; don't recurse without bound.
+
+### 15.3 Logic text (builder and API, via one shared parser in `packages/form-schema`)
+
+The text exists only in the builder (§15.6). One parser, shared by the web editor (live checks) and the API (save), turns it into the tree.
+
+**What may be written:**
+- Condition numbers `1`…`n`, where `n` is the number of conditions. No leading zeros.
+- The words `AND` and `OR`, in any letter case.
+- `(` and `)`.
+- Spaces, which are optional next to brackets and required between a number and a word. So `(1 AND 2)OR 3` is valid; `1AND2` is not.
+
+**Rules:**
+- Operators and numbers must alternate: number or bracketed part, then operator, then number or bracketed part, and so on.
+- **AND and OR may not be mixed at the same bracket level.** `1 AND 2 OR 3` is an error; `(1 AND 2) OR 3` is valid. Authors never need to know operator precedence.
+- Every condition from 1 to `n` must appear at least once. A condition may appear more than once.
+- Redundant brackets are allowed: `((1 AND 2))`, `(1)`.
+
+**Building the tree:**
+1. Each bracket level becomes a node: `all` for AND, `any` for OR.
+2. A bracketed part with no operator, e.g. `(1)`, is replaced by its content.
+3. A node whose operator matches its parent's is merged into the parent: `1 AND (2 AND 3)` → `{ all: [c1, c2, c3] }`.
+4. A repeated id inside the same node is kept once: `1 AND 1 AND 2` → `{ all: [c1, c2] }`.
+
+### 15.4 What is exported
+
+After the tree is built:
+- A root `all` node that lists every condition exactly once and contains no nested nodes → export `enableWhen` only.
+- The same with a root `any` node → export `enableWhen` with `enableBehavior: "any"`.
+- Anything else → export `enableWhen` plus `enableLogic`.
+- An item with a single condition never has `enableLogic`.
+
+### 15.5 Errors
+
+**Text errors** (builder only). These are shown live under the logic field and also block save. They are checked in this order, and only the first one is shown:
+
+| Problem | Message |
+|---|---|
+| Field empty, with 2 or more conditions | Enter how the conditions combine, e.g. 1 AND 2. |
+| Anything other than numbers, AND, OR, brackets and spaces | "{token}" isn't allowed. Use condition numbers, AND, OR and brackets. |
+| Missing operator, e.g. `1 2` or `1 (2 OR 3)` | Add AND or OR between 1 and 2. |
+| Missing condition, e.g. `1 AND`, `AND 1` or `1 AND OR 2` | Add a condition after AND. / Start with a condition number. |
+| `()` | Brackets can't be empty. |
+| Unclosed `(` | A bracket isn't closed. |
+| `)` with no matching `(` | There's a closing bracket without an opening one. |
+| Mixed AND and OR at one level | Add brackets to show whether AND or OR comes first. |
+| A number that isn't a condition, or a leading zero | There's no condition 5. |
+| Conditions not used | Condition 3 isn't used. / Conditions 3 and 4 aren't used. |
+
+**Integrity checks** on the exported shape. The builder refuses these at save (400 naming the block); the renderer throws at mount:
+- a condition without an `id`, with an id outside the pattern, or with a duplicate id within the item;
+- `enableLogic` together with `enableBehavior`;
+- `enableLogic` on an item with fewer than 2 conditions;
+- a node without exactly one key `all` or `any`, or with an empty list;
+- a list item that is neither a string nor a node;
+- an id that doesn't match a condition of the item;
+- a condition that isn't referenced anywhere in `enableLogic`.
+
+The renderer **accepts** single-item nodes and nested nodes with the same operator as their parent, which a hand-edited schema might contain. They are valid logic, even though the builder never exports them.
+
+### 15.6 Builder
+
+- **Condition list.** The "Show this question only when…" panel lists conditions numbered 1…n, in order. **Conditions cannot be reordered.** Any existing move controls on conditions are removed.
+- **Logic field.**
+  - It appears when a second condition is added, pre-filled with `1 AND 2`. It replaces the any/all choice.
+  - It is labelled "Logic", with the hint "Use condition numbers, AND, OR and brackets, e.g. 1 AND (2 OR 3)".
+  - It disappears, and its text is discarded, when only one condition is left.
+- **The author's exact text is kept.**
+  - It is stored as `enableLogicText` in the builder's saved form content. It is never part of the downloaded artifact, which carries only the tree (§15.4).
+  - The builder never rewrites brackets, spacing, word case or order, with one exception: **after a deletion, it lowers every number above the deleted one by one** (e.g. `1 OR 3` becomes `1 OR 2`).
+- **The text is the source of truth.**
+  - At save, the API parses `enableLogicText` with the shared parser and derives `enableBehavior` and `enableLogic` from it; the order of `enableWhen` is never changed. Any tree sent by the client is ignored.
+  - A form whose stored content has a tree but no text (e.g. created through the API) gets text generated from the tree, using numbers in list order, words in upper case, and every nested node in brackets.
+- **Adding a condition** leaves the text untouched. The field then shows "Condition 3 isn't used." until the author adds it.
+- **Deleting a condition** whose number appears anywhere in the text is refused with: "Condition 2 is used in the logic. Remove it from the logic first." The check scans the text for that number even when the text has other errors.
+- **Showing errors.** Errors appear after the author pauses typing. They are shown as:
+  - a red border;
+  - an error icon;
+  - the message under the field, never colour alone.
+
+  The field has `aria-invalid`, and `aria-describedby` pointing at the hint and the error. The message sits in a polite live region. Save shows the same message and refuses, following the existing save-check pattern.
+- **Existing guards are unchanged.** These include refusing deletes and moves that would break a source, the source picker (ordering and prefix rules), and code renames rewriting condition answers (§13.8). They apply to every condition, whatever the logic.
+- Text that is valid but redundant, e.g. `((1 AND 2))`, is saved as written and exported in its simplest form.
+
+### 15.7 Shared test table
+
+Both repos test the tree and export cases (`/core` evaluation, renderer integrity). The builder tests the text cases.
+
+**Valid text → exported**, with 4 conditions unless stated:
+
+| Text | Exported |
+|---|---|
+| `1 AND 2 AND 3 AND 4` | flat, no `enableBehavior` |
+| `1 or 2 or 3 or 4` | flat, `enableBehavior: "any"` |
+| `1 OR (2 AND (3 OR 4))` | `{ any: [c1, { all: [c2, { any: [c3, c4] }] }] }` |
+| `(1 AND 2) OR (1 AND 3) OR 4` | `{ any: [{ all: [c1, c2] }, { all: [c1, c3] }, c4] }` |
+| `((1 AND 2)) AND (3 AND 4)` | flat, no `enableBehavior` |
+| `(1 AND 2)OR(3 AND 4)` | `{ any: [{ all: [c1, c2] }, { all: [c3, c4] }] }` |
+| 2 conditions: `(2) AND 1` | flat, no `enableBehavior` |
+
+**Invalid text → message:**
+
+| Text | Message |
+|---|---|
+| `1 AND 2 OR 3 AND 4` | Add brackets to show whether AND or OR comes first. |
+| `1 AND (2 OR 3` | A bracket isn't closed. |
+| `1 AND 2) OR 3` | There's a closing bracket without an opening one. |
+| `1 AND 2 AND 3` | Condition 4 isn't used. |
+| `1 AND 2 AND 3 AND 5` | There's no condition 5. |
+| `1 AND 02 AND 3 AND 4` | There's no condition 02. |
+| `1 XOR 2` | "XOR" isn't allowed. Use condition numbers, AND, OR and brackets. |
+| `1 2 AND 3 AND 4` | Add AND or OR between 1 and 2. |
+| `1 AND () AND 3` | Brackets can't be empty. |
+| `1AND2 AND 3 AND 4` | "1AND2" isn't allowed. Use condition numbers, AND, OR and brackets. |
+| `NOT 1 AND 2` | "NOT" isn't allowed. Use condition numbers, AND, OR and brackets. |
+
+## 16. Host validators
+
+Agreed 13 Oct 2026. The host's developers can add their own validation to any answerable question, written as JavaScript functions in the host's own code. Nothing about them appears in the schema or the builder. The package runs them with the same rules as its built-in checks, in the browser and in `prepareSubmission`.
+
+Author-written rules (regex or "show this error when…") are **not** part of this section.
+
+### 16.1 Host API (renderer only)
+
+```ts
+type FieldValidator = {
+  field: string;                                    // block id of an answerable question
+  validate: (input: ValidatorInput) => string | null | undefined;
+};
+
+type ValidatorInput = {
+  value: unknown;              // this question's answer (see 16.3)
+  answers: ValidatorAnswers;   // visible answers in this question's context (see 16.3)
+  field: string;               // the block id, as in FieldValidator.field
+  path: (string | number)[];   // as ValidationError.path (§12.5), e.g. ["patients", 1, "mrn"]
+};
+
+type ValidatorAnswers = Record<string, unknown>;    // block id → answer value
+
+<FormRenderer validators?: FieldValidator[] … />
+prepareSubmission(schema, payload, options?: { validators?: FieldValidator[] })
+validateSubmission(schema, answers, options?: { validators?: FieldValidator[] })
+```
+
+- `validate` is a function **reference**. The package never looks functions up by name and never evaluates code from text.
+- The host passes the **same array** to `FormRenderer` and to `prepareSubmission`, normally by importing one shared module in both places. If it isn't passed to `prepareSubmission`, the host's rules are not enforced on the server. The README states this plainly.
+- Several entries may name the same field. They run in array order.
+
+### 16.2 Checks on the array (throw)
+
+The renderer throws at mount, and again whenever the `validators` prop changes to a different array. `prepareSubmission` and `validateSubmission` throw when called. Each error is a `TypeError` naming the entry's position and field:
+- `validators` is present but not an array;
+- an entry is not a plain object, or has no string `field`, or no function `validate`;
+- `field` is not the id of a block in the schema;
+- `field` names a block that is not an answerable question (a group, page, presentational or display block, or `hidden`).
+
+### 16.3 What the function receives
+
+- **Values** are in payload form, with the `{ state, value }` wrapper removed:
+  - numbers as numbers;
+  - coded answers as codes, never labels;
+  - dates as `"YYYY-MM-DD"`;
+  - `checkbox`, `multiselect` and `ranking` as arrays of codes;
+  - `matrix` as `Record<rowCode, columnCode>`;
+  - `grid` as `Record<rowCode, Record<columnCode, string>>`.
+- **`value` is always present and well-formed** (see 16.4).
+- **`answers`** holds every **visible**, answered question in this question's context that passes its own built-in checks (§16.4, item 3), keyed by block id. An empty or hidden question, or one failing a built-in check, is absent, so every value a validator sees is well-formed. Inside a repeating group, `answers` contains:
+  - the questions of the same instance;
+  - the questions of every enclosing instance;
+  - questions outside any repeat.
+
+  Questions inside repeats that don't enclose this question are absent, as with the prefix rule (§3.7, §12.3).
+- `answers` and `value` are copies; changing them has no effect.
+
+### 16.4 When a validator runs
+
+A host validator runs for a question only when **all** of these hold:
+1. the question is visible (in that instance's context, §12.3);
+2. the question is answered (not empty);
+3. the question passes **every built-in check** for its type: format, option membership, min/max, length ceiling, and `completeRequired` / grid required columns.
+
+It runs at the same moments as the built-in checks: Next, Submit, Return to review, final re-validation, and inside `validateSubmission` and `prepareSubmission`. It runs **once per repeat instance**.
+
+### 16.5 Results
+
+- `null` or `undefined` means valid.
+- A **non-empty string** is an error message. It is trimmed and shown as **plain text**: on the question (the existing `…__error` element, `aria-invalid`, `aria-describedby`) and in the error summary, with the usual instance prefix (§12.5). For a `grid`, it is shown on the grid as a whole, not on a cell.
+- The error appears in `ValidationError[]` like any other, with `blockId` and `path` set as for built-in errors.
+- Several failing validators on one question all show, in array order, after any built-in errors. `ValidationError[]` contains every one, but identical messages on one question are shown only once, on the question and in the error summary.
+
+### 16.6 Failures fail closed
+
+The question is treated as **invalid**, with the message **"This answer couldn't be checked."**, when a validator:
+- throws;
+- returns anything other than `null`, `undefined` or a non-empty string, including an empty or whitespace-only string, a number, an object or a `Promise`.
+
+Async validators are not supported in this version, so a `Promise` counts as a bad return value.
+
+- **In the browser,** the real exception or bad value is logged with `console.error`, naming the field. The respondent sees only the message above.
+- **On the server,** that `ValidationError` carries the original exception or value as a **non-enumerable** `cause`, like `Error.cause`. The host can read and log it, but `JSON.stringify` never includes it, so exception details can't leak if a backend returns the errors to the browser.
+
+### 16.7 Out of scope (this version)
+
+- warnings (soft checks that don't block);
+- async validators (network lookups);
+- validators written by authors in the builder, including regex rules.

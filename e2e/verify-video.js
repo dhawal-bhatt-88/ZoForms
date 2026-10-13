@@ -2,7 +2,7 @@
 // same message), canvas previews that load nothing third-party, help text, trimming, and the
 // artifact for the end-to-end render.
 const fs = require("fs");
-const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact } = require("./_setup");
+const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, noIds, hasIds } = require("./_setup");
 const prisma = new PrismaClient();
 
 const results = [];
@@ -158,7 +158,7 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     const sources = await P.getByRole("combobox", { name: "Question" }).first().locator("option").evaluateAll((os) => os.map((o) => o.value));
     check("conditions: earlier videos aren't offered as a condition source", sources.includes(choiceId) && !videoIds.some((id) => sources.includes(id)), JSON.stringify(sources));
     await P.getByRole("combobox", { name: "Question" }).first().selectOption(choiceId);
-    await P.getByRole("combobox", { name: "Condition" }).first().selectOption("=");
+    await P.getByRole("combobox", { name: "operator" }).first().selectOption("=");
     await P.getByRole("combobox", { name: "Answer" }).first().selectOption("Yes");
 
     check("video canvas: no player, iframe or <video> on the canvas", (await P.locator("main iframe, main video, [data-block-id] iframe, [data-block-id] video").count()) === 0);
@@ -187,7 +187,7 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
       aVideos.every((b) => b.label && b.required === false && !("description" in b)) &&
       JSON.stringify(aVideos.map((b) => b.label)) === JSON.stringify(["Welcome from the team", "Pharmacy walkthrough", "Clinic tour"]));
     check("artifact: the conditional video carries its condition",
-      JSON.stringify(aVideos[2].enableWhen) === JSON.stringify([{ question: choiceId, operator: "=", answer: "yes" }]) && aVideos.slice(0, 2).every((b) => !b.enableWhen));
+      JSON.stringify(noIds(aVideos[2].enableWhen)) === JSON.stringify([{ question: choiceId, operator: "=", answer: "yes" }]) && hasIds(aVideos[2].enableWhen) && aVideos.slice(0, 2).every((b) => !b.enableWhen));
     saveArtifact("builder-video-schema.json", raw);
     await remove(formId);
   } catch (e) {

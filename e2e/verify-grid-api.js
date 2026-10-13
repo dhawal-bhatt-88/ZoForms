@@ -25,7 +25,7 @@ const substanceUse = () => ({
   label: "Substance use",
   required: true, // ignored on a grid: dropped
   completeRequired: true, // likewise
-  enableWhen: [{ question: "uses", operator: "=", answer: "yes" }],
+  enableWhen: [{ id: "c1", question: "uses", operator: "=", answer: "yes" }],
   rows: raw(["other", "Other"], ["", "Other!"], ["", "Cannabis"]),
   columns: [
     { code: "", label: "Age at first use", type: "text", required: true, options: opts("Ignored") },
@@ -41,7 +41,7 @@ const valid = {
     group("people", [
       leaf("name"),
       { id: "meds", type: "grid", label: "Medicines", rows: raw(["", "Morning"]), columns: [{ code: "", label: "Dose", type: "text" }],
-        enableWhen: [{ question: "name", operator: "exists" }] },
+        enableWhen: [{ id: "c1", question: "name", operator: "exists" }] },
     ], { repeats: true, repeatLabel: "person", minOccurs: 0 }),
     leaf("notes", "long"),
   ],
@@ -52,7 +52,7 @@ const expectedGrid = {
   id: "subs",
   type: "grid",
   label: "Substance use",
-  enableWhen: [{ question: "uses", operator: "=", answer: "yes" }],
+  enableWhen: [{ id: "c1", question: "uses", operator: "=", answer: "yes" }],
   rows: raw(["other", "Other"], ["other_2", "Other!"], ["cannabis", "Cannabis"]),
   columns: [
     { code: "age_at_first_use", label: "Age at first use", type: "text", required: true },
@@ -92,7 +92,7 @@ const expectedGrid = {
     check("a column's option codes may repeat a row code", grid.rows[0].code === "other" && grid.columns[2].options[0].code === "other" && grid.columns[2].code === "other");
     const inRepeat = art.blocks[2].blocks[1];
     check("grid inside a repeating group saved with codes", JSON.stringify(inRepeat) === JSON.stringify({
-      id: "meds", type: "grid", label: "Medicines", enableWhen: [{ question: "name", operator: "exists" }],
+      id: "meds", type: "grid", label: "Medicines", enableWhen: [{ id: "c1", question: "name", operator: "exists" }],
       rows: raw(["morning", "Morning"]), columns: [{ code: "dose", label: "Dose", type: "text" }],
     }), JSON.stringify(inRepeat));
 

@@ -4,6 +4,7 @@ import {
   artifactNavigation,
   blockName,
   buildArtifact,
+  normalizeConditions,
   deletePageKeepingContents,
   deletePageWithContents,
   deletionBlockers,
@@ -317,7 +318,8 @@ describe("navigation", () => {
     const artifact = buildArtifact({ title: "t", blocks: threePages() }, identity);
     expect(Object.keys(artifact).slice(0, 4)).toEqual(["title", "formId", "formVersionId", "schemaVersion"]);
     expect(artifact.schemaVersion).toBe(2);
-    expect(artifact.blocks[1]).toEqual(threePages()[1]);
+    // The condition gets its id by position, as content saved before ids existed does (contract §15.1).
+    expect(artifact.blocks[1]).toEqual({ ...threePages()[1], enableWhen: [{ id: "c1", ...on("meds", "=", "yes") }] });
   });
 
   it("FormArtifact refuses navigation on an unpaged form, or none on a paged one", () => {
@@ -325,7 +327,8 @@ describe("navigation", () => {
     const full = { showProgress: true, progressStyle: "caption", reviewPage: false };
     expect(FormArtifact.safeParse({ ...base, blocks: [leaf("a")], navigation: full }).success).toBe(false);
     expect(FormArtifact.safeParse({ ...base, blocks: threePages() }).success).toBe(false);
-    expect(FormArtifact.safeParse({ ...base, blocks: threePages(), navigation: full }).success).toBe(true);
+    // An artifact's conditions always have ids (contract §15.1).
+    expect(FormArtifact.safeParse({ ...base, blocks: normalizeConditions(threePages()), navigation: full }).success).toBe(true);
     // Every field explicit: an artifact without progressStyle is refused.
     expect(FormArtifact.safeParse({ ...base, blocks: threePages(), navigation: { showProgress: true, reviewPage: false } }).success).toBe(false);
   });
