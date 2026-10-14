@@ -10,8 +10,10 @@
 // once per grid, editing rows, every save rejection the editor can produce (its
 // inline message is the API's text), a grid inside a repeating group, and the
 // downloaded artifact's exact §14.1 shape. With E2E_EXTERNAL_APP_URL set, the
-// download is rendered with @yourco/forms 0.19.0: a required column blocks
-// submit, a filled grid submits, and the stored record is checked.
+// download is rendered in the test app (@yourco/forms 0.21.2): the §14.5 layout
+// (the table in its own named, focusable region, a table at the app's width and
+// either side of the 34rem container breakpoint, cards below it), a required
+// column blocks submit, a filled grid submits, and the stored record is checked.
 const fs = require("fs");
 const path = require("path");
 const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, opts, noIds, hasIds } = require("./_setup");
@@ -479,55 +481,90 @@ const NOTE = "Changing a code after the form is in use will not match answers al
     } else if (!process.env.E2E_EXTERNAL_FORMS_DIR || !fs.existsSync(path.join(process.env.E2E_EXTERNAL_FORMS_DIR, ARTIFACT))) {
       check("render: E2E_EXTERNAL_FORMS_DIR is set, so the app has this run's artifact", false, "set E2E_EXTERNAL_FORMS_DIR to the test app's src/forms");
     } else {
-      // The brief needs 0.19.0 (grid). Anything else: say so and don't render.
-      const installed = path.join(process.env.E2E_EXTERNAL_FORMS_DIR, "..", "..", "node_modules", "@yourco", "forms", "package.json");
-      const version = fs.existsSync(installed) ? JSON.parse(fs.readFileSync(installed, "utf8")).version : "not installed";
-      check("render: the test app has @yourco/forms 0.19.0", version === "0.19.0", version);
-      if (version === "0.19.0") {
-        await sleep(1500); // let the app's dev server see the new file
-        const R = await ctx.newPage();
-        R.on("pageerror", (e) => check("render: no page errors", false, e.message));
-        await R.goto(`${EXTERNAL_APP}${EXTERNAL_APP.includes("?") ? "&" : "?"}form=builder-grid`);
-        // The grid shows once the question its condition uses is answered, which itself shows after the choice.
-        await R.getByRole("group", { name: "Uses substances?", exact: true }).getByRole("radio", { name: "Option 1" }).check({ timeout: 15000 });
-        await R.getByLabel("Short answer", { exact: true }).fill("Yes, several");
-        const table = R.getByRole("table", { name: "Substance use" });
-        await table.waitFor({ timeout: 15000 });
-        check("render: the grid renders with its column and row headers",
-          JSON.stringify(await table.getByRole("columnheader").allTextContents()) === JSON.stringify(model.map((c) => c.label))
-          && JSON.stringify(await table.getByRole("rowheader").allTextContents()) === JSON.stringify(ROWS.map(([, l]) => l)),
-          JSON.stringify([await table.getByRole("columnheader").allTextContents(), await table.getByRole("rowheader").allTextContents()]));
-        await R.getByRole("radiogroup", { name: "Alcohol, How often" }).getByRole("radio", { name: "Daily" }).check();
-        await R.getByRole("button", { name: "Submit", exact: true }).click();
-        const n = ROWS.length;
-        const blocked = [`"Substance use": answer "Used in the last 30 days?" in every row (${n} missing).`, `"Substance use": answer "Age at first use" in every row (${n} missing).`];
-        await R.getByText(blocked[0]).first().waitFor({ timeout: 10000 }).catch(() => {});
-        check("render: required columns block submit, one summary entry per column", (await R.getByText(blocked[0]).count()) >= 1 && (await R.getByText(blocked[1]).count()) >= 1,
-          (await R.locator("body").innerText()).slice(0, 800));
-        await R.screenshot({ path: `${OUT}/grid-6-render-required.png`, fullPage: true });
-        for (const [, row] of ROWS) {
-          await R.getByRole("radiogroup", { name: `${row}, Used in the last 30 days?` }).getByRole("radio", { name: "Yes" }).check();
-          await R.getByLabel(`${row}, Age at first use`, { exact: true }).selectOption({ label: "Option 2" });
-        }
-        const [res] = await Promise.all([
-          R.waitForResponse((x) => /\/api\/submit$/.test(new URL(x.url()).pathname) && x.request().method() === "POST", { timeout: 15000 }),
-          R.getByRole("button", { name: "Submit", exact: true }).click(),
-        ]);
-        check("render: a filled grid submits (201)", res.status() === 201, String(res.status()));
-        const sent = JSON.parse(res.request().postData()).answers[gridId];
-        check("payload: codes only, row code → column code → cell", sent?.state === "answered" && sent.value.alcohol.frequency === "daily"
-          && ROWS.every(([code]) => sent.value[code].last_30 === "yes" && sent.value[code].age_at_first_use === "option_2"), JSON.stringify(sent));
-        const all = await (await fetch(new URL("api/submissions", EXTERNAL_APP.endsWith("/") ? EXTERNAL_APP : EXTERNAL_APP + "/"))).json();
-        const record = all.filter((x) => x.formId === art.formId).pop();
-        const value = record?.answers?.[gridId]?.value;
-        check("stored: answered rows in row order, each cell { column, value } with labels (§14.2)", Array.isArray(value) && value.length === n
-          && JSON.stringify(value[0]) === JSON.stringify({ row: { code: "alcohol", label: "Alcohol" }, cells: [
-            { column: { code: "frequency", label: "How often" }, value: { code: "daily", label: "Daily" } },
-            { column: { code: "last_30", label: "Used in the last 30 days?" }, value: { code: "yes", label: "Yes" } },
-            { column: { code: "age_at_first_use", label: "Age at first use" }, value: { code: "option_2", label: "Option 2" } }] }), JSON.stringify(value));
-        fs.writeFileSync(path.join(OUT, "grid-stored-record.json"), JSON.stringify(record, null, 2));
-        await R.close();
+      await sleep(1500); // let the app's dev server see the new file
+      // Opens the download in the test app, in a panel `width` pixels wide (the app's ?width=) or
+      // at its default width, and shows the grid: it appears once the question its condition uses
+      // is answered, which itself shows after the choice. Returns the grid's own box and layout.
+      const showGrid = async (page, width) => {
+        await page.goto(`${EXTERNAL_APP}${EXTERNAL_APP.includes("?") ? "&" : "?"}form=builder-grid${width ? `&width=${width}` : ""}`);
+        await page.getByRole("group", { name: "Uses substances?", exact: true }).getByRole("radio", { name: "Option 1" }).check({ timeout: 15000 });
+        await page.getByLabel("Short answer", { exact: true }).fill("Yes, several");
+        const region = page.getByRole("region", { name: "Substance use" });
+        await region.waitFor({ timeout: 15000 });
+        return region.evaluate((box) => {
+          const t = box.querySelector("table");
+          const css = (e) => getComputedStyle(e);
+          const labels = [...t.querySelectorAll("tbody .yf-grid-cell-label")];
+          return {
+            region: { className: box.className, tabIndex: box.tabIndex, container: `${css(box).containerName} / ${css(box).containerType}`, tableInside: t.parentElement === box },
+            width: box.clientWidth, breakpoint: 34 * parseFloat(css(document.documentElement).fontSize), viewport: innerWidth,
+            table: css(t).display, headShown: t.tHead.getBoundingClientRect().height > 1,
+            rows: [...t.tBodies[0].rows].map((r) => (r.classList.contains("yf-grid-card") ? "" : "no card class; ") + css(r).display),
+            cellLabelsShown: labels.length > 0 && labels.every((l) => css(l).display !== "none" && l.getBoundingClientRect().height > 0),
+            scrolls: box.scrollWidth > box.clientWidth,
+          };
+        });
+      };
+      const R = await ctx.newPage();
+      R.on("pageerror", (e) => check("render: no page errors", false, e.message));
+      const wide = await showGrid(R);
+      const table = R.getByRole("table", { name: "Substance use" });
+      check("render: the grid renders with its column and row headers",
+        JSON.stringify(await table.getByRole("columnheader").allTextContents()) === JSON.stringify(model.map((c) => c.label))
+        && JSON.stringify(await table.getByRole("rowheader").allTextContents()) === JSON.stringify(ROWS.map(([, l]) => l)),
+        JSON.stringify([await table.getByRole("columnheader").allTextContents(), await table.getByRole("rowheader").allTextContents()]));
+      // Contract §14.5: the table sits in its own box, a keyboard-scrollable region named by the grid's
+      // label, and the layout follows that box's width (a container query), never the viewport's.
+      check("render: the table is in its own region, named by the grid's label, focusable, a size container",
+        wide.region.className === "yf-grid-scroll" && wide.region.tabIndex === 0 && wide.region.container === "yf-grid / inline-size" && wide.region.tableInside, JSON.stringify(wide.region));
+      const isTable = (m) => m.table === "table" && m.headShown && m.rows.every((r) => r === "table-row") && !m.cellLabelsShown;
+      const isCards = (m) => m.table === "block" && !m.headShown && m.rows.every((r) => r === "block") && m.cellLabelsShown && !m.scrolls;
+      check("render: at the app's default width the grid is a table; too wide for its box, it scrolls inside it",
+        wide.width >= wide.breakpoint && isTable(wide) && wide.scrolls && (await R.evaluate(() => document.documentElement.scrollWidth <= innerWidth)), JSON.stringify(wide));
+      // Either side of the 34rem breakpoint, in a panel narrower than the (unchanged) viewport.
+      const N = await ctx.newPage();
+      N.on("pageerror", (e) => check("render: no page errors", false, e.message));
+      const above = await showGrid(N, 640);
+      check("render: a box just wider than 34rem shows the table", above.width >= above.breakpoint && above.viewport === wide.viewport && isTable(above), JSON.stringify(above));
+      const below = await showGrid(N, 600);
+      check("render: a box just narrower than 34rem shows each row as a card, each answer labelled with its column", below.width < below.breakpoint && below.viewport === wide.viewport && isCards(below), JSON.stringify(below));
+      const cards = N.getByRole("table", { name: "Substance use" });
+      check("render: as cards, the row and column headers are still exposed",
+        JSON.stringify(await cards.getByRole("rowheader").allTextContents()) === JSON.stringify(ROWS.map(([, l]) => l))
+        && (await cards.getByRole("radiogroup", { name: "Alcohol, How often" }).count()) === 1,
+        JSON.stringify(await cards.getByRole("rowheader").allTextContents()));
+      await N.screenshot({ path: `${OUT}/grid-7-render-cards.png`, fullPage: true });
+      await N.close();
+      await R.getByRole("radiogroup", { name: "Alcohol, How often" }).getByRole("radio", { name: "Daily" }).check();
+      await R.getByRole("button", { name: "Submit", exact: true }).click();
+      const n = ROWS.length;
+      const blocked = [`"Substance use": answer "Used in the last 30 days?" in every row (${n} missing).`, `"Substance use": answer "Age at first use" in every row (${n} missing).`];
+      await R.getByText(blocked[0]).first().waitFor({ timeout: 10000 }).catch(() => {});
+      check("render: required columns block submit, one summary entry per column", (await R.getByText(blocked[0]).count()) >= 1 && (await R.getByText(blocked[1]).count()) >= 1,
+        (await R.locator("body").innerText()).slice(0, 800));
+      await R.screenshot({ path: `${OUT}/grid-6-render-required.png`, fullPage: true });
+      for (const [, row] of ROWS) {
+        await R.getByRole("radiogroup", { name: `${row}, Used in the last 30 days?` }).getByRole("radio", { name: "Yes" }).check();
+        await R.getByLabel(`${row}, Age at first use`, { exact: true }).selectOption({ label: "Option 2" });
       }
+      const [res] = await Promise.all([
+        R.waitForResponse((x) => /\/api\/submit$/.test(new URL(x.url()).pathname) && x.request().method() === "POST", { timeout: 15000 }),
+        R.getByRole("button", { name: "Submit", exact: true }).click(),
+      ]);
+      check("render: a filled grid submits (201)", res.status() === 201, String(res.status()));
+      const sent = JSON.parse(res.request().postData()).answers[gridId];
+      check("payload: codes only, row code → column code → cell", sent?.state === "answered" && sent.value.alcohol.frequency === "daily"
+        && ROWS.every(([code]) => sent.value[code].last_30 === "yes" && sent.value[code].age_at_first_use === "option_2"), JSON.stringify(sent));
+      const all = await (await fetch(new URL("api/submissions", EXTERNAL_APP.endsWith("/") ? EXTERNAL_APP : EXTERNAL_APP + "/"))).json();
+      const record = all.filter((x) => x.formId === art.formId).pop();
+      const value = record?.answers?.[gridId]?.value;
+      check("stored: answered rows in row order, each cell { column, value } with labels (§14.2)", Array.isArray(value) && value.length === n
+        && JSON.stringify(value[0]) === JSON.stringify({ row: { code: "alcohol", label: "Alcohol" }, cells: [
+          { column: { code: "frequency", label: "How often" }, value: { code: "daily", label: "Daily" } },
+          { column: { code: "last_30", label: "Used in the last 30 days?" }, value: { code: "yes", label: "Yes" } },
+          { column: { code: "age_at_first_use", label: "Age at first use" }, value: { code: "option_2", label: "Option 2" } }] }), JSON.stringify(value));
+      fs.writeFileSync(path.join(OUT, "grid-stored-record.json"), JSON.stringify(record, null, 2));
+      await R.close();
     }
 
     // ================= labels are plain text =================
