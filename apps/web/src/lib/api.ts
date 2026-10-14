@@ -1,4 +1,4 @@
-import type { FormSchema } from "@formbuilder/form-schema";
+import type { FormSchema, GroupBlock } from "@formbuilder/form-schema";
 
 export const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
@@ -324,6 +324,14 @@ export function createForm(title: string) {
   });
 }
 
+/** A new form from a form template: fresh block ids, and `templateRef` naming the template. */
+export function createFormFromTemplate(templateId: string) {
+  return req<FormListItem>("/v1/forms", {
+    method: "POST",
+    body: JSON.stringify({ templateId }),
+  });
+}
+
 export function getForm(id: string) {
   return req<FormDetail>(`/v1/forms/${id}`);
 }
@@ -364,6 +372,57 @@ export function updateForm(
     method: "PATCH",
     body: JSON.stringify(patch),
   });
+}
+
+/* ---------- templates ---------- */
+
+export type TemplateKind = "form" | "group";
+/** "system": made by us, read-only. "organisation": the organisation's own, which its authors manage. */
+export type TemplateScope = "system" | "organisation";
+export type TemplateSummary = {
+  id: string;
+  kind: TemplateKind;
+  name: string;
+  description: string | null;
+  version: number;
+  scope: TemplateScope;
+  createdAt: string;
+  updatedAt: string;
+};
+/** With its content: a form schema for a form template, one group block for a group template. */
+export type TemplateDetail = TemplateSummary & { content: FormSchema | GroupBlock };
+
+export function listTemplates(kind?: TemplateKind) {
+  return req<TemplateSummary[]>(`/v1/templates${kind ? `?kind=${kind}` : ""}`);
+}
+
+export function getTemplate(id: string) {
+  return req<TemplateDetail>(`/v1/templates/${id}`);
+}
+
+export function createTemplate(body: { kind: TemplateKind; name: string; description?: string; content: FormSchema | GroupBlock }) {
+  return req<TemplateSummary>("/v1/templates", { method: "POST", body: JSON.stringify(body) });
+}
+
+/**
+ * Rename, describe, or save new content. Pass the `version` the edit started
+ * from with new content: a save made after someone else's is refused with
+ * ApiError 409 "VERSION_CONFLICT". Returns the template as stored, content included.
+ */
+export function updateTemplate(
+  id: string,
+  patch: { name?: string; description?: string | null; content?: FormSchema | GroupBlock; version?: number },
+) {
+  return req<TemplateDetail>(`/v1/templates/${id}`, { method: "PATCH", body: JSON.stringify(patch) });
+}
+
+export function deleteTemplate(id: string) {
+  return req<{ ok: boolean }>(`/v1/templates/${id}`, { method: "DELETE" });
+}
+
+/** An editable copy in the organisation's templates: "Copy of {name}". */
+export function duplicateTemplate(id: string) {
+  return req<TemplateSummary>(`/v1/templates/${id}/duplicate`, { method: "POST" });
 }
 
 export type FormVersion = {

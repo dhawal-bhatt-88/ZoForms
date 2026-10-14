@@ -33,6 +33,7 @@ import {
   FileText,
   GripVertical,
   Inbox,
+  LayoutTemplate,
   Loader2,
   Plus,
   Search,
@@ -44,6 +45,7 @@ import {
 import {
   addGridColumn,
   allBlockIds,
+  canInsertAsPage,
   answerCode,
   applyImport,
   BLOCK_META,
@@ -64,6 +66,12 @@ import {
   COMPLETE_REQUIRED_LABELS,
   fillCodeAt,
   findBlock,
+  GROUP_TEMPLATE_TITLE,
+  groupFromTemplate,
+  INSERT_AS_PAGE_UNAVAILABLE,
+  pageForTemplateGroup,
+  templateAsForm,
+  templateFromForm,
   gridColumnName,
   insertBlockIntoTree,
   insertPageAfter,
@@ -152,16 +160,23 @@ import { OptionImportDialog } from "@/components/option-import-dialog";
 import { CodeChangeNote, OptionListEditor } from "@/components/option-list-editor";
 import { GridColumnsEditor } from "@/components/grid-columns-editor";
 import { Switch } from "@/components/switch";
+import { MenuButton, type MenuItem } from "@/components/menu-button";
+import { SaveTemplateDialog } from "@/components/templates/save-template-dialog";
+import { TemplatePicker } from "@/components/templates/template-picker";
 import { BlockPreview, DropLine, GroupBox, ICONS, MAX_INDENT_LEVELS } from "./canvas-preview";
 import {
   ApiError,
   downloadArtifact,
   editForm,
   getForm,
+  getTemplate,
   saveSchema,
+  updateTemplate,
   suggestLogic,
   translateForm,
   type FormStatus,
+  type TemplateDetail,
+  type TemplateKind,
   type LogicSuggestion,
 } from "@/lib/api";
 
@@ -174,13 +189,18 @@ type CatalogItem = {
   keywords?: string;
   level?: number;
   soon?: boolean;
+  /** "From template…": opens the template picker instead of adding a block. */
+  template?: true;
 };
 
 /** The slash-menu block catalog, grouped by category. */
 const CATALOG: { group: string; items: CatalogItem[] }[] = [
   {
     group: "Structure",
-    items: [{ type: "group", label: "Group", keywords: "section fieldset container nest" }],
+    items: [
+      { type: "group", label: "Group", keywords: "section fieldset container nest" },
+      { type: "group", label: "From template…", keywords: "template saved reuse library", template: true },
+    ],
   },
   {
     group: "Questions",
@@ -298,7 +318,7 @@ function BlockMenu({
             {g.group}
           </div>
           {g.items.map((it, i) => {
-            const Icon = ICONS[it.type];
+            const Icon = it.template ? LayoutTemplate : ICONS[it.type];
             const label = catalogLabel(it);
             return (
               <button
@@ -547,6 +567,8 @@ function CanvasCard({
   onMove,
   onToggle,
   dropLine,
+  menu,
+  locked = false,
 }: {
   item: FlatItem;
   /** Question number, for answerable questions. */
@@ -560,6 +582,10 @@ function CanvasCard({
   onToggle: () => void;
   /** Leaves only; a group's drop line is drawn by its box. */
   dropLine?: "top" | "bottom";
+  /** A group's "⋯" menu, when it has one. */
+  menu?: MenuItem[];
+  /** A group template's own group: it can't be moved or deleted, so it has no controls for that. */
+  locked?: boolean;
 }) {
   // The card itself never moves while dragging; a DragOverlay follows the pointer.
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({ id: item.id });
@@ -651,38 +677,43 @@ function CanvasCard({
 
       {/* Visible on hover, and whenever focus is inside the card, so these work from the keyboard. */}
       <div className="absolute right-2 top-2 flex gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onMove(-1);
-          }}
-          disabled={!canMoveUp}
-          className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-surface-3 hover:text-ink disabled:opacity-30"
-          aria-label="Move up"
-        >
-          <ArrowUp className="h-4 w-4" />
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onMove(1);
-          }}
-          disabled={!canMoveDown}
-          className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-surface-3 hover:text-ink disabled:opacity-30"
-          aria-label="Move down"
-        >
-          <ArrowDown className="h-4 w-4" />
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-[#FCECEC] hover:text-red"
-          aria-label={group ? "Delete group" : "Delete"}
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
+        {group && menu && <MenuButton label={`More actions for group "${blockName(group).trim() || "Unlabelled group"}"`} items={menu} />}
+        {!locked && (
+          <>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onMove(-1);
+              }}
+              disabled={!canMoveUp}
+              className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-surface-3 hover:text-ink disabled:opacity-30"
+              aria-label="Move up"
+            >
+              <ArrowUp className="h-4 w-4" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onMove(1);
+              }}
+              disabled={!canMoveDown}
+              className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-surface-3 hover:text-ink disabled:opacity-30"
+              aria-label="Move down"
+            >
+              <ArrowDown className="h-4 w-4" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-[#FCECEC] hover:text-red"
+              aria-label={group ? "Delete group" : "Delete"}
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -989,17 +1020,21 @@ function PositionPanel({
   blockId,
   onMove,
   onMovePage,
+  rootLocked = false,
 }: {
   blocks: readonly Block[];
   blockId: string;
   onMove: (target: MoveTarget) => void;
   onMovePage: (direction: -1 | 1) => void;
+  /** A group template: nothing may move to the top level, beside its group. */
+  rootLocked?: boolean;
 }) {
   const [destination, setDestination] = useState("");
   const pageAt = blocks.findIndex((b) => b.id === blockId && isPage(b));
-  const up = stepMove(blocks, blockId, -1);
-  const down = stepMove(blocks, blockId, 1);
-  const destinations = moveDestinations(blocks, blockId);
+  const allowed = (t: MoveTarget | null) => (rootLocked && t?.parentId === null ? null : t);
+  const up = allowed(stepMove(blocks, blockId, -1));
+  const down = allowed(stepMove(blocks, blockId, 1));
+  const destinations = moveDestinations(blocks, blockId).filter((d) => !(rootLocked && d.id === null));
   const ROOT = "__top_level__";
 
   function moveInto() {
@@ -1482,9 +1517,38 @@ function ConditionsPanel({
   );
 }
 
-export default function FormEditor() {
+/**
+ * Stored content as the editor holds it. Explicit fields, so a version saved
+ * with `description: ""` starts clean too; conditions get their ids and logic
+ * text (contract §15.6).
+ */
+function editorContent(s: Partial<FormSchema> | undefined, fallbackTitle: string): FormSchema {
+  return {
+    title: s?.title || fallbackTitle,
+    description: s?.description || undefined,
+    settings: s?.settings,
+    blocks: normalizeConditions(s?.blocks ?? []),
+    navigation: s?.navigation,
+    drafts: s?.drafts,
+    templateRef: s?.templateRef,
+  };
+}
+
+/**
+ * The form editor. With `templateId` it edits a template instead ("template
+ * mode"): the same canvas, inspector, save rules, Save and Cancel, but Save
+ * writes to the template, and what only applies to a form — Download,
+ * responses, publishing, AI — isn't offered. A group template is edited as a
+ * form whose only root item is its group, and it can't gain more root items.
+ */
+export default function FormEditor({ templateId }: { templateId?: string }) {
   const params = useParams();
+  // A form's id; in template mode the route's id is the template's, and isn't used as a form's.
   const id = String(params.id);
+  const templateMode = templateId !== undefined;
+  // The template being edited: its name, kind, and the version the edit started from.
+  const [template, setTemplate] = useState<{ name: string; kind: TemplateKind; version: number } | null>(null);
+  const groupTemplate = template?.kind === "group";
 
   const [schema, setSchema] = useState<FormSchema | null>(null);
   // The latest saved version's content: the baseline for dirty-state and Cancel.
@@ -1523,24 +1587,32 @@ export default function FormEditor() {
   const [deletingPageId, setDeletingPageId] = useState<string | null>(null);
   // The "Your questions will move to Page 1" confirm is open.
   const [confirmPaging, setConfirmPaging] = useState(false);
+  // The template picker is open; where "Insert as group" puts the copy.
+  const [picking, setPicking] = useState<MoveTarget | null>(null);
+  // The "Save as template" dialog is open, for the form or one group.
+  const [savingAsTemplate, setSavingAsTemplate] = useState<{ kind: "form" } | { kind: "group"; groupId: string } | null>(null);
   // A drag in progress: the block, the row it's over, and how far it has moved sideways.
   const [drag, setDrag] = useState<{ activeId: string; overId: string; offsetX: number } | null>(null);
   const insertRowRef = useRef<HTMLDivElement>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   useEffect(() => {
+    if (templateId !== undefined) {
+      getTemplate(templateId)
+        .then((t) => {
+          const latest = templateContent(t);
+          setTemplate({ name: t.name, kind: t.kind, version: t.version });
+          setSchema(latest);
+          setSaved(latest);
+          setSelectedId(latest.blocks[0]?.id ?? null);
+        })
+        .catch(() => setLoadError(true));
+      return;
+    }
     getForm(id)
       .then((f) => {
         const s = f.versions[0]?.schema;
-        const latest: FormSchema = {
-          title: s?.title || f.title,
-          // Same rule on load, so a version saved with `description: ""` starts clean too.
-          description: s?.description || undefined,
-          settings: s?.settings,
-          blocks: normalizeConditions(s?.blocks ?? []),
-          navigation: s?.navigation,
-          drafts: s?.drafts,
-        };
+        const latest = editorContent(s, f.title);
         setSchema(latest);
         setSaved(latest);
         setSlug(f.slug);
@@ -1548,7 +1620,12 @@ export default function FormEditor() {
         setSelectedId(s?.blocks?.[0]?.id ?? null);
       })
       .catch(() => setLoadError(true));
-  }, [id]);
+  }, [id, templateId]);
+
+  /** A template's content as the editor holds it: a group template as the only block of a form. */
+  function templateContent(t: TemplateDetail): FormSchema {
+    return editorContent(templateAsForm(t.kind, t.content) as FormSchema, GROUP_TEMPLATE_TITLE);
+  }
 
   // Nothing is persisted until Save, so "dirty" = editor differs from the latest
   // saved version, compared the same key-order-insensitive way the API does.
@@ -1584,7 +1661,15 @@ export default function FormEditor() {
     try {
       // The save fills empty option codes and trims labels (contract §13.3): adopt
       // what was stored, unless the author edited while the request was in flight.
-      const { schema: stored } = await saveSchema(id, sent);
+      let stored: FormSchema;
+      if (templateId !== undefined && template) {
+        // The version the edit started from: a save made after someone else's is refused (409).
+        const t = await updateTemplate(templateId, { content: templateFromForm(template.kind, sent), version: template.version });
+        setTemplate({ name: t.name, kind: t.kind, version: t.version });
+        stored = templateContent(t);
+      } else {
+        stored = (await saveSchema(id, sent)).schema;
+      }
       setSaved(stored);
       setSchema((s) => (s === sent ? stored : s));
     } catch (e) {
@@ -1682,6 +1767,8 @@ export default function FormEditor() {
     if (!schema || !entry) {
       const last = schema?.blocks[schema.blocks.length - 1];
       if (last && isPage(last)) return { parentId: last.id, index: last.blocks.length };
+      // A group template's only root item is its group: new blocks go inside it.
+      if (groupTemplate && last && isGroup(last)) return { parentId: last.id, index: last.blocks.length };
       return { parentId: null, index: schema?.blocks.length ?? 0 };
     }
     if (isContainer(entry.block)) return { parentId: entry.block.id, index: entry.block.blocks.length };
@@ -1699,6 +1786,14 @@ export default function FormEditor() {
 
   const insertFromCatalog = (item: CatalogItem) => {
     if (!schema) return;
+    if (item.template) {
+      // The picker inserts where this block would have gone.
+      setPicking(insertTarget ?? selectionInsertTarget());
+      setMenuOpen(false);
+      setMenuQuery("");
+      setInsertTarget(null);
+      return;
+    }
     const taken = allBlockIds(schema.blocks);
     const b: Block =
       item.type === "group"
@@ -1712,6 +1807,50 @@ export default function FormEditor() {
     setMenuQuery("");
     setInsertTarget(null);
   };
+  /** Why "Insert as page" isn't available in this form, or null when it is. */
+  function insertAsPageRefusal(): string | null {
+    if (!schema) return null;
+    if (groupTemplate) return "A group template holds one group, so nothing can be inserted as a page.";
+    return canInsertAsPage(schema.blocks) ? null : INSERT_AS_PAGE_UNAVAILABLE;
+  }
+
+  /**
+   * Insert a group template's copy: fresh ids throughout, its conditions
+   * following them, `templateRef` on the group. As a group, it goes where the
+   * picker was opened; as a page, after the current page, in a form with pages
+   * or an empty one (which then has pages). The usual ordering and prefix
+   * guards apply, though a self-contained copy can't break either.
+   */
+  function insertTemplate(t: TemplateDetail, as: "group" | "page") {
+    if (!schema || !picking) return;
+    const source = { id: t.id, version: t.version, name: t.name, content: t.content as GroupBlock };
+    const group = groupFromTemplate(source, allBlockIds(schema.blocks));
+    let next: Block[];
+    if (as === "page") {
+      if (insertAsPageRefusal()) return;
+      const page = pageForTemplateGroup(group, allBlockIds(schema.blocks));
+      const after = currentPageId();
+      next = after ? insertPageAfter(schema.blocks, after, page) : [page];
+    } else {
+      if (groupTemplate && picking.parentId === null) return;
+      next = insertBlockIntoTree(schema.blocks, picking.parentId, picking.index, group);
+    }
+    setPicking(null);
+    if (refuseStructureEdit(structureBreaks(schema.blocks, next), `insert "${t.name}" there`)) return;
+    patch((s) => ({ ...s, blocks: next }));
+    if (as === "group" && picking.parentId) expand(picking.parentId);
+    setSelectedId(group.id);
+    setNotice({ tone: "info", text: `Inserted a copy of "${t.name}".` });
+  }
+
+  /** A condition in words for the save-as-template list: `"Do you smoke?" is Yes`. */
+  function quotedCondition(c: Condition): string {
+    const source = schema ? findBlock(schema.blocks, c.question)?.block : undefined;
+    const label = source ? conditionAnswerOptions(source)?.find((o) => o.code === c.answer)?.label : undefined;
+    const answer = c.operator === "exists" ? "" : ` ${label ?? c.answer}`;
+    return `${source ? `"${blockName(source)}"` : "a missing question"} ${OPERATOR_TEXT[c.operator]}${answer}`;
+  }
+
   /** Select a block and bring it into view (used by the "jump to" links), opening any folded groups around it. */
   function jumpTo(bid: string) {
     const entry = schema ? findBlock(schema.blocks, bid) : undefined;
@@ -1968,10 +2107,24 @@ export default function FormEditor() {
   }
 
   /** Delete a question or layout block. A page or group opens its two-choice dialog instead. */
+  /**
+   * A group template's only root item is its group (template mode): it can't be
+   * deleted or moved, and nothing can be moved beside it. True, with the reason
+   * shown, when an edit would do that.
+   */
+  function refuseRootChange(bid: string | null, target?: MoveTarget): boolean {
+    if (!groupTemplate || !schema) return false;
+    const root = schema.blocks[0];
+    if (bid !== root?.id && target?.parentId !== null) return false;
+    setNotice({ text: "A group template holds exactly one group: it stays, and everything else goes inside it." });
+    return true;
+  }
+
   const removeBlock = (bid: string) => {
     if (!schema) return;
     const current = findBlock(schema.blocks, bid)?.block;
     if (!current) return;
+    if (refuseRootChange(bid)) return;
     if (isPage(current)) {
       setDeletingPageId(bid);
       return;
@@ -1996,6 +2149,7 @@ export default function FormEditor() {
   function deleteGroupKeepingContents(gid: string) {
     if (!schema) return;
     setDeletingGroupId(null);
+    if (refuseRootChange(gid)) return;
     const next = unwrapGroup(schema.blocks, gid);
     // Unwrapping changes neither reading order nor which repeats enclose a block, but it
     // goes through the same guard as any move.
@@ -2008,6 +2162,7 @@ export default function FormEditor() {
   function deleteGroupWithContents(gid: string) {
     if (!schema) return;
     setDeletingGroupId(null);
+    if (refuseRootChange(gid)) return;
     const group = findBlock(schema.blocks, gid)?.block;
     const deps = deletionBlockers(schema.blocks, gid);
     if (deps.length) {
@@ -2053,6 +2208,7 @@ export default function FormEditor() {
    */
   function tryMove(bid: string, target: MoveTarget) {
     if (!schema) return;
+    if (refuseRootChange(bid, target)) return;
     const moving = findBlock(schema.blocks, bid)?.block;
     if (!moving) return;
     let next: Block[];
@@ -2293,7 +2449,7 @@ export default function FormEditor() {
   if (!schema)
     return (
       <div className="grid h-screen place-items-center text-muted">
-        {loadError ? "Couldn't load this form." : <Loader2 className="h-5 w-5 animate-spin" />}
+        {loadError ? (templateMode ? "Couldn't load this template." : "Couldn't load this form.") : <Loader2 className="h-5 w-5 animate-spin" />}
       </div>
     );
 
@@ -2341,7 +2497,9 @@ export default function FormEditor() {
    */
   function canvasTree() {
     const card = (item: FlatItem) => {
-      const step = { up: stepMove(schema!.blocks, item.id, -1), down: stepMove(schema!.blocks, item.id, 1) };
+      // In a group template, a step that would leave the group isn't offered.
+      const allowed = (t: MoveTarget | null) => (groupTemplate && t?.parentId === null ? null : t);
+      const step = { up: allowed(stepMove(schema!.blocks, item.id, -1)), down: allowed(stepMove(schema!.blocks, item.id, 1)) };
       return (
         <CanvasCard
           key={item.id}
@@ -2358,6 +2516,18 @@ export default function FormEditor() {
             if (target) tryMove(item.id, target);
           }}
           onToggle={() => toggle(item.id)}
+          menu={
+            !templateMode && isGroup(item.block)
+              ? [
+                  {
+                    label: "Save as template…",
+                    icon: LayoutTemplate,
+                    onSelect: () => setSavingAsTemplate({ kind: "group", groupId: item.id }),
+                  },
+                ]
+              : undefined
+          }
+          locked={groupTemplate && item.id === schema!.blocks[0]?.id}
         />
       );
     };
@@ -2443,19 +2613,30 @@ export default function FormEditor() {
       {/* Top bar */}
       <header className="flex h-14 flex-none items-center gap-3 border-b border-line bg-surface px-4">
         <Link
-          href="/app"
+          href={templateMode ? "/app/templates" : "/app"}
           onClick={confirmLeave}
           className="grid h-9 w-9 flex-none place-items-center rounded-lg text-ink-2 hover:bg-surface-3"
-          aria-label="Back"
+          aria-label={templateMode ? "Back to templates" : "Back"}
         >
           <ChevronLeft className="h-4 w-4" />
         </Link>
-        <input
-          value={schema.title}
-          onChange={(e) => patch((s) => ({ ...s, title: e.target.value }))}
-          className="min-w-0 max-w-[280px] flex-none rounded-md px-2 py-1 text-[15px] font-semibold tracking-tight outline-none hover:bg-surface-3 focus:bg-surface-3"
-          spellCheck={false}
-        />
+        {templateMode ? (
+          <h1 className="flex min-w-0 items-center gap-2 text-[15px] font-semibold tracking-tight">
+            <LayoutTemplate className="h-4 w-4 flex-none text-accent-2" aria-hidden="true" />
+            <span className="truncate">Template: {template?.name}</span>
+            <span className="flex-none rounded-full bg-surface-3 px-2 py-0.5 text-[11px] font-semibold text-ink-2">
+              {groupTemplate ? "Group" : "Form"}
+            </span>
+          </h1>
+        ) : (
+          <input
+            value={schema.title}
+            onChange={(e) => patch((s) => ({ ...s, title: e.target.value }))}
+            aria-label="Form title"
+            className="min-w-0 max-w-[280px] flex-none rounded-md px-2 py-1 text-[15px] font-semibold tracking-tight outline-none hover:bg-surface-3 focus:bg-surface-3"
+            spellCheck={false}
+          />
+        )}
         <span className="flex items-center gap-1.5 text-xs text-faint">
           {saving ? (
             <>
@@ -2473,46 +2654,55 @@ export default function FormEditor() {
         </span>
 
         <div className="ml-auto flex items-center gap-2">
-          <Link href={`/app/forms/${id}/responses`} onClick={confirmLeave} className="btn btn-ghost btn-sm">
-            <Inbox className="h-4 w-4" /> Responses
-          </Link>
-          <Link href={`/app/forms/${id}/analytics`} onClick={confirmLeave} className="btn btn-ghost btn-sm">
-            <BarChart3 className="h-4 w-4" /> Analytics
-          </Link>
-          <Link href={`/app/forms/${id}/integrations`} onClick={confirmLeave} className="btn btn-ghost btn-sm">
-            <Zap className="h-4 w-4" /> Connect
-          </Link>
-          <button
-            onClick={() => setAiOpen((v) => !v)}
-            className={`btn btn-sm ${aiOpen ? "btn-primary" : "btn-outline"}`}
-          >
-            <Sparkles className="h-4 w-4" /> Ask AI
-          </button>
-          {status === "PUBLISHED" && (
+          {!templateMode && (
             <>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E7F6ED] px-2.5 py-1 text-xs font-semibold text-green">
-                <span className="h-1.5 w-1.5 rounded-full bg-green" /> Published
-              </span>
-              <button onClick={copyLink} className="btn btn-outline btn-sm">
-                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                {copied ? "Copied" : "Copy link"}
+              <Link href={`/app/forms/${id}/responses`} onClick={confirmLeave} className="btn btn-ghost btn-sm">
+                <Inbox className="h-4 w-4" /> Responses
+              </Link>
+              <Link href={`/app/forms/${id}/analytics`} onClick={confirmLeave} className="btn btn-ghost btn-sm">
+                <BarChart3 className="h-4 w-4" /> Analytics
+              </Link>
+              <Link href={`/app/forms/${id}/integrations`} onClick={confirmLeave} className="btn btn-ghost btn-sm">
+                <Zap className="h-4 w-4" /> Connect
+              </Link>
+              <button
+                onClick={() => setAiOpen((v) => !v)}
+                className={`btn btn-sm ${aiOpen ? "btn-primary" : "btn-outline"}`}
+              >
+                <Sparkles className="h-4 w-4" /> Ask AI
               </button>
-              <button onClick={() => setEmbedOpen(true)} className="btn btn-outline btn-sm">
-                <Code2 className="h-4 w-4" /> Embed
+              {status === "PUBLISHED" && (
+                <>
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E7F6ED] px-2.5 py-1 text-xs font-semibold text-green">
+                    <span className="h-1.5 w-1.5 rounded-full bg-green" /> Published
+                  </span>
+                  <button onClick={copyLink} className="btn btn-outline btn-sm">
+                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                    {copied ? "Copied" : "Copy link"}
+                  </button>
+                  <button onClick={() => setEmbedOpen(true)} className="btn btn-outline btn-sm">
+                    <Code2 className="h-4 w-4" /> Embed
+                  </button>
+                  <a href={`/r/${slug}`} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm">
+                    <ExternalLink className="h-4 w-4" /> View live
+                  </a>
+                </>
+              )}
+              <button
+                onClick={onDownload}
+                className="btn btn-outline btn-sm"
+                title="Download the latest saved version"
+              >
+                {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                Download
               </button>
-              <a href={`/r/${slug}`} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm">
-                <ExternalLink className="h-4 w-4" /> View live
-              </a>
+              <MenuButton
+                label="More form actions"
+                className="btn btn-outline btn-sm px-2"
+                items={[{ label: "Save form as template…", icon: LayoutTemplate, onSelect: () => setSavingAsTemplate({ kind: "form" }) }]}
+              />
             </>
           )}
-          <button
-            onClick={onDownload}
-            className="btn btn-outline btn-sm"
-            title="Download the latest saved version"
-          >
-            {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            Download
-          </button>
           <button onClick={onCancel} disabled={!dirty || saving} className="btn btn-outline btn-sm">
             Cancel
           </button>
@@ -2543,6 +2733,20 @@ export default function FormEditor() {
         />
       )}
       {confirmPaging && <PagingDialog onConfirm={convertToPages} onClose={() => setConfirmPaging(false)} />}
+      {picking && <TemplatePicker asPage={insertAsPageRefusal()} onInsert={insertTemplate} onClose={() => setPicking(null)} />}
+      {savingAsTemplate && (
+        <SaveTemplateDialog
+          kind={savingAsTemplate.kind}
+          form={schema}
+          groupId={savingAsTemplate.kind === "group" ? savingAsTemplate.groupId : undefined}
+          phrase={quotedCondition}
+          onClose={() => setSavingAsTemplate(null)}
+          onSaved={(t) => {
+            setSavingAsTemplate(null);
+            setNotice({ tone: "info", text: `Saved "${t.name}" to your organisation's templates.` });
+          }}
+        />
+      )}
       {importing && (
         <OptionImportDialog
           fileName={importing.fileName}
@@ -2588,23 +2792,34 @@ export default function FormEditor() {
         <div className="overflow-auto bg-bg px-6 py-8">
           <div className="mx-auto max-w-[680px]">
             <div className="rounded-2xl border border-line bg-surface p-8 shadow-soft">
-              <input
-                value={schema.title}
-                onChange={(e) => patch((s) => ({ ...s, title: e.target.value }))}
-                onFocus={() => setSelectedId(null)}
-                className="w-full text-[26px] font-bold tracking-tight outline-none"
-                spellCheck={false}
-              />
-              <input
-                value={schema.description ?? ""}
-                // A cleared description is "no description", not "" — otherwise typing
-                // then deleting would count as an unsaved change.
-                onChange={(e) => patch((s) => ({ ...s, description: e.target.value || undefined }))}
-                onFocus={() => setSelectedId(null)}
-                placeholder="Add a description…"
-                className="mt-1.5 w-full text-[14.5px] text-muted outline-none"
-                spellCheck={false}
-              />
+              {groupTemplate ? (
+                // A group template has no title or description of its own: it is its group.
+                <p className="text-sm text-muted">
+                  This group template is the group below. Everything in it goes inside the group.
+                </p>
+              ) : (
+                <>
+                  <input
+                    value={schema.title}
+                    onChange={(e) => patch((s) => ({ ...s, title: e.target.value }))}
+                    onFocus={() => setSelectedId(null)}
+                    aria-label={templateMode ? "Form title (in forms made from this template)" : "Form title"}
+                    className="w-full text-[26px] font-bold tracking-tight outline-none"
+                    spellCheck={false}
+                  />
+                  <input
+                    value={schema.description ?? ""}
+                    // A cleared description is "no description", not "" — otherwise typing
+                    // then deleting would count as an unsaved change.
+                    onChange={(e) => patch((s) => ({ ...s, description: e.target.value || undefined }))}
+                    onFocus={() => setSelectedId(null)}
+                    placeholder="Add a description…"
+                    aria-label="Form description"
+                    className="mt-1.5 w-full text-[14.5px] text-muted outline-none"
+                    spellCheck={false}
+                  />
+                </>
+              )}
 
               <div className="mt-6">
                 <DndContext
@@ -2660,20 +2875,22 @@ export default function FormEditor() {
                 />
               </div>
 
-              <button
-                onClick={addPage}
-                className="mt-2 flex items-center gap-1.5 rounded-lg px-1 py-1 text-sm font-medium text-muted hover:text-accent-2"
-              >
-                <FileText className="h-4 w-4" />
-                {addPageAfter ? `Add page after "${addPageAfter.title.trim() || "Untitled page"}"` : "Add page"}
-              </button>
+              {!groupTemplate && (
+                <button
+                  onClick={addPage}
+                  className="mt-2 flex items-center gap-1.5 rounded-lg px-1 py-1 text-sm font-medium text-muted hover:text-accent-2"
+                >
+                  <FileText className="h-4 w-4" />
+                  {addPageAfter ? `Add page after "${addPageAfter.title.trim() || "Untitled page"}"` : "Add page"}
+                </button>
+              )}
 
               {schema.blocks.length === 0 && (
                 <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-dashed border-line-2 py-10 text-center">
                   <span className="text-sm font-medium text-ink">Add your first block</span>
                   <span className="text-sm text-muted">
                     Type <kbd className="rounded border border-line-2 bg-surface-2 px-1.5 font-mono text-xs">/</kbd>{" "}
-                    above or click + to choose from {CATALOG.reduce((n, g) => n + g.items.length, 0)} block types.
+                    above or click + to choose from {CATALOG.reduce((n, g) => n + g.items.filter((it) => !it.template).length, 0)} block types.
                   </span>
                 </div>
               )}
@@ -3065,12 +3282,15 @@ export default function FormEditor() {
                 onChange={(p) => updateBlock(selected.id, p)}
                 pickAnswer={pickAnswer}
               />
-              <PositionPanel
-                blocks={schema.blocks}
-                blockId={selected.id}
-                onMove={(t) => tryMove(selected.id, t)}
-                onMovePage={(direction) => movePageBy(selected.id, direction)}
-              />
+              {!(groupTemplate && selected.id === schema.blocks[0]?.id) && (
+                <PositionPanel
+                  blocks={schema.blocks}
+                  blockId={selected.id}
+                  onMove={(t) => tryMove(selected.id, t)}
+                  onMovePage={(direction) => movePageBy(selected.id, direction)}
+                  rootLocked={groupTemplate}
+                />
+              )}
               {isPage(selected) &&
                 (pages.length === 1 ? (
                   <button
@@ -3087,7 +3307,7 @@ export default function FormEditor() {
                     <Trash2 className="h-4 w-4" /> Delete page…
                   </button>
                 ))}
-              {isGroup(selected) && (
+              {isGroup(selected) && !(groupTemplate && selected.id === schema.blocks[0]?.id) && (
                 <button
                   onClick={() => setDeletingGroupId(selected.id)}
                   className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line-2 px-3 py-1.5 text-sm font-medium text-red hover:bg-[#FCECEC]"
@@ -3096,9 +3316,22 @@ export default function FormEditor() {
                 </button>
               )}
             </div>
+          ) : groupTemplate ? (
+            <div>
+              <h4 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-faint">Group template</h4>
+              <p className="text-sm text-muted">
+                A group template has no form settings: forms it&apos;s inserted into keep their own. Select a block to edit it.
+              </p>
+            </div>
           ) : (
             <div>
               <h4 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-faint">Form settings</h4>
+              {templateMode && (
+                <p className="mb-3 rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-2">
+                  Templates don&apos;t keep settings that send answers somewhere or identify your organisation: the redirect
+                  URL, email notifications, logo and cover image. Set those on each form.
+                </p>
+              )}
               <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Submit button label</label>
               <input
                 value={schema.settings?.submitLabel ?? ""}
@@ -3106,16 +3339,20 @@ export default function FormEditor() {
                 placeholder="Submit"
                 className={`${fieldCls} mb-3`}
               />
-              <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Redirect URL after submit</label>
-              <input
-                value={schema.settings?.redirectUrl ?? ""}
-                onChange={(e) => updateSettings({ redirectUrl: e.target.value })}
-                placeholder="https://…"
-                className={fieldCls}
-              />
-              <p className="mt-1.5 text-xs text-muted">
-                Leave blank to show the built-in thank-you screen.
-              </p>
+              {!templateMode && (
+                <>
+                  <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Redirect URL after submit</label>
+                  <input
+                    value={schema.settings?.redirectUrl ?? ""}
+                    onChange={(e) => updateSettings({ redirectUrl: e.target.value })}
+                    placeholder="https://…"
+                    className={fieldCls}
+                  />
+                  <p className="mt-1.5 text-xs text-muted">
+                    Leave blank to show the built-in thank-you screen.
+                  </p>
+                </>
+              )}
 
               <label className="mt-4 flex items-start gap-2.5">
                 <input
@@ -3150,25 +3387,29 @@ export default function FormEditor() {
                 </span>
               </label>
 
-              <label className="mb-1.5 mt-4 block text-[12.5px] font-semibold text-ink-2">
-                Email notifications
-              </label>
-              <input
-                defaultValue={(schema.settings?.notifyEmails ?? []).join(", ")}
-                onBlur={(e) =>
-                  updateSettings({
-                    notifyEmails: e.target.value
-                      .split(",")
-                      .map((s) => s.trim())
-                      .filter(Boolean),
-                  })
-                }
-                placeholder="you@team.com, ops@team.com"
-                className={fieldCls}
-              />
-              <p className="mt-1.5 text-xs text-muted">
-                Comma-separated. We&apos;ll email these addresses on every new response.
-              </p>
+              {!templateMode && (
+                <>
+                  <label className="mb-1.5 mt-4 block text-[12.5px] font-semibold text-ink-2">
+                    Email notifications
+                  </label>
+                  <input
+                    defaultValue={(schema.settings?.notifyEmails ?? []).join(", ")}
+                    onBlur={(e) =>
+                      updateSettings({
+                        notifyEmails: e.target.value
+                          .split(",")
+                          .map((s) => s.trim())
+                          .filter(Boolean),
+                      })
+                    }
+                    placeholder="you@team.com, ops@team.com"
+                    className={fieldCls}
+                  />
+                  <p className="mt-1.5 text-xs text-muted">
+                    Comma-separated. We&apos;ll email these addresses on every new response.
+                  </p>
+                </>
+              )}
 
               {paged && (
                 <>
@@ -3280,48 +3521,52 @@ export default function FormEditor() {
                 </p>
               </fieldset>
 
-              <h4 className="mb-3 mt-6 border-t border-line pt-4 text-[11px] font-bold uppercase tracking-wider text-faint">
-                AI tools
-              </h4>
-              <button
-                onClick={onSuggestLogic}
-                disabled={logicBusy}
-                className="btn btn-outline btn-sm w-full"
-              >
-                {logicBusy ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Sparkles className="h-4 w-4" />
-                )}
-                Suggest logic & branching
-              </button>
-              {logicTips && (
-                <ul className="mt-2 space-y-1.5">
-                  {logicTips.map((t, i) => (
-                    <li key={i} className="rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-2">
-                      <span className="font-semibold">If</span> {t.when} →{" "}
-                      <span className="font-semibold">then</span> {t.then}
-                    </li>
-                  ))}
-                </ul>
+              {!templateMode && (
+                <>
+                  <h4 className="mb-3 mt-6 border-t border-line pt-4 text-[11px] font-bold uppercase tracking-wider text-faint">
+                    AI tools
+                  </h4>
+                  <button
+                    onClick={onSuggestLogic}
+                    disabled={logicBusy}
+                    className="btn btn-outline btn-sm w-full"
+                  >
+                    {logicBusy ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4" />
+                    )}
+                    Suggest logic & branching
+                  </button>
+                  {logicTips && (
+                    <ul className="mt-2 space-y-1.5">
+                      {logicTips.map((t, i) => (
+                        <li key={i} className="rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-2">
+                          <span className="font-semibold">If</span> {t.when} →{" "}
+                          <span className="font-semibold">then</span> {t.then}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="mt-3 flex gap-2">
+                    <input
+                      value={transLang}
+                      onChange={(e) => setTransLang(e.target.value)}
+                      placeholder="Language"
+                      className={fieldCls}
+                    />
+                    <button
+                      onClick={onTranslate}
+                      disabled={transBusy}
+                      className="btn btn-outline btn-sm flex-none"
+                    >
+                      {transBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                      Translate
+                    </button>
+                  </div>
+                  {transNote && <p className="mt-1.5 text-xs text-muted">{transNote}</p>}
+                </>
               )}
-              <div className="mt-3 flex gap-2">
-                <input
-                  value={transLang}
-                  onChange={(e) => setTransLang(e.target.value)}
-                  placeholder="Language"
-                  className={fieldCls}
-                />
-                <button
-                  onClick={onTranslate}
-                  disabled={transBusy}
-                  className="btn btn-outline btn-sm flex-none"
-                >
-                  {transBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                  Translate
-                </button>
-              </div>
-              {transNote && <p className="mt-1.5 text-xs text-muted">{transNote}</p>}
 
               <h4 className="mb-3 mt-6 border-t border-line pt-4 text-[11px] font-bold uppercase tracking-wider text-faint">
                 Design
@@ -3448,21 +3693,25 @@ export default function FormEditor() {
                 Advanced
               </h4>
 
-              <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Logo URL</label>
-              <input
-                value={schema.settings?.theme?.logo ?? ""}
-                onChange={(e) => updateTheme({ logo: e.target.value })}
-                placeholder="https://…/logo.png"
-                className={`${fieldCls} mb-3 font-mono text-xs`}
-              />
+              {!templateMode && (
+                <>
+                  <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Logo URL</label>
+                  <input
+                    value={schema.settings?.theme?.logo ?? ""}
+                    onChange={(e) => updateTheme({ logo: e.target.value })}
+                    placeholder="https://…/logo.png"
+                    className={`${fieldCls} mb-3 font-mono text-xs`}
+                  />
 
-              <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Cover image URL</label>
-              <input
-                value={schema.settings?.theme?.cover ?? ""}
-                onChange={(e) => updateTheme({ cover: e.target.value })}
-                placeholder="https://…/cover.jpg"
-                className={`${fieldCls} mb-3 font-mono text-xs`}
-              />
+                  <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Cover image URL</label>
+                  <input
+                    value={schema.settings?.theme?.cover ?? ""}
+                    onChange={(e) => updateTheme({ cover: e.target.value })}
+                    placeholder="https://…/cover.jpg"
+                    className={`${fieldCls} mb-3 font-mono text-xs`}
+                  />
+                </>
+              )}
 
               <ColorField
                 label="Input background"

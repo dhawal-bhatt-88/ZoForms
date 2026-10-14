@@ -37,9 +37,14 @@ import {
 } from "lucide-react";
 import {
   BLOCK_META,
+  blockName,
   isGrid,
+  isGroup,
+  isPage,
+  isRepeatingGroup,
   isValidImageSource,
   OPTION_TYPES,
+  questionNumbers,
   type AnyBlockType,
   type Block,
   type GridBlock,
@@ -48,6 +53,7 @@ import {
 } from "@formbuilder/form-schema";
 import { audioPreviewText } from "@/lib/audio-preview";
 import { videoPreviewText } from "@/lib/video-preview";
+import { repeatBadgeText } from "@/lib/repeat-settings";
 
 export const ICONS: Record<AnyBlockType, typeof Type> = {
   group: Layers,
@@ -423,4 +429,89 @@ export function GroupBox({
       {children && <div className="flex flex-col gap-2.5">{children}</div>}
     </div>
   );
+}
+
+/* ---------- a read-only canvas ---------- */
+
+/** A block's header line as the canvas shows it: icon, number, name and badges. No controls. */
+function StaticHeader({ block, number }: { block: Block; number?: number }) {
+  const Icon = ICONS[block.type];
+  const unlabelled = isGroup(block) && !block.label.trim();
+  return (
+    <div className="flex items-center gap-2">
+      <span className="grid h-[22px] w-[22px] flex-none place-items-center rounded-md bg-accent-weak text-accent-2">
+        <Icon className="h-3.5 w-3.5" />
+      </span>
+      {number !== undefined && <span className="flex-none text-[13px] font-semibold tabular-nums text-muted">{number}.</span>}
+      <span className={`min-w-0 truncate font-semibold ${unlabelled ? "italic text-faint" : ""}`}>
+        {unlabelled ? "Unlabelled group" : blockName(block)}
+      </span>
+      {(block.required || block.completeRequired) && <span className="text-red">*</span>}
+      {isGroup(block) && isRepeatingGroup(block) && (
+        <span className="flex-none rounded-full border border-line-2 bg-surface px-2 py-0.5 text-[11px] font-semibold text-ink-2">
+          {repeatBadgeText(block)}
+        </span>
+      )}
+      {!!block.enableWhen?.length && (
+        <span className="flex-none rounded-full bg-accent-weak px-2 py-0.5 text-[11px] font-semibold text-accent-2">Conditional</span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * `blocks` as the editor's canvas shows them — pages, group boxes, question
+ * cards with their previews and numbers — but read-only: nothing to select,
+ * move or edit. For previewing a template.
+ */
+export function StaticCanvas({ blocks }: { blocks: readonly Block[] }) {
+  const numbers = questionNumbers(blocks);
+  let pageNumber = 0;
+  const render = (list: readonly Block[], level: number): React.ReactNode[] =>
+    list.map((block) => {
+      if (isPage(block)) {
+        pageNumber += 1;
+        return (
+          <section key={block.id} className="rounded-2xl border-2 border-ink/15 bg-surface">
+            <div className="flex items-center gap-2 rounded-t-[14px] border-b border-ink/10 bg-ink/[0.045] px-3 py-2">
+              <span className="text-[12px] font-bold uppercase tracking-wider text-muted">Page {pageNumber}</span>
+              <span aria-hidden="true" className="text-faint">·</span>
+              <span className="min-w-0 truncate text-[15px] font-semibold">{block.title || "Untitled page"}</span>
+              {!!block.enableWhen?.length && (
+                <span className="flex-none rounded-full bg-accent-weak px-2 py-0.5 text-[11px] font-semibold text-accent-2">Conditional</span>
+              )}
+            </div>
+            <div className="flex flex-col gap-2.5 p-3">{render(block.blocks, 0)}</div>
+          </section>
+        );
+      }
+      if (isGroup(block)) {
+        return (
+          <GroupBox
+            key={block.id}
+            group={block}
+            level={level}
+            selected={false}
+            dropTarget={false}
+            dimmed={false}
+            header={
+              <div className="px-1.5 py-2.5">
+                <StaticHeader block={block} />
+              </div>
+            }
+          >
+            {render(block.blocks, level + 1)}
+          </GroupBox>
+        );
+      }
+      return (
+        <div key={block.id} className="rounded-xl border border-transparent p-3.5">
+          <div className="mb-2.5">
+            <StaticHeader block={block} number={numbers.get(block.id)} />
+          </div>
+          <BlockPreview block={block} />
+        </div>
+      );
+    });
+  return <div className="flex flex-col gap-2.5">{render(blocks, 0)}</div>;
 }
