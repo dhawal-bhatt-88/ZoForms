@@ -2,7 +2,9 @@
 // version on content saves only; 403 on system templates, 404 across organisations, viewers
 // read-only; every save rule applied to templates; settings a template never keeps; a form
 // from a form template; templateRef never in a download or the public form; the seed run
-// twice; body limits. API only.
+// twice, and a bad file skipped while the rest load; body limits. API only.
+const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 const { ROOT, API, PrismaClient, opts } = require("./_setup");
@@ -49,6 +51,7 @@ const household = () => ({
 (async () => {
   const tag = Date.now();
   const emails = [];
+  let seedDir;
   try {
     for (let i = 0; i < 90; i++) { try { if ((await fetch(API + "/health")).ok) break; } catch {} await sleep(1000); }
     const signup = async (who) => {
@@ -289,7 +292,7 @@ const household = () => ({
     check("the form made from it is unchanged", after.length === 1 && JSON.stringify(after[0].schema) === before);
 
     // ---------- the seed: idempotent ----------
-    const seed = () => spawnSync(process.execPath, [path.join(ROOT, "apps/api/dist/templates/seed-cli.js")], { cwd: path.join(ROOT, "apps/api"), encoding: "utf8" });
+    const seed = (dir) => spawnSync(process.execPath, [path.join(ROOT, "apps/api/dist/templates/seed-cli.js"), ...(dir ? [dir] : [])], { cwd: path.join(ROOT, "apps/api"), encoding: "utf8" });
     const countSystem = () => prisma.template.count({ where: { orgId: null } });
     const systemBefore = await countSystem();
     const first = seed();
@@ -303,6 +306,43 @@ const household = () => ({
     const restored = await prisma.template.findUnique({ where: { id: "sys_form_nps" } });
     check("a changed system template is put back in place, same id and version", third.status === 0 && JSON.parse(third.stdout).updated === 1 &&
       restored.name === nps.name && restored.version === nps.version, `${third.stdout}${third.stderr}`);
+
+    // ---------- the seed: a bad file is skipped, the rest still load ----------
+    // A copy of the real files plus extra ones, in a folder of its own; the real set is put back after.
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "verify-templates-"));
+    seedDir = tmp;
+    const realDir = path.join(ROOT, "apps/api/prisma/templates");
+    for (const f of fs.readdirSync(realDir)) fs.copyFileSync(path.join(realDir, f), path.join(tmp, f));
+    const extraId = `sys_e2e_extra_${tag}`;
+    const badId = `sys_e2e_bad_${tag}`;
+    const writeTemplate = (file, t) => fs.writeFileSync(path.join(tmp, file), JSON.stringify(t));
+    const extra = { id: extraId, kind: "group", name: "E2E extra", content: { id: "g", type: "group", label: "Extra", blocks: [q("one")] } };
+    writeTemplate("zz-extra.json", extra);
+    writeTemplate("zz-bad.json", { id: badId, kind: "group", name: "E2E bad",
+      content: { id: "g", type: "group", label: "Bad", blocks: [q("one", "short", { enableWhen: [when("outside", "exists")] })] } });
+    const withBad = seed(tmp);
+    const out = JSON.parse(withBad.stdout || "{}");
+    check("a bad file is skipped, named with its reason, and the exit code says so", withBad.status === 1 &&
+      JSON.stringify(out.skipped) === JSON.stringify(["zz-bad.json"]) &&
+      withBad.stderr.includes("System template zz-bad.json was skipped: ") && withBad.stderr.includes('refers to a question outside this template (id "outside")'),
+      `${withBad.status} ${withBad.stdout} ${withBad.stderr}`);
+    check("…while the rest still load", out.created === 1 && out.unchanged === 16 && out.removed === 0 &&
+      !!(await prisma.template.findUnique({ where: { id: extraId } })) && !(await prisma.template.findUnique({ where: { id: badId } })) &&
+      (await countSystem()) === 17, withBad.stdout);
+    writeTemplate("zz-extra.json", { ...extra, content: { ...extra.content, label: "" } });
+    const extraBroken = seed(tmp);
+    const kept = await prisma.template.findUnique({ where: { id: extraId } });
+    check("a file that goes bad keeps the template loaded from it before", extraBroken.status === 1 &&
+      JSON.parse(extraBroken.stdout).skipped.length === 2 && kept?.content.label === "Extra" && kept.version === 1, `${extraBroken.stdout} ${extraBroken.stderr}`);
+    fs.unlinkSync(path.join(tmp, "zz-extra.json"));
+    fs.writeFileSync(path.join(tmp, "zz-unreadable.json"), "{ not json");
+    const unreadable = seed(tmp);
+    check("with a file whose id can't be read, nothing is deleted", unreadable.status === 1 && JSON.parse(unreadable.stdout).removed === 0 &&
+      !!(await prisma.template.findUnique({ where: { id: extraId } })) && unreadable.stderr.includes("zz-unreadable.json was skipped: it isn't valid JSON"),
+      `${unreadable.stdout} ${unreadable.stderr}`);
+    const back = seed();
+    check("the real set again: the extra template goes, 16 stay", back.status === 0 && JSON.parse(back.stdout).removed === 1 &&
+      (await countSystem()) === 16, `${back.stdout} ${back.stderr}`);
 
     // ---------- body limits ----------
     const bigGroup = { id: "big", type: "group", label: "Big", blocks: [q("list", "dropdown", {
@@ -328,6 +368,9 @@ const household = () => ({
   } catch (e) {
     check("script ran without error", false, e.stack);
   } finally {
+    // A seed test that stopped part-way may have left its extra system templates.
+    await prisma.template.deleteMany({ where: { orgId: null, id: { startsWith: `sys_e2e_` } } }).catch(() => {});
+    if (seedDir) fs.rmSync(seedDir, { recursive: true, force: true });
     for (const email of emails) {
       const u = await prisma.user.findUnique({ where: { email }, include: { memberships: true } });
       if (!u) continue;
