@@ -293,18 +293,60 @@ const yes = (question, id) => ({ ...(id ? { id } : {}), question, operator: "=",
     check("'jump to' selects the dependent", (await page.locator("aside input").first().inputValue()) === "Dietary needs");
     await dismiss();
 
-    // (b) moves — first prove drag works at all with an allowed move
+    // (b) moves — first prove drag works at all with an allowed move.
+    // A pointer near the canvas's top or bottom edge makes dnd-kit scroll it, by an amount that
+    // depends on timing, which moves the target away from where it was measured. So both cards
+    // are brought to the middle of the canvas first, and the target is measured again once the
+    // card is picked up, and on every small step towards it.
+    // Resolves once the card has kept still for 10 animation frames running (or after ~5s).
+    const still = (id) => page.evaluate((id) => new Promise((resolve) => {
+      const el = document.querySelector(`[data-block-id="${id}"]`);
+      let last = null, same = 0, frames = 0;
+      const tick = () => {
+        const y = el.getBoundingClientRect().top;
+        same = y === last ? same + 1 : 0;
+        last = y;
+        if (same >= 10 || ++frames > 300) resolve(y);
+        else requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }), id);
+    // Scrolls the canvas so the span from one card to the other sits at its middle.
+    async function centre(fromId, toId) {
+      await page.evaluate(([a, b]) => {
+        const els = [a, b].map((id) => document.querySelector(`[data-block-id="${id}"]`));
+        let s = els[0].parentElement;
+        while (s && !(/auto|scroll/.test(getComputedStyle(s).overflowY) && s.scrollHeight > s.clientHeight)) s = s.parentElement;
+        s = s ?? document.scrollingElement;
+        const box = s === document.scrollingElement ? { top: 0, height: innerHeight } : s.getBoundingClientRect();
+        const rects = els.map((e) => e.getBoundingClientRect());
+        const mid = (Math.min(...rects.map((r) => r.top)) + Math.max(...rects.map((r) => r.bottom))) / 2;
+        s.scrollTop += mid - (box.top + box.height / 2);
+      }, [fromId, toId]);
+      await still(fromId);
+      await still(toId);
+    }
     async function drag(fromId, toId) {
+      await centre(fromId, toId);
       await card(fromId).hover();
       const g = await card(fromId).getByRole("button", { name: "Drag to reorder" }).boundingBox();
-      const t = await card(toId).boundingBox();
-      await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+      const x = g.x + g.width / 2;
+      let y = g.y + g.height / 2;
+      await page.mouse.move(x, y);
       await page.mouse.down();
-      await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2 + 12, { steps: 4 });
+      y += 12;
+      await page.mouse.move(x, y, { steps: 4 }); // past the 5px activation distance: picked up
+      await still(toId);
       // Aim past the target's near edge in the direction of travel, so the dragged
       // card's centre (the grip is at its top) clearly passes the target.
-      const goingUp = t.y < g.y;
-      await page.mouse.move(t.x + t.width / 2, goingUp ? t.y - 4 : t.y + t.height + 30, { steps: 25 });
+      const goingUp = (await card(toId).boundingBox()).y < y;
+      for (let i = 0; i < 200; i++) {
+        const t = await card(toId).boundingBox();
+        const aim = goingUp ? t.y - 4 : t.y + t.height + 30;
+        if (Math.abs(aim - y) < 1) break;
+        y += Math.sign(aim - y) * Math.min(4, Math.abs(aim - y));
+        await page.mouse.move(x, y);
+      }
       await sleep(150);
       await page.mouse.up();
       await sleep(400);
