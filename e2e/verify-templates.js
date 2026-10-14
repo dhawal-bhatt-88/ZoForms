@@ -389,7 +389,8 @@ const HEALTH = {
         check("render: submits (201)", res.status() === 201, String(res.status()));
         const sent = JSON.parse(res.request().postData()).answers;
         const [t1, t2] = copies.map((g) => timesOf(g).id);
-        check("payload: copy 2's answer is sent, copy 1's hidden one isn't", sent[t2] === 4 && !(t1 in sent), JSON.stringify(sent));
+        // Each answer is sent as { state, value }.
+        check("payload: copy 2's answer is sent, copy 1's hidden one isn't", sent[t2]?.value === 4 && !(t1 in sent), JSON.stringify(sent));
         await R.screenshot({ path: `${OUT}/templates-render.png`, fullPage: true });
       }
       await R.close();
