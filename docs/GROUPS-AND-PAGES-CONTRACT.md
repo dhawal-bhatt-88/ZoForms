@@ -1,6 +1,6 @@
 # Groups and Pages — Schema Contract
 
-Status: agreed 25 Sep 2026; amended 5 Oct 2026 for repeating groups (§12, with matching changes in §1–§8); amended 6 Oct 2026 for coded options and option import (§13); amended 7 Oct 2026 for the grid block (§14); amended 9 Oct 2026 for custom condition logic (§15); amended 13 Oct 2026 for host validators (§16); amended 14 Oct 2026 for grid layout by available width (§14.5). Shared by the builder repo and the `@yourco/forms` renderer repo.
+Status: agreed 25 Sep 2026; amended 5 Oct 2026 for repeating groups (§12, with matching changes in §1–§8); amended 6 Oct 2026 for coded options and option import (§13); amended 7 Oct 2026 for the grid block (§14); amended 9 Oct 2026 for custom condition logic (§15); amended 13 Oct 2026 for host validators (§16); amended 14 Oct 2026 for grid layout by available width (§14.5); amended 14 Oct 2026 for the required marker and ranking announcements (§7). Shared by the builder repo and the `@yourco/forms` renderer repo.
 Both implementations must follow this file exactly. Change it here first, then in both repos.
 
 ## 1. Shapes
@@ -95,6 +95,8 @@ The builder rejects these at save (400 naming the block). The renderer throws at
 - Heading level: in a single-page form, root-level groups use `h2`; in a paged form the page title is `h2` and its root-level groups `h3`. Each nesting level adds one, **capped at `h6`** (nesting continues; only the level stops rising). Author heading blocks keep their own `level`.
 - Public class names include `yf-group`, `yf-group-legend`, `yf-page`, `yf-page-title`, `yf-nav`, `yf-next`, `yf-back`, `yf-progress`, `yf-progress-bar`, `yf-review` (additive under the existing class-name policy, which starts at the first release to a client). This list is not exhaustive; the renderer's `classNames` constant and its contract test are the complete, authoritative list.
 - Repeating groups render as described in §12.6.
+- **Required marker:** the visible `*` is decoration only and is never part of any accessible name, whether or not the package stylesheet is loaded. A required question's name is exactly its label (e.g. "Priorities", never "Priorities *"). "Required" is conveyed by native `required`, by `aria-required`, or, on questions rendered as a fieldset, by a "Required" description listed first in the fieldset's `aria-describedby`.
+- **Ranking:** each option button's name is exactly its option label. Its description gives its rank ("Ranked 2 of 3") or "Not ranked". Each ranking question has a polite status region, present from first render, that announces every change: "Speed ranked 2 of 3." when ranking, and "Speed unranked. Order: 1 Cost, 2 Quality." (or "Speed unranked. Nothing ranked.") when un-ranking.
 
 ## 8. Paged behaviour (renderer only)
 
