@@ -4,13 +4,20 @@ import type { JwtService } from "@nestjs/jwt";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { BODY_LIMIT, SAVE_BODY_LIMIT } from "./limits";
 
-/** Saving a form's schema: `PUT /v1/forms/:id/schema`. */
-const SAVE_PATH = /^\/v1\/forms\/[^/]+\/schema\/?$/;
+/**
+ * Routes that save form content: a form's schema (`PUT /v1/forms/:id/schema`),
+ * and a template's content (`POST /v1/templates`, `PATCH /v1/templates/:id`).
+ */
+const SAVE_ROUTES: { method: string; path: RegExp }[] = [
+  { method: "PUT", path: /^\/v1\/forms\/[^/]+\/schema\/?$/ },
+  { method: "POST", path: /^\/v1\/templates\/?$/ },
+  { method: "PATCH", path: /^\/v1\/templates\/[^/]+\/?$/ },
+];
 
 /**
  * Request bodies, parsed in this order (Nest's own parsing is off: `bodyParser: false`):
  *
- *  1. Saving a form, by a signed-in author, accepts JSON up to 10 MB: option
+ *  1. Saving a form or a template, by a signed-in author, accepts JSON up to 10 MB: option
  *     lists have no size limit (contract §13.9), and a 5,000-option list is
  *     several hundred KB. The token is checked here, before the body is read,
  *     so an anonymous request never gets the larger limit.
@@ -21,7 +28,8 @@ const SAVE_PATH = /^\/v1\/forms\/[^/]+\/schema\/?$/;
 export function configureBodyParsing(app: NestExpressApplication, jwt: JwtService): void {
   const saveJson = json({ limit: SAVE_BODY_LIMIT });
   app.use((req: Request, res: Response, next: NextFunction) => {
-    if (req.method === "PUT" && SAVE_PATH.test(req.path) && signedIn(req, jwt)) return saveJson(req, res, next);
+    const saving = SAVE_ROUTES.some((r) => r.method === req.method && r.path.test(req.path));
+    if (saving && signedIn(req, jwt)) return saveJson(req, res, next);
     next();
   });
 

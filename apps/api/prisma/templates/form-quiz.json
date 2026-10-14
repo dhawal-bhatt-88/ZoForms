@@ -1,0 +1,66 @@
+{
+  "id": "sys_form_quiz",
+  "kind": "form",
+  "name": "Knowledge Quiz",
+  "description": "A multi-question quiz with a progress bar and scored answers.",
+  "content": {
+    "title": "Test your knowledge",
+    "description": "10 quick questions.",
+    "blocks": [
+      {
+        "id": "q1",
+        "type": "choice",
+        "label": "Which planet is closest to the sun?",
+        "required": true,
+        "options": [
+          {
+            "code": "mercury",
+            "label": "Mercury"
+          },
+          {
+            "code": "venus",
+            "label": "Venus"
+          },
+          {
+            "code": "earth",
+            "label": "Earth"
+          },
+          {
+            "code": "mars",
+            "label": "Mars"
+          }
+        ]
+      },
+      {
+        "id": "q2",
+        "type": "choice",
+        "label": "What is the capital of Japan?",
+        "required": true,
+        "options": [
+          {
+            "code": "kyoto",
+            "label": "Kyoto"
+          },
+          {
+            "code": "osaka",
+            "label": "Osaka"
+          },
+          {
+            "code": "tokyo",
+            "label": "Tokyo"
+          },
+          {
+            "code": "nagoya",
+            "label": "Nagoya"
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "theme": {
+        "accent": "#6D5EFA",
+        "radius": "md"
+      }
+    }
+  }
+}

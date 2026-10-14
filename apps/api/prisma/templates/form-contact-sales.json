@@ -1,0 +1,60 @@
+{
+  "id": "sys_form_contact_sales",
+  "kind": "form",
+  "name": "Contact Sales",
+  "description": "Qualify inbound sales leads with company and budget details.",
+  "content": {
+    "title": "Talk to sales",
+    "description": "Tell us a bit about your team.",
+    "blocks": [
+      {
+        "id": "name",
+        "type": "short",
+        "label": "Full name",
+        "required": true
+      },
+      {
+        "id": "company",
+        "type": "short",
+        "label": "Company name",
+        "required": true
+      },
+      {
+        "id": "budget",
+        "type": "dropdown",
+        "label": "Budget range",
+        "required": false,
+        "options": [
+          {
+            "code": "1kmo",
+            "label": "< $1k/mo"
+          },
+          {
+            "code": "1k5kmo",
+            "label": "$1k–5k/mo"
+          },
+          {
+            "code": "5k20kmo",
+            "label": "$5k–20k/mo"
+          },
+          {
+            "code": "20kmo",
+            "label": "$20k+/mo"
+          }
+        ]
+      },
+      {
+        "id": "message",
+        "type": "long",
+        "label": "What are you looking to solve?",
+        "required": false
+      }
+    ],
+    "settings": {
+      "theme": {
+        "accent": "#C4790B",
+        "radius": "md"
+      }
+    }
+  }
+}

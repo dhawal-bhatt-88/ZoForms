@@ -1,0 +1,49 @@
+{
+  "id": "sys_form_newsletter",
+  "kind": "form",
+  "name": "Newsletter Signup",
+  "description": "Grow your list and capture topic interests.",
+  "content": {
+    "title": "Join the newsletter",
+    "description": "One email a week. No spam, ever.",
+    "blocks": [
+      {
+        "id": "email",
+        "type": "email",
+        "label": "Email",
+        "required": true
+      },
+      {
+        "id": "topics",
+        "type": "checkbox",
+        "label": "What are you interested in?",
+        "required": false,
+        "options": [
+          {
+            "code": "product",
+            "label": "Product"
+          },
+          {
+            "code": "engineering",
+            "label": "Engineering"
+          },
+          {
+            "code": "design",
+            "label": "Design"
+          },
+          {
+            "code": "company_news",
+            "label": "Company news"
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "submitLabel": "Subscribe",
+      "theme": {
+        "accent": "#2F6BE4",
+        "radius": "lg"
+      }
+    }
+  }
+}

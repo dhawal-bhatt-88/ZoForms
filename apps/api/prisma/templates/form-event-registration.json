@@ -1,0 +1,66 @@
+{
+  "id": "sys_form_event_registration",
+  "kind": "form",
+  "name": "Event Registration",
+  "description": "Collect attendance, guest counts, and dietary needs for your event.",
+  "content": {
+    "title": "You're invited 🎉",
+    "description": "Please register by Friday.",
+    "blocks": [
+      {
+        "id": "name",
+        "type": "short",
+        "label": "Your name",
+        "required": true
+      },
+      {
+        "id": "email",
+        "type": "email",
+        "label": "Email",
+        "required": true
+      },
+      {
+        "id": "date",
+        "type": "date",
+        "label": "Which date works for you?",
+        "required": true
+      },
+      {
+        "id": "guests",
+        "type": "number",
+        "label": "How many guests?",
+        "required": false
+      },
+      {
+        "id": "diet",
+        "type": "checkbox",
+        "label": "Dietary preferences",
+        "required": false,
+        "options": [
+          {
+            "code": "vegetarian",
+            "label": "Vegetarian"
+          },
+          {
+            "code": "vegan",
+            "label": "Vegan"
+          },
+          {
+            "code": "gluten-free",
+            "label": "Gluten-free"
+          },
+          {
+            "code": "no_restrictions",
+            "label": "No restrictions"
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "theme": {
+        "accent": "#E1663E",
+        "radius": "lg"
+      }
+    }
+  }
+}

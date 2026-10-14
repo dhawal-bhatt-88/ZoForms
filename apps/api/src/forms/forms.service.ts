@@ -1,24 +1,23 @@
 import {
   BadRequestException,
   ConflictException,
-  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import {
   buildArtifact,
-  describeBlockPath,
   draftsProblem,
   formProblems,
-  gridColumnName,
   emptyForm,
+  formFromTemplate,
   idsFromPrevious,
   normalizeConditions,
   sameContent,
   FormSchema,
   STATIC_TYPES,
   validateSubmission,
+  withoutTemplateRefs,
 } from "@formbuilder/form-schema";
 import { PrismaService } from "../prisma/prisma.service";
 import { AutomationsService } from "../automations/automations.service";
@@ -26,60 +25,18 @@ import { MailService } from "../mail/mail.service";
 import { SearchService } from "../search/search.service";
 import { env } from "../config/env";
 import type { AuthUser } from "../auth/current-user.decorator";
+import { assertCanEdit } from "../auth/can-edit";
+import { describeSchemaError } from "../common/schema-errors";
+import { TemplatesService } from "../templates/templates.service";
 
 /** Versions are append-only, so a form's current version is its highest `version`. */
 const LATEST_VERSION = { orderBy: { version: "desc" }, take: 1 } as const;
 
-type RawBlock = { type?: unknown; label?: unknown; title?: unknown; blocks?: RawBlock[]; columns?: unknown };
-
-/**
- * Turn the first schema validation issue into a message a person can act on,
- * naming the innermost block it's in by its path — inside a page or group, the
- * question, not the container — the same way the save rules name blocks.
- * Follows the issue's own path (blocks.2.blocks.0…) down the raw input, so it
- * visits one chain of blocks, not the whole tree.
- */
-function describeSchemaError(
-  raw: unknown,
-  error: { issues: { path: (string | number)[]; message: string; code?: string }[] },
-): string {
-  const issue = error.issues[0];
-  let list = (raw as { blocks?: RawBlock[] } | null)?.blocks;
-  const chain: RawBlock[] = [];
-  const indices: number[] = [];
-  let consumed = 0;
-  while (
-    issue.path[consumed] === "blocks" &&
-    typeof issue.path[consumed + 1] === "number" &&
-    Array.isArray(list)
-  ) {
-    const index = issue.path[consumed + 1] as number;
-    const block: RawBlock = list[index] ?? {};
-    chain.push(block);
-    indices.push(index);
-    list = block.blocks;
-    consumed += 2;
-  }
-  if (consumed === 0) {
-    return `Invalid form schema${issue.path.length ? ` (${issue.path.join(".")})` : ""}: ${issue.message}`;
-  }
-  const block = chain[chain.length - 1];
-  // A matrix's `options` are its rows (contract §13.1); name them as the author sees them.
-  const rest = issue.path.slice(consumed).map((step, k) =>
-    k === 0 && step === "options" && block?.type === "matrix" ? "rows" : step,
-  );
-  const subject = describeBlockPath(chain, indices);
-  // Inside a grid column, name the column as the save rules do (contract §14.4). An
-  // unknown type, or a column that isn't an object, reads straight after its name.
-  if (block?.type === "grid" && rest[0] === "columns" && typeof rest[1] === "number") {
-    const column = Array.isArray(block.columns) ? (block.columns[rest[1]] as { label?: unknown } | null) : null;
-    const name = gridColumnName(typeof column === "object" && column !== null ? column : {}, rest[1]);
-    const inner = rest.slice(2);
-    if (issue.code === "invalid_union_discriminator" || inner.length === 0) return `${subject}: ${name} ${issue.message}`;
-    return `${subject}: ${name} (${inner.join(".")}): ${issue.message}`;
-  }
-  const where = rest.length ? ` (${rest.join(".")})` : "";
-  return `${subject}${where}: ${issue.message}`;
+/** Stored content without its template references (see `TemplateRef`), at any depth. */
+function withoutProvenance(schema: unknown): unknown {
+  if (typeof schema !== "object" || schema === null) return schema;
+  const { templateRef: _ref, ...rest } = schema as { templateRef?: unknown; blocks?: unknown };
+  return Array.isArray(rest.blocks) ? { ...rest, blocks: withoutTemplateRefs(rest.blocks) } : rest;
 }
 
 function escapeHtml(s: string): string {
@@ -97,6 +54,7 @@ export class FormsService {
     private readonly automations: AutomationsService,
     private readonly mail: MailService,
     private readonly search: SearchService,
+    private readonly templates: TemplatesService,
   ) {}
 
   /* ---------- authenticated (scoped to the user's org) ---------- */
@@ -308,6 +266,17 @@ export class FormsService {
     });
   }
 
+  /**
+   * A new form from a form template, as a blank form is made but with the
+   * template's content: fresh block ids, and `templateRef` naming the template
+   * and the version used. Nothing else of the template carries over.
+   */
+  async createFromTemplate(user: AuthUser, templateId: unknown) {
+    if (typeof templateId !== "string" || !templateId) throw new BadRequestException("templateId must be a template id.");
+    const template = await this.templates.formTemplate(user, templateId);
+    return this.createWithSchema(user, formFromTemplate(template));
+  }
+
   async createWithSchema(user: AuthUser, schema: unknown) {
     await this.assertCanEdit(user);
     const parsed = FormSchema.parse(schema);
@@ -435,7 +404,8 @@ export class FormsService {
       id: form.id,
       title: form.title,
       slug: form.slug,
-      schema: form.versions[0]?.schema ?? emptyForm(form.title),
+      // Template provenance is the builder's own: respondents never get it.
+      schema: withoutProvenance(form.versions[0]?.schema ?? emptyForm(form.title)),
       // White-label: hide the "Made with Frame" footer for orgs that opt in.
       branding: !form.workspace.org.brandingHidden,
     };
@@ -598,14 +568,8 @@ export class FormsService {
   }
 
   /** Viewers can read everything in the org but never mutate. */
-  private async assertCanEdit(user: AuthUser) {
-    const m = await this.prisma.membership.findFirst({
-      where: { orgId: user.orgId, userId: user.sub },
-      select: { role: true },
-    });
-    if (!m || m.role === "VIEWER") {
-      throw new ForbiddenException("Viewers have read-only access.");
-    }
+  private assertCanEdit(user: AuthUser) {
+    return assertCanEdit(this.prisma, user);
   }
 
   private slugify(title: string) {

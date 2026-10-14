@@ -1,0 +1,50 @@
+{
+  "id": "sys_form_course_enrollment",
+  "kind": "form",
+  "name": "Course Enrollment",
+  "description": "Enroll students with course selection and preferences.",
+  "content": {
+    "title": "Course enrollment",
+    "description": "Reserve your seat.",
+    "blocks": [
+      {
+        "id": "name",
+        "type": "short",
+        "label": "Student name",
+        "required": true
+      },
+      {
+        "id": "email",
+        "type": "email",
+        "label": "Email",
+        "required": true
+      },
+      {
+        "id": "courses",
+        "type": "checkbox",
+        "label": "Which courses?",
+        "required": true,
+        "options": [
+          {
+            "code": "intro_to_design",
+            "label": "Intro to Design"
+          },
+          {
+            "code": "advanced_figma",
+            "label": "Advanced Figma"
+          },
+          {
+            "code": "design_systems",
+            "label": "Design Systems"
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "theme": {
+        "accent": "#6D5EFA",
+        "radius": "md"
+      }
+    }
+  }
+}

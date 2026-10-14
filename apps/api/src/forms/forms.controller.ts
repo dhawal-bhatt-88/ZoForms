@@ -32,8 +32,10 @@ export class FormsController {
     return this.forms.get(user, id);
   }
 
+  /** A blank form, or with `templateId` a new form from a form template. */
   @Post()
-  create(@CurrentUser() user: AuthUser, @Body() body: { title?: string }) {
+  create(@CurrentUser() user: AuthUser, @Body() body: { title?: string; templateId?: unknown }) {
+    if (body?.templateId !== undefined) return this.forms.createFromTemplate(user, body.templateId);
     return this.forms.create(user, body?.title?.trim() || "Untitled form");
   }
 

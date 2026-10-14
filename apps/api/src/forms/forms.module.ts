@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
+import { TemplatesModule } from "../templates/templates.module";
 import { FormsController } from "./forms.controller";
 import { PublicController } from "./public.controller";
 import { UploadsController } from "./uploads.controller";
@@ -14,7 +15,7 @@ import { RetentionService } from "../settings/retention.service";
 import { SearchService } from "../search/search.service";
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, TemplatesModule],
   controllers: [
     FormsController,
     PublicController,

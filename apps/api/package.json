@@ -7,6 +7,7 @@
     "build": "nest build",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
+    "seed:templates": "node dist/templates/seed-cli.js",
     "postinstall": "prisma generate"
   },
   "dependencies": {

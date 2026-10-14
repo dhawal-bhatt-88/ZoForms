@@ -1,0 +1,32 @@
+{
+  "id": "sys_form_nps",
+  "kind": "form",
+  "name": "Customer Feedback & NPS Survey",
+  "description": "Measure satisfaction with an NPS scale, a follow-up question, and a thank-you screen.",
+  "content": {
+    "title": "How are we doing?",
+    "description": "Two quick questions — thank you!",
+    "blocks": [
+      {
+        "id": "nps",
+        "type": "scale",
+        "label": "How likely are you to recommend us?",
+        "required": true,
+        "min": 0,
+        "max": 10
+      },
+      {
+        "id": "why",
+        "type": "long",
+        "label": "What could we improve?",
+        "required": false
+      }
+    ],
+    "settings": {
+      "theme": {
+        "accent": "#6D5EFA",
+        "radius": "md"
+      }
+    }
+  }
+}

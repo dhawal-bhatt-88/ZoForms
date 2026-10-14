@@ -1,0 +1,50 @@
+{
+  "id": "sys_form_community_signup",
+  "kind": "form",
+  "name": "Community Sign-Up",
+  "description": "Onboard new members with tier selection and interests.",
+  "content": {
+    "title": "Join the community",
+    "description": "Welcome aboard!",
+    "blocks": [
+      {
+        "id": "name",
+        "type": "short",
+        "label": "Your name",
+        "required": true
+      },
+      {
+        "id": "email",
+        "type": "email",
+        "label": "Email",
+        "required": true
+      },
+      {
+        "id": "tier",
+        "type": "choice",
+        "label": "Membership tier",
+        "required": true,
+        "options": [
+          {
+            "code": "free",
+            "label": "Free"
+          },
+          {
+            "code": "supporter",
+            "label": "Supporter"
+          },
+          {
+            "code": "founding_member",
+            "label": "Founding member"
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "theme": {
+        "accent": "#6D5EFA",
+        "radius": "lg"
+      }
+    }
+  }
+}

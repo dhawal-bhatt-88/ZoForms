@@ -1,0 +1,56 @@
+{
+  "id": "sys_form_customer_survey",
+  "kind": "form",
+  "name": "Customer Survey",
+  "description": "A linear-scale satisfaction survey with follow-up questions.",
+  "content": {
+    "title": "Customer survey",
+    "description": "Your input shapes what we build next.",
+    "blocks": [
+      {
+        "id": "sat",
+        "type": "scale",
+        "label": "How satisfied are you overall?",
+        "required": true,
+        "min": 1,
+        "max": 5
+      },
+      {
+        "id": "use",
+        "type": "choice",
+        "label": "How often do you use us?",
+        "required": false,
+        "options": [
+          {
+            "code": "daily",
+            "label": "Daily"
+          },
+          {
+            "code": "weekly",
+            "label": "Weekly"
+          },
+          {
+            "code": "monthly",
+            "label": "Monthly"
+          },
+          {
+            "code": "rarely",
+            "label": "Rarely"
+          }
+        ]
+      },
+      {
+        "id": "more",
+        "type": "long",
+        "label": "Anything else you'd like to share?",
+        "required": false
+      }
+    ],
+    "settings": {
+      "theme": {
+        "accent": "#C4790B",
+        "radius": "md"
+      }
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "id": "sys_form_community_testimonial",
+  "kind": "form",
+  "name": "Testimonial Collector",
+  "description": "Gather glowing quotes with a rating and permission to share.",
+  "content": {
+    "title": "Share your story",
+    "description": "We'd love to feature you.",
+    "blocks": [
+      {
+        "id": "rating",
+        "type": "rating",
+        "label": "How would you rate us?",
+        "required": true
+      },
+      {
+        "id": "quote",
+        "type": "long",
+        "label": "Your testimonial",
+        "required": true
+      },
+      {
+        "id": "consent",
+        "type": "choice",
+        "label": "Can we share this publicly?",
+        "required": true,
+        "options": [
+          {
+            "code": "yes",
+            "label": "Yes"
+          },
+          {
+            "code": "no",
+            "label": "No"
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "theme": {
+        "accent": "#C4790B",
+        "radius": "md"
+      }
+    }
+  }
+}

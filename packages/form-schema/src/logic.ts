@@ -274,6 +274,27 @@ export function logicTreeToText(tree: NumberedItem): string {
 }
 
 /**
+ * An item's logic with conditions `removed` (numbers, from 1) taken out — for
+ * a group saved as a template without the conditions that refer outside it.
+ * Each removed number leaves the tree, a part left empty goes with it, the
+ * §15.3 building rules are applied, and the numbers above a removed one are
+ * lowered to close the gap, as after a deletion (§15.6). Null when nothing is
+ * left. Write the result with `logicTreeToText`.
+ */
+export function logicWithout(tree: NumberedItem, removed: ReadonlySet<number>): NumberedItem | null {
+  const below = (n: number) => [...removed].filter((r) => r < n).length;
+  const pruned = fold<number, NumberedItem | null>(
+    tree,
+    (n) => (removed.has(n) ? null : n - below(n)),
+    (kind, children) => {
+      const kept = children.filter((child): child is NumberedItem => child !== null);
+      return kept.length === 0 ? null : kept.length === 1 ? kept[0] : makeNode(kind, kept);
+    },
+  );
+  return pruned === null ? null : simplify(pruned);
+}
+
+/**
  * A stored or exported `enableLogic` checked against the §15.5 integrity rules,
  * and turned into a numbered tree when it passes. `conditionIds` are the item's
  * condition ids in order. Errors read after `Block "<name>": `.

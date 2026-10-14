@@ -7,6 +7,7 @@ import { FormsModule } from "./forms/forms.module";
 import { AdminModule } from "./admin/admin.module";
 import { TeamModule } from "./team/team.module";
 import { DomainsModule } from "./domains/domains.module";
+import { TemplatesModule } from "./templates/templates.module";
 import { HealthController } from "./health/health.controller";
 
 @Module({
@@ -20,6 +21,7 @@ import { HealthController } from "./health/health.controller";
     AdminModule,
     TeamModule,
     DomainsModule,
+    TemplatesModule,
   ],
   controllers: [HealthController],
 })

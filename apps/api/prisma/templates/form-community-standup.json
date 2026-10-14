@@ -1,0 +1,36 @@
+{
+  "id": "sys_form_community_standup",
+  "kind": "form",
+  "name": "Async Standup",
+  "description": "A daily async check-in shared by a remote team.",
+  "content": {
+    "title": "Daily standup",
+    "description": "Keep the team in sync.",
+    "blocks": [
+      {
+        "id": "yesterday",
+        "type": "long",
+        "label": "What did you do yesterday?",
+        "required": true
+      },
+      {
+        "id": "today",
+        "type": "long",
+        "label": "What are you working on today?",
+        "required": true
+      },
+      {
+        "id": "blockers",
+        "type": "short",
+        "label": "Any blockers?",
+        "required": false
+      }
+    ],
+    "settings": {
+      "theme": {
+        "accent": "#159C56",
+        "radius": "md"
+      }
+    }
+  }
+}

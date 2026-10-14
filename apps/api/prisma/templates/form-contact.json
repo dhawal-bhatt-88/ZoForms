@@ -1,0 +1,30 @@
+{
+  "id": "sys_form_contact",
+  "kind": "form",
+  "name": "Contact Us",
+  "description": "Let visitors reach you with a message and email.",
+  "content": {
+    "title": "Contact us",
+    "description": "We'll get back to you shortly.",
+    "blocks": [
+      {
+        "id": "message",
+        "type": "long",
+        "label": "What's on your mind?",
+        "required": true
+      },
+      {
+        "id": "email",
+        "type": "email",
+        "label": "Your email",
+        "required": true
+      }
+    ],
+    "settings": {
+      "theme": {
+        "accent": "#159C56",
+        "radius": "md"
+      }
+    }
+  }
+}

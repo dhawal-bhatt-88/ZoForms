@@ -1,0 +1,36 @@
+{
+  "id": "sys_form_lead_capture",
+  "kind": "form",
+  "name": "Lead Capture Form",
+  "description": "Turn visitors into leads with a clean name, work email, and company field.",
+  "content": {
+    "title": "Get in touch",
+    "description": "We'll reach out within one business day.",
+    "blocks": [
+      {
+        "id": "name",
+        "type": "short",
+        "label": "Full name",
+        "required": true
+      },
+      {
+        "id": "email",
+        "type": "email",
+        "label": "Work email",
+        "required": true
+      },
+      {
+        "id": "company",
+        "type": "short",
+        "label": "Company",
+        "required": false
+      }
+    ],
+    "settings": {
+      "theme": {
+        "accent": "#6D5EFA",
+        "radius": "md"
+      }
+    }
+  }
+}

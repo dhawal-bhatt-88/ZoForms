@@ -1,0 +1,50 @@
+{
+  "id": "sys_form_product_feedback",
+  "kind": "form",
+  "name": "Product Feedback",
+  "description": "Capture a star rating and open comments to guide your roadmap.",
+  "content": {
+    "title": "Product feedback",
+    "description": "Help us build the right things.",
+    "blocks": [
+      {
+        "id": "rating",
+        "type": "rating",
+        "label": "How was your experience?",
+        "required": true
+      },
+      {
+        "id": "liked",
+        "type": "long",
+        "label": "What did you like most?",
+        "required": false
+      },
+      {
+        "id": "recommend",
+        "type": "choice",
+        "label": "Would you recommend us?",
+        "required": true,
+        "options": [
+          {
+            "code": "definitely",
+            "label": "Definitely"
+          },
+          {
+            "code": "maybe",
+            "label": "Maybe"
+          },
+          {
+            "code": "not_yet",
+            "label": "Not yet"
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "theme": {
+        "accent": "#159C56",
+        "radius": "md"
+      }
+    }
+  }
+}

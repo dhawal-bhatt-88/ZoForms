@@ -1,0 +1,48 @@
+{
+  "id": "sys_form_job",
+  "kind": "form",
+  "name": "Job Application",
+  "description": "Structured candidate intake with a résumé upload.",
+  "content": {
+    "title": "Apply — Product Designer",
+    "description": "We review every application.",
+    "blocks": [
+      {
+        "id": "name",
+        "type": "short",
+        "label": "Full name",
+        "required": true
+      },
+      {
+        "id": "email",
+        "type": "email",
+        "label": "Email",
+        "required": true
+      },
+      {
+        "id": "role",
+        "type": "short",
+        "label": "Role you're applying for",
+        "required": true
+      },
+      {
+        "id": "resume",
+        "type": "file",
+        "label": "Upload résumé",
+        "required": true
+      },
+      {
+        "id": "why",
+        "type": "long",
+        "label": "Why do you want this role?",
+        "required": true
+      }
+    ],
+    "settings": {
+      "theme": {
+        "accent": "#159C56",
+        "radius": "md"
+      }
+    }
+  }
+}

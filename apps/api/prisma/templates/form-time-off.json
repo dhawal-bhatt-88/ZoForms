@@ -1,0 +1,60 @@
+{
+  "id": "sys_form_time_off",
+  "kind": "form",
+  "name": "Time-Off Request",
+  "description": "Let employees request time off with reason and date range.",
+  "content": {
+    "title": "Time-off request",
+    "description": "Submit for manager approval.",
+    "blocks": [
+      {
+        "id": "name",
+        "type": "short",
+        "label": "Your name",
+        "required": true
+      },
+      {
+        "id": "reason",
+        "type": "dropdown",
+        "label": "Reason for time off",
+        "required": true,
+        "options": [
+          {
+            "code": "vacation",
+            "label": "Vacation"
+          },
+          {
+            "code": "sick_leave",
+            "label": "Sick leave"
+          },
+          {
+            "code": "personal",
+            "label": "Personal"
+          },
+          {
+            "code": "other",
+            "label": "Other"
+          }
+        ]
+      },
+      {
+        "id": "start",
+        "type": "date",
+        "label": "Start date",
+        "required": true
+      },
+      {
+        "id": "end",
+        "type": "date",
+        "label": "End date",
+        "required": true
+      }
+    ],
+    "settings": {
+      "theme": {
+        "accent": "#159C56",
+        "radius": "md"
+      }
+    }
+  }
+}

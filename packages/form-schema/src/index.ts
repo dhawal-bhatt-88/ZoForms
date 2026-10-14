@@ -406,6 +406,20 @@ export function isGrid(block: Block): block is GridBlock {
 /** A question or presentational block — anything that isn't a group. */
 export type LeafBlock = QuestionBlock | GridBlock | PresentationalBlock;
 
+/**
+ * Where a form or group came from, when it was made from a template: the
+ * template's id, its version at the time, and its name then. Provenance only —
+ * the content is a copy, and nothing follows the template afterwards. Stored
+ * content only: never in the artifact (`buildArtifact` strips it) and never
+ * sent to respondents. Builder-only, so it isn't in the contract.
+ */
+export const TemplateRef = z.object({
+  id: z.string().min(1),
+  version: z.number().int().min(1),
+  name: z.string(),
+});
+export type TemplateRef = z.infer<typeof TemplateRef>;
+
 /*
  * Groups — docs/GROUPS-AND-PAGES-CONTRACT.md §1. A group holds other blocks,
  * including groups, to any depth. It has none of a leaf's own fields — no value,
@@ -440,6 +454,8 @@ export interface GroupBlock extends NoLeafFields {
   enableBehavior?: "any";
   enableLogic?: LogicNode;
   enableLogicText?: string;
+  /** Set when the group was inserted from a group template (see `TemplateRef`). */
+  templateRef?: TemplateRef;
   blocks: Block[];
 }
 
@@ -496,6 +512,7 @@ interface GroupBlockInput {
   enableBehavior?: "all" | "any";
   enableLogic?: LogicNode;
   enableLogicText?: string;
+  templateRef?: TemplateRef;
   blocks: BlockInput[];
 }
 interface PageBlockInput {
@@ -542,6 +559,7 @@ export const GroupBlock = z.object({
   minOccurs: z.number().optional(),
   maxOccurs: z.number().optional(),
   ...shownWhen,
+  templateRef: TemplateRef.optional(),
   blocks: childBlocks,
 });
 
@@ -816,6 +834,8 @@ export const FormSchema = z.object({
   blocks: z.array(Block).default([]),
   navigation: Navigation.optional(),
   drafts: Drafts.optional(),
+  /** Set when the form was created from a form template (see `TemplateRef`). */
+  templateRef: TemplateRef.optional(),
 });
 export type FormSchema = z.infer<typeof FormSchema>;
 
@@ -885,7 +905,7 @@ export const FormArtifact = z
     /** Schema format. 2 = groups and pages may appear (contract §1). Stamped at export. */
     schemaVersion: z.literal(2),
   })
-  .merge(FormSchema.omit({ title: true, navigation: true, drafts: true }))
+  .merge(FormSchema.omit({ title: true, navigation: true, drafts: true, templateRef: true }))
   .extend({
     /** Present exactly when the form is paged, with every field explicit. */
     navigation: z
@@ -904,6 +924,9 @@ export const FormArtifact = z
     for (const entry of walkBlocks(artifact.blocks)) {
       const issue = artifactLogicProblem(entry.block);
       if (issue) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["blocks"], message: `${subject(entry)}: ${issue}` });
+      if (isGroup(entry.block) && entry.block.templateRef !== undefined) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["blocks"], message: `${subject(entry)}: the template reference is never part of the artifact.` });
+      }
     }
     if (isPaged(artifact.blocks) !== (artifact.navigation !== undefined)) {
       ctx.addIssue({
@@ -954,12 +977,13 @@ export function buildArtifact(
   content: unknown,
   identity: { formId: string; formVersionId: string },
 ): FormArtifact {
-  const { navigation: stored, drafts: storedDrafts, ...form } = FormSchema.parse(content);
+  // A template reference is builder provenance, never exported (see `TemplateRef`).
+  const { navigation: stored, drafts: storedDrafts, templateRef: _ref, ...form } = FormSchema.parse(content);
   const navigation = artifactNavigation({ blocks: form.blocks, navigation: stored });
   const drafts = draftsWithoutDefault(storedDrafts);
   // Content saved before condition ids existed gets c1, c2, … by position, so
   // downloading the same version twice gives the same file.
-  const blocks = withArtifactLogic(normalizeConditions(form.blocks, positionalConditionId));
+  const blocks = withArtifactLogic(normalizeConditions(withoutTemplateRefs(form.blocks), positionalConditionId));
   return FormArtifact.parse({
     ...form,
     blocks,
@@ -967,6 +991,18 @@ export function buildArtifact(
     schemaVersion: 2,
     ...(navigation ? { navigation } : {}),
     ...(drafts ? { drafts } : {}),
+  });
+}
+
+/**
+ * The blocks without any `templateRef`, at any depth: for the artifact, for
+ * what respondents are sent, and for a template's own content.
+ */
+export function withoutTemplateRefs(blocks: readonly Block[]): Block[] {
+  return blocks.map((block) => {
+    if (!isContainer(block)) return block;
+    const { templateRef: _ref, ...rest } = block as GroupBlock;
+    return { ...rest, blocks: withoutTemplateRefs(block.blocks) } as Block;
   });
 }
 
@@ -2844,3 +2880,8 @@ export function replaceBlockers(blocks: readonly Block[], sourceId: string, code
   const kept = new Set(codes);
   return dependentsOf(blocks, sourceId, (c) => typeof c.answer === "string" && !kept.has(c.answer));
 }
+
+/* ---------- templates (builder only) ---------- */
+
+// Last: templates.ts uses this module, and only inside functions, so the cycle is safe.
+export * from "./templates";

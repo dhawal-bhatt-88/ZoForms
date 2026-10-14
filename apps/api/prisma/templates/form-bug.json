@@ -1,0 +1,60 @@
+{
+  "id": "sys_form_bug",
+  "kind": "form",
+  "name": "Bug Report",
+  "description": "Let users report issues with severity and a screenshot.",
+  "content": {
+    "title": "Report a bug",
+    "description": "Thanks for helping us squash it.",
+    "blocks": [
+      {
+        "id": "title",
+        "type": "short",
+        "label": "Summary",
+        "required": true
+      },
+      {
+        "id": "steps",
+        "type": "long",
+        "label": "Steps to reproduce",
+        "required": true
+      },
+      {
+        "id": "severity",
+        "type": "dropdown",
+        "label": "Severity",
+        "required": true,
+        "options": [
+          {
+            "code": "low",
+            "label": "Low"
+          },
+          {
+            "code": "medium",
+            "label": "Medium"
+          },
+          {
+            "code": "high",
+            "label": "High"
+          },
+          {
+            "code": "critical",
+            "label": "Critical"
+          }
+        ]
+      },
+      {
+        "id": "shot",
+        "type": "file",
+        "label": "Screenshot",
+        "required": false
+      }
+    ],
+    "settings": {
+      "theme": {
+        "accent": "#DC4B47",
+        "radius": "md"
+      }
+    }
+  }
+}
