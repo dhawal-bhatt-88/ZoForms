@@ -1,6 +1,6 @@
 # Groups and Pages — Schema Contract
 
-Status: agreed 25 Sep 2026; amended 5 Oct 2026 for repeating groups (§12, with matching changes in §1–§8); amended 6 Oct 2026 for coded options and option import (§13); amended 7 Oct 2026 for the grid block (§14); amended 9 Oct 2026 for custom condition logic (§15); amended 13 Oct 2026 for host validators (§16). Shared by the builder repo and the `@yourco/forms` renderer repo.
+Status: agreed 25 Sep 2026; amended 5 Oct 2026 for repeating groups (§12, with matching changes in §1–§8); amended 6 Oct 2026 for coded options and option import (§13); amended 7 Oct 2026 for the grid block (§14); amended 9 Oct 2026 for custom condition logic (§15); amended 13 Oct 2026 for host validators (§16); amended 14 Oct 2026 for grid layout by available width (§14.5). Shared by the builder repo and the `@yourco/forms` renderer repo.
 Both implementations must follow this file exactly. Change it here first, then in both repos.
 
 ## 1. Shapes
@@ -465,12 +465,13 @@ The builder refuses these at save (400 naming the block); the renderer throws at
 
 ### 14.5 Rendering (renderer only)
 
-- **Wide layout:** a `<table>` with the grid label as its caption, column headers (`scope="col"`) and row headers (`scope="row"`). Required columns show the required marker in their header.
+- **Wide layout:** a `<table>` named by the grid's visible label through `aria-labelledby` (no separate `<caption>`, so the label isn't shown twice), with column headers (`scope="col"`) and row headers (`scope="row"`). Required columns show the required marker in their header.
 - Every cell input's accessible name is "{row label}, {column label}" (e.g. "Cannabis, Frequency"). A radio cell is a small radio group with that name; each radio is named by its option label.
-- **Narrow layout:** below the stylesheet's narrow breakpoint, each row is shown as a card — the row label as a heading, then one labelled field per column. Accessible names are the same in both layouts.
+- **Narrow layout:** when the **space available to the grid** is below **34rem**, each row is shown as a card — the row label as a heading, then one labelled field per column. Accessible names are the same in both layouts. The space is measured on the grid itself (a CSS container query on its wrapper), **never the viewport**, because the form may sit in a narrow side panel on a wide screen, or inside nested groups. The grid's breakpoint is lower than the form's own 40rem width on purpose: grids usually sit indented inside groups or repeats, and at 40rem every indented grid would become cards even on a wide desktop.
+- **Wide but too wide:** above that breakpoint, if the table is still wider than the space available, the table scrolls horizontally inside its own wrapper. The wrapper is a `role="region"` with `tabindex="0"` and the grid label as its accessible name, so keyboard users can scroll it. The page itself never scrolls sideways because of a grid. Without the package stylesheet, the plain table is shown and these layout rules don't apply.
 - Labels are plain text (§13.7).
 - **Review page:** each answered row under its row label, with "{column}: {value}" lines; a grid with nothing answered shows "Not answered".
-- Public class names include `yf-grid`, `yf-grid-row`, `yf-grid-cell` and `yf-grid-card` (additive; the `classNames` constant stays authoritative).
+- Public class names include `yf-grid`, `yf-grid-scroll`, `yf-grid-row`, `yf-grid-cell` and `yf-grid-card` (additive; the `classNames` constant stays authoritative).
 
 ### 14.6 Builder
 
