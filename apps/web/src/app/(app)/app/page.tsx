@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import AppShell from "@/components/app-shell";
 import { NewFormDialog } from "@/components/templates/new-form-dialog";
+import { useCanEdit } from "@/lib/use-can-edit";
 import {
   deleteForm,
   downloadArtifact,
@@ -66,8 +67,9 @@ export default function Dashboard() {
   const router = useRouter();
   const [forms, setForms] = useState<FormListItem[]>([]);
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
-  // "New form": blank, or from a form template.
+  // "New form": blank, or from a form template. Not offered to viewers.
   const [newFormOpen, setNewFormOpen] = useState(false);
+  const canEdit = useCanEdit();
 
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | FormStatus>("all");
@@ -182,10 +184,12 @@ export default function Dashboard() {
             <Sparkles className="h-4 w-4 text-accent-2" />
             <span className="hidden sm:inline">Generate with AI</span>
           </button>
-          <button onClick={onCreate} className="btn btn-primary btn-sm">
-            <Plus className="h-4 w-4" />
-            New form
-          </button>
+          {canEdit && (
+            <button onClick={onCreate} className="btn btn-primary btn-sm">
+              <Plus className="h-4 w-4" />
+              New form
+            </button>
+          )}
         </>
       }
     >
@@ -260,9 +264,11 @@ export default function Dashboard() {
             Start from scratch, or describe it and let AI draft the questions.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-2">
-            <button onClick={onCreate} className="btn btn-primary btn-sm">
-              <Plus className="h-4 w-4" /> New form
-            </button>
+            {canEdit && (
+              <button onClick={onCreate} className="btn btn-primary btn-sm">
+                <Plus className="h-4 w-4" /> New form
+              </button>
+            )}
             <button
               onClick={() => {
                 setAiError(null);

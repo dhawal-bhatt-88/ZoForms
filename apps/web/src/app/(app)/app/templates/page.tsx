@@ -9,6 +9,7 @@ import { Dialog } from "@/components/dialog";
 import { MenuButton } from "@/components/menu-button";
 import { PreviewPane, useTemplateDetail } from "@/components/templates/template-preview";
 import { filterTemplates, TemplateSearch } from "@/components/templates/template-list";
+import { useCanEdit } from "@/lib/use-can-edit";
 import {
   createFormFromTemplate,
   deleteTemplate,
@@ -32,9 +33,11 @@ const updated = (iso: string) =>
  * own, which its authors edit, rename, duplicate and delete. Each tab lists
  * form templates and group templates separately. A form template starts a new
  * form; a group template is inserted from the form editor ("From template…").
+ * Viewers can browse and preview, and see no write actions.
  */
 export default function TemplatesPage() {
   const router = useRouter();
+  const canEdit = useCanEdit();
   const [templates, setTemplates] = useState<TemplateSummary[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [tab, setTab] = useState<TemplateScope>("system");
@@ -173,6 +176,7 @@ export default function TemplatesPage() {
                       <TemplateCard
                         key={t.id}
                         template={t}
+                        canEdit={canEdit}
                         busy={busy}
                         onPreview={() => setPreviewing(t)}
                         onUse={() => use(t)}
@@ -188,7 +192,9 @@ export default function TemplatesPage() {
                       ? `No ${kind} templates match "${query.trim()}".`
                       : tab === "system"
                         ? `There are no system ${kind} templates yet.`
-                        : kind === "form"
+                        : !canEdit
+                          ? `Your organisation has no ${kind} templates yet.`
+                          : kind === "form"
                           ? "No form templates yet. In the form editor, choose Save form as template from the ⋯ menu, or duplicate a system template."
                           : "No group templates yet. On the canvas, choose Save as template from a group's ⋯ menu."}
                   </p>
@@ -202,6 +208,7 @@ export default function TemplatesPage() {
       {previewing && (
         <PreviewDialog
           template={previewing}
+          canEdit={canEdit}
           busy={busy}
           onClose={() => setPreviewing(null)}
           onUse={() => use(previewing)}
@@ -260,6 +267,7 @@ export default function TemplatesPage() {
 
 function TemplateCard({
   template: t,
+  canEdit,
   busy,
   onPreview,
   onUse,
@@ -268,6 +276,8 @@ function TemplateCard({
   onDelete,
 }: {
   template: TemplateSummary;
+  /** False for a viewer: no write actions. */
+  canEdit: boolean;
   busy: string | null;
   onPreview: () => void;
   onUse: () => void;
@@ -292,13 +302,13 @@ function TemplateCard({
         <button onClick={onPreview} className="btn btn-outline btn-sm" aria-label={`Preview "${t.name}"`}>
           <Eye className="h-4 w-4" /> Preview
         </button>
-        {t.kind === "form" && (
+        {canEdit && t.kind === "form" && (
           <button onClick={onUse} disabled={!!busy} className="btn btn-primary btn-sm" aria-label={`Use "${t.name}" for a new form`}>
             {busy === `use-${t.id}` && <Loader2 className="h-4 w-4 animate-spin" />}
             Use
           </button>
         )}
-        {own ? (
+        {!canEdit ? null : own ? (
           <>
             <Link href={`/app/templates/${t.id}/edit`} className="btn btn-outline btn-sm" aria-label={`Edit "${t.name}"`}>
               <Pencil className="h-4 w-4" /> Edit
@@ -333,12 +343,15 @@ function TemplateCard({
 
 function PreviewDialog({
   template: t,
+  canEdit,
   busy,
   onClose,
   onUse,
   onDuplicate,
 }: {
   template: TemplateSummary;
+  /** False for a viewer: no write actions. */
+  canEdit: boolean;
   busy: string | null;
   onClose: () => void;
   onUse: () => void;
@@ -356,7 +369,7 @@ function PreviewDialog({
           <button onClick={onClose} className="btn btn-outline btn-sm">
             Close
           </button>
-          {t.scope === "system" ? (
+          {!canEdit ? null : t.scope === "system" ? (
             <button onClick={onDuplicate} disabled={!!busy} className="btn btn-outline btn-sm">
               <Copy className="h-4 w-4" /> Duplicate to my templates
             </button>
@@ -365,7 +378,7 @@ function PreviewDialog({
               <Pencil className="h-4 w-4" /> Edit
             </Link>
           )}
-          {t.kind === "form" && (
+          {canEdit && t.kind === "form" && (
             <button onClick={onUse} disabled={!!busy} className="btn btn-primary btn-sm">
               {busy === `use-${t.id}` && <Loader2 className="h-4 w-4 animate-spin" />}
               Use for a new form

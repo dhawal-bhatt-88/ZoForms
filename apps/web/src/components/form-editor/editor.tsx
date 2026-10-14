@@ -163,6 +163,7 @@ import { Switch } from "@/components/switch";
 import { MenuButton, type MenuItem } from "@/components/menu-button";
 import { SaveTemplateDialog } from "@/components/templates/save-template-dialog";
 import { TemplatePicker } from "@/components/templates/template-picker";
+import { useCanEdit } from "@/lib/use-can-edit";
 import { BlockPreview, DropLine, GroupBox, ICONS, MAX_INDENT_LEVELS } from "./canvas-preview";
 import {
   ApiError,
@@ -177,6 +178,7 @@ import {
   type FormStatus,
   type TemplateDetail,
   type TemplateKind,
+  type TemplateScope,
   type LogicSuggestion,
 } from "@/lib/api";
 
@@ -1547,8 +1549,12 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   const id = String(params.id);
   const templateMode = templateId !== undefined;
   // The template being edited: its name, kind, and the version the edit started from.
-  const [template, setTemplate] = useState<{ name: string; kind: TemplateKind; version: number } | null>(null);
+  const [template, setTemplate] = useState<{ name: string; kind: TemplateKind; version: number; scope: TemplateScope } | null>(null);
   const groupTemplate = template?.kind === "group";
+  // Viewers aren't offered "Save as template" (the API refuses it with 403 anyway).
+  const canEdit = useCanEdit();
+  // A template that can't be saved here: a system template, or anything for a viewer. No Save or Cancel.
+  const readOnlyTemplate = templateMode && (template?.scope === "system" || !canEdit);
 
   const [schema, setSchema] = useState<FormSchema | null>(null);
   // The latest saved version's content: the baseline for dirty-state and Cancel.
@@ -1601,10 +1607,13 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
       getTemplate(templateId)
         .then((t) => {
           const latest = templateContent(t);
-          setTemplate({ name: t.name, kind: t.kind, version: t.version });
+          setTemplate({ name: t.name, kind: t.kind, version: t.version, scope: t.scope });
           setSchema(latest);
           setSaved(latest);
           setSelectedId(latest.blocks[0]?.id ?? null);
+          if (t.scope === "system") {
+            setNotice({ tone: "info", text: "This is a system template, so it can't be changed. Duplicate it from Templates to make your own copy." });
+          }
         })
         .catch(() => setLoadError(true));
       return;
@@ -1629,9 +1638,10 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
 
   // Nothing is persisted until Save, so "dirty" = editor differs from the latest
   // saved version, compared the same key-order-insensitive way the API does.
+  // A template that can't be saved here (`readOnlyTemplate`) is never dirty: there is nothing to lose by leaving.
   const dirty = useMemo(
-    () => !!schema && !!saved && !sameContent(schema, saved),
-    [schema, saved],
+    () => !readOnlyTemplate && !!schema && !!saved && !sameContent(schema, saved),
+    [schema, saved, readOnlyTemplate],
   );
 
   // With no autosave, closing or reloading the tab would silently lose edits.
@@ -1653,7 +1663,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   }
 
   async function onSave() {
-    if (!schema || !dirty || saving) return;
+    if (!schema || !dirty || saving || readOnlyTemplate) return;
     // Baseline is what was sent, so edits made while the request is in flight stay dirty.
     const sent = schema;
     setSaving(true);
@@ -1665,7 +1675,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
       if (templateId !== undefined && template) {
         // The version the edit started from: a save made after someone else's is refused (409).
         const t = await updateTemplate(templateId, { content: templateFromForm(template.kind, sent), version: template.version });
-        setTemplate({ name: t.name, kind: t.kind, version: t.version });
+        setTemplate({ name: t.name, kind: t.kind, version: t.version, scope: t.scope });
         stored = templateContent(t);
       } else {
         stored = (await saveSchema(id, sent)).schema;
@@ -2517,7 +2527,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
           }}
           onToggle={() => toggle(item.id)}
           menu={
-            !templateMode && isGroup(item.block)
+            !templateMode && canEdit && isGroup(item.block)
               ? [
                   {
                     label: "Save as template…",
@@ -2696,20 +2706,26 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                 {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                 Download
               </button>
-              <MenuButton
-                label="More form actions"
-                className="btn btn-outline btn-sm px-2"
-                items={[{ label: "Save form as template…", icon: LayoutTemplate, onSelect: () => setSavingAsTemplate({ kind: "form" }) }]}
-              />
+              {canEdit && (
+                <MenuButton
+                  label="More form actions"
+                  className="btn btn-outline btn-sm px-2"
+                  items={[{ label: "Save form as template…", icon: LayoutTemplate, onSelect: () => setSavingAsTemplate({ kind: "form" }) }]}
+                />
+              )}
             </>
           )}
-          <button onClick={onCancel} disabled={!dirty || saving} className="btn btn-outline btn-sm">
-            Cancel
-          </button>
-          <button onClick={onSave} disabled={!dirty || saving} className="btn btn-primary btn-sm">
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Save
-          </button>
+          {!readOnlyTemplate && (
+            <>
+              <button onClick={onCancel} disabled={!dirty || saving} className="btn btn-outline btn-sm">
+                Cancel
+              </button>
+              <button onClick={onSave} disabled={!dirty || saving} className="btn btn-primary btn-sm">
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Save
+              </button>
+            </>
+          )}
         </div>
       </header>
 
