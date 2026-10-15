@@ -181,7 +181,8 @@ import { Switch } from "@/components/switch";
 import { MenuButton, type MenuItem } from "@/components/menu-button";
 import { SaveTemplateDialog } from "@/components/templates/save-template-dialog";
 import { TemplatePicker } from "@/components/templates/template-picker";
-import { useCanEdit } from "@/lib/use-can-edit";
+import { canEditAs, useMe } from "@/lib/use-can-edit";
+import { SETTINGS_PANE_ID, SETTINGS_PANE_NAME, SettingsPaneHandle, useSettingsPane } from "./settings-pane";
 import { BlockPreview, DropLine, GroupBox, ICONS, MAX_INDENT_LEVELS } from "./canvas-preview";
 import {
   ApiError,
@@ -1571,8 +1572,13 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   // The template being edited: its name, kind, and the version the edit started from.
   const [template, setTemplate] = useState<{ name: string; kind: TemplateKind; version: number; scope: TemplateScope } | null>(null);
   const groupTemplate = template?.kind === "group";
+  // The signed-in member: their role, and their settings pane width, so the pane is laid out once.
+  const user = useMe();
   // Viewers aren't offered "Save as template" (the API refuses it with 403 anyway).
-  const canEdit = useCanEdit();
+  const canEdit = canEditAs(user);
+  const pane = useSettingsPane(
+    user.status === "loading" ? undefined : user.status === "ready" ? user.me.settingsPaneWidth : null,
+  );
   // A template that can't be saved here: a system template, or anything for a viewer. No Save or Cancel.
   const readOnlyTemplate = templateMode && (template?.scope === "system" || !canEdit);
 
@@ -2597,7 +2603,8 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   // The save's scoring rules (contract §17.6–§17.8), each shown under its field.
   const scoreIssues = useMemo(() => (schema ? scoreProblems(walkBlocks(schema.blocks)) : []), [schema]);
 
-  if (!schema)
+  // Until the member arrives too: the pane's width comes with them, and it mustn't jump after the first paint.
+  if (!schema || user.status === "loading")
     return (
       <div className="grid h-screen place-items-center text-muted">
         {loadError ? (templateMode ? "Couldn't load this template." : "Couldn't load this form.") : <Loader2 className="h-5 w-5 animate-spin" />}
@@ -2944,7 +2951,11 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
       )}
 
       {/* Body */}
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_300px]">
+      <div
+        className="grid min-h-0 flex-1"
+        // The handle sits in a zero-width column between the canvas and the settings pane.
+        style={{ gridTemplateColumns: `minmax(0,1fr) 0px ${pane.width}px` }}
+      >
         {/* Canvas */}
         <div className="overflow-auto bg-bg px-6 py-8">
           <div className="mx-auto max-w-[680px]">
@@ -3078,7 +3089,12 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         )}
 
         {/* Inspector */}
-        <aside className="overflow-auto border-l border-line bg-surface p-4">
+        <SettingsPaneHandle pane={pane} />
+        <aside
+          id={SETTINGS_PANE_ID}
+          aria-label={SETTINGS_PANE_NAME}
+          className="overflow-auto border-l border-line bg-surface p-4"
+        >
           {selected ? (
             <div key={selected.id}>
               <h4 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-faint">

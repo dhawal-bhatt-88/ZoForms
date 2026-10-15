@@ -119,9 +119,25 @@ export async function resetPassword(token: string, password: string) {
 export type Role = "OWNER" | "ADMIN" | "EDITOR" | "VIEWER";
 
 export function me() {
-  return req<User & { role: Role; orgId: string; emailVerified: boolean }>(
-    "/v1/auth/me",
-  );
+  return req<
+    User & {
+      role: Role;
+      orgId: string;
+      emailVerified: boolean;
+      /** The editor's settings pane width in px as the author left it; null = the default. */
+      settingsPaneWidth: number | null;
+    }
+  >("/v1/auth/me");
+}
+
+/** Sets or clears (null) the signed-in author's settings pane width. */
+export function updatePreferences(patch: { settingsPaneWidth: number | null }) {
+  return req<{ settingsPaneWidth: number | null }>("/v1/auth/me/preferences", {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+    // Sent even if the page is closed or reloaded right after a resize.
+    keepalive: true,
+  });
 }
 
 export function verifyEmail(token: string) {

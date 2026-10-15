@@ -211,6 +211,11 @@ html {
   background-size: 44px 44px;
 }
 
+/* While the editor's settings pane is being resized: the resize cursor everywhere, no text selected,
+   and embedded previews (iframes) don't take the pointer. */
+.pane-resizing, .pane-resizing * { cursor: col-resize !important; user-select: none !important; }
+.pane-resizing iframe { pointer-events: none; }
+
 @media (prefers-reduced-motion: reduce) {
   .reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
   .float, .float-slow, .marquee,
