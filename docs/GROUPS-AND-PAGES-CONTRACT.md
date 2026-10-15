@@ -1,6 +1,6 @@
 # Groups and Pages — Schema Contract
 
-Status: agreed 25 Sep 2026; amended 5 Oct 2026 for repeating groups (§12, with matching changes in §1–§8); amended 6 Oct 2026 for coded options and option import (§13); amended 7 Oct 2026 for the grid block (§14); amended 9 Oct 2026 for custom condition logic (§15); amended 13 Oct 2026 for host validators (§16); amended 14 Oct 2026 for grid layout by available width (§14.5); amended 14 Oct 2026 for the required marker and ranking announcements (§7). Shared by the builder repo and the `@yourco/forms` renderer repo.
+Status: agreed 25 Sep 2026; amended 5 Oct 2026 for repeating groups (§12, with matching changes in §1–§8); amended 6 Oct 2026 for coded options and option import (§13); amended 7 Oct 2026 for the grid block (§14); amended 9 Oct 2026 for custom condition logic (§15); amended 13 Oct 2026 for host validators (§16); amended 14 Oct 2026 for grid layout by available width (§14.5); amended 14 Oct 2026 for the required marker and ranking announcements (§7); amended 15 Oct 2026 for scoring (§17, with matching changes in §1, §6 and §13.1). Shared by the builder repo and the `@yourco/forms` renderer repo.
 Both implementations must follow this file exactly. Change it here first, then in both repos.
 
 ## 1. Shapes
@@ -11,6 +11,7 @@ Both implementations must follow this file exactly. Change it here first, then i
   enableWhen?: EnableWhenCondition[]; enableBehavior?: "any";
   repeats?: boolean; repeatLabel?: string;     // repeating group, see §12
   minOccurs?: number; maxOccurs?: number;      // repeating group, see §12
+  scores?: Score[];                            // see §17
   blocks: Block[] }
 
 // Page — root level only
@@ -85,7 +86,8 @@ The builder rejects these at save (400 naming the block). The renderer throws at
 - `repeats: true` on a page;
 - `repeats: true` with a blank or missing `repeatLabel`;
 - `minOccurs` not a whole number ≥ 0; `maxOccurs` not a whole number ≥ 1, or less than `minOccurs`.
-- any §15.5 logic rule broken.
+- any §15.5 logic rule broken;
+- any §17.6 scoring rule broken.
 
 `repeatLabel`, `minOccurs` and `maxOccurs` on a group without `repeats: true` are ignored, not rejected.
 
@@ -300,7 +302,7 @@ Agreed 6 Oct 2026. Every option has a stable **code** and a display **label**. A
 ### 13.1 Shape
 
 ```ts
-type Option = { code: string; label: string };
+type Option = { code: string; label: string; score?: number };   // score: §17
 ```
 
 - Applies to `options` on `choice`, `checkbox`, `multiselect`, `dropdown` and `ranking`, and to `matrix` `options` (its rows) and `columns`. It replaces the plain-string lists.
@@ -751,3 +753,208 @@ Async validators are not supported in this version, so a `Promise` counts as a b
 - warnings (soft checks that don't block);
 - async validators (network lookups);
 - validators written by authors in the builder, including regex rules.
+
+## 17. Scoring
+
+Agreed 15 Oct 2026. A group can carry one or more **scores**, each calculated from a formula over the group's questions, e.g. a questionnaire total (`q1 + q2 + … + q9`) or a weighted value (`(mood + sleep) * days`).
+
+- Options carry a numeric `score`. Number, scale and rating questions give their own value.
+- The author types the formula in the builder using short question names. The exported form carries a tree that refers to block ids, so the renderer never parses text (as §15).
+- Scores are always recalculated by `prepareSubmission` on the server. The browser never sends them.
+- Modelled on FHIR's option weights ([`itemWeight`](https://www.hl7.org/fhir/extensions/StructureDefinition-itemWeight.html)) and SDC's calculated expressions; FHIR uses FHIRPath for the formula, which we don't.
+- Not in this version: severity bands, scores as condition sources, aggregates across repeat instances, and option scores imported from files.
+
+### 17.1 Shape
+
+```ts
+// Group (plain or repeating), extending §1 and §12.1
+scores?: Score[];
+
+type Score = {
+  id: string;                        // §13.2 code pattern; unique within this group's scores
+  label: string;                     // non-blank, plain text, e.g. "Total score"
+  formula: FormulaNode;
+  unanswered: "no-score" | "zero";   // §17.3
+  decimals?: number;                 // whole number 0–4; default 0
+  showToRespondent?: boolean;        // default false; §17.5
+};
+
+type FormulaNode =
+  | { num: number }                  // a finite number
+  | { ref: string }                  // the block id of a question within reach (§17.2)
+  | { op: "+" | "-" | "*" | "/"; args: [FormulaNode, FormulaNode] };
+
+// Option, extending §13.1
+type Option = { code: string; label: string; score?: number };   // score: a finite number
+```
+
+- Scores are allowed on any group, plain or repeating, at any depth. Pages never carry scores.
+- `score` is used on the options of `choice`, `dropdown`, `checkbox` and `multiselect`, and on `matrix` **columns**. Anywhere else it is ignored.
+- Score ids are unique within one group only, like condition ids (§15.1), so a group inserted twice from a template needs no new score ids.
+
+### 17.2 Reach and what a reference gives
+
+**Reach.** A group's formulas may refer to answerable questions inside the group, including inside its nested **plain** groups at any depth, but **not** inside a nested repeating group. A formula never reaches outside its group.
+
+**Calculated where.** A score is calculated once for each context in which its group appears:
+- for a group outside any repeat, once;
+- for a repeating group, once **per instance**, over that instance's questions;
+- for a plain group inside a repeat, once per instance of the enclosing repeat.
+
+**What a reference gives:**
+
+| Question type | Value |
+|---|---|
+| `number`, `scale`, `rating` | its numeric answer |
+| `choice`, `dropdown` | the chosen option's `score` |
+| `checkbox`, `multiselect` | the sum of the chosen options' `score`s |
+| `matrix` | the sum, over its rows, of the chosen column's `score` |
+| any other type | not allowed in a formula |
+
+Every option (or matrix column) of a referenced coded question must have a `score` (§17.6).
+
+### 17.3 Unanswered questions
+
+A referenced question is **unanswered** when it is hidden, or its state is anything other than `answered`. A `matrix` counts as unanswered when **any** of its rows is unanswered.
+
+- `"no-score"` (the builder's default): if any referenced question is unanswered, the score has no value (`null`, reason `"unanswered"`).
+- `"zero"`: an unanswered question counts as 0. For a partly answered matrix, its unanswered rows count as 0.
+
+### 17.4 Calculation (`/core`)
+
+1. If the scored group is hidden in a context (§3.4, §12.3), that score is not calculated there and produces no result.
+2. Apply §17.3, then evaluate the tree. `*` and `/` come before `+` and `-` only in the text; the tree is evaluated exactly as structured.
+3. Division by zero, or any non-finite result, gives no value (`null`, reason `"invalid"`).
+4. Round only the final result to `decimals` places, **half away from zero** (2.5 → 3, −2.5 → −3). Rounding also clears floating-point noise (0.1 + 0.2 with 2 decimals → 0.3).
+5. Use the shared iterative walker or an equivalent; a long sum makes a deep tree, so don't recurse without bound (as §15.2).
+6. Scores are calculated only for a submission that passes validation. They never produce validation errors.
+
+### 17.5 Results
+
+**Browser payload:** carries no scores. `prepareSubmission` ignores any score-like data in a request.
+
+**`prepareSubmission`** returns the scores it calculated from the schema it was given, alongside the answers:
+
+```ts
+derived: { scores: ScoreResult[] }
+
+type ScoreResult = {
+  groupId: string;
+  scoreId: string;
+  label: string;
+  path: (string | number)[];         // as §12.5, to the group; ends with the instance position for a repeating group
+  value: number | null;
+  reason?: "unanswered" | "invalid"; // present only when value is null
+};
+```
+
+- `derived` is always present on a successful result, as `{ scores: [] }` when the form has no scores.
+- Results follow the form's reading order, instance by instance, the same order the error summary uses. Each context lists its group's scores in `scores` order. Example: a repeating group R with scores s1 and s2, containing a scored plain group P, gives R@0 s1, R@0 s2, P@0, R@1 s1, R@1 s2, P@1.
+- A hidden group, or a repeating group with no instances, contributes no results.
+
+**Shown to the respondent** only when `showToRespondent` is true, and only **after a successful submit**: never while filling in the form, and never on the review page. The renderer calculates the score in the browser with the same `/core` function, purely for display, and lists each such visible score as "{label}: {value}" in plain text, in a list directly after the success message. `{value}` is the number as calculated, without added trailing zeros (5, not 5.00; 0.67). A `null` score is not shown. Inside a repeat, the label is prefixed with the instance, as in the error summary (§12.5): "Patient 2: Total score: 14".
+
+**Focus after submit (every form, with or without scores):** focus moves to the success message, which takes `tabindex="-1"`, so keyboard and screen-reader users land on it instead of on the page body.
+
+### 17.6 Integrity checks
+
+The builder refuses these at save (400 naming the block); the renderer throws at mount:
+- `scores` on a page, or `scores` that is not an array;
+- a score without a valid `id`, with a duplicate `id` within its group, or with a blank `label`;
+- `unanswered` other than `"no-score"` or `"zero"`; `decimals` not a whole number from 0 to 4; `showToRespondent` not a boolean;
+- a malformed node: not exactly one of `num`, `ref`, or `op` with `args`; a `num` that isn't a finite number; an `op` outside `+ - * /`; `args` not exactly two nodes;
+- a `ref` that is not the id of a question within reach (§17.2), or names a type that can't be scored;
+- a referenced coded question with an option (or matrix column) whose `score` is missing or not a finite number.
+
+### 17.7 Formula text (builder and API, via one shared parser in `packages/form-schema`)
+
+The text exists only in the builder, as `formulaText` on each score in the saved form content. It is never part of the downloaded artifact.
+
+**What may be written:**
+- question **names** (§17.8), matched ignoring case;
+- numbers: digits, optionally with a decimal point followed by digits (`2`, `0.5`, `10`);
+- `+`, `-`, `*`, `/`, `(`, `)` and spaces. Spaces are optional everywhere.
+
+**Rules:**
+- Usual maths order: `*` and `/` before `+` and `-`; equal operators left to right. Brackets override. So `q1 + q2 * 2` is `q1 + (q2 * 2)`.
+- No unary minus: write `0 - q1` or `4 - q1`.
+- At least one question name.
+
+**Building the tree:** each operator becomes a two-argument node, built left to right within each level of precedence. `q1 + q2 + q3` → `{ op: "+", args: [{ op: "+", args: [q1, q2] }, q3] }`.
+
+**Errors**, shown live under the field and blocking save, checked in this order, only the first shown:
+
+| Problem | Message |
+|---|---|
+| Empty | Enter a formula, e.g. q1 + q2. |
+| Anything other than names, numbers, operators, brackets and spaces | "{token}" isn't allowed. Use question names, numbers, + - * / and brackets. |
+| Missing operator, e.g. `q1 q2` or `2 q1` | Add an operator between q1 and q2. |
+| Missing operand, e.g. `q1 +`, `* q1`, `-q1` | Add a name or number after +. / Start with a question name, a number or a bracket. |
+| `()` | Brackets can't be empty. |
+| Unclosed `(` | A bracket isn't closed. |
+| `)` with no matching `(` | There's a closing bracket without an opening one. |
+| A name not within reach | There's no question named "{name}" in this group. |
+| A name inside a nested repeating group | "{name}" is in a repeating group, so this score can't use it. |
+| A name of a type that can't be scored | "{name}" can't be scored. Use number, scale, rating, choice, dropdown, checkbox, multiselect or matrix questions. |
+| No names | Use at least one question name. |
+
+At save, the API parses `formulaText` and derives `formula`; any tree sent by the client is ignored. A score with a tree but no text (e.g. created through the API) gets text generated from it, with names, single spaces around operators, and brackets only where needed.
+
+### 17.8 Question names (builder only)
+
+- Every answerable question within reach of a group that has a score has a short **name**, used only in formula text. It is stored as `name` in the builder's saved content and stripped from the artifact.
+- **Pattern:** `^[a-z][a-z0-9_]{0,63}$`.
+- **Unique** within the reach of every scored group that reaches the question.
+- **Generated** when empty: when the question first comes within reach of a scored group, and at save. Steps:
+  1. Take the label; normalise it (NFKD) and remove accents; lower-case it.
+  2. Replace each run of whitespace with `_`; remove every character other than `a–z`, `0–9`, `_`; collapse repeated `_`; trim `_` from both ends.
+  3. If it starts with a digit, prefix `q_`.
+  4. If longer than 32 characters, cut at the last `_` within the first 32; if there is none, cut at 32.
+  5. If nothing is left, use `q{n}`, where `n` is the question's number (§4).
+  6. If it clashes, append `_2`, `_3`, … (the first free one).
+- A name is generated once and never regenerated; label edits don't change it.
+
+| Label | Name |
+|---|---|
+| `Age` | `age` |
+| `Little interest or pleasure in doing things` | `little_interest_or_pleasure_in` |
+| `1. Feeling nervous` | `q_1_feeling_nervous` |
+| `焦虑` (question 7) | `q7` |
+| `Age` when `age` is taken | `age_2` |
+
+### 17.9 Builder
+
+- **Scores panel** in the group inspector: a list of scores, each with Label, Formula (hint: "Use question names, numbers, + - * / and brackets, e.g. q1 + q2"), "If a question is unanswered" (**No score** / Count as 0), Decimal places (0–4) and a "Show to respondent after submit" switch. Errors are shown as in §15.6 (border, icon, message, `aria-invalid`, polite live region).
+- **Names** are shown and editable in the inspector of every question within reach of a scored group, checked against §17.8 inline and at save.
+- **Option scores:** the option editor (and the matrix columns editor) shows a Score field for questions within reach of a scored group.
+- **Guards**, following the existing pattern (refuse, naming the dependents with jump links):
+  - **renaming** a question rewrites every formula text that uses the name, and says how many were updated;
+  - **deleting** a question a formula uses is refused: `Used in the score "Total score" of "PHQ-9". Remove it from the formula first.`;
+  - **changing the type** of a referenced question to one that can't be scored is refused;
+  - **moving** a referenced question out of reach, or turning a nested plain group that holds one into a repeating group, is refused;
+  - **removing an option score** a formula needs is a save error naming the question and the score.
+- **Templates:** id remapping also remaps every `ref`. Names and formula text are copied unchanged. If an inserted copy's names clash within an enclosing scored group's reach, the copy's names get the §17.8 suffix and its own formula texts are rewritten to match.
+
+### 17.10 Shared test table
+
+Both repos test the tree cases (`/core` calculation, renderer integrity). The builder tests the text cases.
+
+With `q1` = 2, `q2` = 3 (number questions) unless stated:
+
+| Formula | Settings | Result |
+|---|---|---|
+| `q1 + q2` | | 5 |
+| `(q1 + q2) * 2` | | 10 |
+| `q1 + q2 * 2` | | 8 |
+| `q1 / q2` | 2 decimals | 0.67 |
+| `q1 - q2` | | −1 |
+| `q1 / (q2 - 3)` | | null, `invalid` |
+| `q1 + 0.5` | 0 decimals | 3 (2.5 rounds away from zero) |
+| `0 - q1 - 0.5` | 0 decimals | −3 |
+| `q1 + q2`, `q2` unanswered | `no-score` | null, `unanswered` |
+| `q1 + q2`, `q2` unanswered | `zero` | 2 |
+| `q1 + q2`, `q2` hidden | `zero` | 2 |
+| `c`: checkbox, options scored 1, 2, 4; first two chosen | | 3 |
+| `m`: matrix, 3 rows, columns scored 0–3; two rows answered with columns scored 1 and 2, one row unanswered | `no-score` | null, `unanswered` |
+| same | `zero` | 3 |
+| scored repeating group, 2 instances, `q1` = 2 and 5 | | two results, 2 and 5, paths ending 0 and 1 |
