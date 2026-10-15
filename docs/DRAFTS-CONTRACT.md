@@ -1,6 +1,6 @@
 # Drafts — Contract
 
-Status: agreed 29 Sep 2026; amended 29 Sep 2026 after renderer Checkpoint 0; amended 5 Oct 2026 for repeating groups (§5, §8). Shared by the builder repo and the `@zoworkhq/forms` renderer repo.
+Status: agreed 29 Sep 2026; amended 29 Sep 2026 after renderer Checkpoint 0; amended 5 Oct 2026 for repeating groups (§5, §8); amended 15 Oct 2026 for the package rename (§3, §5). Shared by the builder repo and the `@zoworkhq/forms` renderer repo.
 Change it here first, then in both repos.
 
 ## 1. Purpose
@@ -100,7 +100,7 @@ type DraftAnswers = Record<string, BlockValue | DraftAnswers[]>;
 ```
 
 ### Device storage format
-- IndexedDB database `yourco-forms-drafts`, one record per `(scope, formId)`.
+- IndexedDB database `zoworkhq-forms-drafts`, one record per `(scope, formId)`.
 - Record key: hex SHA-256 of `scope` + a separator character that can't appear in the hash input ambiguously (e.g. U+0000) + `formId`.
 - Record value: `{ scopeHash, ownerHash?, iv, ciphertext, expiresAt }`, with indexes on `scopeHash` and `ownerHash` (each a hex SHA-256 of `scope` / `owner`), so `clearDrafts` can find every matching draft across forms. `ownerHash` is present only when the host supplied `owner`.
 - `ciphertext` is the AES-GCM encryption of the whole `Draft` with a fresh 96-bit IV per save. `expiresAt` stays in clear so expired records can be swept without a key.

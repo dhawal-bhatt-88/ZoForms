@@ -1,6 +1,6 @@
 # Groups and Pages — Schema Contract
 
-Status: agreed 25 Sep 2026; amended 5 Oct 2026 for repeating groups (§12, with matching changes in §1–§8); amended 6 Oct 2026 for coded options and option import (§13); amended 7 Oct 2026 for the grid block (§14); amended 9 Oct 2026 for custom condition logic (§15); amended 13 Oct 2026 for host validators (§16); amended 14 Oct 2026 for grid layout by available width (§14.5); amended 14 Oct 2026 for the required marker and ranking announcements (§7); amended 15 Oct 2026 for scoring (§17, with matching changes in §1, §6 and §13.1). Shared by the builder repo and the `@zoworkhq/forms` renderer repo.
+Status: agreed 25 Sep 2026; amended 5 Oct 2026 for repeating groups (§12, with matching changes in §1–§8); amended 6 Oct 2026 for coded options and option import (§13); amended 7 Oct 2026 for the grid block (§14); amended 9 Oct 2026 for custom condition logic (§15); amended 13 Oct 2026 for host validators (§16); amended 14 Oct 2026 for grid layout by available width (§14.5); amended 14 Oct 2026 for the required marker and ranking announcements (§7); amended 15 Oct 2026 for scoring (§17, with matching changes in §1, §6 and §13.1); amended 15 Oct 2026 for the package rename (`@zoworkhq/forms`, public prefix `zf-`: §7, §8, §12.6, §14.5). Shared by the builder repo and the `@zoworkhq/forms` renderer repo.
 Both implementations must follow this file exactly. Change it here first, then in both repos.
 
 ## 1. Shapes
@@ -95,7 +95,8 @@ The builder rejects these at save (400 naming the block). The renderer throws at
 
 - Group → `<fieldset>` with a `<legend>` containing the label as a heading.
 - Heading level: in a single-page form, root-level groups use `h2`; in a paged form the page title is `h2` and its root-level groups `h3`. Each nesting level adds one, **capped at `h6`** (nesting continues; only the level stops rising). Author heading blocks keep their own `level`.
-- Public class names include `yf-group`, `yf-group-legend`, `yf-page`, `yf-page-title`, `yf-nav`, `yf-next`, `yf-back`, `yf-progress`, `yf-progress-bar`, `yf-review` (additive under the existing class-name policy, which starts at the first release to a client). This list is not exhaustive; the renderer's `classNames` constant and its contract test are the complete, authoritative list.
+- Public class names include `zf-group`, `zf-group-legend`, `zf-page`, `zf-page-title`, `zf-nav`, `zf-next`, `zf-back`, `zf-progress`, `zf-progress-bar`, `zf-review` (additive under the existing class-name policy, which starts at the first release to a client). This list is not exhaustive; the renderer's `classNames` constant and its contract test are the complete, authoritative list.
+- **Public prefix:** every public identifier the renderer exposes — class names, data attributes, CSS custom properties — uses the `zf-` prefix (`--zf-` for custom properties). No other prefix is public.
 - Repeating groups render as described in §12.6.
 - **Required marker:** the visible `*` is decoration only and is never part of any accessible name, whether or not the package stylesheet is loaded. A required question's name is exactly its label (e.g. "Priorities", never "Priorities *"). "Required" is conveyed by native `required`, by `aria-required`, or, on questions rendered as a fieldset, by a "Required" description listed first in the fieldset's `aria-describedby`.
 - **Ranking:** each option button's name is exactly its option label. Its description gives its rank ("Ranked 2 of 3") or "Not ranked". Each ranking question has a polite status region, present from first render, that announces every change: "Speed ranked 2 of 3." when ranking, and "Speed unranked. Order: 1 Cost, 2 Quality." (or "Speed unranked. Nothing ranked.") when un-ranking.
@@ -112,7 +113,7 @@ The builder rejects these at save (400 naming the block). The renderer throws at
 - One idempotency key per form fill, across all pages.
 - **Completed page:** visited **and** currently passes validation. It becomes incomplete again if a later change reveals a required question on it.
 - **Progress** (`showProgress`): a caption "Step x of y" over displayed pages, shown above the page title and part of its heading, so it is announced when focus moves to the title. When `reviewPage` is on, the review step is the last step and is counted. `y` may change as answers change. There is no step list and no navigation from the progress indicator.
-- **Progress bar:** when `progressStyle` is `"bar"`, a display-only segmented bar appears above the caption — one segment per step: completed, current, pending — hidden from assistive technology, never clickable. The caption always stays. The host can override the author's choice either way with `data-yf-progress-style="bar"` or `"caption"` on any wrapper; the host's attribute wins. The bar is only shown when the package stylesheet is loaded.
+- **Progress bar:** when `progressStyle` is `"bar"`, a display-only segmented bar appears above the caption — one segment per step: completed, current, pending — hidden from assistive technology, never clickable. The caption always stays. The host can override the author's choice either way with `data-zf-progress-style="bar"` or `"caption"` on any wrapper; the host's attribute wins. The bar is only shown when the package stylesheet is loaded.
 - **No step jumping.** Respondents return to earlier pages with Back, or with Change on the review page.
 - **Review page** (`reviewPage`): lists every visible question on every displayed page, grouped by page, with group labels as subheadings; unanswered ones show "Not answered"; each page has a **Change** button (a `<button>`, not a link) that opens it. A page opened from review shows **Return to review**. Pressing it first validates the current page: if it has errors, stay there and show its error summary, as Next does. Otherwise go to the first displayed page that isn't completed, if any (with its summary if it has errors), otherwise back to review. Submit lives on the review page. Repeating groups are listed as in §12.6.
 - **Unvisited pages open clean.** Whenever Return to review lands on a page the respondent has never visited, it opens without an error summary or flagged errors, even if it has unanswered required questions. Its errors appear only when the respondent presses that page's primary button. "With its error summary" elsewhere in this section applies to visited pages only.
@@ -278,7 +279,7 @@ Question values keep the existing `BlockValue` wire format (`{ state, value }`);
 - Element ids and error ids (`…__error`) are built from the instance ids along the path, never from positions, so they stay stable when an instance above is removed.
 - **Focus:** after Add, focus moves to the new instance's heading. After Remove, focus moves to the previous instance's heading; if there is none, to the instance that took its place; if none remain, to the Add button. A polite `role="status"` region announces "{RepeatLabel} {n} removed."
 - **Review page:** each instance is listed under its own subheading ("{RepeatLabel} {n}"), with nested instances nested the same way. A visible repeating group with zero instances shows "None added". An instance whose questions are all hidden still shows its subheading, so the numbering matches the form.
-- Public class names include `yf-repeat`, `yf-repeat-instance`, `yf-repeat-legend`, `yf-repeat-add`, `yf-repeat-remove`, `yf-repeat-limit` and `yf-repeat-status` (additive, under the existing policy; the renderer's `classNames` constant stays authoritative).
+- Public class names include `zf-repeat`, `zf-repeat-instance`, `zf-repeat-legend`, `zf-repeat-add`, `zf-repeat-remove`, `zf-repeat-limit` and `zf-repeat-status` (additive, under the existing policy; the renderer's `classNames` constant stays authoritative).
 
 ### 12.7 State, sessionStorage and drafts
 
@@ -475,7 +476,7 @@ The builder refuses these at save (400 naming the block); the renderer throws at
 - **Wide but too wide:** above that breakpoint, if the table is still wider than the space available, the table scrolls horizontally inside its own wrapper. The wrapper is a `role="region"` with `tabindex="0"` and the grid label as its accessible name, so keyboard users can scroll it. The page itself never scrolls sideways because of a grid. Without the package stylesheet, the plain table is shown and these layout rules don't apply.
 - Labels are plain text (§13.7).
 - **Review page:** each answered row under its row label, with "{column}: {value}" lines; a grid with nothing answered shows "Not answered".
-- Public class names include `yf-grid`, `yf-grid-scroll`, `yf-grid-row`, `yf-grid-cell` and `yf-grid-card` (additive; the `classNames` constant stays authoritative).
+- Public class names include `zf-grid`, `zf-grid-scroll`, `zf-grid-row`, `zf-grid-cell` and `zf-grid-card` (additive; the `classNames` constant stays authoritative).
 
 ### 14.6 Builder
 
