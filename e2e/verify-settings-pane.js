@@ -72,7 +72,8 @@ const SETTLE = 1200; // longer than the editor's 500ms save delay
     P.on("console", (m) => m.type() === "warning" && warnings.push(m.text()));
 
     const pane = P.locator("#settings-pane");
-    const handle = P.getByRole("separator", { name: "Field settings" });
+    // Its name follows the pane's heading, so find it by the pane it controls.
+    const handle = P.locator('[role="separator"][aria-controls="settings-pane"]');
     const width = async () => Math.round((await pane.boundingBox()).width);
     const attr = (name) => handle.getAttribute(name);
     const open = async () => {
@@ -97,8 +98,22 @@ const SETTLE = 1200; // longer than the editor's 500ms save delay
     // ---------- default and ARIA ----------
     await open();
     check("a new account's pane is the default 300px", (await width()) === DEFAULT, `${await width()}`);
-    check("the pane is a landmark named Field settings", (await P.getByRole("complementary", { name: "Field settings" }).count()) === 1);
-    check("the handle is a separator with the pane's name", (await handle.count()) === 1);
+    // Named by the pane's visible heading, through aria-labelledby, for both the pane and the handle.
+    await P.locator('input[placeholder="Add a description…"]').click(); // nothing selected: form settings
+    const heading = P.locator("#settings-pane-heading");
+    check("with nothing selected the pane shows its \"Form settings\" heading", (await heading.count()) === 1 && (await heading.textContent()).trim() === "Form settings", await heading.textContent());
+    check("the pane is a landmark named \"Form settings\", from that heading", (await P.getByRole("complementary", { name: "Form settings", exact: true }).count()) === 1);
+    check("the handle is a separator named \"Form settings\" too", (await P.getByRole("separator", { name: "Form settings", exact: true }).count()) === 1);
+    check("both take the name from the heading (aria-labelledby), not a fixed label",
+      (await handle.getAttribute("aria-labelledby")) === "settings-pane-heading" && (await handle.getAttribute("aria-label")) === null &&
+      (await pane.getAttribute("aria-labelledby")) === "settings-pane-heading" && (await pane.getAttribute("aria-label")) === null);
+    await P.locator('[data-block-id="q"]').first().click({ position: { x: 60, y: 12 } });
+    await P.locator("#block-label").waitFor();
+    check("with a question selected, the pane and the handle are both named \"Question\"",
+      (await P.getByRole("complementary", { name: "Question", exact: true }).count()) === 1 &&
+      (await P.getByRole("separator", { name: "Question", exact: true }).count()) === 1);
+    check("one heading at a time carries the id", (await heading.count()) === 1);
+    await P.locator('input[placeholder="Add a description…"]').click();
     check("aria-orientation is vertical", (await attr("aria-orientation")) === "vertical");
     check("aria-controls points at the pane", (await attr("aria-controls")) === "settings-pane");
     check("aria-valuenow is the pane's width in px", (await attr("aria-valuenow")) === String(DEFAULT), await attr("aria-valuenow"));

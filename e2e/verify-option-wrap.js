@@ -80,7 +80,7 @@ const EDITORS = [
     await P.getByText("All changes saved").waitFor();
 
     const pane = P.locator("#settings-pane");
-    const handle = P.getByRole("separator", { name: "Field settings" });
+    const handle = P.locator('[role="separator"][aria-controls="settings-pane"]');
     const select = async (id) => {
       await P.locator(`[data-block-id="${id}"]`).first().click({ position: { x: 60, y: 12 } });
       await P.locator("#block-label").waitFor();

@@ -182,7 +182,7 @@ import { MenuButton, type MenuItem } from "@/components/menu-button";
 import { SaveTemplateDialog } from "@/components/templates/save-template-dialog";
 import { TemplatePicker } from "@/components/templates/template-picker";
 import { canEditAs, useMe } from "@/lib/use-can-edit";
-import { SETTINGS_PANE_ID, SETTINGS_PANE_NAME, SettingsPaneHandle, useSettingsPane } from "./settings-pane";
+import { SETTINGS_PANE_HEADING_ID, SETTINGS_PANE_ID, SettingsPaneHandle, useSettingsPane } from "./settings-pane";
 import { BlockPreview, DropLine, GroupBox, ICONS, MAX_INDENT_LEVELS } from "./canvas-preview";
 import {
   ApiError,
@@ -3092,12 +3092,13 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         <SettingsPaneHandle pane={pane} />
         <aside
           id={SETTINGS_PANE_ID}
-          aria-label={SETTINGS_PANE_NAME}
+          // Named by whichever heading it shows; the handle uses the same one.
+          aria-labelledby={SETTINGS_PANE_HEADING_ID}
           className="overflow-auto border-l border-line bg-surface p-4"
         >
           {selected ? (
             <div key={selected.id}>
-              <h4 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-faint">
+              <h4 id={SETTINGS_PANE_HEADING_ID} className="mb-3 text-[11px] font-bold uppercase tracking-wider text-faint">
                 {inspectorHeading(selected)}
               </h4>
               <label htmlFor="block-label" className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">
@@ -3554,14 +3555,18 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
             </div>
           ) : groupTemplate ? (
             <div>
-              <h4 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-faint">Group template</h4>
+              <h4 id={SETTINGS_PANE_HEADING_ID} className="mb-3 text-[11px] font-bold uppercase tracking-wider text-faint">
+                Group template
+              </h4>
               <p className="text-sm text-muted">
                 A group template has no form settings: forms it&apos;s inserted into keep their own. Select a block to edit it.
               </p>
             </div>
           ) : (
             <div>
-              <h4 className="mb-3 text-[11px] font-bold uppercase tracking-wider text-faint">Form settings</h4>
+              <h4 id={SETTINGS_PANE_HEADING_ID} className="mb-3 text-[11px] font-bold uppercase tracking-wider text-faint">
+                Form settings
+              </h4>
               {templateMode && (
                 <p className="mb-3 rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-2">
                   Templates don&apos;t keep settings that send answers somewhere or identify your organisation: the redirect

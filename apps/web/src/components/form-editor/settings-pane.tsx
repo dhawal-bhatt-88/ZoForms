@@ -11,8 +11,12 @@ import { updatePreferences } from "@/lib/api";
 
 /** The pane's element id, which the handle's `aria-controls` points at. */
 export const SETTINGS_PANE_ID = "settings-pane";
-/** The pane's accessible name, which the handle shares (W3C APG window splitter). */
-export const SETTINGS_PANE_NAME = "Field settings";
+/**
+ * The id of the pane's visible heading ("Form settings", "Question", "Group"…).
+ * It names both the pane and the handle, so the handle's name always matches
+ * the pane's (W3C APG window splitter). One heading is shown at a time.
+ */
+export const SETTINGS_PANE_HEADING_ID = "settings-pane-heading";
 /** How long after the last drag or key press the width is saved. */
 const SAVE_DELAY_MS = 500;
 /** On <html> while a drag is in progress: col-resize everywhere and no text selection (globals.css). */
@@ -97,7 +101,7 @@ export function useSettingsPane(saved: number | null | undefined) {
     role: "separator",
     tabIndex: 0,
     "aria-orientation": "vertical",
-    "aria-label": SETTINGS_PANE_NAME,
+    "aria-labelledby": SETTINGS_PANE_HEADING_ID,
     "aria-controls": SETTINGS_PANE_ID,
     "aria-valuenow": width,
     "aria-valuemin": limits.min,
