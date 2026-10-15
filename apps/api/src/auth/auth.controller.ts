@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Patch, Post, UseGuards } from "@nestjs/common";
 import { Throttle, ThrottlerGuard } from "@nestjs/throttler";
 import { AuthService } from "./auth.service";
 import { AuthGuard } from "./auth.guard";
@@ -39,6 +39,12 @@ export class AuthController {
   @UseGuards(AuthGuard)
   me(@CurrentUser() user: AuthUser) {
     return this.auth.me(user);
+  }
+
+  @Patch("me/preferences")
+  @UseGuards(AuthGuard)
+  updatePreferences(@CurrentUser() user: AuthUser, @Body() body: unknown) {
+    return this.auth.updatePreferences(user, body);
   }
 
   @Post("verify-email")

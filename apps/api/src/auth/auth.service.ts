@@ -7,6 +7,7 @@ import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { OAuth2Client } from "google-auth-library";
+import { parsePreferencesPatch } from "@formbuilder/form-schema";
 import { PrismaService } from "../prisma/prisma.service";
 import { MailService } from "../mail/mail.service";
 import { env } from "../config/env";
@@ -93,7 +94,8 @@ export class AuthService {
   async me(auth: AuthUser) {
     const user = await this.prisma.user.findUnique({
       where: { id: auth.sub },
-      select: { id: true, email: true, name: true, emailVerified: true },
+      // settingsPaneWidth comes with the user so the editor lays out its pane at the right width at once.
+      select: { id: true, email: true, name: true, emailVerified: true, settingsPaneWidth: true },
     });
     if (!user) throw new UnauthorizedException();
     const membership = await this.prisma.membership.findFirst({
@@ -101,6 +103,17 @@ export class AuthService {
       select: { role: true },
     });
     return { ...user, role: membership?.role ?? "VIEWER", orgId: auth.orgId };
+  }
+
+  /** Sets or clears (null) the signed-in author's preferences: for now, the settings pane width. */
+  async updatePreferences(auth: AuthUser, body: unknown) {
+    const parsed = parsePreferencesPatch(body);
+    if (!parsed.ok) throw new BadRequestException(parsed.message);
+    return this.prisma.user.update({
+      where: { id: auth.sub },
+      data: parsed.value,
+      select: { settingsPaneWidth: true },
+    });
   }
 
   /* ---------- email verification ---------- */

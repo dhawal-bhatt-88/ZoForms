@@ -3040,3 +3040,7 @@ export function replaceBlockers(blocks: readonly Block[], sourceId: string, code
 export * from "./templates";
 // The same holds for scoring.ts, which this module also calls, only from inside functions.
 export * from "./scoring";
+
+/* ---------- author preferences (builder only) ---------- */
+
+export * from "./preferences";
