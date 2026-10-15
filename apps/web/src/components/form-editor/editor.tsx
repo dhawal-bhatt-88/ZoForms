@@ -95,6 +95,7 @@ import {
   newGroup,
   newPage,
   normalizeConditions,
+  normalizeScores,
   pageContentsDestination,
   prefixRuleBreaker,
   problemsBesideContent,
@@ -1522,14 +1523,16 @@ function ConditionsPanel({
 /**
  * Stored content as the editor holds it. Explicit fields, so a version saved
  * with `description: ""` starts clean too; conditions get their ids and logic
- * text (contract §15.6).
+ * text (contract §15.6), and scores are brought to the saved shape as the API
+ * does (§17.7–§17.9): text only, never a formula tree, which is what the
+ * editor's dirty check and Cancel compare against.
  */
 function editorContent(s: Partial<FormSchema> | undefined, fallbackTitle: string): FormSchema {
   return {
     title: s?.title || fallbackTitle,
     description: s?.description || undefined,
     settings: s?.settings,
-    blocks: normalizeConditions(s?.blocks ?? []),
+    blocks: normalizeScores(normalizeConditions(s?.blocks ?? [])),
     navigation: s?.navigation,
     drafts: s?.drafts,
     templateRef: s?.templateRef,

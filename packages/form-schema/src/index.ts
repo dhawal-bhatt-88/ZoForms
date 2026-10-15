@@ -6,8 +6,16 @@ import {
   logicTreeToText,
   parseLogicText,
 } from "./logic";
+import type { FormulaNode } from "./formula";
+import {
+  artifactScoreProblems,
+  scoreBreaks,
+  scoreProblems,
+  withArtifactScores,
+} from "./scoring";
 
 export * from "./logic";
+export * from "./formula";
 
 /**
  * The form schema — the single source of truth for what a form *is*.
@@ -165,6 +173,13 @@ export const Option = z.object(
       .optional()
       .transform((c) => (c ?? "").trim()),
     label: z.string().transform((l) => l.trim()),
+    /**
+     * What choosing the option is worth in a score (contract §17.1): a finite
+     * number, used on the options of choice, dropdown, checkbox and multiselect
+     * and on a matrix's columns. Any value parses, so the save rules can refuse
+     * a bad one by name (`optionListProblems`).
+     */
+    score: z.custom<number>((v) => v !== undefined).optional(),
   },
   { invalid_type_error: "each option must be an object with a code and a label" },
 );
@@ -266,6 +281,12 @@ export const QuestionBlock = z.object({
   id: z.string(),
   type: QuestionType,
   label: z.string().min(1),
+  /**
+   * The short name score formulas use (contract §17.8). Stored content only —
+   * never in the artifact. Any value parses, so the save rules can refuse a bad
+   * one by name; only a question within reach of a scored group is checked.
+   */
+  name: z.custom<string>((v) => v !== undefined).optional(),
   description: helpText,
   placeholder: z.string().optional(),
   required: z.boolean().default(false),
@@ -291,8 +312,9 @@ export const QuestionBlock = z.object({
   max: z.number().optional(),
   ...shownWhen,
 });
-// `rows` is a grid's own field (contract §14.1), declared `never` so code can read it off any block.
-export type QuestionBlock = z.infer<typeof QuestionBlock> & { rows?: never };
+// `rows` is a grid's own field (contract §14.1) and `scores` a group's (§17.1), declared
+// `never` so code can read them off any block.
+export type QuestionBlock = z.infer<typeof QuestionBlock> & { rows?: never; scores?: never };
 
 export const PresentationalBlock = z.object({
   id: z.string(),
@@ -387,6 +409,8 @@ export const GridBlock = z.object({
   id: z.string(),
   type: z.literal("grid"),
   label: z.string().min(1),
+  /** As a question's (contract §17.8): a grid within reach of a scored group has a name, though it can't be scored. */
+  name: QuestionBlock.shape.name,
   description: helpText,
   ...shownWhen,
   rows: optionList.optional(),
@@ -420,6 +444,60 @@ export const TemplateRef = z.object({
 });
 export type TemplateRef = z.infer<typeof TemplateRef>;
 
+/* ---------- scores (contract §17) ---------- */
+
+/** How a score treats an unanswered question (contract §17.3). The builder's default is "no-score". */
+export const SCORE_UNANSWERED = ["no-score", "zero"] as const;
+export type ScoreUnanswered = (typeof SCORE_UNANSWERED)[number];
+
+/**
+ * One score on a group (contract §17.1). `formulaText` is the author's text
+ * and the source of truth (§17.7): stored content holds the text only, which
+ * the save parses and checks, and the artifact carries only the `formula` tree
+ * derived from it (`withArtifactScores`). A `formula` here is a tree sent
+ * through the API, before the save turns it into text (`normalizeScores`),
+ * or the artifact's. `id` is missing only before the save fills it (§17.9).
+ */
+export type Score = {
+  id?: string;
+  label: string;
+  formulaText?: string;
+  formula?: FormulaNode;
+  unanswered: ScoreUnanswered;
+  decimals?: number;
+  showToRespondent?: boolean;
+};
+type ScoreInput = { [K in keyof Score]?: unknown };
+
+/** Any value but undefined parses, typed as `T`: the save rules check it and refuse it by name. */
+const loose = <T>() => z.custom<T>((v) => v !== undefined);
+
+/*
+ * A score's fields all parse whatever their value, so the save rules can name
+ * the group and the score (contract §17.6). Parsed as an object, so its keys
+ * come out in this order and unknown keys are dropped, like every other part
+ * of the content (`sameContent`). The formula is any value, checked without
+ * recursion (`formulaShapeProblem`), so a deep tree can't overflow the stack.
+ */
+const ScoreEntry = z.object({
+  id: loose<string>().optional(),
+  label: loose<string>(),
+  /** Exactly as typed: never trimmed, and an empty string is kept so the save rules can refuse it. */
+  formulaText: loose<string>().optional(),
+  formula: loose<FormulaNode>().optional(),
+  unanswered: loose<ScoreUnanswered>(),
+  decimals: loose<number>().optional(),
+  showToRespondent: loose<boolean>().optional(),
+}) as unknown as z.ZodType<Score, z.ZodTypeDef, ScoreInput>;
+
+/**
+ * A group's scores. Anything that isn't a list of objects with a label and an
+ * `unanswered` is kept as sent, so the save rules can refuse it by name.
+ */
+const scoresField = z
+  .union([z.array(ScoreEntry), loose<Score[]>()])
+  .optional() as unknown as z.ZodType<Score[] | undefined, z.ZodTypeDef, unknown>;
+
 /*
  * Groups — docs/GROUPS-AND-PAGES-CONTRACT.md §1. A group holds other blocks,
  * including groups, to any depth. It has none of a leaf's own fields — no value,
@@ -430,7 +508,7 @@ export type TemplateRef = z.infer<typeof TemplateRef>;
 type NoLeafFields = {
   [K in Exclude<
     keyof QuestionBlock,
-    "id" | "type" | "label" | "enableWhen" | "enableBehavior" | "enableLogic" | "enableLogicText"
+    "id" | "type" | "label" | "enableWhen" | "enableBehavior" | "enableLogic" | "enableLogicText" | "scores"
   >]?: never;
 };
 
@@ -454,6 +532,8 @@ export interface GroupBlock extends NoLeafFields {
   enableBehavior?: "any";
   enableLogic?: LogicNode;
   enableLogicText?: string;
+  /** Scores calculated from the group's questions (contract §17). */
+  scores?: Score[];
   /** Set when the group was inserted from a group template (see `TemplateRef`). */
   templateRef?: TemplateRef;
   blocks: Block[];
@@ -492,6 +572,8 @@ export interface PageBlock extends NoLeafFields {
   enableBehavior?: "any";
   enableLogic?: LogicNode;
   enableLogicText?: string;
+  /** Pages never carry scores (contract §17.1). Kept when sent only so the save rules can reject it by name. */
+  scores?: Score[];
   blocks: Block[];
 }
 
@@ -512,6 +594,7 @@ interface GroupBlockInput {
   enableBehavior?: "all" | "any";
   enableLogic?: LogicNode;
   enableLogicText?: string;
+  scores?: unknown;
   templateRef?: TemplateRef;
   blocks: BlockInput[];
 }
@@ -524,6 +607,7 @@ interface PageBlockInput {
   enableBehavior?: "all" | "any";
   enableLogic?: LogicNode;
   enableLogicText?: string;
+  scores?: unknown;
   blocks: BlockInput[];
 }
 
@@ -559,6 +643,7 @@ export const GroupBlock = z.object({
   minOccurs: z.number().optional(),
   maxOccurs: z.number().optional(),
   ...shownWhen,
+  scores: scoresField,
   templateRef: TemplateRef.optional(),
   blocks: childBlocks,
 });
@@ -570,6 +655,7 @@ export const PageBlock = z.object({
   title: z.string(),
   repeats,
   ...shownWhen,
+  scores: scoresField,
   blocks: childBlocks,
 });
 
@@ -928,6 +1014,10 @@ export const FormArtifact = z
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["blocks"], message: `${subject(entry)}: the template reference is never part of the artifact.` });
       }
     }
+    // Contract §17.6, §17.8: the scoring rules the renderer checks at mount, and no builder-only names or text.
+    for (const message of artifactScoreProblems(artifact.blocks)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["blocks"], message });
+    }
     if (isPaged(artifact.blocks) !== (artifact.navigation !== undefined)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -983,7 +1073,10 @@ export function buildArtifact(
   const drafts = draftsWithoutDefault(storedDrafts);
   // Content saved before condition ids existed gets c1, c2, … by position, so
   // downloading the same version twice gives the same file.
-  const blocks = withArtifactLogic(normalizeConditions(withoutTemplateRefs(form.blocks), positionalConditionId));
+  // Scores carry only their tree, derived from the text; question names stay in the builder (§17.7, §17.8).
+  const blocks = withArtifactScores(
+    withArtifactLogic(normalizeConditions(withoutTemplateRefs(form.blocks), positionalConditionId)),
+  );
   return FormArtifact.parse({
     ...form,
     blocks,
@@ -1003,6 +1096,30 @@ export function withoutTemplateRefs(blocks: readonly Block[]): Block[] {
     if (!isContainer(block)) return block;
     const { templateRef: _ref, ...rest } = block as GroupBlock;
     return { ...rest, blocks: withoutTemplateRefs(block.blocks) } as Block;
+  });
+}
+
+/**
+ * The blocks without anything only the builder uses, at any depth: template
+ * references, question names (contract §17.8) and formula text (§17.7). For
+ * what respondents are sent.
+ */
+export function withoutBuilderFields(blocks: readonly Block[]): Block[] {
+  return blocks.map((block) => {
+    if (!isContainer(block)) {
+      if (block.name === undefined) return block;
+      const { name: _name, ...rest } = block;
+      return rest as Block;
+    }
+    const { templateRef: _ref, ...rest } = block as GroupBlock;
+    const scores = Array.isArray(rest.scores)
+      ? rest.scores.map((s) => {
+          if (typeof s !== "object" || s === null || !("formulaText" in s)) return s;
+          const { formulaText: _text, ...kept } = s;
+          return kept as Score;
+        })
+      : rest.scores;
+    return { ...rest, ...(scores !== undefined ? { scores } : {}), blocks: withoutBuilderFields(block.blocks) } as Block;
   });
 }
 
@@ -1263,6 +1380,14 @@ export function newBlockId(taken: Iterable<string> = []): string {
  */
 export function newConditionId(taken: Iterable<string> = []): string {
   return randomId("c_", taken);
+}
+
+/**
+ * A fresh score id (contract §17.1, §17.9): `s_` and 8 random characters, not
+ * in `taken` (pass the group's other score ids). Never shown to authors.
+ */
+export function newScoreId(taken: Iterable<string> = []): string {
+  return randomId("s_", taken);
 }
 
 function randomId(prefix: string, taken: Iterable<string>): string {
@@ -1860,6 +1985,10 @@ export type ConditionProblem = {
   message: string;
   /** The same message without the block's name — for showing inline, on that block. */
   detail: string;
+  /** For a problem with one of a group's scores (contract §17.6): that score's id, or its position from 0 when it has none. */
+  score?: string | number;
+  /** For a problem with a question's name (contract §17.8). */
+  field?: "name";
 };
 
 /** Anything a save message can name, before or after parsing: it may have no usable name. */
@@ -2212,7 +2341,7 @@ export function withOptionList<T extends Option>(block: Block, ref: OptionListRe
 export type OptionProblem = OptionListRef & {
   /** The option at fault, from 0; absent when the whole list is. */
   index?: number;
-  field?: "code" | "label";
+  field?: "code" | "label" | "score";
   /** Reads after the block's name in a save message. */
   rule: string;
   /** The same text, to show inline. */
@@ -2243,6 +2372,13 @@ export function optionListProblems(block: Block): OptionProblem[] {
     options.forEach((o, index) => {
       const code = o.code.trim();
       const label = o.label.trim();
+      // A score is a finite number wherever it is given (contract §17.1); a missing one is a scoring rule (§17.6).
+      if (o.score !== undefined && !(typeof o.score === "number" && Number.isFinite(o.score))) {
+        found.push({
+          ...ref, index, field: "score",
+          rule: inside(`the score of ${noun} ${index + 1}${label ? ` ("${label}")` : ""} must be a number.`),
+        });
+      }
       if (!label) {
         found.push({ ...ref, index, field: "label", rule: inside(`${noun} ${index + 1}${code ? ` (code "${code}")` : ""} needs a label.`) });
       } else {
@@ -2397,6 +2533,9 @@ function collectProblems(form: { blocks: readonly Block[] }, withFieldRules: boo
       if (block.repeats) {
         add(entry, "a page can't repeat — only groups can. Put its questions in a repeating group on the page instead.");
       }
+      if (block.scores !== undefined) {
+        add(entry, "a page can't have scores — only groups can. Put its questions in a group on the page and score that instead.");
+      }
     } else if (isGroup(block)) {
       if (!block.label.trim()) add(entry, "a group needs a label.");
       if (block.blocks.length === 0) add(entry, "a group must contain at least one block.");
@@ -2427,6 +2566,9 @@ function collectProblems(form: { blocks: readonly Block[] }, withFieldRules: boo
     const logic = withFieldRules ? logicProblem(entry.block) : null;
     if (logic) add(entry, logic);
   }
+  // Scores, question names and option scores (contract §17.6–§17.8): each is shown
+  // under its own field in the editor, so they are field rules too.
+  if (withFieldRules) problems.push(...scoreProblems(entries));
   return problems;
 }
 
@@ -2631,11 +2773,13 @@ export function prefixBrokenDependents(blocks: readonly Block[]): Block[] {
 export function structureBreaks(
   before: readonly Block[],
   after: readonly Block[],
-): { order: Block[]; prefix: Block[] } {
+): { order: Block[]; prefix: Block[]; score: Block[] } {
   const alreadyBroken = new Set(prefixBrokenDependents(before).map((b) => b.id));
   return {
     order: moveBreaks(before, after),
     prefix: prefixBrokenDependents(after).filter((b) => !alreadyBroken.has(b.id)),
+    // `score`: a scored group whose formula would use a question out of its reach (contract §17.9).
+    score: scoreBreaks(before, after),
   };
 }
 
@@ -2868,7 +3012,14 @@ export function canApplyImport(preview: readonly ImportPreviewRow[]): boolean {
 /** The list after applying an unflagged preview: appended in file order, or replacing the list. */
 export function applyImport(existing: readonly Option[], preview: readonly ImportPreviewRow[], mode: ImportMode): Option[] {
   const imported = preview.map(({ code, label }) => ({ code, label }));
-  return mode === "add" ? [...existing, ...imported] : imported;
+  if (mode === "add") return [...existing, ...imported];
+  // Replace all keeps the score of every option whose code is in the file, matched as
+  // conditions match (`replaceBlockers`), so it keeps its score as it keeps its conditions (contract §17.9).
+  const scores = new Map(existing.flatMap((o) => (o.score === undefined ? [] : [[o.code, o.score] as const])));
+  return imported.map((o) => {
+    const score = scores.get(o.code);
+    return score === undefined ? o : { ...o, score };
+  });
 }
 
 /**
@@ -2885,3 +3036,5 @@ export function replaceBlockers(blocks: readonly Block[], sourceId: string, code
 
 // Last: templates.ts uses this module, and only inside functions, so the cycle is safe.
 export * from "./templates";
+// The same holds for scoring.ts, which this module also calls, only from inside functions.
+export * from "./scoring";

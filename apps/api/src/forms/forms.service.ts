@@ -13,11 +13,12 @@ import {
   formFromTemplate,
   idsFromPrevious,
   normalizeConditions,
+  normalizeScores,
   sameContent,
   FormSchema,
   STATIC_TYPES,
   validateSubmission,
-  withoutTemplateRefs,
+  withoutBuilderFields,
 } from "@formbuilder/form-schema";
 import { PrismaService } from "../prisma/prisma.service";
 import { AutomationsService } from "../automations/automations.service";
@@ -32,11 +33,14 @@ import { TemplatesService } from "../templates/templates.service";
 /** Versions are append-only, so a form's current version is its highest `version`. */
 const LATEST_VERSION = { orderBy: { version: "desc" }, take: 1 } as const;
 
-/** Stored content without its template references (see `TemplateRef`), at any depth. */
+/**
+ * Stored content without what only the builder uses, at any depth: template
+ * references (see `TemplateRef`), question names and formula text (contract §17).
+ */
 function withoutProvenance(schema: unknown): unknown {
   if (typeof schema !== "object" || schema === null) return schema;
   const { templateRef: _ref, ...rest } = schema as { templateRef?: unknown; blocks?: unknown };
-  return Array.isArray(rest.blocks) ? { ...rest, blocks: withoutTemplateRefs(rest.blocks) } : rest;
+  return Array.isArray(rest.blocks) ? { ...rest, blocks: withoutBuilderFields(rest.blocks) } : rest;
 }
 
 function escapeHtml(s: string): string {
@@ -177,13 +181,14 @@ export class FormsService {
       where: { id: versionId, formId: form.id },
     });
     if (!source) throw new NotFoundException("Version not found");
-    // A version saved before condition ids and logic text gets them now (contract §15.6).
+    // A version saved before condition ids and logic text gets them now (contract §15.6),
+    // and its scores their ids, names and trees (§17.9).
     const restored = FormSchema.parse(source.schema);
     const current = FormSchema.safeParse(form.versions[0]?.schema);
     const previous = current.success ? current.data.blocks : [];
     const created = await this.appendVersion(
       form,
-      { ...restored, blocks: normalizeConditions(restored.blocks, idsFromPrevious(previous)) },
+      { ...restored, blocks: normalizeScores(normalizeConditions(restored.blocks, idsFromPrevious(previous)), previous) },
       `Restored from v${source.version}`,
     );
     return { ok: true, versionId: created.id, version: created.version };
@@ -200,9 +205,13 @@ export class FormsService {
     // keeps the one it already has, so re-sending the same content is no change.
     const current = FormSchema.safeParse(form.versions[0]?.schema);
     const previous = current.success ? current.data.blocks : [];
+    // Scores the same way (contract §17.7–§17.9): a score sent without an id gets
+    // one (the one it has, if re-sent), questions within reach of a scored group
+    // get names, and each formula's tree comes from its text — a tree sent with
+    // text is ignored, and a tree sent without text gets text made from it.
     const content: FormSchema = {
       ...parsed.data,
-      blocks: normalizeConditions(parsed.data.blocks, idsFromPrevious(previous)),
+      blocks: normalizeScores(normalizeConditions(parsed.data.blocks, idsFromPrevious(previous)), previous),
     };
     // Structure (unique ids, labelled non-empty groups) and conditional logic
     // (sources earlier in reading order, of a usable type, with valid operators
@@ -404,7 +413,7 @@ export class FormsService {
       id: form.id,
       title: form.title,
       slug: form.slug,
-      // Template provenance is the builder's own: respondents never get it.
+      // What only the builder uses (template provenance, question names, formula text): respondents never get it.
       schema: withoutProvenance(form.versions[0]?.schema ?? emptyForm(form.title)),
       // White-label: hide the "Made with Frame" footer for orgs that opt in.
       branding: !form.workspace.org.brandingHidden,

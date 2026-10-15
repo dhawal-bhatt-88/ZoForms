@@ -4,6 +4,7 @@ import {
   FormSchema,
   idsFromPrevious,
   normalizeConditions,
+  normalizeScores,
   sameContent,
   templateAsForm,
   templateFromForm,
@@ -35,9 +36,10 @@ export function prepareTemplateContent(kind: TemplateKind, raw: unknown, previou
   const parsed = FormSchema.safeParse(asForm);
   if (!parsed.success) throw new BadRequestException(describeSchemaError(asForm, parsed.error));
   const before = previous === undefined ? undefined : FormSchema.safeParse(templateAsForm(kind, previous));
+  const previousBlocks = before?.success ? before.data.blocks : [];
   const form = cleanTemplateForm({
     ...parsed.data,
-    blocks: normalizeConditions(parsed.data.blocks, idsFromPrevious(before?.success ? before.data.blocks : [])),
+    blocks: normalizeScores(normalizeConditions(parsed.data.blocks, idsFromPrevious(previousBlocks)), previousBlocks),
   });
   const problems = templateProblems(kind, form);
   if (problems.length) {

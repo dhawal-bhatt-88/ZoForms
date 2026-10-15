@@ -8,6 +8,7 @@ import {
   findBlock,
   FormSchema,
   normalizeConditions,
+  normalizeScores,
   templateAsForm,
   templateProblems,
   withoutOutsideConditions,
@@ -67,7 +68,7 @@ export function SaveTemplateDialog({
     const content = stripped ? stripped.group : form;
     const parsed = FormSchema.safeParse(templateAsForm(kind, content));
     const problems = parsed.success
-      ? templateProblems(kind, cleanTemplateForm({ ...parsed.data, blocks: normalizeConditions(parsed.data.blocks) }))
+      ? templateProblems(kind, cleanTemplateForm({ ...parsed.data, blocks: normalizeScores(normalizeConditions(parsed.data.blocks)) }))
       : [`${parsed.error.issues[0].path.join(".")}: ${parsed.error.issues[0].message}`];
     return {
       content,

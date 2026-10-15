@@ -33,6 +33,8 @@ import {
   type TemplateRef,
 } from "./index";
 import { logicTreeToText, logicWithout, parseLogicText } from "./logic";
+import { formulaShapeProblem, mapFormulaRefs } from "./formula";
+import { fillQuestionNames, resolveNameClashes } from "./scoring";
 
 export const TemplateKind = z.enum(["form", "group"]);
 export type TemplateKind = z.infer<typeof TemplateKind>;
@@ -227,9 +229,29 @@ export function remapBlockIds(
         return question === undefined ? c : { ...c, question };
       });
     }
+    // A score's tree refers to questions by id (contract §17.9); its text uses names, copied unchanged.
+    if (isGroup(block) && Array.isArray(block.scores)) {
+      (next as GroupBlock).scores = block.scores.map((s) =>
+        typeof s === "object" && s !== null && s.formula !== undefined && formulaShapeProblem(s.formula) === null
+          ? { ...s, formula: mapFormulaRefs(s.formula, ids) }
+          : s,
+      );
+    }
     return isContainer(next) ? ({ ...next, blocks: next.blocks.map(copy) } as Block) : next;
   };
   return { blocks: blocks.map(copy), ids };
+}
+
+/**
+ * Names after inserting `copy` (from `groupFromTemplate`), `before` → `after`
+ * (contract §17.9): a copy's name that clashes within an enclosing scored
+ * group's reach gets the §17.8 suffix and the copy's own formula texts follow
+ * it (`resolveNameClashes`); then every question newly within reach of a scored
+ * group that has no name gets one (`fillQuestionNames`).
+ */
+export function namesAfterInsert(before: readonly Block[], after: readonly Block[], copy: Block): Block[] {
+  const ids = new Set(walkBlocks([copy]).map((entry) => entry.block.id));
+  return fillQuestionNames(resolveNameClashes(before, after, ids).blocks);
 }
 
 /** A template as it is inserted: its identity, its current version, its name and its content. */

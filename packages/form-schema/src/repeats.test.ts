@@ -392,7 +392,7 @@ describe("repeating group guards", () => {
   it("refuses moving a source into a repeat that doesn't hold its dependents", () => {
     const blocks: Block[] = [leaf("age", "number"), repeat("patients", "patient", [leaf("name")]), when(leaf("summary"), exists("age"))];
     const after = moveBlockInTree(blocks, "age", "patients", 0);
-    expect(structureBreaks(blocks, after)).toEqual({ order: [], prefix: [findBlock(after, "summary")!.block] });
+    expect(structureBreaks(blocks, after)).toEqual({ order: [], prefix: [findBlock(after, "summary")!.block], score: [] });
   });
 
   it("refuses moving a dependent out of the repeat that holds its source", () => {
@@ -421,7 +421,7 @@ describe("repeating group guards", () => {
       when(leaf("summary"), exists("amount")),
     ];
     // Already broken before the move: "summary" uses a payment's amount from outside. It isn't counted again.
-    expect(structureBreaks(blocks, moveBlockInTree(blocks, "x", null, 0))).toEqual({ order: [], prefix: [] });
+    expect(structureBreaks(blocks, moveBlockInTree(blocks, "x", null, 0))).toEqual({ order: [], prefix: [], score: [] });
     // Moving it into "patients" (but not "payments") still breaks the rule, but it was already broken.
     expect(structureBreaks(blocks, moveBlockInTree(blocks, "summary", "patients", 2)).prefix).toEqual([]);
   });
@@ -432,14 +432,14 @@ describe("repeating group guards", () => {
       repeat("patients", "patient", [leaf("name"), when(leaf("nick"), exists("name")), group("box", [leaf("y")])]),
       group("plain", [leaf("z")]),
     ];
-    expect(structureBreaks(blocks, moveBlockInTree(blocks, "patients", "plain", 1))).toEqual({ order: [], prefix: [] });
-    expect(structureBreaks(blocks, moveBlockInTree(blocks, "nick", "box", 1))).toEqual({ order: [], prefix: [] });
+    expect(structureBreaks(blocks, moveBlockInTree(blocks, "patients", "plain", 1))).toEqual({ order: [], prefix: [], score: [] });
+    expect(structureBreaks(blocks, moveBlockInTree(blocks, "nick", "box", 1))).toEqual({ order: [], prefix: [], score: [] });
   });
 
   it("never breaks the prefix rule by removing a repeating group but keeping its contents", () => {
     const blocks = withCondition(withCondition(clinic(), "note", "amount"), "amount", "name");
-    expect(structureBreaks(blocks, unwrapGroup(blocks, "payments"))).toEqual({ order: [], prefix: [] });
-    expect(structureBreaks(blocks, unwrapGroup(blocks, "patients"))).toEqual({ order: [], prefix: [] });
+    expect(structureBreaks(blocks, unwrapGroup(blocks, "payments"))).toEqual({ order: [], prefix: [], score: [] });
+    expect(structureBreaks(blocks, unwrapGroup(blocks, "patients"))).toEqual({ order: [], prefix: [], score: [] });
   });
 
   it("lists every block breaking the prefix rule", () => {
