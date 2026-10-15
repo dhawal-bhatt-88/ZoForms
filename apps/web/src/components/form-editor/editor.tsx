@@ -65,7 +65,9 @@ import {
   CODE_PATTERN,
   COMPLETE_REQUIRED_LABELS,
   fillCodeAt,
+  fillQuestionNames,
   findBlock,
+  generateQuestionName,
   GROUP_TEMPLATE_TITLE,
   groupFromTemplate,
   INSERT_AS_PAGE_UNAVAILABLE,
@@ -83,11 +85,16 @@ import {
   isPage,
   isPaged,
   isRepeatingGroup,
+  isScoredGroup,
+  isWithinScoreReach,
   logicTreeToText,
   makePaged,
   moveBlockInTree,
   moveGridColumn,
   movePage,
+  NAME_PATTERN,
+  namesAfterInsert,
+  namesTakenFor,
   NAVIGATION_DEFAULTS,
   navigationWithoutDefaults,
   newBlock,
@@ -111,14 +118,22 @@ import {
   questionNumbers,
   removeBlockFromTree,
   renameOptionCode,
+  renameQuestion,
   renumberAfterDelete,
   replaceBlockers,
   REPEAT_DEFAULTS,
   repeatsOnBlockers,
+  repeatsOnScoreBlockers,
   repeatSettingsProblems,
+  resolveNameClashes,
   resolveTheme,
   sameContent,
   sameOptionList,
+  scoreDeletionBlockers,
+  scoredOptionList,
+  scoreProblems,
+  scoreTypeChangeBlockers,
+  scoreUseMessage,
   sourceOperators,
   structureBreaks,
   unwrapGroup,
@@ -130,6 +145,7 @@ import {
   type AnyBlockType,
   type Block,
   type Condition,
+  type Score,
   type ConditionOperator,
   type ContainerBlock,
   type DraftMode,
@@ -160,6 +176,7 @@ import { parseCount, repeatBadgeText, repeatPreviewText } from "@/lib/repeat-set
 import { OptionImportDialog } from "@/components/option-import-dialog";
 import { CodeChangeNote, OptionListEditor } from "@/components/option-list-editor";
 import { GridColumnsEditor } from "@/components/grid-columns-editor";
+import { ScoresPanel } from "@/components/scores-panel";
 import { Switch } from "@/components/switch";
 import { MenuButton, type MenuItem } from "@/components/menu-button";
 import { SaveTemplateDialog } from "@/components/templates/save-template-dialog";
@@ -1813,6 +1830,8 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         ? newGroup(taken)
         : newBlock(item.type, item.level ? { level: item.level } : undefined, taken);
     const target = insertTarget ?? selectionInsertTarget();
+    // A new question's name waits for its real label (contract §17.8).
+    if (isAnswerable(b)) newQuestions.current.add(b.id);
     patch((s) => ({ ...s, blocks: insertBlockIntoTree(s.blocks, target.parentId, target.index, b) }));
     if (target.parentId) expand(target.parentId);
     setSelectedId(b.id);
@@ -1850,7 +1869,9 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     }
     setPicking(null);
     if (refuseStructureEdit(structureBreaks(schema.blocks, next), `insert "${t.name}" there`)) return;
-    patch((s) => ({ ...s, blocks: next }));
+    // Inside a scored group, a copy's clashing names get suffixes and its own formulas follow (contract §17.9).
+    const named = namesAfterInsert(schema.blocks, next, group, { skip: newQuestions.current });
+    patch((s) => ({ ...s, blocks: named }));
     if (as === "group" && picking.parentId) expand(picking.parentId);
     setSelectedId(group.id);
     setNotice({ tone: "info", text: `Inserted a copy of "${t.name}".` });
@@ -1878,6 +1899,73 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   }
 
   /*
+   * Question names (contract §17.8). An existing question gets its name as soon
+   * as it comes within reach of a scored group — a score added, a move, Repeats
+   * turned off, a group removed but its contents kept, a template inserted. A
+   * new question waits for its real label: it is in `newQuestions` until the
+   * author leaves its label field after changing it, and the save names any
+   * still without one. A name is never regenerated.
+   */
+  const newQuestions = useRef(new Set<string>());
+  const withNames = (blocks: Block[]) => fillQuestionNames(blocks, { skip: newQuestions.current });
+  /** Leaving a new question's label field after changing it: its name comes from that label. */
+  function labelLeft(bid: string) {
+    if (!newQuestions.current.delete(bid)) return;
+    patch((s) => ({ ...s, blocks: fillQuestionNames(s.blocks, { only: new Set([bid]) }) }));
+  }
+
+  /*
+   * A question's name is stored as typed, so its inline message shows. When the
+   * author leaves the field with a valid name no other question in reach has,
+   * every formula using the old one follows it (§17.9), and the field says how
+   * many. A field left empty gets a name from the label at once, and the
+   * formulas follow that. `nameOrigins` remembers the name the formulas still
+   * use while the field holds something else, as `codeOrigins` does for codes.
+   */
+  const nameOrigins = useRef(new Map<string, string>());
+  const [nameStatus, setNameStatus] = useState<{ blockId: string; text: string } | null>(null);
+  function nameFocus(bid: string) {
+    if (nameOrigins.current.has(bid) || !schema) return;
+    const current = findBlock(schema.blocks, bid)?.block.name;
+    nameOrigins.current.set(bid, typeof current === "string" ? current : "");
+  }
+  function nameLeave(bid: string) {
+    if (!schema) return;
+    const entry = findBlock(schema.blocks, bid);
+    if (!entry) return;
+    const typed = typeof entry.block.name === "string" ? entry.block.name.trim() : "";
+    const taken = namesTakenFor(schema.blocks, bid);
+    const from = nameOrigins.current.get(bid) ?? typed;
+    const to = typed || generateQuestionName(entry.block.label ?? "", taken, questionNumbers(schema.blocks).get(bid) ?? 0);
+    if (!NAME_PATTERN.test(to) || taken.includes(to.toLowerCase())) {
+      if (typed !== entry.block.name) updateBlock(bid, { name: typed });
+      return; // the inline message explains; the formulas keep `from`
+    }
+    nameOrigins.current.delete(bid);
+    const { blocks, updated } = renameQuestion(schema.blocks, bid, from, to);
+    patch((s) => ({ ...s, blocks }));
+    setNameStatus(
+      updated ? { blockId: bid, text: `${updated} ${updated === 1 ? "formula" : "formulas"} updated to use "${to}".` } : null,
+    );
+  }
+
+  /** A group's scores changed (contract §17.9); the first score brings names to the questions it can reach. */
+  function updateScores(gid: string, scores: Score[] | undefined) {
+    patch((s) => ({ ...s, blocks: withNames(updateBlockInTree(s.blocks, gid, (b) => ({ ...b, scores }) as Block)) }));
+  }
+
+  /**
+   * Refused because scores use the blocks in the way (contract §17.9): the
+   * contract's message for each score, with links to their groups.
+   */
+  function refuseForScores(uses: ReturnType<typeof scoreDeletionBlockers>, before = ""): boolean {
+    if (!uses.length) return false;
+    const groups = uses.map((u) => u.group).filter((g, k, all) => all.findIndex((x) => x.id === g.id) === k);
+    setNotice({ text: `${before}${uses.map(scoreUseMessage).join(" ")}`, blocks: groups });
+    return true;
+  }
+
+  /*
    * Dependency guards: other blocks' conditions reference a source block by id,
    * by reading order (sources must come first) and by option code. These edits
    * would silently break those conditions, so they're refused, naming the
@@ -1897,6 +1985,8 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
           });
           return;
         }
+        // A formula can only use a question of a type that can be scored (contract §17.2, §17.9).
+        if (refuseForScores(scoreTypeChangeBlockers(schema.blocks, bid, p.type), `Can't change the type of "${blockName(current)}". `)) return;
       }
     }
     patch((s) => ({
@@ -2024,6 +2114,14 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
       onAdd: () => {
         const options = listOf(bid, ref);
         setList(bid, ref, [...options, ...placeholderOptions(noun, 1, options)]);
+      },
+      // An option's score (contract §17.9); clearing the field removes it.
+      onScore: (i: number, score: number | undefined) => {
+        const options = listOf(bid, ref);
+        if (!options[i]) return;
+        const { score: _old, ...rest } = options[i];
+        options[i] = score === undefined ? rest : { ...rest, score };
+        setList(bid, ref, options);
       },
     };
   };
@@ -2154,6 +2252,8 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
       });
       return;
     }
+    if (refuseForScores(scoreDeletionBlockers(schema.blocks, bid))) return;
+    newQuestions.current.delete(bid);
     patch((s) => ({ ...s, blocks: removeBlockFromTree(s.blocks, bid) }));
     setSelectedId((cur) => (cur === bid ? null : cur));
   };
@@ -2167,7 +2267,8 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     // Unwrapping changes neither reading order nor which repeats enclose a block, but it
     // goes through the same guard as any move.
     if (refuseStructureEdit(structureBreaks(schema.blocks, next), "remove that group")) return;
-    patch((s) => ({ ...s, blocks: unwrapGroup(s.blocks, gid) }));
+    // A repeating group's questions may now be within reach of a scored group (contract §17.8).
+    patch((s) => ({ ...s, blocks: withNames(unwrapGroup(s.blocks, gid)) }));
     setSelectedId((cur) => (cur === gid ? null : cur));
   }
 
@@ -2185,6 +2286,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
       });
       return;
     }
+    if (refuseForScores(scoreDeletionBlockers(schema.blocks, gid))) return;
     patch((s) => ({ ...s, blocks: removeBlockFromTree(s.blocks, gid) }));
     setSelectedId(null);
   }
@@ -2194,7 +2296,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
    * (`structureBreaks`), naming the blocks it would break. `action` completes
    * "Can't …". Returns true when refused.
    */
-  function refuseStructureEdit(breaks: { order: Block[]; prefix: Block[] }, action: string): boolean {
+  function refuseStructureEdit(breaks: { order: Block[]; prefix: Block[]; score: Block[] }, action: string): boolean {
     if (breaks.order.length) {
       setNotice({
         text: `Can't ${action} — these questions would end up before a question their conditions depend on:`,
@@ -2206,6 +2308,13 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
       setNotice({
         text: `Can't ${action} — these blocks would have conditions on a question inside a repeating group they aren't in:`,
         blocks: breaks.prefix,
+      });
+      return true;
+    }
+    if (breaks.score.length) {
+      setNotice({
+        text: `Can't ${action} — these groups have scores whose formulas use a question that would be out of their reach:`,
+        blocks: breaks.score,
       });
       return true;
     }
@@ -2233,7 +2342,18 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     }
     if (refuseStructureEdit(structureBreaks(schema.blocks, next), `move "${blockName(moving)}" there`)) return;
     if (target.parentId) expand(target.parentId);
-    patch((s) => ({ ...s, blocks: next }));
+    // A moved name already taken in a scored group's reach gets a suffix, and the
+    // formulas that meant it follow (contract §17.9); questions newly in reach get names.
+    const moved = new Set(walkBlocks([moving]).map((e) => e.block.id));
+    const { blocks: resolved, renamed } = resolveNameClashes(schema.blocks, next, moved);
+    patch((s) => ({ ...s, blocks: withNames(resolved) }));
+    if (renamed.length) {
+      setNotice({
+        tone: "info",
+        text: renamed.map((r) => `"${r.from}" is already used there, so the moved question is now named "${r.to}".`).join(" "),
+        blocks: renamed.map((r) => findBlock(resolved, r.id)!.block),
+      });
+    }
   }
 
   /**
@@ -2255,9 +2375,24 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         });
         return;
       }
+      // A score outside it can't use a question in a repeating group (contract §17.2, §17.9).
+      const scored = repeatsOnScoreBlockers(schema.blocks, gid);
+      if (scored.length) {
+        setNotice({
+          text: `Can't make "${blockName(group)}" repeat — these groups have scores whose formulas use a question inside it:`,
+          blocks: scored,
+        });
+        return;
+      }
       updateBlock(gid, { repeats: true, ...REPEAT_DEFAULTS, maxOccurs: undefined });
     } else {
-      updateBlock(gid, { repeats: undefined, repeatLabel: undefined, minOccurs: undefined, maxOccurs: undefined });
+      // Its questions may now be within reach of a scored group around it (contract §17.8).
+      patch((s) => ({
+        ...s,
+        blocks: withNames(
+          updateBlockInTree(s.blocks, gid, (b) => ({ ...b, repeats: undefined, repeatLabel: undefined, minOccurs: undefined, maxOccurs: undefined }) as Block),
+        ),
+      }));
     }
   }
 
@@ -2458,6 +2593,9 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     },
     { key: "full", label: "Full-page link", code: `${origin}/r/${slug}` },
   ];
+
+  // The save's scoring rules (contract §17.6–§17.8), each shown under its field.
+  const scoreIssues = useMemo(() => (schema ? scoreProblems(walkBlocks(schema.blocks)) : []), [schema]);
 
   if (!schema)
     return (
@@ -2955,6 +3093,10 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                 onChange={(e) =>
                   updateBlock(selected.id, isPage(selected) ? { title: e.target.value } : { label: e.target.value })
                 }
+                onFocus={(e) => (e.currentTarget.dataset.atFocus = e.currentTarget.value)}
+                onBlur={(e) => {
+                  if (e.currentTarget.value !== e.currentTarget.dataset.atFocus) labelLeft(selected.id);
+                }}
                 className={`${fieldCls} ${["image", "video", "audio"].includes(selected.type) ? "mb-1.5" : "mb-3"}`}
               />
               {selected.type === "image" && (
@@ -2972,6 +3114,53 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                   Read aloud to screen-reader users — say what the recording is.
                 </p>
               )}
+
+              {/* A question's name, for score formulas (contract §17.8): only within reach of a scored group. */}
+              {isAnswerable(selected) && isWithinScoreReach(schema.blocks, selected.id) && (() => {
+                const problem = scoreIssues.find((p) => p.blockId === selected.id && p.field === "name")?.detail;
+                const status = nameStatus?.blockId === selected.id ? nameStatus.text : null;
+                return (
+                  <div className="mb-3">
+                    <label htmlFor="block-name" className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">
+                      Name
+                    </label>
+                    <input
+                      id="block-name"
+                      value={typeof selected.name === "string" ? selected.name : ""}
+                      placeholder={newQuestions.current.has(selected.id) ? "Given when you set the label" : undefined}
+                      spellCheck={false}
+                      autoCapitalize="off"
+                      autoComplete="off"
+                      onFocus={() => nameFocus(selected.id)}
+                      onChange={(e) => {
+                        updateBlock(selected.id, { name: e.target.value });
+                        setNameStatus(null);
+                      }}
+                      onBlur={() => nameLeave(selected.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") e.currentTarget.blur();
+                      }}
+                      aria-invalid={problem ? true : undefined}
+                      aria-describedby="block-name-help block-name-error block-name-status"
+                      className={`${fieldCls} font-mono aria-[invalid=true]:border-red`}
+                    />
+                    <p id="block-name-help" className="mt-1.5 text-xs text-muted">
+                      Used in score formulas. Lower-case letters, digits and _, starting with a letter.
+                    </p>
+                    <div id="block-name-error" aria-live="polite">
+                      {problem && (
+                        <p className="mt-1.5 flex items-start gap-1 text-xs text-red">
+                          <CircleAlert aria-hidden="true" className="mt-px h-3.5 w-3.5 flex-none" />
+                          {problem}
+                        </p>
+                      )}
+                    </div>
+                    <p id="block-name-status" role="status" aria-live="polite" className="mt-1 text-xs text-ink-2">
+                      {status}
+                    </p>
+                  </div>
+                );
+              })()}
 
               {/* Repeating groups (contract §12): groups only, never pages. */}
               {isGroup(selected) && (
@@ -3058,6 +3247,17 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                     </div>
                   )}
                 </div>
+              )}
+              {/* Scores (contract §17): groups only, plain or repeating, never pages. */}
+              {isGroup(selected) && (
+                <ScoresPanel
+                  key={`scores-${selected.id}`}
+                  group={selected}
+                  blocks={schema.blocks}
+                  problems={scoreIssues.filter((p) => p.group === selected.id)}
+                  onChange={(scores) => updateScores(selected.id, scores)}
+                  onJump={jumpTo}
+                />
               )}
               {/*
                 Help text only where the renderer shows it: on questions. Not on pages,
@@ -3186,6 +3386,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                     options={optionListAt(selected, ref)}
                     problems={optionListProblems(selected).filter((p) => sameOptionList(p, ref))}
                     status={listStatus(selected.id, ref)}
+                    showScores={scoredOptionList(selected)?.list === ref.list && isWithinScoreReach(schema.blocks, selected.id)}
                     {...optionHandlers(selected.id, ref, placeholder)}
                     onImportFile={(file) => readImportFile(selected.id, ref, heading.toLowerCase(), file)}
                   />

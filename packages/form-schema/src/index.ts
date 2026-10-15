@@ -1987,6 +1987,8 @@ export type ConditionProblem = {
   detail: string;
   /** For a problem with one of a group's scores (contract §17.6): that score's id, or its position from 0 when it has none. */
   score?: string | number;
+  /** For a problem with one of a group's scores: that group's id (score ids are unique only within a group). */
+  group?: string;
   /** For a problem with a question's name (contract §17.8). */
   field?: "name";
 };

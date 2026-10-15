@@ -12,6 +12,8 @@ export type RowHandlers = {
   onCodeFocus: (index: number) => void;
   onCodeLeave: (index: number) => void;
   onRemove: (index: number) => void;
+  /** An option's score (contract §17.1): a number, or undefined when the field is cleared. */
+  onScore?: (index: number, score: number | undefined) => void;
 };
 
 /**
@@ -34,6 +36,7 @@ export function OptionListEditor({
   status,
   owner,
   sharedNoteId,
+  showScores = false,
   onAdd,
   onImportFile,
   ...handlers
@@ -61,6 +64,12 @@ export function OptionListEditor({
    * its own, and its code fields point at that one. Absent: it shows its own.
    */
   sharedNoteId?: string;
+  /**
+   * Show a Score field on each option (contract §17.9): for the options of a
+   * choice, dropdown, checkbox or multiselect, or a matrix's columns, while the
+   * question is within reach of a scored group. Scores stay when it isn't.
+   */
+  showScores?: boolean;
   onAdd: () => void;
   /** A .csv or .txt file the author chose; it is read in the browser, never uploaded (contract §13.9). */
   onImportFile: (file: File) => void;
@@ -77,6 +86,7 @@ export function OptionListEditor({
       onCodeFocus: (i) => latest.current.onCodeFocus(i),
       onCodeLeave: (i) => latest.current.onCodeLeave(i),
       onRemove: (i) => latest.current.onRemove(i),
+      onScore: (i, v) => latest.current.onScore?.(i, v),
     }),
     [],
   );
@@ -101,8 +111,10 @@ export function OptionListEditor({
       )}
       {options.length > 0 && (
         <div className="mb-1 flex gap-1.5 pr-[38px] text-[11px] font-semibold uppercase tracking-wider text-faint" aria-hidden>
-          <span className="w-24 flex-none">Code</span>
+          {/* With scores, code and score share the room so the label keeps most of it. */}
+          <span className={`${showScores ? "w-20" : "w-24"} flex-none`}>Code</span>
           <span className="flex-1">Label</span>
+          {showScores && <span className="w-12 flex-none">Score</span>}
         </div>
       )}
       <div className="flex flex-col gap-2">
@@ -116,8 +128,11 @@ export function OptionListEditor({
             index={i}
             label={o.label}
             code={o.code}
+            score={showScores ? o.score : undefined}
+            showScore={showScores}
             labelError={byRow.get(`${i}:label`)}
             codeError={byRow.get(`${i}:code`)}
+            scoreError={byRow.get(`${i}:score`)}
             handlers={stable}
           />
         ))}
@@ -192,8 +207,11 @@ export const OptionRow = memo(function OptionRow({
   index: i,
   label,
   code,
+  score,
+  showScore = false,
   labelError,
   codeError,
+  scoreError,
   handlers: h,
 }: {
   idPrefix: string;
@@ -205,8 +223,12 @@ export const OptionRow = memo(function OptionRow({
   index: number;
   label: string;
   code: string;
+  /** The option's score, when the Score field is shown (contract §17.9). */
+  score?: number;
+  showScore?: boolean;
   labelError?: string;
   codeError?: string;
+  scoreError?: string;
   handlers: RowHandlers;
 }) {
   const Noun = noun.charAt(0).toUpperCase() + noun.slice(1);
@@ -240,7 +262,7 @@ export const OptionRow = memo(function OptionRow({
           }}
           aria-invalid={!!codeError}
           aria-describedby={[codeError ? `${base}-code-error` : "", noteId ?? `${idPrefix}-note`].filter(Boolean).join(" ")}
-          className={`${field} w-24 flex-none font-mono text-xs`}
+          className={`${field} ${showScore ? "w-20" : "w-24"} flex-none font-mono text-xs`}
         />
         <input
           id={`${base}-label`}
@@ -258,6 +280,24 @@ export const OptionRow = memo(function OptionRow({
           aria-describedby={labelError ? `${base}-label-error` : undefined}
           className={`${field} flex-1`}
         />
+        {showScore && (
+          <input
+            id={`${base}-score`}
+            type="number"
+            step="any"
+            inputMode="decimal"
+            aria-label={`${Noun} ${i + 1} score${of}`}
+            // A stored value that isn't a number (sent through the API) shows empty; its message says why.
+            value={typeof score === "number" ? score : ""}
+            onChange={(e) => {
+              const n = e.target.valueAsNumber;
+              h.onScore?.(i, e.target.value === "" || !Number.isFinite(n) ? undefined : n);
+            }}
+            aria-invalid={!!scoreError}
+            aria-describedby={scoreError ? `${base}-score-error` : undefined}
+            className={`${field} w-12 flex-none px-1.5 text-right tabular-nums`}
+          />
+        )}
         <button
           type="button"
           onClick={() => h.onRemove(i)}
@@ -275,6 +315,11 @@ export const OptionRow = memo(function OptionRow({
       {labelError && (
         <p id={`${base}-label-error`} role="alert" className="mt-1 text-xs text-red">
           {labelError}
+        </p>
+      )}
+      {scoreError && (
+        <p id={`${base}-score-error`} role="alert" className="mt-1 text-xs text-red">
+          {scoreError}
         </p>
       )}
     </div>

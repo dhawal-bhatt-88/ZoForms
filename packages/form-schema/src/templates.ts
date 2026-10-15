@@ -247,11 +247,17 @@ export function remapBlockIds(
  * (contract §17.9): a copy's name that clashes within an enclosing scored
  * group's reach gets the §17.8 suffix and the copy's own formula texts follow
  * it (`resolveNameClashes`); then every question newly within reach of a scored
- * group that has no name gets one (`fillQuestionNames`).
+ * group that has no name gets one (`fillQuestionNames`), except those in
+ * `options.skip` (new questions whose label hasn't been written yet).
  */
-export function namesAfterInsert(before: readonly Block[], after: readonly Block[], copy: Block): Block[] {
+export function namesAfterInsert(
+  before: readonly Block[],
+  after: readonly Block[],
+  copy: Block,
+  options: { skip?: ReadonlySet<string> } = {},
+): Block[] {
   const ids = new Set(walkBlocks([copy]).map((entry) => entry.block.id));
-  return fillQuestionNames(resolveNameClashes(before, after, ids).blocks);
+  return fillQuestionNames(resolveNameClashes(before, after, ids).blocks, options);
 }
 
 /** A template as it is inserted: its identity, its current version, its name and its content. */

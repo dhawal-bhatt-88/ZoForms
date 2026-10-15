@@ -387,6 +387,26 @@ export function resolveNameClashes(
   return { blocks, renamed };
 }
 
+/**
+ * The first §17.7 error in `text` as a formula of group `groupId`, or null:
+ * what the editor shows under the Formula field, word for word as the save.
+ */
+export function formulaTextError(blocks: readonly Block[], groupId: string, text: string): string | null {
+  const parsed = checkFormulaText(text, lookupFor(scoreContext(blocks), groupId));
+  return parsed.ok ? null : parsed.error;
+}
+
+/**
+ * The questions group `groupId`'s formulas can use, with their names, in
+ * reading order (§17.2, §17.8): for the editor's list of names. A question
+ * that can't be scored is left out; one without a name yet is listed without.
+ */
+export function scoreableQuestions(blocks: readonly Block[], groupId: string): { block: Block; name?: string }[] {
+  return (scoreContext(blocks).reach.get(groupId) ?? [])
+    .filter((q) => canBeScored(q.block))
+    .map((q) => ({ block: q.block, name: nameOf(q.block) }));
+}
+
 /* ---------- which questions formulas use (the editor's guards, §17.9) ---------- */
 
 /** One question used by one score's formula. */
@@ -634,7 +654,7 @@ export function scoreProblems(entries: readonly TreeEntry[], artifact = false): 
     if (scores === undefined) continue;
     if (!Array.isArray(scores)) {
       const detail = "Its scores must be a list.";
-      problems.push({ blockId: g.block.id, message: `${subject(g)}: ${detail}`, detail });
+      problems.push({ blockId: g.block.id, message: `${subject(g)}: ${detail}`, detail, group: g.block.id });
       continue;
     }
     const lookup = lookupFor(ctx, g.block.id);
@@ -647,6 +667,7 @@ export function scoreProblems(entries: readonly TreeEntry[], artifact = false): 
           message: `${subject(g)}, ${scoreName(s, i)}: ${detail}`,
           detail,
           score: key,
+          group: g.block.id,
         });
       if (!isObject(s)) {
         at("It must be an object with a label, a formula and how to treat unanswered questions.");
@@ -698,7 +719,7 @@ export function scoreProblems(entries: readonly TreeEntry[], artifact = false): 
         if (problems.some((p) => p.blockId === q.block.id && p.score !== undefined)) continue;
         const o = list.options[missing];
         const detail = `${capitalize(list.noun)} ${missing + 1}${o.label ? ` ("${o.label}")` : ""} has no score, but the ${scoreName(s, i)} of "${blockName(g.block)}" uses this question. Give every ${list.noun} a score.`;
-        problems.push({ blockId: q.block.id, message: `${subject(q)}: ${detail}`, detail, score: key });
+        problems.push({ blockId: q.block.id, message: `${subject(q)}: ${detail}`, detail, score: key, group: g.block.id });
       }
     });
   }
