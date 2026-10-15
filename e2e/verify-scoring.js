@@ -9,13 +9,13 @@
 // is covered by the unit tests and verify-scoring-api.js (decision C).
 //
 // With E2E_EXTERNAL_APP_URL set, the download is rendered in the external test
-// app (?form=builder-scoring, @zoworkhq/forms 0.23.0 or later), filled in and submitted;
+// app (?form=builder-scoring, @zoworkhq/forms 0.25.0 or later), filled in and submitted;
 // the scores shown after submit and the test app API's derived.scores are
 // checked against the expected values, with one score left without a value
 // because a question it uses is unanswered ("No score").
 const fs = require("fs");
 const path = require("path");
-const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact } = require("./_setup");
+const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, ZF_RENDERER, rendererVersion, atLeast } = require("./_setup");
 const prisma = new PrismaClient();
 
 const EXTERNAL_APP = process.env.E2E_EXTERNAL_APP_URL;
@@ -287,11 +287,9 @@ const moodTemplate = {
       check("render: E2E_EXTERNAL_FORMS_DIR is set, so the app has this run's artifact", false, "set E2E_EXTERNAL_FORMS_DIR to the test app's src/forms");
     } else {
       const appRoot = path.join(process.env.E2E_EXTERNAL_FORMS_DIR, "..", "..");
-      const installed = path.join(appRoot, "node_modules", "@zoworkhq", "forms", "package.json");
-      const version = fs.existsSync(installed) ? JSON.parse(fs.readFileSync(installed, "utf8")).version : "not installed";
-      // Scores need 0.23.0 or later (renamed from @yourco/forms at 0.24.0).
-      const [maj, min] = version.split(".").map(Number);
-      check("render: the test app has @zoworkhq/forms 0.23.0 or later", maj > 0 || min >= 23, version);
+      // Scores need 0.23.0, and the checks below read the renderer's zf- class names.
+      const version = rendererVersion();
+      check(`render: the test app has @zoworkhq/forms ${ZF_RENDERER} or later (zf- names)`, atLeast(version, ZF_RENDERER), version);
       await sleep(1500); // let the app's dev server see the new file
       const R = await ctx.newPage();
       R.on("pageerror", (e) => check("render: no page errors", false, e.message));
@@ -302,7 +300,7 @@ const moodTemplate = {
       check("render: the test app shows ?form=builder-scoring", registered,
         "register it in the test app's src/App.tsx, as the other builder exports are: import ./forms/builder-scoring-schema.json and add a 'builder-scoring' entry");
       if (registered) {
-        check("render: no score is shown while filling in", (await R.locator(".yf-scores").count()) === 0);
+        check("render: no score is shown while filling in", (await R.locator(".zf-scores").count()) === 0);
         // Item k → option: scores 2, 1, 0, 2, 1 → total 6.
         const picks = [3, 2, 1, 3, 2];
         for (let k = 1; k <= 5; k += 1) {
@@ -323,11 +321,11 @@ const moodTemplate = {
         const sent = JSON.parse(res.request().postData());
         // 0.23.0 sends an empty `derived: {}`; what matters (§17.5) is that no score is in it.
         check("payload: the browser sends no scores", !JSON.stringify(sent).includes("scores"), JSON.stringify(sent.derived));
-        await R.locator(".yf-success").waitFor({ timeout: 10000 });
-        const shown = (await R.locator(".yf-scores li").allInnerTexts()).map((t) => t.trim());
+        await R.locator(".zf-success").waitFor({ timeout: 10000 });
+        const shown = (await R.locator(".zf-scores li").allInnerTexts()).map((t) => t.trim());
         check("after submit: the shown scores, rounded, without the one that has no value",
           JSON.stringify(shown) === JSON.stringify(["Total: 6", "Weighted: 1.29", "Mood total: 8"]), JSON.stringify(shown));
-        check("after submit: focus on the success message", await R.evaluate(() => document.activeElement?.classList.contains("yf-success")));
+        check("after submit: focus on the success message", await R.evaluate(() => document.activeElement?.classList.contains("zf-success")));
         await R.screenshot({ path: `${OUT}/scoring-render.png`, fullPage: true });
 
         // The test app's API: what prepareSubmission calculated, stored and logged.

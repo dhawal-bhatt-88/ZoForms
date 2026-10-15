@@ -10,13 +10,13 @@
 // once per grid, editing rows, every save rejection the editor can produce (its
 // inline message is the API's text), a grid inside a repeating group, and the
 // downloaded artifact's exact §14.1 shape. With E2E_EXTERNAL_APP_URL set, the
-// download is rendered in the test app (@zoworkhq/forms 0.21.2 or later): the §14.5 layout
+// download is rendered in the test app (@zoworkhq/forms 0.25.0 or later): the §14.5 layout
 // (the table in its own named, focusable region, a table at the app's width and
 // either side of the 34rem container breakpoint, cards below it), a required
 // column blocks submit, a filled grid submits, and the stored record is checked.
 const fs = require("fs");
 const path = require("path");
-const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, opts, noIds, hasIds } = require("./_setup");
+const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, opts, noIds, hasIds, ZF_RENDERER, rendererVersion, atLeast } = require("./_setup");
 const prisma = new PrismaClient();
 
 const results = [];
@@ -481,6 +481,9 @@ const NOTE = "Changing a code after the form is in use will not match answers al
     } else if (!process.env.E2E_EXTERNAL_FORMS_DIR || !fs.existsSync(path.join(process.env.E2E_EXTERNAL_FORMS_DIR, ARTIFACT))) {
       check("render: E2E_EXTERNAL_FORMS_DIR is set, so the app has this run's artifact", false, "set E2E_EXTERNAL_FORMS_DIR to the test app's src/forms");
     } else {
+      // The layout checks read the renderer's zf- class names and container name.
+      const version = rendererVersion();
+      check(`render: the test app has @zoworkhq/forms ${ZF_RENDERER} or later (zf- names)`, atLeast(version, ZF_RENDERER), version);
       await sleep(1500); // let the app's dev server see the new file
       // Opens the download in the test app, in a panel `width` pixels wide (the app's ?width=) or
       // at its default width, and shows the grid: it appears once the question its condition uses
@@ -494,12 +497,12 @@ const NOTE = "Changing a code after the form is in use will not match answers al
         return region.evaluate((box) => {
           const t = box.querySelector("table");
           const css = (e) => getComputedStyle(e);
-          const labels = [...t.querySelectorAll("tbody .yf-grid-cell-label")];
+          const labels = [...t.querySelectorAll("tbody .zf-grid-cell-label")];
           return {
             region: { className: box.className, tabIndex: box.tabIndex, container: `${css(box).containerName} / ${css(box).containerType}`, tableInside: t.parentElement === box },
             width: box.clientWidth, breakpoint: 34 * parseFloat(css(document.documentElement).fontSize), viewport: innerWidth,
             table: css(t).display, headShown: t.tHead.getBoundingClientRect().height > 1,
-            rows: [...t.tBodies[0].rows].map((r) => (r.classList.contains("yf-grid-card") ? "" : "no card class; ") + css(r).display),
+            rows: [...t.tBodies[0].rows].map((r) => (r.classList.contains("zf-grid-card") ? "" : "no card class; ") + css(r).display),
             cellLabelsShown: labels.length > 0 && labels.every((l) => css(l).display !== "none" && l.getBoundingClientRect().height > 0),
             scrolls: box.scrollWidth > box.clientWidth,
           };
@@ -516,7 +519,7 @@ const NOTE = "Changing a code after the form is in use will not match answers al
       // Contract §14.5: the table sits in its own box, a keyboard-scrollable region named by the grid's
       // label, and the layout follows that box's width (a container query), never the viewport's.
       check("render: the table is in its own region, named by the grid's label, focusable, a size container",
-        wide.region.className === "yf-grid-scroll" && wide.region.tabIndex === 0 && wide.region.container === "yf-grid / inline-size" && wide.region.tableInside, JSON.stringify(wide.region));
+        wide.region.className === "zf-grid-scroll" && wide.region.tabIndex === 0 && wide.region.container === "zf-grid / inline-size" && wide.region.tableInside, JSON.stringify(wide.region));
       const isTable = (m) => m.table === "table" && m.headShown && m.rows.every((r) => r === "table-row") && !m.cellLabelsShown;
       const isCards = (m) => m.table === "block" && !m.headShown && m.rows.every((r) => r === "block") && m.cellLabelsShown && !m.scrolls;
       check("render: at the app's default width the grid is a table; too wide for its box, it scrolls inside it",

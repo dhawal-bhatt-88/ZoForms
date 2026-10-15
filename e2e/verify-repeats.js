@@ -3,7 +3,7 @@
 // and — when E2E_EXTERNAL_APP_URL is set — rendering the download with @zoworkhq/forms.
 const fs = require("fs");
 const path = require("path");
-const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, opts, noIds } = require("./_setup");
+const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, opts, noIds, ZF_RENDERER, rendererVersion, atLeast } = require("./_setup");
 const prisma = new PrismaClient();
 
 const results = [];
@@ -414,6 +414,9 @@ const seed = () => ({
     } else if (!process.env.E2E_EXTERNAL_FORMS_DIR || !fs.existsSync(path.join(process.env.E2E_EXTERNAL_FORMS_DIR, ARTIFACT))) {
       check("render: E2E_EXTERNAL_FORMS_DIR is set, so the app has this run's artifact", false, "set E2E_EXTERNAL_FORMS_DIR to the test app's src/forms");
     } else {
+      // The steps below find repeats, their entries and Add by the renderer's zf- class names.
+      const version = rendererVersion();
+      check(`render: the test app has @zoworkhq/forms ${ZF_RENDERER} or later (zf- names)`, atLeast(version, ZF_RENDERER), version);
       await sleep(1500); // let the app's dev server see the new file
       const R = await ctx.newPage();
       R.on("pageerror", (e) => check("render: no page errors", false, e.message));
@@ -422,7 +425,7 @@ const seed = () => ({
       await R.goto(`${EXTERNAL_APP}${EXTERNAL_APP.includes("?") ? "&" : "?"}form=builder-repeats`);
       const next = () => R.getByRole("button", { name: "Next", exact: true }).click();
       const choose = (scope, question, option) => scope.getByRole("group", { name: question, exact: true }).getByRole("radio", { name: option, exact: true }).check();
-      const repeatOf = (legend) => R.locator("fieldset.yf-repeat").filter({ has: R.locator(":scope > legend", { hasText: legend }) }).first();
+      const repeatOf = (legend) => R.locator("fieldset.zf-repeat").filter({ has: R.locator(":scope > legend", { hasText: legend }) }).first();
       const instance = (name) => R.getByRole("group", { name, exact: true });
 
       await choose(R, "Do you agree to share details?", "Yes");
@@ -430,7 +433,7 @@ const seed = () => ({
       await next();
       await instance("Patient 1").waitFor({ timeout: 15000 });
       check("render: Patients starts with one patient (minOccurs 1), Payments with none (minOccurs 0)",
-        (await repeatOf("Patients").locator(":scope > fieldset.yf-repeat-instance").count()) === 1
+        (await repeatOf("Patients").locator(":scope > fieldset.zf-repeat-instance").count()) === 1
         && (await instance("Patient 1").getByRole("button", { name: /^Add payment to patient \d$/ }).count()) === 1);
       const p1 = instance("Patient 1");
       await p1.getByLabel("Patient name").fill("Ann");
@@ -445,7 +448,7 @@ const seed = () => ({
       await item.getByLabel("Cost").fill("50");
       check("render: a same-instance condition: Notes shown once the name is answered", await p1.getByLabel("Notes about this patient").isVisible());
 
-      await repeatOf("Patients").locator(":scope > .yf-repeat-add").click();
+      await repeatOf("Patients").locator(":scope > .zf-repeat-add").click();
       const p2 = instance("Patient 2");
       await p2.getByLabel("Patient name").fill("Bob");
       await choose(p2, "Is this patient insured?", "Yes");
@@ -457,19 +460,19 @@ const seed = () => ({
         (await pay2.getByLabel("Cost").count()) === 0 && await pay2.getByLabel("Refund reason").isVisible() && (await pay.getByLabel("Refund reason").count()) === 0);
       await pay2.getByLabel("Refund reason").fill("Overcharged");
 
-      await repeatOf("Patients").locator(":scope > .yf-repeat-add").click();
-      check("render: at maxOccurs 3 Add is disabled with its limit text", await repeatOf("Patients").locator(":scope > .yf-repeat-add").isDisabled()
+      await repeatOf("Patients").locator(":scope > .zf-repeat-add").click();
+      check("render: at maxOccurs 3 Add is disabled with its limit text", await repeatOf("Patients").locator(":scope > .zf-repeat-add").isDisabled()
         && await repeatOf("Patients").getByText("You can add up to 3.", { exact: true }).first().isVisible());
       await instance("Patient 3").getByLabel("Patient name").fill("Temp");
       await instance("Patient 3").getByRole("button", { name: /^Remove patient 3$/ }).click();
       check("render: removing an instance with answers asks first", dialogs.includes("Remove patient 3? Its answers will be deleted."), dialogs.join(" | "));
-      check("render: two patients left, Add enabled again", (await repeatOf("Patients").locator(":scope > fieldset.yf-repeat-instance").count()) === 2
-        && !(await repeatOf("Patients").locator(":scope > .yf-repeat-add").isDisabled()));
+      check("render: two patients left, Add enabled again", (await repeatOf("Patients").locator(":scope > fieldset.zf-repeat-instance").count()) === 2
+        && !(await repeatOf("Patients").locator(":scope > .zf-repeat-add").isDisabled()));
       await R.screenshot({ path: `${OUT}/repeats-3-render-patients.png`, fullPage: true });
       await next();
 
       await R.getByLabel("Address").waitFor();
-      check("render: the conditional repeat is hidden while its condition fails", (await R.locator("fieldset.yf-repeat").count()) === 0);
+      check("render: the conditional repeat is hidden while its condition fails", (await R.locator("fieldset.zf-repeat").count()) === 0);
       await R.getByRole("button", { name: "Back", exact: true }).click();
       await R.getByRole("button", { name: "Back", exact: true }).click();
       await choose(R, "Do you have children?", "Yes");
@@ -477,8 +480,8 @@ const seed = () => ({
       await R.getByLabel("Address").fill("1 High St");
       const kids = repeatOf("Children");
       check("render: shown when it passes, inside its plain group, starting empty (minOccurs 0)",
-        await kids.isVisible() && (await kids.locator(":scope > fieldset.yf-repeat-instance").count()) === 0
-        && (await R.locator("fieldset.yf-group:not(.yf-repeat)").filter({ has: kids }).count()) >= 1);
+        await kids.isVisible() && (await kids.locator(":scope > fieldset.zf-repeat-instance").count()) === 0
+        && (await R.locator("fieldset.zf-group:not(.zf-repeat)").filter({ has: kids }).count()) >= 1);
       await kids.getByRole("button", { name: "Add child", exact: true }).click();
       const child = instance("Child 1");
       await child.getByLabel("Child's name").fill("Cy");

@@ -51,4 +51,24 @@ const opts = (...labels) => labels.map((label) => ({ code: code(label), label })
 const noIds = (conditions) => conditions?.map(({ id, ...rest }) => rest);
 const hasIds = (conditions) => !!conditions?.length && conditions.every((c) => /^c_[0-9a-z]{8}$/.test(c.id));
 
-module.exports = { ROOT, OUT, API, WEB, PrismaClient, chromium, launchBrowser, saveArtifact, code, opts, noIds, hasIds };
+/*
+ * The renderer installed in the external test app (beside E2E_EXTERNAL_FORMS_DIR):
+ * its version, or "not installed". ZF_RENDERER is the first version whose public
+ * class names, data attributes and custom properties use the zf- prefix (older
+ * ones use the previous prefix), so a render step that checks any of them needs
+ * at least that.
+ */
+const ZF_RENDERER = "0.25.0";
+function rendererVersion() {
+  const installed = path.join(process.env.E2E_EXTERNAL_FORMS_DIR || "", "..", "..", "node_modules", "@zoworkhq", "forms", "package.json");
+  return fs.existsSync(installed) ? JSON.parse(fs.readFileSync(installed, "utf8")).version : "not installed";
+}
+/** Whether `version` ("x.y.z") is `minimum` or later; false for "not installed". */
+function atLeast(version, minimum) {
+  const a = version.split(".").map(Number), b = minimum.split(".").map(Number);
+  if (a.length !== 3 || a.some(Number.isNaN)) return false;
+  for (let k = 0; k < 3; k++) if (a[k] !== b[k]) return a[k] > b[k];
+  return true;
+}
+
+module.exports = { ROOT, OUT, API, WEB, PrismaClient, chromium, launchBrowser, saveArtifact, code, opts, noIds, hasIds, ZF_RENDERER, rendererVersion, atLeast };

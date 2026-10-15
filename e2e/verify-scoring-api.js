@@ -213,7 +213,7 @@ const RENDERER = path.join(process.env.E2E_EXTERNAL_APP_DIR || "D:/ZoworkProject
       try { core = await import(pathToFileURL(RENDERER).href); } catch (e) { check("…the external app's @zoworkhq/forms loads", false, e.message); }
       if (deepArtifact && core) {
         const version = require(path.join(path.dirname(RENDERER), "../../package.json")).version;
-        // Scores need 0.23.0 or later (renamed from @yourco/forms at 0.24.0).
+        // Scores need 0.23.0 or later. Only the core is called here, with no class names, so not the zf- minimum.
         const [maj, min] = version.split(".").map(Number);
         check("…checked with the external app's @zoworkhq/forms, 0.23.0 or later", maj > 0 || min >= 23, version);
         let integrity = null;
