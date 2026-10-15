@@ -111,10 +111,8 @@ export function OptionListEditor({
       )}
       {options.length > 0 && (
         <div className="mb-1 flex gap-1.5 pr-[38px] text-[11px] font-semibold uppercase tracking-wider text-faint" aria-hidden>
-          {/* With scores, code and score share the room so the label keeps most of it. */}
-          <span className={`${showScores ? "w-20" : "w-24"} flex-none`}>Code</span>
+          <span className="w-24 flex-none">Code</span>
           <span className="flex-1">Label</span>
-          {showScores && <span className="w-12 flex-none">Score</span>}
         </div>
       )}
       <div className="flex flex-col gap-2">
@@ -244,8 +242,17 @@ export const OptionRow = memo(function OptionRow({
         Code first, then label, as in import files (contract §13.8). The DOM order is
         the visual and the tab order. The code field is a fixed-width slot (flex-none),
         so a code generated on leaving the label changes neither the layout nor focus.
+        With a score (contract §17.9) the row is a grid: the score sits on a second line
+        under the label, so code and label keep their widths; it comes before the remove
+        button in the DOM, so the tab order is code, label, score.
       */}
-      <div className="flex items-center gap-1.5">
+      <div
+        className={
+          showScore
+            ? "grid grid-cols-[6rem_minmax(0,1fr)_2rem] items-center gap-x-1.5 gap-y-1"
+            : "flex items-center gap-1.5"
+        }
+      >
         <input
           id={`${base}-code`}
           aria-label={`${Noun} ${i + 1} code${of}`}
@@ -262,7 +269,7 @@ export const OptionRow = memo(function OptionRow({
           }}
           aria-invalid={!!codeError}
           aria-describedby={[codeError ? `${base}-code-error` : "", noteId ?? `${idPrefix}-note`].filter(Boolean).join(" ")}
-          className={`${field} ${showScore ? "w-20" : "w-24"} flex-none font-mono text-xs`}
+          className={`${field} w-24 flex-none font-mono text-xs`}
         />
         <input
           id={`${base}-label`}
@@ -278,30 +285,37 @@ export const OptionRow = memo(function OptionRow({
           }}
           aria-invalid={!!labelError}
           aria-describedby={labelError ? `${base}-label-error` : undefined}
-          className={`${field} flex-1`}
+          className={`${field} ${showScore ? "w-full" : "flex-1"}`}
         />
         {showScore && (
-          <input
-            id={`${base}-score`}
-            type="number"
-            step="any"
-            inputMode="decimal"
-            aria-label={`${Noun} ${i + 1} score${of}`}
-            // A stored value that isn't a number (sent through the API) shows empty; its message says why.
-            value={typeof score === "number" ? score : ""}
-            onChange={(e) => {
-              const n = e.target.valueAsNumber;
-              h.onScore?.(i, e.target.value === "" || !Number.isFinite(n) ? undefined : n);
-            }}
-            aria-invalid={!!scoreError}
-            aria-describedby={scoreError ? `${base}-score-error` : undefined}
-            className={`${field} w-12 flex-none px-1.5 text-right tabular-nums`}
-          />
+          <div className="col-start-2 row-start-2 flex items-center gap-1.5">
+            <label htmlFor={`${base}-score`} className="text-xs font-medium text-muted">
+              Score
+            </label>
+            <input
+              id={`${base}-score`}
+              type="number"
+              step="any"
+              inputMode="decimal"
+              // Starts with the visible "Score" (WCAG 2.5.3) and says which option, as every row has one.
+              aria-label={`Score for ${noun} ${i + 1}${of}`}
+              // A stored value that isn't a number (sent through the API) shows empty; its message says why.
+              value={typeof score === "number" ? score : ""}
+              onChange={(e) => {
+                const n = e.target.valueAsNumber;
+                h.onScore?.(i, e.target.value === "" || !Number.isFinite(n) ? undefined : n);
+              }}
+              aria-invalid={!!scoreError}
+              aria-describedby={scoreError ? `${base}-score-error` : undefined}
+              // About 6 characters wide.
+              className={`${field} w-[calc(6ch+1.25rem)] flex-none px-2 tabular-nums`}
+            />
+          </div>
         )}
         <button
           type="button"
           onClick={() => h.onRemove(i)}
-          className="grid h-8 w-8 flex-none place-items-center rounded-lg text-faint hover:bg-surface-3 hover:text-ink"
+          className={`grid h-8 w-8 flex-none place-items-center rounded-lg text-faint hover:bg-surface-3 hover:text-ink ${showScore ? "col-start-3 row-start-1" : ""}`}
           aria-label={`Remove ${noun} ${i + 1}${of}`}
         >
           <X className="h-4 w-4" />
