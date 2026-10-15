@@ -9,7 +9,7 @@
 // is covered by the unit tests and verify-scoring-api.js (decision C).
 //
 // With E2E_EXTERNAL_APP_URL set, the download is rendered in the external test
-// app (?form=builder-scoring, @yourco/forms 0.23.0), filled in and submitted;
+// app (?form=builder-scoring, @zoworkhq/forms 0.23.0 or later), filled in and submitted;
 // the scores shown after submit and the test app API's derived.scores are
 // checked against the expected values, with one score left without a value
 // because a question it uses is unanswered ("No score").
@@ -287,9 +287,11 @@ const moodTemplate = {
       check("render: E2E_EXTERNAL_FORMS_DIR is set, so the app has this run's artifact", false, "set E2E_EXTERNAL_FORMS_DIR to the test app's src/forms");
     } else {
       const appRoot = path.join(process.env.E2E_EXTERNAL_FORMS_DIR, "..", "..");
-      const installed = path.join(appRoot, "node_modules", "@yourco", "forms", "package.json");
+      const installed = path.join(appRoot, "node_modules", "@zoworkhq", "forms", "package.json");
       const version = fs.existsSync(installed) ? JSON.parse(fs.readFileSync(installed, "utf8")).version : "not installed";
-      check("render: the test app has @yourco/forms 0.23.0", version === "0.23.0", version);
+      // Scores need 0.23.0 or later (renamed from @yourco/forms at 0.24.0).
+      const [maj, min] = version.split(".").map(Number);
+      check("render: the test app has @zoworkhq/forms 0.23.0 or later", maj > 0 || min >= 23, version);
       await sleep(1500); // let the app's dev server see the new file
       const R = await ctx.newPage();
       R.on("pageerror", (e) => check("render: no page errors", false, e.message));

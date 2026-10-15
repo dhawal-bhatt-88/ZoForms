@@ -64,7 +64,7 @@ export const BlockType = z.enum([
 ]);
 export type BlockType = z.infer<typeof BlockType>;
 
-/* ---------- conditional logic (enableWhen) — the @yourco/forms contract ---------- */
+/* ---------- conditional logic (enableWhen) — the @zoworkhq/forms contract ---------- */
 
 export const ConditionOperator = z.enum(["exists", "=", "!=", ">", "<", ">=", "<=", "contains"]);
 export type ConditionOperator = z.infer<typeof ConditionOperator>;
@@ -964,7 +964,7 @@ export function sameContent(a: unknown, b: unknown): boolean {
  * Both identity fields are REQUIRED here, so an artifact cannot be produced
  * without them — `FormsService.getArtifact` (served by
  * `GET /v1/forms/:id/artifact`) parses through this, which is what guarantees
- * consumers (@yourco/forms) always receive them.
+ * consumers (@zoworkhq/forms) always receive them.
  *
  * They live here rather than on `FormSchema` because `FormSchema` describes
  * stored, editable form *content*, which legitimately has no identity yet
@@ -1592,7 +1592,7 @@ export const NUMERIC_SOURCE_TYPES: readonly AnyBlockType[] = ["number", "scale",
 const ORDERING: readonly ConditionOperator[] = [">", "<", ">=", "<="];
 
 /**
- * The countries a country question offers. This MUST match the @yourco/forms
+ * The countries a country question offers. This MUST match the @zoworkhq/forms
  * renderer's country list exactly — same strings, same order — because a
  * condition on a country question is matched against these values.
  */

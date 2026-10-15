@@ -1,6 +1,6 @@
 // Repeating groups (contract §12): every save rule through the API, the editor's Repeats
 // toggle, fields, inline errors, badge, source picker and dependency guards, the artifact,
-// and — when E2E_EXTERNAL_APP_URL is set — rendering the download with @yourco/forms.
+// and — when E2E_EXTERNAL_APP_URL is set — rendering the download with @zoworkhq/forms.
 const fs = require("fs");
 const path = require("path");
 const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, opts, noIds } = require("./_setup");

@@ -4,7 +4,7 @@
 // a tree sent without text; score ids filled and kept; question names generated
 // at save from labels; the 300-term limit (text and tree), with a 300-term
 // formula nested 5 groups deep downloaded and checked by the external app's
-// installed @yourco/forms (assertSchemaIntegrity, calculateScores); every
+// installed @zoworkhq/forms (assertSchemaIntegrity, calculateScores); every
 // save-time rejection with its message (naming the group and the score, or the
 // question); the downloaded artifact and the published form (scores and option
 // scores, no names or formula text); group templates; restoring a version.
@@ -83,7 +83,7 @@ const longText = (terms) => Array.from({ length: terms }, (_, k) => (k % 2 ? "q2
 const noFormulaKey = (blocks) => (blocks ?? []).every((b) =>
   (Array.isArray(b.scores) ? b.scores.every((x) => typeof x !== "object" || x === null || !("formula" in x)) : true) && noFormulaKey(b.blocks));
 /** The external test app's installed renderer, for the 300-term check (ESM, so imported). */
-const RENDERER = path.join(process.env.E2E_EXTERNAL_APP_DIR || "D:/ZoworkProjects/external-test-app", "node_modules/@yourco/forms/dist/core/index.js");
+const RENDERER = path.join(process.env.E2E_EXTERNAL_APP_DIR || "D:/ZoworkProjects/external-test-app", "node_modules/@zoworkhq/forms/dist/core/index.js");
 
 (async () => {
   const email = `verify-scoring-api-${Date.now()}@example.test`;
@@ -210,10 +210,12 @@ const RENDERER = path.join(process.env.E2E_EXTERNAL_APP_DIR || "D:/ZoworkProject
       let deepArtifact;
       try { deepArtifact = JSON.parse(dl.text); } catch (e) { check("…the download is JSON", false, e.message); }
       let core;
-      try { core = await import(pathToFileURL(RENDERER).href); } catch (e) { check("…the external app's @yourco/forms loads", false, e.message); }
+      try { core = await import(pathToFileURL(RENDERER).href); } catch (e) { check("…the external app's @zoworkhq/forms loads", false, e.message); }
       if (deepArtifact && core) {
         const version = require(path.join(path.dirname(RENDERER), "../../package.json")).version;
-        check("…checked with the external app's @yourco/forms 0.23.0", version === "0.23.0", version);
+        // Scores need 0.23.0 or later (renamed from @yourco/forms at 0.24.0).
+        const [maj, min] = version.split(".").map(Number);
+        check("…checked with the external app's @zoworkhq/forms, 0.23.0 or later", maj > 0 || min >= 23, version);
         let integrity = null;
         try { core.assertSchemaIntegrity(deepArtifact); } catch (e) { integrity = e.message; }
         check("…assertSchemaIntegrity passes", integrity === null, integrity);

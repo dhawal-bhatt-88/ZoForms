@@ -1,6 +1,6 @@
 # Drafts — Contract
 
-Status: agreed 29 Sep 2026; amended 29 Sep 2026 after renderer Checkpoint 0; amended 5 Oct 2026 for repeating groups (§5, §8). Shared by the builder repo and the `@yourco/forms` renderer repo.
+Status: agreed 29 Sep 2026; amended 29 Sep 2026 after renderer Checkpoint 0; amended 5 Oct 2026 for repeating groups (§5, §8). Shared by the builder repo and the `@zoworkhq/forms` renderer repo.
 Change it here first, then in both repos.
 
 ## 1. Purpose
@@ -41,7 +41,7 @@ drafts?: { mode: "session" | "device" | "server" }   // default "session"
 
 type DraftRef = { scope: string; formId: string };
 
-// Exported from @yourco/forms/react, for the host to call, e.g. on logout:
+// Exported from @zoworkhq/forms/react, for the host to call, e.g. on logout:
 clearDrafts(options?: { scope?: string; owner?: string }): Promise<void>
 //   { owner }  -> every draft recorded with that owner, across all scopes and forms (the normal logout call)
 //   { scope }  -> every draft for that scope, across all forms
