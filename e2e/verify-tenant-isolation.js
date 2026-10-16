@@ -96,8 +96,9 @@ const MISSING = "00000000-0000-4000-8000-000000000000";
     // ---------- forms: change ----------
     r = await call("PUT", `/v1/forms/${form.id}/schema`, B, { title: "Taken", blocks: [q("x", "B's question")] });
     check("B: save A's form → 404", r.status === 404, short(r));
-    r = await call("PATCH", `/v1/forms/${form.id}`, B, { title: "Taken" });
-    check("B: rename A's form → 404", r.status === 404, short(r));
+    // The editor renames a form by saving its schema with a new title.
+    r = await call("PUT", `/v1/forms/${form.id}/schema`, B, { ...latest.schema, title: "Taken" });
+    check("B: rename A's form (its content, only the title changed) → 404", r.status === 404, short(r));
     r = await call("POST", `/v1/forms/${form.id}/duplicate`, B);
     check("B: duplicate A's form → 404", r.status === 404, short(r));
     check("…B gets no copy", (await formsInB()) === bFormsBefore, `${await formsInB()} vs ${bFormsBefore}`);

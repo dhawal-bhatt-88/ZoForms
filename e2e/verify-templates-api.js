@@ -278,9 +278,8 @@ const household = () => ({
     const withPage = [...paged, pageForTemplateGroup(g3, allBlockIds(paged))];
     r = await call("PUT", `/v1/forms/${host.id}/schema`, A, { title: "Host", blocks: withPage });
     check("inserted as a page in a paged form: saves (200)", r.status === 200, short(r));
-    await call("PATCH", `/v1/forms/${host.id}`, A, { status: "PUBLISHED" });
-    r = await call("GET", `/v1/public/forms/${host.slug}`, null);
-    check("the published form sent to respondents has no templateRef", r.status === 200 && !r.text.includes("templateRef") && r.json.schema.blocks.length === 2, short(r));
+    r = await call("GET", `/v1/forms/${host.id}/artifact`, A);
+    check("what respondents get (the download) has no templateRef, both pages included", r.status === 200 && !r.text.includes("templateRef") && r.json.blocks.length === 2, short(r));
 
     // ---------- copies, never links ----------
     const before = JSON.stringify((await prisma.formVersion.findFirst({ where: { formId: made.id }, orderBy: { version: "desc" } })).schema);

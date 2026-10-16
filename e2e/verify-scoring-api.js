@@ -227,7 +227,7 @@ const RENDERER = path.join(process.env.E2E_EXTERNAL_APP_DIR || "D:/ZoworkProject
       }
     }
 
-    // ---------- the artifact and the published form ----------
+    // ---------- the artifact ----------
     r = await put(valid());
     check("back to the valid form (200)", r.status === 200, short(r));
     r = await call("GET", `/v1/forms/${form.id}/artifact`);
@@ -244,11 +244,10 @@ const RENDERER = path.join(process.env.E2E_EXTERNAL_APP_DIR || "D:/ZoworkProject
     check("download: no score where it means nothing (a matrix's rows, a ranking)",
       find(art.blocks, "mx").options.every((o) => !("score" in o)) && find(art.blocks, "rank").options.every((o) => !("score" in o)));
     check("download: no name and no formulaText anywhere", !r.text.includes('"name"') && !r.text.includes("formulaText"));
-    await call("PATCH", `/v1/forms/${form.id}`, { status: "PUBLISHED" });
-    const pub = await fetch(`${API}/v1/public/forms/${form.slug}`);
-    const pubText = await pub.text();
-    check("the published form has scores but no names or formula text",
-      pub.status === 200 && pubText.includes('"scores"') && !pubText.includes('"name"') && !pubText.includes("formulaText"), `${pub.status}`);
+    // What respondents get is the download, rendered in the client's app: never the builder-only names or formula text.
+    const sent = await call("GET", `/v1/forms/${form.id}/artifact`);
+    check("what respondents get (the download) has scores but no names or formula text",
+      sent.status === 200 && sent.text.includes('"scores"') && !sent.text.includes('"name"') && !sent.text.includes("formulaText"), `${sent.status}`);
 
     // ---------- every rejection names the group and the score, or the question ----------
     const before = await rows();

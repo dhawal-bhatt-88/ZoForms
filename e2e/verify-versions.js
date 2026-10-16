@@ -130,14 +130,11 @@ const Y = { title: "Verify", blocks: [{ id: "b_x1", type: "short", label: "Full 
     const crossSave = await call("PUT", `/v1/forms/${form.id}/schema`, B, Y);
     check("save cross-org -> 404", crossSave.status === 404, `${crossSave.status}`);
 
-    // Status change no longer snapshots; public path serves latest version
-    const before = await rowCount();
-    await call("PATCH", `/v1/forms/${form.id}`, A, { status: "PUBLISHED" });
-    check("PATCH status creates no version", (await rowCount()) === before);
-    const pub = await call("GET", `/v1/public/forms/${form.slug}`, null);
+    // After the concurrent saves, the download serves the newest version
+    const newest = await prisma.formVersion.findFirst({ where: { formId: form.id }, orderBy: { version: "desc" } });
     const latest = (await call("GET", `/v1/forms/${form.id}/artifact`, A)).json;
-    check("public path serves latest version", pub.status === 200 && pub.json.schema.title === latest.title
-      && JSON.stringify(pub.json.schema.blocks) === JSON.stringify(latest.blocks), `${pub.status}`);
+    check("download serves the latest version", latest.formVersionId === newest.id && latest.title === newest.schema.title
+      && JSON.stringify(latest.blocks) === JSON.stringify(newest.schema.blocks), `${latest.formVersionId} vs ${newest.id}`);
 
     // uploads/ untouched
     const uploadsAfter = uploadsState();
