@@ -197,39 +197,6 @@ export function revokeInvite(id: string) {
   return req<{ ok: boolean }>(`/v1/team/invites/${id}`, { method: "DELETE" });
 }
 
-/* ---------- custom domains ---------- */
-
-export type Domain = {
-  id: string;
-  hostname: string;
-  status: "pending" | "active" | "error";
-  cfHostnameId: string | null;
-  lastError: string | null;
-  verifiedAt: string | null;
-  createdAt: string;
-};
-export type DomainList = {
-  domains: Domain[];
-  cnameTarget: string;
-  managed: boolean;
-};
-
-export function listDomains() {
-  return req<DomainList>("/v1/domains");
-}
-export function addDomain(hostname: string) {
-  return req<{ domain: Domain; cnameTarget: string; managed: boolean }>("/v1/domains", {
-    method: "POST",
-    body: JSON.stringify({ hostname }),
-  });
-}
-export function verifyDomain(id: string) {
-  return req<Domain>(`/v1/domains/${id}/verify`, { method: "POST" });
-}
-export function deleteDomain(id: string) {
-  return req<{ ok: boolean }>(`/v1/domains/${id}`, { method: "DELETE" });
-}
-
 /* ---------- invite accept (public) ---------- */
 
 export type InviteInfo = {

@@ -41,9 +41,6 @@ services:
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       MAIL_FROM: ${MAIL_FROM:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:-}
-      CLOUDFLARE_ZONE_ID: ${CLOUDFLARE_ZONE_ID:-}
-      DOMAIN_CNAME_TARGET: ${DOMAIN_CNAME_TARGET:-}
     # Apply migrations on every boot (idempotent), then start the server.
     command: ["sh", "-c", "pnpm --filter api exec prisma migrate deploy && node apps/api/dist/main.js"]
     ports:

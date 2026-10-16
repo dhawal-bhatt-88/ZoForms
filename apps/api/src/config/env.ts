@@ -20,12 +20,6 @@ const EnvSchema = z.object({
   CORS_ORIGINS: z.string().optional(),
   // Public origin of the tenant web app — used to build invite/accept links.
   PUBLIC_TENANT_URL: z.string().url().default("http://localhost:3000"),
-  // Custom domains (Cloudflare SSL-for-SaaS). All optional — without them, the
-  // domain flow falls back to a DNS (CNAME) verification the user sets up.
-  CLOUDFLARE_API_TOKEN: z.string().optional(),
-  CLOUDFLARE_ZONE_ID: z.string().optional(),
-  // The CNAME target customers point their domain at (e.g. "cname.frame.so").
-  DOMAIN_CNAME_TARGET: z.string().default("cname.frame.so"),
   // Resend transactional email. Without a key, emails are logged and skipped.
   RESEND_API_KEY: z.string().optional(),
   MAIL_FROM: z.string().default("Frame <onboarding@resend.dev>"),

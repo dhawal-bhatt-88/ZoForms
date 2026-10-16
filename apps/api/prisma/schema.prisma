@@ -53,22 +53,7 @@ model Organization {
   workspaces      Workspace[]
   memberships     Membership[]
   invites         Invite[]
-  domains         Domain[]
   templates       Template[]
-}
-
-model Domain {
-  id           String       @id @default(uuid())
-  org          Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  orgId        String
-  hostname     String       @unique
-  status       String       @default("pending") // pending | active | error
-  cfHostnameId String?
-  lastError    String?
-  verifiedAt   DateTime?
-  createdAt    DateTime     @default(now())
-
-  @@index([orgId])
 }
 
 model Invite {

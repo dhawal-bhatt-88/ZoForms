@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ChevronsUpDown,
-  Globe,
   LayoutGrid,
   LayoutTemplate,
   LogOut,
@@ -18,7 +17,6 @@ type Me = Awaited<ReturnType<typeof me>>;
 const NAV = [
   { href: "/app", label: "My forms", icon: LayoutGrid, exact: true },
   { href: "/app/templates", label: "Templates", icon: LayoutTemplate },
-  { href: "/app/domains", label: "Domains", icon: Globe },
   { href: "/app/team", label: "Team", icon: Users },
 ];
 

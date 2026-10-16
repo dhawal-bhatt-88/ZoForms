@@ -62,8 +62,7 @@ export function templateFromForm(kind: TemplateKind, form: FormSchema): FormSche
 /*
  * Form settings a template never keeps: the theme's `logo` and `cover` images,
  * which identify the organisation the form was made for. The other settings
- * stay. Custom domains aren't part of form content at all, so a template can't
- * carry them.
+ * stay.
  */
 export const TEMPLATE_STRIPPED_THEME_SETTINGS = ["logo", "cover"] as const;
 

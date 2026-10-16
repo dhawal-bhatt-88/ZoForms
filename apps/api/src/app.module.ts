@@ -6,7 +6,6 @@ import { AuthModule } from "./auth/auth.module";
 import { FormsModule } from "./forms/forms.module";
 import { AdminModule } from "./admin/admin.module";
 import { TeamModule } from "./team/team.module";
-import { DomainsModule } from "./domains/domains.module";
 import { TemplatesModule } from "./templates/templates.module";
 import { HealthController } from "./health/health.controller";
 
@@ -20,7 +19,6 @@ import { HealthController } from "./health/health.controller";
     FormsModule,
     AdminModule,
     TeamModule,
-    DomainsModule,
     TemplatesModule,
   ],
   controllers: [HealthController],
