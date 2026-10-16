@@ -2,7 +2,7 @@
   "id": "sys_form_bug",
   "kind": "form",
   "name": "Bug Report",
-  "description": "Let users report issues with severity and a screenshot.",
+  "description": "Let users report issues with a summary, steps to reproduce and a severity.",
   "content": {
     "title": "Report a bug",
     "description": "Thanks for helping us squash it.",
@@ -42,12 +42,6 @@
             "label": "Critical"
           }
         ]
-      },
-      {
-        "id": "shot",
-        "type": "file",
-        "label": "Screenshot",
-        "required": false
       }
     ],
     "settings": {

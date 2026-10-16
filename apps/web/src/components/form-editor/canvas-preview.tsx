@@ -26,17 +26,13 @@ import {
   ListOrdered,
   Mail,
   Minus,
-  PenTool,
   Phone,
-  ShieldCheck,
   Star,
   Table2,
   Tag,
   Type,
-  Upload,
 } from "lucide-react";
 import {
-  BLOCK_META,
   blockName,
   isGrid,
   isGroup,
@@ -68,14 +64,12 @@ export const ICONS: Record<AnyBlockType, typeof Type> = {
   email: Mail,
   phone: Phone,
   link: Link2,
-  file: Upload,
   date: Calendar,
   time: Clock,
   scale: Gauge,
   matrix: Table2,
   grid: Grid3x3,
   rating: Star,
-  signature: PenTool,
   ranking: ListOrdered,
   heading: HeadingIcon,
   text: AlignLeft,
@@ -85,9 +79,7 @@ export const ICONS: Record<AnyBlockType, typeof Type> = {
   image: ImageIcon,
   video: Film,
   audio: AudioLines,
-  embed: Globe,
   hidden: EyeOff,
-  recaptcha: ShieldCheck,
   country: Globe,
 };
 
@@ -150,20 +142,8 @@ export function BlockPreview({ block }: { block: Block }) {
         <span className="min-w-0 truncate">{audioPreviewText(block.content)}</span>
       </div>
     );
-  if (block.type === "embed")
-    return (
-      <div className={`${box} flex items-center gap-2`}>
-        {BLOCK_META[block.type].label} · {block.content || "paste a URL"}
-      </div>
-    );
   if (block.type === "hidden")
     return <div className={box}>Hidden field — not shown to respondents</div>;
-  if (block.type === "recaptcha")
-    return (
-      <div className={`${box} flex items-center gap-2`}>
-        <ShieldCheck className="h-4 w-4" /> reCAPTCHA badge (added on publish)
-      </div>
-    );
   if (block.type === "country")
     return (
       <div className={`${box} flex items-center justify-between`}>
@@ -186,13 +166,6 @@ export function BlockPreview({ block }: { block: Block }) {
       <div className={`${box} flex items-center justify-between`}>
         <span>--:--</span>
         <Clock className="h-4 w-4" />
-      </div>
-    );
-  if (block.type === "file")
-    return (
-      <div className="flex flex-col items-center gap-1.5 rounded-lg border border-dashed border-line-2 py-5 text-sm text-muted">
-        <Upload className="h-4 w-4" />
-        Drag a file or browse
       </div>
     );
   if (block.type === "rating")
@@ -282,12 +255,6 @@ export function BlockPreview({ block }: { block: Block }) {
       </div>
     );
   }
-  if (block.type === "signature")
-    return (
-      <div className="rounded-lg border border-dashed border-line-2 py-6 text-center text-sm text-muted">
-        Sign here
-      </div>
-    );
   const ph =
     block.type === "email"
       ? "name@company.com"

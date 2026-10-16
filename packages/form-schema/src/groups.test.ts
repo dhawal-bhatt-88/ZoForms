@@ -142,7 +142,7 @@ describe("group schema", () => {
   });
 
   it("keeps required defaulting to false for every other leaf, the untouched types included", () => {
-    const types = ["short", "long", "text", "image", "video", "audio", "embed", "file", "choice", "matrix"];
+    const types = ["short", "long", "text", "image", "video", "audio", "choice", "matrix"];
     const parsed = FormSchema.parse({ title: "t", blocks: types.map((type) => ({ id: type, type, label: type })) });
     for (const block of parsed.blocks) expect(block, block.type).toHaveProperty("required", false);
   });

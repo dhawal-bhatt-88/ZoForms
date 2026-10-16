@@ -10,7 +10,7 @@
 // formula text); group templates; restoring a version.
 const path = require("path");
 const { pathToFileURL } = require("url");
-const { API, PrismaClient } = require("./_setup");
+const { API, PrismaClient, RENDERER_CORE } = require("./_setup");
 const prisma = new PrismaClient();
 
 const results = [];
@@ -82,8 +82,6 @@ const longText = (terms) => Array.from({ length: terms }, (_, k) => (k % 2 ? "q2
 /** True when no score anywhere in `blocks` holds a formula tree: stored content keeps text only. */
 const noFormulaKey = (blocks) => (blocks ?? []).every((b) =>
   (Array.isArray(b.scores) ? b.scores.every((x) => typeof x !== "object" || x === null || !("formula" in x)) : true) && noFormulaKey(b.blocks));
-/** The external test app's installed renderer, for the 300-term check (ESM, so imported). */
-const RENDERER = path.join(process.env.E2E_EXTERNAL_APP_DIR || "D:/ZoworkProjects/external-test-app", "node_modules/@zoworkhq/forms/dist/core/index.js");
 
 (async () => {
   const email = `verify-scoring-api-${Date.now()}@example.test`;
@@ -210,9 +208,9 @@ const RENDERER = path.join(process.env.E2E_EXTERNAL_APP_DIR || "D:/ZoworkProject
       let deepArtifact;
       try { deepArtifact = JSON.parse(dl.text); } catch (e) { check("…the download is JSON", false, e.message); }
       let core;
-      try { core = await import(pathToFileURL(RENDERER).href); } catch (e) { check("…the external app's @zoworkhq/forms loads", false, e.message); }
+      try { core = await import(pathToFileURL(RENDERER_CORE).href); } catch (e) { check("…the external app's @zoworkhq/forms loads", false, e.message); }
       if (deepArtifact && core) {
-        const version = require(path.join(path.dirname(RENDERER), "../../package.json")).version;
+        const version = require(path.join(path.dirname(RENDERER_CORE), "../../package.json")).version;
         // Scores need 0.23.0 or later. Only the core is called here, with no class names, so not the zf- minimum.
         const [maj, min] = version.split(".").map(Number);
         check("…checked with the external app's @zoworkhq/forms, 0.23.0 or later", maj > 0 || min >= 23, version);

@@ -2,7 +2,7 @@
   "id": "sys_form_job",
   "kind": "form",
   "name": "Job Application",
-  "description": "Structured candidate intake with a résumé upload.",
+  "description": "Structured candidate intake: name, email, the role and why they want it.",
   "content": {
     "title": "Apply — Product Designer",
     "description": "We review every application.",
@@ -23,12 +23,6 @@
         "id": "role",
         "type": "short",
         "label": "Role you're applying for",
-        "required": true
-      },
-      {
-        "id": "resume",
-        "type": "file",
-        "label": "Upload résumé",
         "required": true
       },
       {

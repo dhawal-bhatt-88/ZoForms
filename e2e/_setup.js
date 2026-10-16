@@ -63,6 +63,11 @@ function rendererVersion() {
   const installed = path.join(process.env.E2E_EXTERNAL_FORMS_DIR || "", "..", "..", "node_modules", "@zoworkhq", "forms", "package.json");
   return fs.existsSync(installed) ? JSON.parse(fs.readFileSync(installed, "utf8")).version : "not installed";
 }
+/**
+ * The core entry of the renderer installed in the external test app
+ * (E2E_EXTERNAL_APP_DIR): ESM, so suites load it with import(pathToFileURL(RENDERER_CORE).href).
+ */
+const RENDERER_CORE = path.join(process.env.E2E_EXTERNAL_APP_DIR || "D:/ZoworkProjects/external-test-app", "node_modules/@zoworkhq/forms/dist/core/index.js");
 /** Whether `version` ("x.y.z") is `minimum` or later; false for "not installed". */
 function atLeast(version, minimum) {
   const a = version.split(".").map(Number), b = minimum.split(".").map(Number);
@@ -71,4 +76,4 @@ function atLeast(version, minimum) {
   return true;
 }
 
-module.exports = { ROOT, OUT, API, WEB, PrismaClient, chromium, launchBrowser, saveArtifact, code, opts, noIds, hasIds, ZF_RENDERER, rendererVersion, atLeast };
+module.exports = { ROOT, OUT, API, WEB, PrismaClient, chromium, launchBrowser, saveArtifact, code, opts, noIds, hasIds, ZF_RENDERER, rendererVersion, atLeast, RENDERER_CORE };

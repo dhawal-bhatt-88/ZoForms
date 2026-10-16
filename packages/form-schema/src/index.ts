@@ -38,14 +38,12 @@ export const BlockType = z.enum([
   "email",
   "phone",
   "link",
-  "file",
   "date",
   "time",
   "scale",
   "matrix",
   "grid",
   "rating",
-  "signature",
   "ranking",
   // layout blocks (structure / static content)
   "heading",
@@ -53,14 +51,12 @@ export const BlockType = z.enum([
   "divider",
   "title",
   "label",
-  // embed blocks
+  // media blocks
   "image",
   "video",
   "audio",
-  "embed",
   // advanced blocks
   "hidden",
-  "recaptcha",
   "country",
 ]);
 export type BlockType = z.infer<typeof BlockType>;
@@ -306,7 +302,7 @@ export const QuestionBlock = z.object({
   columns: optionList.optional(),
   /** Unused by question types (headings are presentational); kept so their shape is unchanged. */
   level: z.number().int().min(1).max(3).optional(),
-  /** static content: text copy, or the URL for image/video/audio/embed */
+  /** static content: text copy, or the URL for image/video/audio */
   content: z.string().optional(),
   /** linear scale bounds */
   min: z.number().optional(),
@@ -1304,8 +1300,6 @@ export const STATIC_TYPES: readonly AnyBlockType[] = [
   "image",
   "video",
   "audio",
-  "embed",
-  "recaptcha",
 ];
 
 /** Human label + default question text for each block type. */
@@ -1320,14 +1314,12 @@ export const BLOCK_META: Record<BlockType, { label: string; question: string }> 
   email: { label: "Email", question: "Email address" },
   phone: { label: "Phone number", question: "Phone number" },
   link: { label: "Link", question: "Website / URL" },
-  file: { label: "File upload", question: "Upload a file" },
   date: { label: "Date", question: "Date" },
   time: { label: "Time", question: "Time" },
   scale: { label: "Linear scale", question: "Rate from 1 to 5" },
   matrix: { label: "Matrix", question: "Matrix question" },
   grid: { label: "Grid", question: "Grid question" },
   rating: { label: "Rating", question: "How would you rate this?" },
-  signature: { label: "Signature", question: "Signature" },
   ranking: { label: "Ranking", question: "Rank these in order" },
   heading: { label: "Heading", question: "Section heading" },
   text: { label: "Text", question: "Text" },
@@ -1337,9 +1329,7 @@ export const BLOCK_META: Record<BlockType, { label: string; question: string }> 
   image: { label: "Image", question: "Image" },
   video: { label: "Video", question: "Video" },
   audio: { label: "Audio", question: "Audio" },
-  embed: { label: "Embed anything", question: "Embed" },
   hidden: { label: "Hidden field", question: "Hidden field" },
-  recaptcha: { label: "reCAPTCHA", question: "Spam protection" },
   country: { label: "Respondent's country", question: "Country" },
 };
 
@@ -1420,7 +1410,7 @@ export function newBlock(
   if (type === "text") block.content = "Add some descriptive text here.";
   if (type === "title") block.content = "Section title";
   if (type === "label") block.content = "Label";
-  if (type === "image" || type === "video" || type === "audio" || type === "embed") {
+  if (type === "image" || type === "video" || type === "audio") {
     block.content = "";
   }
   return { ...block, ...overrides } as LeafBlock;
@@ -1524,7 +1514,7 @@ const MEMBERSHIP: readonly ConditionOperator[] = ["exists", "contains"];
 /**
  * The operators each block type allows when used as a condition source. A type
  * missing from this table can't be a source at all (matrix, layout blocks, and
- * types whose answers can't be compared, e.g. long text or file uploads).
+ * types whose answers can't be compared, e.g. long text).
  */
 export const SOURCE_OPERATORS: Partial<Record<AnyBlockType, readonly ConditionOperator[]>> = {
   choice: EQUALITY,

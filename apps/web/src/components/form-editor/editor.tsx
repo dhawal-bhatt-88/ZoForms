@@ -195,7 +195,6 @@ type CatalogItem = {
   label?: string;
   keywords?: string;
   level?: number;
-  soon?: boolean;
   /** "From template…": opens the template picker instead of adding a block. */
   template?: true;
 };
@@ -222,7 +221,6 @@ const CATALOG: { group: string; items: CatalogItem[] }[] = [
       { type: "email" },
       { type: "phone", keywords: "mobile" },
       { type: "link", keywords: "url website" },
-      { type: "file", keywords: "upload attachment" },
       { type: "date" },
       { type: "time" },
       { type: "scale", keywords: "linear nps" },
@@ -246,12 +244,11 @@ const CATALOG: { group: string; items: CatalogItem[] }[] = [
     ],
   },
   {
-    group: "Embed",
+    group: "Media",
     items: [
       { type: "image", keywords: "picture photo" },
       { type: "video", keywords: "youtube vimeo mp4 webm" },
       { type: "audio", keywords: "sound" },
-      { type: "embed", keywords: "iframe anything" },
     ],
   },
   {
@@ -330,6 +327,7 @@ function BlockMenu({
             return (
               <button
                 key={it.type + i}
+                data-block-type={it.template ? undefined : it.type}
                 onClick={() => onPick(it)}
                 className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm text-ink-2 transition-colors hover:bg-accent-weak hover:text-accent-2"
               >
@@ -337,11 +335,6 @@ function BlockMenu({
                   <Icon className="h-4 w-4" />
                 </span>
                 <span className="flex-1">{label}</span>
-                {it.soon && (
-                  <span className="rounded-full bg-surface-3 px-1.5 py-0.5 text-[10px] font-semibold text-faint">
-                    basic
-                  </span>
-                )}
               </button>
             );
           })}
@@ -3162,7 +3155,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                 </div>
               )}
 
-              {["image", "video", "audio", "embed"].includes(selected.type) && (
+              {["image", "video", "audio"].includes(selected.type) && (
                 <div className="mb-4">
                   <label htmlFor="block-url" className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">
                     URL
@@ -3176,11 +3169,9 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                         ? "https://… or a path on your app's server, e.g. /images/logo.png"
                         : selected.type === "video"
                           ? "YouTube or Vimeo link, or an .mp4 / .webm address"
-                          : selected.type === "audio"
-                            ? "An .mp3, .m4a, .ogg or .wav address"
-                            : "https://…"
+                          : "An .mp3, .m4a, .ogg or .wav address"
                     }
-                    aria-invalid={selected.type !== "embed" && !!selectedDisplayProblem}
+                    aria-invalid={!!selectedDisplayProblem}
                     className={`${fieldCls} font-mono text-xs`}
                   />
                   {/* Audio-only content needs a text alternative (contract §11, WCAG 1.2.1). */}
@@ -3189,7 +3180,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                       Add a transcript in a Text block next to it so everyone can follow.
                     </p>
                   )}
-                  {selected.type !== "embed" && selectedDisplayProblem && (
+                  {selectedDisplayProblem && (
                     <p role="alert" className="mt-1.5 text-xs text-red">
                       {selectedDisplayProblem}
                     </p>
