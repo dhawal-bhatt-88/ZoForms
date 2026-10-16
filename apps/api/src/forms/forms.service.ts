@@ -21,7 +21,6 @@ import {
   withoutBuilderFields,
 } from "@formbuilder/form-schema";
 import { PrismaService } from "../prisma/prisma.service";
-import { AutomationsService } from "../automations/automations.service";
 import { MailService } from "../mail/mail.service";
 import { SearchService } from "../search/search.service";
 import { env } from "../config/env";
@@ -55,7 +54,6 @@ function escapeHtml(s: string): string {
 export class FormsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly automations: AutomationsService,
     private readonly mail: MailService,
     private readonly search: SearchService,
     private readonly templates: TemplatesService,
@@ -495,21 +493,10 @@ export class FormsService {
     // Index for search (no-op without Meilisearch).
     void this.search.index(response);
 
-    // Resolve answers to human labels so Slack/Sheets deliveries read well.
+    // Resolve answers to human labels so the notification email reads well.
     const fields = schema.blocks
       .filter((b) => !STATIC_TYPES.includes(b.type) && b.id in cleaned)
       .map((b) => ({ label: b.label, value: cleaned[b.id] }));
-
-    // Fire webhooks/automations without blocking the submitter's response.
-    void this.automations.dispatch(form.id, {
-      formId: form.id,
-      formTitle: form.title,
-      slug: form.slug,
-      responseId: response.id,
-      submittedAt: response.createdAt.toISOString(),
-      data: cleaned,
-      fields,
-    });
 
     // Email the form's notify list (fire-and-forget; never blocks the submit).
     const notifyEmails = schema.settings?.notifyEmails?.filter(Boolean) ?? [];

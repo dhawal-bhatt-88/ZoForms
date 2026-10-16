@@ -63,8 +63,8 @@ export function templateFromForm(kind: TemplateKind, form: FormSchema): FormSche
  * Form settings a template never keeps. They route a form's answers somewhere
  * (`notifyEmails`, `redirectUrl`) or identify the organisation it was made for
  * (the theme's `logo` and `cover` images). Presentation and behaviour settings
- * stay. Automations, integrations, custom domains and the form's slug aren't
- * part of form content at all, so a template can't carry them.
+ * stay. Custom domains and the form's slug aren't part of form content at all,
+ * so a template can't carry them.
  */
 export const TEMPLATE_STRIPPED_SETTINGS = ["notifyEmails", "redirectUrl"] as const;
 export const TEMPLATE_STRIPPED_THEME_SETTINGS = ["logo", "cover"] as const;

@@ -144,7 +144,6 @@ model Form {
   updatedAt   DateTime      @updatedAt
   versions    FormVersion[]
   responses   Response[]
-  automations Automation[]
   events      Event[]
 }
 
@@ -158,22 +157,6 @@ model Event {
   createdAt DateTime @default(now())
 
   @@index([formId, type, createdAt])
-}
-
-model Automation {
-  id          String    @id @default(uuid())
-  form        Form      @relation(fields: [formId], references: [id], onDelete: Cascade)
-  formId      String
-  name        String
-  trigger     String    @default("new_response")
-  action      String    @default("webhook")
-  config      Json      // { url } for webhook
-  enabled     Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  lastFiredAt DateTime?
-  lastStatus  String?
-
-  @@index([formId])
 }
 
 // A form or group template. Copied into forms on use, never linked: editing or

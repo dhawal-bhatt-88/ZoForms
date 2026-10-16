@@ -11,7 +11,6 @@ import {
   LogOut,
   Settings,
   Users,
-  Zap,
 } from "lucide-react";
 import { logout, me, resendVerification } from "@/lib/api";
 
@@ -20,7 +19,6 @@ type Me = Awaited<ReturnType<typeof me>>;
 const NAV = [
   { href: "/app", label: "My forms", icon: LayoutGrid, exact: true },
   { href: "/app/templates", label: "Templates", icon: LayoutTemplate },
-  { href: "/app/integrations", label: "Integrations", icon: Zap },
   { href: "/app/domains", label: "Domains", icon: Globe },
   { href: "/app/team", label: "Team", icon: Users },
   { href: "/app/settings", label: "Settings", icon: Settings },

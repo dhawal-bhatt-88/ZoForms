@@ -40,7 +40,6 @@ import {
   Sparkles,
   Trash2,
   X,
-  Zap,
 } from "lucide-react";
 import {
   addGridColumn,
@@ -2819,9 +2818,6 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
               </Link>
               <Link href={`/app/forms/${id}/analytics`} onClick={confirmLeave} className="btn btn-ghost btn-sm">
                 <BarChart3 className="h-4 w-4" /> Analytics
-              </Link>
-              <Link href={`/app/forms/${id}/integrations`} onClick={confirmLeave} className="btn btn-ghost btn-sm">
-                <Zap className="h-4 w-4" /> Connect
               </Link>
               <button
                 onClick={() => setAiOpen((v) => !v)}

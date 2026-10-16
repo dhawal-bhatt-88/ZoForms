@@ -7,8 +7,6 @@ import { UploadsController } from "./uploads.controller";
 import { FormsService } from "./forms.service";
 import { AiController } from "../ai/ai.controller";
 import { AiService } from "../ai/ai.service";
-import { AutomationsController } from "../automations/automations.controller";
-import { AutomationsService } from "../automations/automations.service";
 import { SettingsController } from "../settings/settings.controller";
 import { SettingsService } from "../settings/settings.service";
 import { RetentionService } from "../settings/retention.service";
@@ -21,13 +19,11 @@ import { SearchService } from "../search/search.service";
     PublicController,
     UploadsController,
     AiController,
-    AutomationsController,
     SettingsController,
   ],
   providers: [
     FormsService,
     AiService,
-    AutomationsService,
     SettingsService,
     RetentionService,
     SearchService,
