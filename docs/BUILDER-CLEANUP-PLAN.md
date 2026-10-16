@@ -98,7 +98,8 @@ Run one at a time, in this order. Each ends with one forward Prisma migration th
 - `file`, `embed`, `signature`, `recaptcha` from the block enum, menu, previews, inspector and save rules.
 - The Design panel, `FormTheme`, `resolveTheme`, the submit label.
 - All 16 system templates: remove `theme` and `submitLabel`; remove the `file` blocks from "Bug report" and "Job application".
-- Saved forms in development databases may still contain removed keys or types. Parsing must not crash on them.
+- Remove `settings` from the schema and the artifact; it's empty once theme and submit label go (decided at CP0).
+- Saved data: none needs handling. The dev database has no affected versions or organisation templates, and the system templates are reseeded from their JSON files. A stray version elsewhere with a removed type gives a 400 on save and a 500 on download or restore; with no client data, that's accepted rather than adding permanent read-time tolerance.
 
 ### 7. Static pages and homepage (A16, A17)
 
