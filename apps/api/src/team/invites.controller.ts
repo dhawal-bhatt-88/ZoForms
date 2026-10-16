@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Post } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { ThrottlerGuard } from "@nestjs/throttler";
 import { TeamService } from "./team.service";
 
 /** Unauthenticated endpoints backing the public invite-accept page. */
@@ -11,7 +12,9 @@ export class InvitesController {
     return this.team.getInviteByToken(token);
   }
 
+  /** Sets a password, so it is throttled like the auth credential routes. */
   @Post(":token/accept")
+  @UseGuards(ThrottlerGuard)
   accept(
     @Param("token") token: string,
     @Body() body: { password?: string; name?: string },
