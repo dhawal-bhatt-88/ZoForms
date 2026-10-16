@@ -20,9 +20,10 @@ export * from "./formula";
 /**
  * The form schema — the single source of truth for what a form *is*.
  *
- * The builder writes this, the public runtime reads it, and the API validates
- * it. It is stored as JSONB in `FormVersion.schema`. Keep this the keystone:
- * everything that touches a form's structure imports from here.
+ * The builder writes this, the API validates it, and the download built from
+ * it is what the `@zoworkhq/forms` renderer reads. It is stored as JSONB in
+ * `FormVersion.schema`. Keep this the keystone: everything that touches a
+ * form's structure imports from here.
  */
 
 export const BlockType = z.enum([
@@ -789,16 +790,14 @@ export const FormTheme = z.object({
 });
 export type FormTheme = z.infer<typeof FormTheme>;
 
+/**
+ * Not strict: forms saved before the hosted settings were removed may still
+ * carry redirectUrl, spamProtection, partialSubmissions or notifyEmails. They
+ * parse, and those keys are dropped.
+ */
 export const FormSettings = z.object({
   submitLabel: z.string().optional(),
-  redirectUrl: z.string().optional(),
   theme: FormTheme.optional(),
-  /** Require a Cloudflare Turnstile challenge before the form can be submitted. */
-  spamProtection: z.boolean().optional(),
-  /** Capture in-progress answers as partial submissions before the user finishes. */
-  partialSubmissions: z.boolean().optional(),
-  /** Email addresses notified when a new response arrives. */
-  notifyEmails: z.array(z.string()).optional(),
 });
 export type FormSettings = z.infer<typeof FormSettings>;
 
@@ -1526,25 +1525,6 @@ export const DEFAULT_PAGE_TITLE = "Untitled page";
 export function newPage(taken?: Iterable<string>, title = DEFAULT_PAGE_TITLE): PageBlock {
   // No `label` at runtime: see PageBlock.label.
   return { id: newBlockId(taken), type: "page", title, blocks: [] } as unknown as PageBlock;
-}
-
-/** Validate an incoming submission against a form's blocks. Returns cleaned values or throws. */
-export function validateSubmission(
-  form: FormSchema,
-  values: Record<string, unknown>,
-): Record<string, unknown> {
-  const cleaned: Record<string, unknown> = {};
-  for (const block of form.blocks) {
-    if (STATIC_TYPES.includes(block.type)) continue;
-    const v = values[block.id];
-    const empty =
-      v === undefined || v === null || v === "" || (Array.isArray(v) && v.length === 0);
-    if (block.required && empty) {
-      throw new Error(`"${block.label}" is required`);
-    }
-    if (!empty) cleaned[block.id] = v;
-  }
-  return cleaned;
 }
 
 /* ---------- conditional logic rules ---------- */

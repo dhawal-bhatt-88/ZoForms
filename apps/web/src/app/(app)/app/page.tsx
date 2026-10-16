@@ -4,12 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Check,
   Copy,
-  ExternalLink,
   FileText,
   Inbox,
-  Link2,
   Loader2,
   MoreHorizontal,
   Pencil,
@@ -30,7 +27,6 @@ import {
   generateForm,
   listForms,
   type FormListItem,
-  type FormStatus,
 } from "@/lib/api";
 
 const AI_EXAMPLES = [
@@ -39,12 +35,6 @@ const AI_EXAMPLES = [
   "RSVP for a company offsite",
   "Bug report with severity and screenshot",
 ];
-
-const STATUS: Record<FormStatus, { label: string; dot: string; cls: string }> = {
-  PUBLISHED: { label: "Live", dot: "bg-green", cls: "bg-[#E7F6ED] text-green" },
-  DRAFT: { label: "Draft", dot: "bg-[#9AA0AA]", cls: "bg-surface-3 text-muted" },
-  CLOSED: { label: "Closed", dot: "bg-amber", cls: "bg-[#FBF0D9] text-amber" },
-};
 
 function relTime(iso?: string) {
   if (!iso) return "";
@@ -72,7 +62,6 @@ export default function Dashboard() {
   const canEdit = useCanEdit();
 
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<"all" | FormStatus>("all");
   const [sort, setSort] = useState<Sort>("recent");
 
   const [aiOpen, setAiOpen] = useState(false);
@@ -98,7 +87,6 @@ export default function Dashboard() {
 
   const visible = useMemo(() => {
     let list = forms;
-    if (filter !== "all") list = list.filter((f) => f.status === filter);
     const q = query.trim().toLowerCase();
     if (q) list = list.filter((f) => f.title.toLowerCase().includes(q));
     const sorted = [...list];
@@ -112,7 +100,7 @@ export default function Dashboard() {
           new Date(a.updatedAt || a.createdAt).getTime(),
       );
     return sorted;
-  }, [forms, filter, query, sort]);
+  }, [forms, query, sort]);
 
   function onCreate() {
     setNewFormOpen(true);
@@ -160,14 +148,6 @@ export default function Dashboard() {
     }
   }
 
-  const counts = useMemo(
-    () => ({
-      all: forms.length,
-      PUBLISHED: forms.filter((f) => f.status === "PUBLISHED").length,
-      DRAFT: forms.filter((f) => f.status === "DRAFT").length,
-    }),
-    [forms],
-  );
 
   return (
     <AppShell
@@ -203,22 +183,6 @@ export default function Dashboard() {
             placeholder="Search forms…"
             className="w-full rounded-lg border border-line bg-surface py-2 pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-faint focus:border-accent focus:ring-2 focus:ring-accent/15"
           />
-        </div>
-        <div className="flex items-center gap-1 rounded-lg border border-line bg-surface p-0.5">
-          {(["all", "PUBLISHED", "DRAFT"] as const).map((k) => (
-            <button
-              key={k}
-              onClick={() => setFilter(k)}
-              className={`rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors ${
-                filter === k ? "bg-ink text-white" : "text-muted hover:text-ink"
-              }`}
-            >
-              {k === "all" ? "All" : k === "PUBLISHED" ? "Live" : "Drafts"}
-              <span className={`ml-1.5 tabular-nums ${filter === k ? "text-white/60" : "text-faint"}`}>
-                {counts[k as keyof typeof counts]}
-              </span>
-            </button>
-          ))}
         </div>
         <select
           value={sort}
@@ -284,7 +248,7 @@ export default function Dashboard() {
 
       {status === "ok" && forms.length > 0 && visible.length === 0 && (
         <div className="rounded-2xl border border-dashed border-line-2 py-16 text-center text-sm text-muted">
-          No forms match your filters.
+          No forms match your search.
         </div>
       )}
 
@@ -423,16 +387,6 @@ function FormCard({
   onDelete: () => void;
 }) {
   const [menu, setMenu] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const st = STATUS[f.status] ?? STATUS.DRAFT;
-
-  function copyLink() {
-    const url = `${window.location.origin}/r/${f.slug}`;
-    navigator.clipboard?.writeText(url);
-    setCopied(true);
-    setMenu(false);
-    setTimeout(() => setCopied(false), 1600);
-  }
 
   return (
     <div className="group relative flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:border-line-2 hover:shadow-pop">
@@ -441,10 +395,6 @@ function FormCard({
       <div className="relative z-[1] mb-4 flex items-start justify-between gap-2">
         <span className="grid h-9 w-9 place-items-center rounded-xl bg-surface-2 text-muted transition-colors group-hover:bg-accent-weak group-hover:text-accent-2">
           <FileText className="h-[18px] w-[18px]" />
-        </span>
-        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${st.cls}`}>
-          <span className={`h-1.5 w-1.5 rounded-full ${st.dot}`} />
-          {st.label}
         </span>
       </div>
 
@@ -460,36 +410,21 @@ function FormCard({
         <span>Edited {relTime(f.updatedAt || f.createdAt)}</span>
       </div>
 
-      <div className="relative z-10 mt-4 flex items-center justify-between border-t border-line pt-3">
-        <span className="truncate font-mono text-xs text-faint">/{f.slug}</span>
+      <div className="relative z-10 mt-4 flex items-center justify-end border-t border-line pt-3">
         <div className="flex flex-none items-center gap-1">
-          {f.status === "PUBLISHED" && (
-            <a
-              href={`/r/${f.slug}`}
-              target="_blank"
-              rel="noreferrer"
-              className="grid h-7 w-7 place-items-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-accent-2"
-              title="View live"
-            >
-              <ExternalLink className="h-4 w-4" />
-            </a>
-          )}
           <div className="relative">
             <button
               onClick={() => setMenu((v) => !v)}
               className="grid h-7 w-7 place-items-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-ink"
               title="More"
             >
-              {copied ? <Check className="h-4 w-4 text-green" /> : <MoreHorizontal className="h-4 w-4" />}
+              <MoreHorizontal className="h-4 w-4" />
             </button>
             {menu && (
               <>
                 <div className="fixed inset-0 z-20" onClick={() => setMenu(false)} />
                 <div className="absolute bottom-9 right-0 z-30 w-44 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-pop">
                   <MenuItem icon={Pencil} label="Edit" href={`/app/forms/${f.id}/edit`} />
-                  {f.status === "PUBLISHED" && (
-                    <MenuItem icon={Link2} label="Copy link" onClick={copyLink} />
-                  )}
                   <MenuItem
                     icon={Copy}
                     label="Duplicate"

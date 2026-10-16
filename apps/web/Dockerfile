@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# ---- Tenant app + public runtime (Next.js standalone, pnpm monorepo aware) ----
+# ---- Tenant app (Next.js standalone, pnpm monorepo aware) ----
 # Build context is the repo ROOT: docker build -f apps/web/Dockerfile .
 
 FROM node:20-slim AS base

@@ -4,14 +4,12 @@ import {
   Delete,
   Get,
   Param,
-  Patch,
   Post,
   Put,
   Query,
   Res,
   UseGuards,
 } from "@nestjs/common";
-import { FormStatus } from "@prisma/client";
 import type { Response } from "express";
 import { FormsService } from "./forms.service";
 import { AuthGuard } from "../auth/auth.guard";
@@ -37,15 +35,6 @@ export class FormsController {
   create(@CurrentUser() user: AuthUser, @Body() body: { title?: string; templateId?: unknown }) {
     if (body?.templateId !== undefined) return this.forms.createFromTemplate(user, body.templateId);
     return this.forms.create(user, body?.title?.trim() || "Untitled form");
-  }
-
-  @Patch(":id")
-  update(
-    @CurrentUser() user: AuthUser,
-    @Param("id") id: string,
-    @Body() body: { title?: string; status?: FormStatus },
-  ) {
-    return this.forms.update(user, id, body || {});
   }
 
   @Put(":id/schema")

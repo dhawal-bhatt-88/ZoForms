@@ -14,7 +14,7 @@ and restarts the stack. No managed RDS, no load balancer, no IaC.
                                                     ▼
    ┌──────────────────────────── EC2 (Docker Compose) ────────────────────────────┐
    │  db (postgres:16, volume pgdata)                                              │
-   │  api   :4000   ← DATABASE_URL=db:5432 · uploads volume · prisma migrate deploy│
+   │  api   :4000   ← DATABASE_URL=db:5432 · prisma migrate deploy                 │
    │  web   :3000   (Next standalone)                                              │
    │  admin :3002   (Next standalone)                                              │
    └──────────────────────────────────────────────────────────────────────────────┘
@@ -43,7 +43,7 @@ and restarts the stack. No managed RDS, no load balancer, no IaC.
    | Port | Source | Why |
    | --- | --- | --- |
    | 22  | your IP | SSH / GitHub Actions deploy |
-   | 3000 | 0.0.0.0/0 | tenant app + public forms |
+   | 3000 | 0.0.0.0/0 | tenant app |
    | 3002 | 0.0.0.0/0 | admin console |
    | 4000 | 0.0.0.0/0 | API |
 
@@ -119,7 +119,7 @@ automatically. Then open:
 
 | App | URL |
 | --- | --- |
-| Tenant app / public forms | `http://<ELASTIC_IP>:3000` |
+| Tenant app | `http://<ELASTIC_IP>:3000` |
 | Admin console | `http://<ELASTIC_IP>:3002` |
 | API health | `http://<ELASTIC_IP>:4000/health` |
 
@@ -138,8 +138,6 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod exec db \
   pg_dump -U frame formbuilder > backup-$(date +%F).sql
 ```
 
-- **Uploads** persist in the `uploads` Docker volume on the box. This is fine for
-  dev; move to S3 before you care about durability or a second instance.
 - **Postgres data** persists in the `pgdata` volume — it survives redeploys, but
   **not** instance termination. Snapshot the EBS volume (or `pg_dump`) for real backups.
 

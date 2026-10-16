@@ -66,7 +66,7 @@ export async function login(email: string, password: string) {
 /* ---------- types ---------- */
 
 export type Overview = {
-  totals: { orgs: number; users: number; forms: number; published: number; responses: number };
+  totals: { orgs: number; users: number; forms: number; responses: number };
   signups: { date: string; count: number }[];
   recentOrgs: { id: string; name: string; status: string; createdAt: string }[];
 };
@@ -89,7 +89,7 @@ export type OrgDetail = {
   createdAt: string;
   hasAiKey: boolean;
   members: { id: string; email: string; name: string | null; role: string; status: string }[];
-  forms: { id: string; title: string; slug: string; status: string; createdAt: string; _count: { responses: number } }[];
+  forms: { id: string; title: string; createdAt: string; _count: { responses: number } }[];
   responses: number;
 };
 
@@ -106,8 +106,6 @@ export type UserRow = {
 export type AdminForm = {
   id: string;
   title: string;
-  slug: string;
-  status: string;
   createdAt: string;
   responses: number;
   org: { id: string; name: string };
@@ -142,7 +140,5 @@ export const impersonate = (id: string) =>
     method: "POST",
   });
 export const listForms = (q = "") => req<AdminForm[]>(`/v1/admin/forms${q ? `?q=${encodeURIComponent(q)}` : ""}`);
-export const updateForm = (id: string, body: { status: string }) =>
-  req<{ id: string; status: string }>(`/v1/admin/forms/${id}`, { method: "PATCH", body: JSON.stringify(body) });
 export const deleteForm = (id: string) => req<{ ok: boolean }>(`/v1/admin/forms/${id}`, { method: "DELETE" });
 export const listAudit = () => req<AuditEntry[]>("/v1/admin/audit");

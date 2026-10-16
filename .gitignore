@@ -31,5 +31,5 @@ playwright-report/
 apps/*/.env
 apps/*/.env.local
 
-# local file-upload storage (dev)
-apps/api/uploads/
+# local file-upload storage (dev), no longer used: never commit it
+uploads/

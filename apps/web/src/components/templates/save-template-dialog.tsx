@@ -22,8 +22,6 @@ import { createTemplate, type TemplateSummary } from "@/lib/api";
 function strippedSettings(form: FormSchema): string[] {
   const s = form.settings;
   return [
-    s?.redirectUrl?.trim() ? "the redirect URL" : null,
-    s?.notifyEmails?.length ? "the email notifications" : null,
     s?.theme?.logo?.trim() ? "the logo" : null,
     s?.theme?.cover?.trim() ? "the cover image" : null,
   ].filter((x): x is string => x !== null);
@@ -191,7 +189,7 @@ export function SaveTemplateDialog({
 
       {plan.settings.length > 0 && (
         <p className="mt-4 rounded-lg bg-surface-2 px-3 py-2 text-[13px] text-ink-2">
-          Templates don&apos;t keep settings that send answers somewhere or identify your organisation, so{" "}
+          Templates don&apos;t keep settings that identify your organisation, so{" "}
           {list(plan.settings)} won&apos;t be included.
         </p>
       )}

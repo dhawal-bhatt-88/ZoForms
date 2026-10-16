@@ -1,13 +1,10 @@
 import "dotenv/config";
 import "reflect-metadata";
-import { mkdirSync } from "fs";
-import { join } from "path";
 import { Logger } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import helmet from "helmet";
 import type { NextFunction, Request, Response } from "express";
-import type { ServerResponse } from "http";
 import { AppModule } from "./app.module";
 import { env } from "./config/env";
 import { AllExceptionsFilter } from "./common/all-exceptions.filter";
@@ -47,9 +44,7 @@ async function bootstrap() {
   app.disable("x-powered-by");
   configureBodyParsing(app, app.get(JwtService));
 
-  // Security headers. CSP is disabled here (the API serves JSON + uploaded
-  // assets, not app HTML); crossOriginResourcePolicy stays "cross-origin" so
-  // the web runtime can still load uploaded images.
+  // Security headers. CSP is disabled here: the API serves JSON, not app HTML.
   app.use(
     helmet({
       contentSecurityPolicy: false,
@@ -85,18 +80,6 @@ async function bootstrap() {
   // Consistent JSON errors + one log line per request, applied app-wide.
   app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalInterceptors(new LoggingInterceptor());
-
-  // Local upload storage (dev). Served statically at /uploads with nosniff so a
-  // mislabeled file can never be interpreted as executable HTML/JS.
-  const uploads = join(process.cwd(), "uploads");
-  mkdirSync(uploads, { recursive: true });
-  app.useStaticAssets(uploads, {
-    prefix: "/uploads/",
-    setHeaders: (res: ServerResponse) => {
-      res.setHeader("X-Content-Type-Options", "nosniff");
-      res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
-    },
-  });
 
   await app.listen(env.PORT);
   Logger.log(

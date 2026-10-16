@@ -31,6 +31,7 @@ async function waitFor(url) {
     const form = await (await fetch(API + "/v1/forms", { method: "POST", headers: H, body: JSON.stringify({ title: "UI verify" }) })).json();
     const rows = () => prisma.formVersion.count({ where: { formId: form.id } });
     const latestId = async () => (await prisma.formVersion.findFirst({ where: { formId: form.id }, orderBy: { version: "desc" } })).id;
+    const latestVersion = async () => (await prisma.formVersion.findFirst({ where: { formId: form.id }, orderBy: { version: "desc" } })).version;
 
     browser = await launchBrowser();
     const ctx = await browser.newContext({ acceptDownloads: true });
@@ -77,7 +78,8 @@ async function waitFor(url) {
     // --- edit without saving -> Download returns the previous saved version ---
     const d1 = await download(() => downloadBtn.click());
     const a1 = JSON.parse(d1.text);
-    check("download filename from response", d1.name === `${form.slug}-schema.json`, d1.name);
+    // The name comes from Content-Disposition, which CORS must expose to the web app; else it would be form.json.
+    check("download named from title and version, read from the response across origins", d1.name === "ui-verify-v1.json", d1.name);
     check("unsaved edit NOT in download", a1.description === undefined, JSON.stringify(a1.description));
     check("download is the saved version (formVersionId)", a1.formVersionId === v1Id);
     const d2 = await download(() => downloadBtn.click());
@@ -151,7 +153,7 @@ async function waitFor(url) {
     await page2.getByTitle("More").first().click();
     const [dl] = await Promise.all([page2.waitForEvent("download"), page2.getByRole("button", { name: "Download" }).click()]);
     const dash = JSON.parse(fs.readFileSync(await dl.path(), "utf8"));
-    check("dashboard Download -> latest saved artifact", dash.formId === form.id && dash.formVersionId === (await latestId()) && dl.suggestedFilename() === `${form.slug}-schema.json`);
+    check("dashboard Download -> latest saved artifact", dash.formId === form.id && dash.formVersionId === (await latestId()) && dl.suggestedFilename() === `ui-verify-v${await latestVersion()}.json`, dl.suggestedFilename());
 
     // --- versions page: copy, current disabled, restore creates version + editor shows it ---
     await page2.goto(`${WEB}/app/forms/${form.id}/versions`);

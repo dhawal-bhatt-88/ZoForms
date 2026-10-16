@@ -16,14 +16,9 @@ import {
   normalizeScores,
   sameContent,
   FormSchema,
-  STATIC_TYPES,
-  validateSubmission,
-  withoutBuilderFields,
 } from "@formbuilder/form-schema";
 import { PrismaService } from "../prisma/prisma.service";
-import { MailService } from "../mail/mail.service";
 import { SearchService } from "../search/search.service";
-import { env } from "../config/env";
 import type { AuthUser } from "../auth/current-user.decorator";
 import { assertCanEdit } from "../auth/can-edit";
 import { describeSchemaError } from "../common/schema-errors";
@@ -33,28 +28,20 @@ import { TemplatesService } from "../templates/templates.service";
 const LATEST_VERSION = { orderBy: { version: "desc" }, take: 1 } as const;
 
 /**
- * Stored content without what only the builder uses, at any depth: template
- * references (see `TemplateRef`), question names and formula text (contract §17).
+ * The download's file name: the title in lower case, each run of anything but
+ * a–z and 0–9 as "-", trimmed of "-", then "-v<version>.json". "PHQ-9 (adult)"
+ * at version 12 is "phq-9-adult-v12.json"; a title that leaves nothing gives
+ * "form-v12.json".
  */
-function withoutProvenance(schema: unknown): unknown {
-  if (typeof schema !== "object" || schema === null) return schema;
-  const { templateRef: _ref, ...rest } = schema as { templateRef?: unknown; blocks?: unknown };
-  return Array.isArray(rest.blocks) ? { ...rest, blocks: withoutBuilderFields(rest.blocks) } : rest;
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+export function downloadFileName(title: string, version: number): string {
+  const stem = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return `${stem || "form"}-v${version}.json`;
 }
 
 @Injectable()
 export class FormsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly mail: MailService,
     private readonly search: SearchService,
     private readonly templates: TemplatesService,
   ) {}
@@ -69,8 +56,6 @@ export class FormsService {
       select: {
         id: true,
         title: true,
-        slug: true,
-        status: true,
         createdAt: true,
         updatedAt: true,
         _count: { select: { responses: true } },
@@ -92,8 +77,6 @@ export class FormsService {
     return this.prisma.form.create({
       data: {
         title,
-        slug: this.slugify(title),
-        status: "DRAFT",
         workspaceId: user.workspaceId,
         versions: {
           create: {
@@ -102,19 +85,6 @@ export class FormsService {
           },
         },
       },
-    });
-  }
-
-  async update(
-    user: AuthUser,
-    id: string,
-    patch: { title?: string; status?: Prisma.FormUpdateInput["status"] },
-  ) {
-    await this.assertOwned(user, id);
-    await this.assertCanEdit(user);
-    return this.prisma.form.update({
-      where: { id },
-      data: { title: patch.title, status: patch.status },
     });
   }
 
@@ -240,7 +210,7 @@ export class FormsService {
     // Identity, schema format and navigation are stamped by buildArtifact, never
     // stored in or read from the schema itself.
     const artifact = buildArtifact(current.schema, { formId: form.id, formVersionId: current.id });
-    return { fileName: `${form.slug}-schema.json`, artifact };
+    return { fileName: downloadFileName(artifact.title, current.version), artifact };
   }
 
   async listResponses(user: AuthUser, id: string, q?: string) {
@@ -263,8 +233,6 @@ export class FormsService {
     return this.prisma.form.create({
       data: {
         title,
-        slug: this.slugify(title),
-        status: "DRAFT",
         workspaceId: user.workspaceId,
         versions: {
           create: { version: 1, schema: schema as unknown as Prisma.InputJsonValue },
@@ -290,8 +258,6 @@ export class FormsService {
     return this.prisma.form.create({
       data: {
         title: parsed.title,
-        slug: this.slugify(parsed.title),
-        status: "DRAFT",
         workspaceId: user.workspaceId,
         versions: {
           create: { version: 1, schema: parsed as unknown as Prisma.InputJsonValue },
@@ -372,166 +338,6 @@ export class FormsService {
     };
   }
 
-  /* ---------- public (form runtime, unauthenticated) ---------- */
-
-  async track(slug: string, type: string, source: string | undefined, userAgent: string) {
-    if (type !== "view" && type !== "start") return { ok: false };
-    const form = await this.prisma.form.findUnique({ where: { slug }, select: { id: true, status: true } });
-    if (!form || form.status !== "PUBLISHED") return { ok: false };
-    const ua = userAgent || "";
-    const device = /iPad|Tablet/i.test(ua)
-      ? "tablet"
-      : /Mobi|Android|iPhone/i.test(ua)
-        ? "mobile"
-        : "desktop";
-    let src = "direct";
-    if (source) {
-      try {
-        src = new URL(source).hostname || "direct";
-      } catch {
-        src = source.slice(0, 60);
-      }
-    }
-    await this.prisma.event.create({ data: { formId: form.id, type, device, source: src } });
-    return { ok: true };
-  }
-
-  async getPublicBySlug(slug: string) {
-    const form = await this.prisma.form.findUnique({
-      where: { slug },
-      include: {
-        versions: LATEST_VERSION,
-        workspace: { select: { org: { select: { brandingHidden: true } } } },
-      },
-    });
-    if (!form || form.status !== "PUBLISHED") {
-      throw new NotFoundException("Form not found");
-    }
-    return {
-      id: form.id,
-      title: form.title,
-      slug: form.slug,
-      // What only the builder uses (template provenance, question names, formula text): respondents never get it.
-      schema: withoutProvenance(form.versions[0]?.schema ?? emptyForm(form.title)),
-      // White-label: hide the "Made with Frame" footer for orgs that opt in.
-      branding: !form.workspace.org.brandingHidden,
-    };
-  }
-
-  /** Store an in-progress (partial) submission, keyed by a client session id. */
-  async savePartial(slug: string, sessionId: string, data: Record<string, unknown>) {
-    if (!sessionId) throw new BadRequestException("Missing session.");
-    const form = await this.prisma.form.findUnique({
-      where: { slug },
-      select: { id: true, status: true },
-    });
-    if (!form || form.status !== "PUBLISHED") {
-      throw new NotFoundException("This form is not accepting responses");
-    }
-    await this.prisma.response.upsert({
-      where: { formId_sessionId: { formId: form.id, sessionId } },
-      create: {
-        formId: form.id,
-        sessionId,
-        partial: true,
-        data: (data || {}) as Prisma.InputJsonValue,
-      },
-      update: { data: (data || {}) as Prisma.InputJsonValue, partial: true },
-    });
-    return { ok: true };
-  }
-
-  async submit(
-    slug: string,
-    data: Record<string, unknown>,
-    opts?: { sessionId?: string; turnstileToken?: string },
-  ) {
-    const form = await this.prisma.form.findUnique({
-      where: { slug },
-      include: { versions: LATEST_VERSION },
-    });
-    if (!form || form.status !== "PUBLISHED") {
-      throw new NotFoundException("This form is not accepting responses");
-    }
-    const schema = FormSchema.parse(
-      form.versions[0]?.schema ?? emptyForm(form.title),
-    );
-    if (schema.settings?.spamProtection) {
-      await this.verifyTurnstile(opts?.turnstileToken);
-    }
-    let cleaned: Record<string, unknown>;
-    try {
-      cleaned = validateSubmission(schema, data || {});
-    } catch (e) {
-      throw new BadRequestException((e as Error).message);
-    }
-    // If this submitter left a partial trail, complete it in place; else create.
-    const sessionId = opts?.sessionId;
-    const existingPartial = sessionId
-      ? await this.prisma.response.findUnique({
-          where: { formId_sessionId: { formId: form.id, sessionId } },
-        })
-      : null;
-    const response = existingPartial
-      ? await this.prisma.response.update({
-          where: { id: existingPartial.id },
-          data: {
-            data: cleaned as unknown as Prisma.InputJsonValue,
-            partial: false,
-            completedAt: new Date(),
-          },
-        })
-      : await this.prisma.response.create({
-          data: {
-            formId: form.id,
-            sessionId: sessionId ?? null,
-            partial: false,
-            completedAt: new Date(),
-            data: cleaned as unknown as Prisma.InputJsonValue,
-          },
-        });
-    // Index for search (no-op without Meilisearch).
-    void this.search.index(response);
-
-    // Resolve answers to human labels so the notification email reads well.
-    const fields = schema.blocks
-      .filter((b) => !STATIC_TYPES.includes(b.type) && b.id in cleaned)
-      .map((b) => ({ label: b.label, value: cleaned[b.id] }));
-
-    // Email the form's notify list (fire-and-forget; never blocks the submit).
-    const notifyEmails = schema.settings?.notifyEmails?.filter(Boolean) ?? [];
-    if (notifyEmails.length) {
-      void this.notifyNewResponse(form.title, form.slug, notifyEmails, fields);
-    }
-    return { ok: true, id: response.id };
-  }
-
-  private async notifyNewResponse(
-    formTitle: string,
-    slug: string,
-    to: string[],
-    fields: { label: string; value: unknown }[],
-  ) {
-    const rows = fields
-      .slice(0, 20)
-      .map(
-        (f) =>
-          `<tr><td style="padding:4px 12px 4px 0;color:#6B7280;vertical-align:top">${escapeHtml(
-            f.label,
-          )}</td><td style="padding:4px 0;color:#1B1D22">${escapeHtml(
-            Array.isArray(f.value) ? f.value.join(", ") : String(f.value ?? ""),
-          )}</td></tr>`,
-      )
-      .join("");
-    const link = `${env.PUBLIC_TENANT_URL.replace(/\/$/, "")}/app`;
-    const html = this.mail.layout(
-      `New response to “${escapeHtml(formTitle)}”`,
-      `<table style="width:100%;border-collapse:collapse;margin-top:6px">${rows}</table>`,
-      { label: "View all responses", url: link },
-    );
-    await this.mail.send({ to, subject: `New response · ${formTitle}`, html }).catch(() => {});
-  }
-
   /* ---------- helpers ---------- */
 
   private async assertOwned(user: AuthUser, id: string) {
@@ -542,41 +348,8 @@ export class FormsService {
     if (!f) throw new NotFoundException("Form not found");
   }
 
-  /** Verify a Cloudflare Turnstile token. No-op when no secret is configured. */
-  private async verifyTurnstile(token: string | undefined) {
-    if (!env.TURNSTILE_SECRET) return; // graceful: not enforced until configured
-    if (!token) throw new BadRequestException("Please complete the spam check.");
-    try {
-      const res = await fetch(
-        "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ secret: env.TURNSTILE_SECRET, response: token }),
-          signal: AbortSignal.timeout(8000),
-        },
-      );
-      const body = (await res.json()) as { success: boolean };
-      if (!body.success) throw new Error();
-    } catch {
-      throw new BadRequestException("Spam check failed. Please try again.");
-    }
-  }
-
   /** Viewers can read everything in the org but never mutate. */
   private assertCanEdit(user: AuthUser) {
     return assertCanEdit(this.prisma, user);
-  }
-
-  private slugify(title: string) {
-    return (
-      title
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/(^-|-$)/g, "")
-        .slice(0, 40) +
-      "-" +
-      Math.random().toString(36).slice(2, 7)
-    );
   }
 }

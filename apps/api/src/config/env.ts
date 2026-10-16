@@ -28,9 +28,6 @@ const EnvSchema = z.object({
   CLOUDFLARE_ZONE_ID: z.string().optional(),
   // The CNAME target customers point their domain at (e.g. "cname.frame.so").
   DOMAIN_CNAME_TARGET: z.string().default("cname.frame.so"),
-  // Cloudflare Turnstile secret for spam protection. Without it, forms that
-  // enable spam protection still submit (verification is skipped, not enforced).
-  TURNSTILE_SECRET: z.string().optional(),
   // Resend transactional email. Without a key, emails are logged and skipped.
   RESEND_API_KEY: z.string().optional(),
   MAIL_FROM: z.string().default("Frame <onboarding@resend.dev>"),

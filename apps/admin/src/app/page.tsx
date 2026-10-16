@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Building2, FileText, Inbox, Loader2, Send, Users } from "lucide-react";
+import { Building2, FileText, Inbox, Loader2, Users } from "lucide-react";
 import AdminShell from "@/components/admin-shell";
 import { getOverview, type Overview } from "@/lib/api";
 
@@ -34,11 +34,10 @@ export default function OverviewPage() {
 
       {status === "ok" && data && (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <Stat icon={Building2} label="Tenants" value={data.totals.orgs} />
             <Stat icon={Users} label="Users" value={data.totals.users} />
             <Stat icon={FileText} label="Forms" value={data.totals.forms} />
-            <Stat icon={Send} label="Published" value={data.totals.published} />
             <Stat icon={Inbox} label="Responses" value={data.totals.responses} />
           </div>
 

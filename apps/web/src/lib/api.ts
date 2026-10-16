@@ -3,7 +3,6 @@ import type { FormSchema, GroupBlock } from "@formbuilder/form-schema";
 export const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
-export type FormStatus = "DRAFT" | "PUBLISHED" | "CLOSED";
 export type User = { id: string; email: string; name: string | null };
 
 /* ---------- token ---------- */
@@ -312,8 +311,6 @@ export function testAiConnection() {
 export type FormListItem = {
   id: string;
   title: string;
-  slug: string;
-  status: FormStatus;
   createdAt: string;
   updatedAt?: string;
   _count?: { responses: number };
@@ -322,8 +319,6 @@ export type FormListItem = {
 export type FormDetail = {
   id: string;
   title: string;
-  slug: string;
-  status: FormStatus;
   createdAt: string;
   updatedAt: string;
   versions: { id: string; version: number; schema: FormSchema }[];
@@ -371,23 +366,13 @@ export function saveSchema(id: string, schema: FormSchema) {
 export async function downloadArtifact(id: string) {
   const res = await apiFetch(`/v1/forms/${id}/artifact`);
   const disposition = res.headers.get("Content-Disposition") ?? "";
-  const fileName = /filename="([^"]+)"/.exec(disposition)?.[1] ?? "form-schema.json";
+  const fileName = /filename="([^"]+)"/.exec(disposition)?.[1] ?? "form.json";
   const url = URL.createObjectURL(await res.blob());
   const a = document.createElement("a");
   a.href = url;
   a.download = fileName;
   a.click();
   URL.revokeObjectURL(url);
-}
-
-export function updateForm(
-  id: string,
-  patch: { title?: string; status?: FormStatus },
-) {
-  return req<FormListItem>(`/v1/forms/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify(patch),
-  });
 }
 
 /* ---------- templates ---------- */
@@ -527,69 +512,4 @@ export type Analytics = {
 
 export function getAnalytics(id: string) {
   return req<Analytics>(`/v1/forms/${id}/analytics`);
-}
-
-/** Fire-and-forget page-view / start tracking from the public runtime. */
-export function trackEvent(slug: string, type: "view" | "start", source?: string) {
-  try {
-    fetch(`${API_URL}/v1/public/forms/${slug}/events`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type, source }),
-      keepalive: true,
-    }).catch(() => {});
-  } catch {
-    /* ignore */
-  }
-}
-
-/* ---------- public (form runtime) ---------- */
-
-export type PublicForm = {
-  id: string;
-  title: string;
-  slug: string;
-  schema: FormSchema;
-  /** false when the org has white-label enabled — hide the "Made with Frame" footer. */
-  branding?: boolean;
-};
-
-export function getPublicForm(slug: string) {
-  return req<PublicForm>(`/v1/public/forms/${slug}`);
-}
-
-export function submitResponse(
-  slug: string,
-  data: Record<string, unknown>,
-  opts?: { sessionId?: string; turnstileToken?: string },
-) {
-  return req<{ ok: boolean; id: string }>(
-    `/v1/public/forms/${slug}/responses`,
-    { method: "POST", body: JSON.stringify({ data, ...opts }) },
-  );
-}
-
-/** Best-effort save of an in-progress submission (partial). Never throws to the UI. */
-export function savePartial(
-  slug: string,
-  sessionId: string,
-  data: Record<string, unknown>,
-) {
-  return req<{ ok: boolean }>(`/v1/public/forms/${slug}/partial`, {
-    method: "POST",
-    body: JSON.stringify({ sessionId, data }),
-  }).catch(() => ({ ok: false }));
-}
-
-export type UploadedFile = { name: string; url: string; size: number };
-
-export async function uploadFile(file: File): Promise<UploadedFile> {
-  const fd = new FormData();
-  fd.append("file", file);
-  const res = await fetch(`${API_URL}/v1/public/uploads`, {
-    method: "POST",
-    body: fd,
-  });
-  if (!res.ok) throw new Error("Upload failed");
-  return res.json() as Promise<UploadedFile>;
 }

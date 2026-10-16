@@ -41,8 +41,6 @@ function describe(e: AuditEntry): string {
       return "granted admin access";
     case "user.revoked_admin":
       return "revoked admin access";
-    case "form.status_changed":
-      return `changed form status ${m.from} → ${m.to}`;
     case "form.deleted":
       return `deleted form “${m.title}”`;
     default:

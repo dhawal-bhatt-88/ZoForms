@@ -7,11 +7,10 @@
 .github
 *.log
 
-# Local env & upload storage — never bake into an image
+# Local env — never bake into an image
 **/.env
 **/.env.local
 **/.env.*.local
-apps/api/uploads
 
 # Large local-only artifacts
 blueprint.html

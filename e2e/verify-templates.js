@@ -222,7 +222,7 @@ const HEALTH = {
     await page.getByRole("tab", { name: /Your organisation/ }).click();
     await page.getByRole("link", { name: 'Edit "Smoking details"' }).click();
     await page.getByRole("heading", { name: "Template: Smoking details" }).waitFor();
-    check("template mode: no Download, Responses, publishing or Ask AI", (await page.getByRole("button", { name: /Download|Ask AI/ }).count()) === 0 &&
+    check("template mode: no Download, Responses or Ask AI", (await page.getByRole("button", { name: /Download|Ask AI/ }).count()) === 0 &&
       (await page.getByRole("link", { name: /Responses|Analytics|Connect/ }).count()) === 0);
     check("template mode: the group can't gain siblings (no Add page)", (await page.getByRole("button", { name: /^Add page/ }).count()) === 0);
     await card("b_quit0001").click();

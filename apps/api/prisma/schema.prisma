@@ -17,12 +17,6 @@ enum Role {
   VIEWER
 }
 
-enum FormStatus {
-  DRAFT
-  PUBLISHED
-  CLOSED
-}
-
 model User {
   id                String       @id @default(uuid())
   email             String       @unique
@@ -138,8 +132,6 @@ model Form {
   workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   workspaceId String
   title       String
-  slug        String        @unique
-  status      FormStatus    @default(DRAFT)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   versions    FormVersion[]

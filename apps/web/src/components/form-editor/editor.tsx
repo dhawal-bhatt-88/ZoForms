@@ -26,10 +26,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleAlert,
-  Code2,
-  Copy,
   Download,
-  ExternalLink,
   FileText,
   GripVertical,
   Inbox,
@@ -193,7 +190,6 @@ import {
   updateTemplate,
   suggestLogic,
   translateForm,
-  type FormStatus,
   type TemplateDetail,
   type TemplateKind,
   type TemplateScope,
@@ -1560,7 +1556,7 @@ function editorContent(s: Partial<FormSchema> | undefined, fallbackTitle: string
  * The form editor. With `templateId` it edits a template instead ("template
  * mode"): the same canvas, inspector, save rules, Save and Cancel, but Save
  * writes to the template, and what only applies to a form — Download,
- * responses, publishing, AI — isn't offered. A group template is edited as a
+ * responses, AI — isn't offered. A group template is edited as a
  * form whose only root item is its group, and it can't gain more root items.
  */
 export default function FormEditor({ templateId }: { templateId?: string }) {
@@ -1584,8 +1580,6 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   const [schema, setSchema] = useState<FormSchema | null>(null);
   // The latest saved version's content: the baseline for dirty-state and Cancel.
   const [saved, setSaved] = useState<FormSchema | null>(null);
-  const [slug, setSlug] = useState("");
-  const [status, setStatus] = useState<FormStatus>("DRAFT");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -1593,9 +1587,6 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   // `info` notes are neutral (e.g. a setting switched for the author); the rest are refusals.
   const [notice, setNotice] = useState<{ text: string; blocks?: Block[]; tone?: "info" } | null>(null);
   const [loadError, setLoadError] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [embedOpen, setEmbedOpen] = useState(false);
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
   const [aiMsgs, setAiMsgs] = useState<AiMsg[]>([]);
   const [aiInput, setAiInput] = useState("");
@@ -1649,8 +1640,6 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         const latest = editorContent(s, f.title);
         setSchema(latest);
         setSaved(latest);
-        setSlug(f.slug);
-        setStatus(f.status);
         setSelectedId(s?.blocks?.[0]?.id ?? null);
       })
       .catch(() => setLoadError(true));
@@ -2496,10 +2485,6 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
 
   const updateSettings = (p: {
     submitLabel?: string;
-    redirectUrl?: string;
-    spamProtection?: boolean;
-    partialSubmissions?: boolean;
-    notifyEmails?: string[];
   }) => patch((s) => ({ ...s, settings: { ...s.settings, ...p } }));
   const updateTheme = (p: {
     accent?: string;
@@ -2571,33 +2556,6 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     if (projection.parentId === currentParent && projection.index === currentIndex) return; // dropped in place
     tryMove(activeId, { parentId: projection.parentId, index: projection.index });
   }
-
-  const shareUrl =
-    typeof window !== "undefined" ? `${window.location.origin}/r/${slug}` : `/r/${slug}`;
-  function copyLink() {
-    navigator.clipboard?.writeText(shareUrl).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  }
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
-  function copySnippet(key: string, text: string) {
-    navigator.clipboard?.writeText(text).catch(() => {});
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 1500);
-  }
-  const embeds = [
-    {
-      key: "inline",
-      label: "Inline (auto-resizes)",
-      code: `<script src="${origin}/embed.js"></script>\n<div data-frame-form="${slug}"></div>`,
-    },
-    {
-      key: "popup",
-      label: "Popup button",
-      code: `<script src="${origin}/embed.js"></script>\n<button data-frame-popup="${slug}">Open form</button>`,
-    },
-    { key: "full", label: "Full-page link", code: `${origin}/r/${slug}` },
-  ];
 
   // The save's scoring rules (contract §17.6–§17.8), each shown under its field.
   const scoreIssues = useMemo(() => (schema ? scoreProblems(walkBlocks(schema.blocks)) : []), [schema]);
@@ -2825,23 +2783,6 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
               >
                 <Sparkles className="h-4 w-4" /> Ask AI
               </button>
-              {status === "PUBLISHED" && (
-                <>
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E7F6ED] px-2.5 py-1 text-xs font-semibold text-green">
-                    <span className="h-1.5 w-1.5 rounded-full bg-green" /> Published
-                  </span>
-                  <button onClick={copyLink} className="btn btn-outline btn-sm">
-                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    {copied ? "Copied" : "Copy link"}
-                  </button>
-                  <button onClick={() => setEmbedOpen(true)} className="btn btn-outline btn-sm">
-                    <Code2 className="h-4 w-4" /> Embed
-                  </button>
-                  <a href={`/r/${slug}`} target="_blank" rel="noreferrer" className="btn btn-primary btn-sm">
-                    <ExternalLink className="h-4 w-4" /> View live
-                  </a>
-                </>
-              )}
               <button
                 onClick={onDownload}
                 className="btn btn-outline btn-sm"
@@ -3565,8 +3506,8 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
               </h4>
               {templateMode && (
                 <p className="mb-3 rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-2">
-                  Templates don&apos;t keep settings that send answers somewhere or identify your organisation: the redirect
-                  URL, email notifications, logo and cover image. Set those on each form.
+                  Templates don&apos;t keep the logo and cover image, which identify your organisation. Set those on
+                  each form.
                 </p>
               )}
               <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Submit button label</label>
@@ -3576,78 +3517,6 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                 placeholder="Submit"
                 className={`${fieldCls} mb-3`}
               />
-              {!templateMode && (
-                <>
-                  <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Redirect URL after submit</label>
-                  <input
-                    value={schema.settings?.redirectUrl ?? ""}
-                    onChange={(e) => updateSettings({ redirectUrl: e.target.value })}
-                    placeholder="https://…"
-                    className={fieldCls}
-                  />
-                  <p className="mt-1.5 text-xs text-muted">
-                    Leave blank to show the built-in thank-you screen.
-                  </p>
-                </>
-              )}
-
-              <label className="mt-4 flex items-start gap-2.5">
-                <input
-                  type="checkbox"
-                  checked={!!schema.settings?.spamProtection}
-                  onChange={(e) => updateSettings({ spamProtection: e.target.checked })}
-                  className="mt-0.5 h-4 w-4 accent-[#6D5EFA]"
-                />
-                <span>
-                  <span className="block text-[12.5px] font-semibold text-ink-2">
-                    Spam protection
-                  </span>
-                  <span className="block text-xs text-muted">
-                    Require a Cloudflare Turnstile challenge before submitting.
-                  </span>
-                </span>
-              </label>
-              <label className="mt-3 flex items-start gap-2.5">
-                <input
-                  type="checkbox"
-                  checked={!!schema.settings?.partialSubmissions}
-                  onChange={(e) => updateSettings({ partialSubmissions: e.target.checked })}
-                  className="mt-0.5 h-4 w-4 accent-[#6D5EFA]"
-                />
-                <span>
-                  <span className="block text-[12.5px] font-semibold text-ink-2">
-                    Capture partial submissions
-                  </span>
-                  <span className="block text-xs text-muted">
-                    Save in-progress answers before the respondent finishes.
-                  </span>
-                </span>
-              </label>
-
-              {!templateMode && (
-                <>
-                  <label className="mb-1.5 mt-4 block text-[12.5px] font-semibold text-ink-2">
-                    Email notifications
-                  </label>
-                  <input
-                    defaultValue={(schema.settings?.notifyEmails ?? []).join(", ")}
-                    onBlur={(e) =>
-                      updateSettings({
-                        notifyEmails: e.target.value
-                          .split(",")
-                          .map((s) => s.trim())
-                          .filter(Boolean),
-                      })
-                    }
-                    placeholder="you@team.com, ops@team.com"
-                    className={fieldCls}
-                  />
-                  <p className="mt-1.5 text-xs text-muted">
-                    Comma-separated. We&apos;ll email these addresses on every new response.
-                  </p>
-                </>
-              )}
-
               {paged && (
                 <>
                   <h4 className="mb-2 mt-5 text-[12.5px] font-semibold text-ink-2">Navigation</h4>
@@ -4077,41 +3946,6 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                 {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {embedOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setEmbedOpen(false)} />
-          <div className="relative w-full max-w-lg rounded-2xl bg-surface p-6 shadow-2xl">
-            <div className="mb-1 flex items-center justify-between">
-              <h3 className="text-lg font-semibold tracking-tight">Embed this form</h3>
-              <button
-                onClick={() => setEmbedOpen(false)}
-                className="grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-surface-3 hover:text-ink"
-                aria-label="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <p className="mb-4 text-sm text-muted">Paste into any site, CMS, or docs page.</p>
-            {embeds.map((s) => (
-              <div key={s.key} className="mb-4">
-                <div className="mb-1.5 flex items-center justify-between">
-                  <span className="text-[12.5px] font-semibold text-ink-2">{s.label}</span>
-                  <button
-                    onClick={() => copySnippet(s.key, s.code)}
-                    className="text-xs font-semibold text-accent-2 hover:underline"
-                  >
-                    {copiedKey === s.key ? "Copied!" : "Copy"}
-                  </button>
-                </div>
-                <pre className="overflow-x-auto whitespace-pre-wrap break-all rounded-lg bg-[#17161c] p-3 text-[12px] leading-relaxed text-[#e7e5ee]">
-                  {s.code}
-                </pre>
-              </div>
-            ))}
           </div>
         </div>
       )}

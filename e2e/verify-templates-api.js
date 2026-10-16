@@ -96,6 +96,7 @@ const household = () => ({
       templateRef: { id: "x", version: 9, name: "Old" },
       settings: {
         submitLabel: "Send it",
+        // Removed from FormSettings with the hosted form: accepted, and not stored.
         notifyEmails: ["owner@client.example"],
         redirectUrl: "https://client.example/thanks",
         spamProtection: true,
@@ -108,10 +109,10 @@ const household = () => ({
     check("create form template: 201, version 1", r.status === 201 && formTpl.kind === "form" && formTpl.version === 1, short(r));
     const storedForm = (await prisma.template.findUnique({ where: { id: formTpl?.id } })).content;
     const s = storedForm.settings;
-    check("stored: settings that route data or identify the organisation are stripped",
-      !("notifyEmails" in s) && !("redirectUrl" in s) && !("logo" in s.theme) && !("cover" in s.theme), JSON.stringify(s));
-    check("stored: presentation and behaviour settings are kept",
-      s.submitLabel === "Send it" && s.spamProtection === true && s.theme.accent === "#123456" && Object.keys(s).length === 3 && Object.keys(s.theme).length === 1,
+    check("stored: the logo and cover, which identify the organisation, are stripped", !("logo" in s.theme) && !("cover" in s.theme), JSON.stringify(s));
+    check("stored: the removed hosted settings are dropped", !("notifyEmails" in s) && !("redirectUrl" in s) && !("spamProtection" in s), JSON.stringify(s));
+    check("stored: the other settings are kept",
+      s.submitLabel === "Send it" && s.theme.accent === "#123456" && Object.keys(s).length === 2 && Object.keys(s.theme).length === 1,
       JSON.stringify(s));
     check("stored: no template references in a template, at any depth", !JSON.stringify(storedForm).includes("templateRef"));
 
@@ -244,7 +245,7 @@ const household = () => ({
     check("conditions follow the new ids; condition ids and logic text kept",
       madeDose.enableWhen.every((c) => formIds.includes(c.question)) && madeDose.enableLogicText === "1 AND (2 OR 3)" &&
       JSON.stringify(madeDose.enableWhen.map((c) => c.id)) === JSON.stringify(walkBlocks(storedForm.blocks).find((e) => e.block.id === "dose").block.enableWhen.map((c) => c.id)));
-    check("its settings are the template's", madeSchema.settings.submitLabel === "Send it" && !("notifyEmails" in madeSchema.settings));
+    check("its settings are the template's", JSON.stringify(madeSchema.settings) === JSON.stringify(s), JSON.stringify(madeSchema.settings));
     r = await call("GET", `/v1/forms/${made.id}/artifact`, A);
     check("its download has no templateRef", r.status === 200 && !r.text.includes("templateRef") && !r.text.includes(formTpl.id), short(r));
     r = await call("POST", "/v1/forms", A, { templateId: group.id });
@@ -258,7 +259,7 @@ const household = () => ({
     const plain = (await prisma.formVersion.findFirst({ where: { formId: r.json.id } })).schema;
     check("a blank form is made as before (no templateRef)", r.status === 201 && plain.title === "Plain" && plain.blocks.length === 0 && !("templateRef" in plain), short(r));
 
-    // ---------- inserted twice, saved, downloaded and published ----------
+    // ---------- inserted twice, saved and downloaded ----------
     const tpl = await call("GET", `/v1/templates/${group.id}`, A);
     const source = { id: group.id, version: tpl.json.version, name: tpl.json.name, content: tpl.json.content };
     let blocks = [q("intro")];

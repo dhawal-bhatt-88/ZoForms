@@ -7,12 +7,6 @@ import { ChevronLeft, Loader2, Power, Sparkles } from "lucide-react";
 import AdminShell from "@/components/admin-shell";
 import { getOrg, updateOrg, type OrgDetail } from "@/lib/api";
 
-const FORM_STATUS: Record<string, string> = {
-  PUBLISHED: "text-green",
-  DRAFT: "text-muted",
-  CLOSED: "text-amber",
-};
-
 export default function TenantDetail() {
   const { id } = useParams<{ id: string }>();
   const [org, setOrg] = useState<OrgDetail | null>(null);
@@ -131,9 +125,6 @@ export default function TenantDetail() {
                   <div key={f.id} className="flex items-center gap-3 py-2.5 text-sm">
                     <span className="flex-1 truncate font-medium">{f.title}</span>
                     <span className="tabular-nums text-muted">{f._count.responses} resp.</span>
-                    <span className={`w-20 text-right text-xs font-semibold uppercase ${FORM_STATUS[f.status]}`}>
-                      {f.status}
-                    </span>
                   </div>
                 ))}
               </div>

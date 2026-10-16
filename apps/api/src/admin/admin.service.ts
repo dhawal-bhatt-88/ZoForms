@@ -16,12 +16,11 @@ export class AdminService {
   async overview() {
     const since = new Date(Date.now() - 13 * 24 * 60 * 60 * 1000);
     since.setHours(0, 0, 0, 0);
-    const [orgs, users, forms, published, responses, userRows, recentOrgs] =
+    const [orgs, users, forms, responses, userRows, recentOrgs] =
       await Promise.all([
         this.prisma.organization.count(),
         this.prisma.user.count(),
         this.prisma.form.count(),
-        this.prisma.form.count({ where: { status: "PUBLISHED" } }),
         this.prisma.response.count(),
         this.prisma.user.findMany({ where: { createdAt: { gte: since } }, select: { createdAt: true } }),
         this.prisma.organization.findMany({
@@ -45,7 +44,7 @@ export class AdminService {
     }
 
     return {
-      totals: { orgs, users, forms, published, responses },
+      totals: { orgs, users, forms, responses },
       signups,
       recentOrgs,
     };
@@ -119,8 +118,6 @@ export class AdminService {
         select: {
           id: true,
           title: true,
-          slug: true,
-          status: true,
           createdAt: true,
           _count: { select: { responses: true } },
         },
@@ -235,7 +232,7 @@ export class AdminService {
 
   async listForms(q?: string) {
     const where: Prisma.FormWhereInput = q
-      ? { OR: [{ title: { contains: q, mode: "insensitive" } }, { slug: { contains: q, mode: "insensitive" } }] }
+      ? { title: { contains: q, mode: "insensitive" } }
       : {};
     const forms = await this.prisma.form.findMany({
       where,
@@ -244,8 +241,6 @@ export class AdminService {
       select: {
         id: true,
         title: true,
-        slug: true,
-        status: true,
         createdAt: true,
         _count: { select: { responses: true } },
         workspace: { select: { org: { select: { id: true, name: true } } } },
@@ -254,25 +249,10 @@ export class AdminService {
     return forms.map((f) => ({
       id: f.id,
       title: f.title,
-      slug: f.slug,
-      status: f.status,
       createdAt: f.createdAt,
       responses: f._count.responses,
       org: f.workspace.org,
     }));
-  }
-
-  async updateForm(actor: AdminActor, id: string, dto: { status?: string }) {
-    const form = await this.prisma.form.findUnique({ where: { id }, select: { status: true } });
-    if (!form) throw new NotFoundException("Form not found");
-    if (!dto.status || !["DRAFT", "PUBLISHED", "CLOSED"].includes(dto.status))
-      throw new BadRequestException("Invalid status");
-    const updated = await this.prisma.form.update({
-      where: { id },
-      data: { status: dto.status as "DRAFT" | "PUBLISHED" | "CLOSED" },
-    });
-    await this.audit(actor, "form.status_changed", "form", id, { from: form.status, to: dto.status });
-    return { id: updated.id, status: updated.status };
   }
 
   async deleteForm(actor: AdminActor, id: string) {

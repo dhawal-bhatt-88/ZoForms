@@ -6,8 +6,8 @@
 // formula nested 5 groups deep downloaded and checked by the external app's
 // installed @zoworkhq/forms (assertSchemaIntegrity, calculateScores); every
 // save-time rejection with its message (naming the group and the score, or the
-// question); the downloaded artifact and the published form (scores and option
-// scores, no names or formula text); group templates; restoring a version.
+// question); the downloaded artifact (scores and option scores, no names or
+// formula text); group templates; restoring a version.
 const path = require("path");
 const { pathToFileURL } = require("url");
 const { API, PrismaClient } = require("./_setup");

@@ -2,8 +2,6 @@ import { Module } from "@nestjs/common";
 import { AuthModule } from "../auth/auth.module";
 import { TemplatesModule } from "../templates/templates.module";
 import { FormsController } from "./forms.controller";
-import { PublicController } from "./public.controller";
-import { UploadsController } from "./uploads.controller";
 import { FormsService } from "./forms.service";
 import { AiController } from "../ai/ai.controller";
 import { AiService } from "../ai/ai.service";
@@ -16,8 +14,6 @@ import { SearchService } from "../search/search.service";
   imports: [AuthModule, TemplatesModule],
   controllers: [
     FormsController,
-    PublicController,
-    UploadsController,
     AiController,
     SettingsController,
   ],

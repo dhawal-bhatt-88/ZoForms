@@ -434,16 +434,12 @@ describe("templateRef", () => {
 });
 
 describe("cleanTemplateForm", () => {
-  it("strips settings that route data or identify the organisation, and template references", () => {
+  it("strips the settings that identify the organisation, and template references", () => {
     const content = FormSchema.parse({
       title: "F",
       templateRef: { id: "t", version: 1, name: "T" },
       settings: {
         submitLabel: "Send",
-        redirectUrl: "https://client.example/thanks",
-        notifyEmails: ["owner@client.example"],
-        spamProtection: true,
-        partialSubmissions: true,
         theme: { accent: "#111111", font: "serif", logo: "https://client.example/logo.png", cover: "/uploads/cover.png", customCss: ".x{}" },
       },
       navigation: { reviewPage: false },
@@ -454,8 +450,6 @@ describe("cleanTemplateForm", () => {
     expect(clean.templateRef).toBeUndefined();
     expect(clean.settings).toEqual({
       submitLabel: "Send",
-      spamProtection: true,
-      partialSubmissions: true,
       theme: { accent: "#111111", font: "serif", customCss: ".x{}" },
     });
     expect(clean.navigation).toEqual({ reviewPage: false });
@@ -464,7 +458,7 @@ describe("cleanTemplateForm", () => {
   });
 
   it("leaves no empty settings or theme behind", () => {
-    const clean = cleanTemplateForm(FormSchema.parse({ title: "F", settings: { notifyEmails: ["a@b.c"], theme: { logo: "x" } }, blocks: [] }));
+    const clean = cleanTemplateForm(FormSchema.parse({ title: "F", settings: { theme: { logo: "x" } }, blocks: [] }));
     expect(clean).not.toHaveProperty("settings");
   });
 });

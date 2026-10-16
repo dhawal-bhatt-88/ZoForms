@@ -3,15 +3,16 @@ import { dirname, join } from "path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Baseline security headers applied to every route. (No global X-Frame-Options
-// so the public form runtime /r/* stays embeddable; the authenticated app is
-// frame-protected separately below.)
-const SAFE_HEADERS = [
+// Security headers applied to every route. No page is meant to be embedded, so
+// framing is denied everywhere, by both the old header and CSP.
+const SECURITY_HEADERS = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
   { key: "X-DNS-Prefetch-Control", value: "off" },
   { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
 ];
 
 /** @type {import('next').NextConfig} */
@@ -21,11 +22,7 @@ const nextConfig = {
   outputFileTracingRoot: join(__dirname, "../../"),
   transpilePackages: ["@formbuilder/form-schema", "@formbuilder/ui"],
   async headers() {
-    return [
-      { source: "/:path*", headers: SAFE_HEADERS },
-      // Anti-clickjacking for the authenticated app (embeds are on /r/* only).
-      { source: "/app/:path*", headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }] },
-    ];
+    return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },
 };
 

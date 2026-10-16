@@ -76,15 +76,6 @@ export class AdminController {
     return this.admin.listForms(q);
   }
 
-  @Patch("forms/:id")
-  updateForm(
-    @CurrentAdmin() actor: AdminActor,
-    @Param("id") id: string,
-    @Body() body: { status?: string },
-  ) {
-    return this.admin.updateForm(actor, id, body || {});
-  }
-
   @Delete("forms/:id")
   deleteForm(@CurrentAdmin() actor: AdminActor, @Param("id") id: string) {
     return this.admin.deleteForm(actor, id);

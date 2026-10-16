@@ -60,19 +60,16 @@ export function templateFromForm(kind: TemplateKind, form: FormSchema): FormSche
 }
 
 /*
- * Form settings a template never keeps. They route a form's answers somewhere
- * (`notifyEmails`, `redirectUrl`) or identify the organisation it was made for
- * (the theme's `logo` and `cover` images). Presentation and behaviour settings
- * stay. Custom domains and the form's slug aren't part of form content at all,
- * so a template can't carry them.
+ * Form settings a template never keeps: the theme's `logo` and `cover` images,
+ * which identify the organisation the form was made for. The other settings
+ * stay. Custom domains aren't part of form content at all, so a template can't
+ * carry them.
  */
-export const TEMPLATE_STRIPPED_SETTINGS = ["notifyEmails", "redirectUrl"] as const;
 export const TEMPLATE_STRIPPED_THEME_SETTINGS = ["logo", "cover"] as const;
 
 function templateSettings(settings: FormSettings | undefined): FormSettings | undefined {
   if (!settings) return undefined;
   const kept: Record<string, unknown> = { ...settings };
-  for (const key of TEMPLATE_STRIPPED_SETTINGS) delete kept[key];
   if (settings.theme) {
     const theme: Record<string, unknown> = { ...settings.theme };
     for (const key of TEMPLATE_STRIPPED_THEME_SETTINGS) delete theme[key];
@@ -85,7 +82,7 @@ function templateSettings(settings: FormSettings | undefined): FormSettings | un
 /**
  * A template's content as stored: without template references at any depth
  * (a template doesn't carry another template's provenance) and without the
- * settings in `TEMPLATE_STRIPPED_SETTINGS` and `TEMPLATE_STRIPPED_THEME_SETTINGS`.
+ * theme settings in `TEMPLATE_STRIPPED_THEME_SETTINGS`.
  */
 export function cleanTemplateForm(form: FormSchema): FormSchema {
   const { templateRef: _ref, settings, ...rest } = form;

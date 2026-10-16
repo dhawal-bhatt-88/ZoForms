@@ -11,7 +11,6 @@ import {
   newBlock,
   newBlockId,
   resolveTheme,
-  validateSubmission,
   type LeafBlock as TBlock,
   type Condition,
 } from "./index";
@@ -231,39 +230,20 @@ describe("dependency guards", () => {
   });
 });
 
-describe("validateSubmission", () => {
-  const form: FormSchema = {
-    title: "Contact",
-    blocks: [
-      { id: "name", type: "short", label: "Name", required: true },
-      { id: "note", type: "long", label: "Note", required: false },
-      { id: "intro", type: "heading", label: "Welcome" },
-    ],
-  };
-
-  it("returns cleaned values for a valid submission", () => {
-    expect(validateSubmission(form, { name: "Ada", note: "hi" })).toEqual({
-      name: "Ada",
-      note: "hi",
+describe("FormSettings", () => {
+  it("drops the removed hosted settings from a form saved before, without failing", () => {
+    const saved = FormSchema.parse({
+      title: "Old",
+      settings: {
+        submitLabel: "Send",
+        redirectUrl: "https://client.example/thanks",
+        spamProtection: true,
+        partialSubmissions: true,
+        notifyEmails: ["owner@client.example"],
+      },
+      blocks: [],
     });
-  });
-
-  it("omits empty optional answers", () => {
-    expect(validateSubmission(form, { name: "Ada" })).toEqual({ name: "Ada" });
-  });
-
-  it("throws when a required field is missing", () => {
-    expect(() => validateSubmission(form, { note: "hi" })).toThrow(/"Name" is required/);
-  });
-
-  it("treats empty strings and empty arrays as missing", () => {
-    expect(() => validateSubmission(form, { name: "" })).toThrow(/required/);
-    expect(() => validateSubmission(form, { name: [] })).toThrow(/required/);
-  });
-
-  it("never collects a value for static (layout) blocks", () => {
-    const cleaned = validateSubmission(form, { name: "Ada", intro: "should be ignored" });
-    expect(cleaned).not.toHaveProperty("intro");
+    expect(saved.settings).toEqual({ submitLabel: "Send" });
   });
 });
 

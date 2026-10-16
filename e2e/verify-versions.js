@@ -1,9 +1,6 @@
 // HTTP-level verification of append-only versions + read-only artifact endpoint,
 // against the running API (real auth + org guards) and the live dev database.
-const path = require("path");
-const fs = require("fs");
-const { ROOT, API, PrismaClient } = require("./_setup");
-const API_DIR = path.join(ROOT, "apps/api");
+const { API, PrismaClient } = require("./_setup");
 const prisma = new PrismaClient();
 
 const results = [];
@@ -19,16 +16,6 @@ async function call(method, p, token, body) {
   return { status: r.status, headers: r.headers, text, json };
 }
 
-// Snapshot of every file under both uploads dirs: name -> mtime.
-function uploadsState() {
-  const out = {};
-  for (const dir of [path.join(API_DIR, "uploads"), path.join(API_DIR, "../../uploads")]) {
-    if (!fs.existsSync(dir)) continue;
-    for (const f of fs.readdirSync(dir)) out[dir + "/" + f] = fs.statSync(path.join(dir, f)).mtimeMs;
-  }
-  return out;
-}
-
 const X = { title: "Verify", blocks: [{ id: "b_x1", type: "short", label: "Name", required: false }] };
 const Y = { title: "Verify", blocks: [{ id: "b_x1", type: "short", label: "Full name", required: true }] };
 
@@ -36,8 +23,6 @@ const Y = { title: "Verify", blocks: [{ id: "b_x1", type: "short", label: "Full 
   const tag = Date.now();
   const createdEmails = [];
   try {
-    const uploadsBefore = uploadsState();
-
     const signup = async (who) => {
       const email = `verify-${who}-${tag}@example.test`;
       createdEmails.push(email);
@@ -63,8 +48,8 @@ const Y = { title: "Verify", blocks: [{ id: "b_x1", type: "short", label: "Full 
     const art1 = d1.json;
     check("artifact -> 200", d1.status === 200, `${d1.status} ${d1.text.slice(0, 120)}`);
     check("Content-Type application/json", (d1.headers.get("content-type") || "").startsWith("application/json"), d1.headers.get("content-type"));
-    check("Content-Disposition attachment + filename",
-      d1.headers.get("content-disposition") === `attachment; filename="${form.slug}-schema.json"`,
+    check("Content-Disposition attachment, named from the title and version",
+      d1.headers.get("content-disposition") === `attachment; filename="verify-v2.json"`,
       d1.headers.get("content-disposition"));
     check("formId === Form.id", art1.formId === form.id);
     check("formVersionId === saved version row id", art1.formVersionId === s1.json.versionId);
@@ -136,9 +121,17 @@ const Y = { title: "Verify", blocks: [{ id: "b_x1", type: "short", label: "Full 
     check("download serves the latest version", latest.formVersionId === newest.id && latest.title === newest.schema.title
       && JSON.stringify(latest.blocks) === JSON.stringify(newest.schema.blocks), `${latest.formVersionId} vs ${newest.id}`);
 
-    // uploads/ untouched
-    const uploadsAfter = uploadsState();
-    check("uploads/ not written", JSON.stringify(uploadsBefore) === JSON.stringify(uploadsAfter));
+    // Download names: lower case, runs of anything but a–z 0–9 as "-", trimmed, then -v<version>
+    const named = async (title) => {
+      const f = (await call("POST", "/v1/forms", A, { title: "Naming" })).json;
+      await call("PUT", `/v1/forms/${f.id}/schema`, A, { title, blocks: X.blocks });
+      const r = await call("GET", `/v1/forms/${f.id}/artifact`, A);
+      return /filename="([^"]+)"/.exec(r.headers.get("content-disposition") || "")?.[1];
+    };
+    for (const [title, want] of [["PHQ-9 (adult)", "phq-9-adult-v2.json"], ["  --Intake  form--  ", "intake-form-v2.json"], ["¿¡ !?", "form-v2.json"], ["Café №5", "caf-5-v2.json"]]) {
+      const got = await named(title);
+      check(`download name for ${JSON.stringify(title)}: ${want}`, got === want, got);
+    }
   } catch (e) {
     check("script ran without error", false, e.stack);
   } finally {
