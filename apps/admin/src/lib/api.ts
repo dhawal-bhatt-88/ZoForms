@@ -87,7 +87,6 @@ export type OrgDetail = {
   slug: string;
   status: string;
   createdAt: string;
-  hasAiKey: boolean;
   members: { id: string; email: string; name: string | null; role: string; status: string }[];
   forms: { id: string; title: string; createdAt: string }[];
 };

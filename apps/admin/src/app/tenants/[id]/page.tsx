@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, Loader2, Power, Sparkles } from "lucide-react";
+import { ChevronLeft, Loader2, Power } from "lucide-react";
 import AdminShell from "@/components/admin-shell";
 import { getOrg, updateOrg, type OrgDetail } from "@/lib/api";
 
@@ -65,11 +65,6 @@ export default function TenantDetail() {
                 {org.status === "suspended" && (
                   <span className="rounded-full bg-[#FCECEC] px-2 py-0.5 text-[11px] font-semibold text-red">
                     Suspended
-                  </span>
-                )}
-                {org.hasAiKey && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-accent-weak px-2 py-0.5 text-[11px] font-semibold text-accent-2">
-                    <Sparkles className="h-3 w-3" /> AI key
                   </span>
                 )}
               </div>

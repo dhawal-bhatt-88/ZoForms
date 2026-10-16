@@ -20,8 +20,6 @@ const EnvSchema = z.object({
   CORS_ORIGINS: z.string().optional(),
   // Public origin of the tenant web app — used to build invite/accept links.
   PUBLIC_TENANT_URL: z.string().url().default("http://localhost:3000"),
-  ANTHROPIC_API_KEY: z.string().optional(),
-  ANTHROPIC_MODEL: z.string().default("claude-haiku-4-5-20251001"),
   // Custom domains (Cloudflare SSL-for-SaaS). All optional — without them, the
   // domain flow falls back to a DNS (CNAME) verification the user sets up.
   CLOUDFLARE_API_TOKEN: z.string().optional(),

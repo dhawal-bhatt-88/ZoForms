@@ -98,7 +98,6 @@ export class AdminService {
         slug: true,
         status: true,
         createdAt: true,
-        anthropicApiKey: true,
         memberships: {
           select: {
             role: true,
@@ -121,7 +120,6 @@ export class AdminService {
       slug: org.slug,
       status: org.status,
       createdAt: org.createdAt,
-      hasAiKey: !!org.anthropicApiKey,
       members: org.memberships.map((m) => ({ role: m.role, ...m.user })),
       forms,
     };

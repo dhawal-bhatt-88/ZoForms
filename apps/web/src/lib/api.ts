@@ -254,36 +254,6 @@ export async function acceptInvite(
   return r.user;
 }
 
-/* ---------- settings ---------- */
-
-export type Settings = {
-  hasAnthropicKey: boolean;
-  keyHint: string | null;
-  aiModel: string;
-  envKeyPresent: boolean;
-};
-
-export function getSettings() {
-  return req<Settings>("/v1/settings");
-}
-
-export function updateSettings(patch: {
-  anthropicApiKey?: string | null;
-  aiModel?: string | null;
-}) {
-  return req<Settings>("/v1/settings", {
-    method: "PUT",
-    body: JSON.stringify(patch),
-  });
-}
-
-export function testAiConnection() {
-  return req<{ ok: boolean; model?: string; sample?: string; reason?: string }>(
-    "/v1/settings/test-ai",
-    { method: "POST" },
-  );
-}
-
 /* ---------- forms (authenticated) ---------- */
 
 export type FormListItem = {
@@ -425,32 +395,4 @@ export function duplicateForm(id: string) {
 
 export function deleteForm(id: string) {
   return req<{ ok: boolean }>(`/v1/forms/${id}`, { method: "DELETE" });
-}
-
-export function generateForm(prompt: string) {
-  return req<FormListItem>("/v1/ai/generate-form", {
-    method: "POST",
-    body: JSON.stringify({ prompt }),
-  });
-}
-
-export function editForm(schema: FormSchema, instruction: string) {
-  return req<{ schema: FormSchema; message: string; changes: string[] }>(
-    "/v1/ai/edit-form",
-    { method: "POST", body: JSON.stringify({ schema, instruction }) },
-  );
-}
-
-export type LogicSuggestion = { when: string; then: string; rationale?: string };
-export function suggestLogic(schema: FormSchema) {
-  return req<{ suggestions: LogicSuggestion[]; ai: boolean }>("/v1/ai/suggest-logic", {
-    method: "POST",
-    body: JSON.stringify({ schema }),
-  });
-}
-export function translateForm(schema: FormSchema, targetLang: string) {
-  return req<{ schema: FormSchema; translated: boolean; note?: string }>(
-    "/v1/ai/translate-form",
-    { method: "POST", body: JSON.stringify({ schema, targetLang }) },
-  );
 }

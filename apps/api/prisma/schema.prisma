@@ -50,8 +50,6 @@ model Organization {
   slug            String       @unique
   status           String      @default("active") // active | suspended
   createdAt        DateTime    @default(now())
-  anthropicApiKey String?
-  aiModel         String?
   workspaces      Workspace[]
   memberships     Membership[]
   invites         Invite[]

@@ -9,7 +9,6 @@ import {
   LayoutGrid,
   LayoutTemplate,
   LogOut,
-  Settings,
   Users,
 } from "lucide-react";
 import { logout, me, resendVerification } from "@/lib/api";
@@ -21,7 +20,6 @@ const NAV = [
   { href: "/app/templates", label: "Templates", icon: LayoutTemplate },
   { href: "/app/domains", label: "Domains", icon: Globe },
   { href: "/app/team", label: "Team", icon: Users },
-  { href: "/app/settings", label: "Settings", icon: Settings },
 ];
 
 export default function AppShell({

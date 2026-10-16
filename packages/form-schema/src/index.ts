@@ -551,22 +551,11 @@ export interface PageBlock extends NoLeafFields {
   type: "page";
   title: string;
   /**
-   * WORKAROUND — a page has NO `label` at runtime; it is named by `title`.
-   *
-   * Declared as a required `never` (not an optional one) purely so that
-   * `block.label` on the `Block` union still types as `string`. An optional
-   * `never` would make it `string | undefined`, which breaks code written
-   * before pages existed that must not be touched in Phase 7: the AI service
-   * (apps/api/src/ai/ai.service.ts).
-   *
-   * RUNTIME RISK: this is a lie to the type checker. Any code that reads
-   * `block.label` on a block that turns out to be a page gets `undefined`,
-   * with no compile error to warn about it. The AI service does exactly that
-   * for a paged form's top-level blocks. In-scope code reads names with
-   * `blockName`. See KNOWN-ISSUES.md: revisit this when the AI service comes
-   * back into scope, and make this `label?: never`.
+   * A page has no `label`; it is named by `title`. Declared as an optional
+   * `never` so that `block.label` on the `Block` union types as
+   * `string | undefined`: code that may meet a page reads names with `blockName`.
    */
-  label: never;
+  label?: never;
   /** Pages never repeat (contract §12.1). Kept when sent only so the save rules can reject it by name. */
   repeats?: true;
   enableWhen?: Condition[];
@@ -726,20 +715,19 @@ const BlockUnion = z.discriminatedUnion("type", [
   PresentationalBlock,
 ]);
 /*
- * A parsed page has no `label`, while PageBlock declares a phantom
- * `label: never` (see PageBlock.label), so the union is cast to `Block`. These
- * compile-time checks keep what the cast would otherwise hide: every member's
- * parsed shape matches its TypeScript type, and so does every input.
+ * `z.preprocess` types its input as `unknown`, so the union is cast to name
+ * `BlockInput`. These compile-time checks keep what the cast would otherwise
+ * hide: every member's parsed shape matches its TypeScript type, and so does
+ * every input.
  */
 type Parsed = z.output<typeof BlockUnion>;
 type Expect<T extends true> = T;
 type Assignable<A, B> = [A] extends [B] ? true : false;
 export type _BlockShapesMatch = [
-  Expect<Assignable<Exclude<Parsed, { type: "page" }>, Block>>,
-  Expect<Assignable<Extract<Parsed, { type: "page" }>, Omit<PageBlock, "label">>>,
+  Expect<Assignable<Parsed, Block>>,
   Expect<Assignable<BlockInput, z.input<typeof BlockUnion>>>,
 ];
-export const Block = z.preprocess(withoutIdleRepeatSettings, BlockUnion) as unknown as z.ZodType<
+export const Block = z.preprocess(withoutIdleRepeatSettings, BlockUnion) as z.ZodType<
   Block,
   z.ZodTypeDef,
   BlockInput
@@ -967,7 +955,7 @@ export function sameContent(a: unknown, b: unknown): boolean {
  *
  * They live here rather than on `FormSchema` because `FormSchema` describes
  * stored, editable form *content*, which legitimately has no identity yet
- * (templates, AI drafts, a form seeded by `emptyForm`). Identity belongs to the
+ * (templates, a form seeded by `emptyForm`). Identity belongs to the
  * `FormVersion` row the content is stored in, not to the content itself.
  *
  * The API stamps both and never reads them from client input: a client could

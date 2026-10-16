@@ -32,7 +32,6 @@ import {
   Loader2,
   Plus,
   Search,
-  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -181,20 +180,14 @@ import { BlockPreview, DropLine, GroupBox, ICONS, MAX_INDENT_LEVELS } from "./ca
 import {
   ApiError,
   downloadArtifact,
-  editForm,
   getForm,
   getTemplate,
   saveSchema,
   updateTemplate,
-  suggestLogic,
-  translateForm,
   type TemplateDetail,
   type TemplateKind,
   type TemplateScope,
-  type LogicSuggestion,
 } from "@/lib/api";
-
-type AiMsg = { role: "user" | "assistant"; text: string; changes?: string[] };
 
 type CatalogItem = {
   // Pages are added with their own control, never from the block menu.
@@ -1553,9 +1546,9 @@ function editorContent(s: Partial<FormSchema> | undefined, fallbackTitle: string
 /**
  * The form editor. With `templateId` it edits a template instead ("template
  * mode"): the same canvas, inspector, save rules, Save and Cancel, but Save
- * writes to the template, and what only applies to a form — Download and
- * AI — isn't offered. A group template is edited as a form whose only root
- * item is its group, and it can't gain more root items.
+ * writes to the template, and what only applies to a form — Download — isn't
+ * offered. A group template is edited as a form whose only root item is its
+ * group, and it can't gain more root items.
  */
 export default function FormEditor({ templateId }: { templateId?: string }) {
   const params = useParams();
@@ -1585,15 +1578,6 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   // `info` notes are neutral (e.g. a setting switched for the author); the rest are refusals.
   const [notice, setNotice] = useState<{ text: string; blocks?: Block[]; tone?: "info" } | null>(null);
   const [loadError, setLoadError] = useState(false);
-  const [aiOpen, setAiOpen] = useState(false);
-  const [aiMsgs, setAiMsgs] = useState<AiMsg[]>([]);
-  const [aiInput, setAiInput] = useState("");
-  const [aiBusy, setAiBusy] = useState(false);
-  const [logicTips, setLogicTips] = useState<LogicSuggestion[] | null>(null);
-  const [logicBusy, setLogicBusy] = useState(false);
-  const [transLang, setTransLang] = useState("Spanish");
-  const [transBusy, setTransBusy] = useState(false);
-  const [transNote, setTransNote] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuQuery, setMenuQuery] = useState("");
   const [menuAnchor, setMenuAnchor] = useState({ left: 0, top: 0 });
@@ -1732,37 +1716,6 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
 
   const patch = (fn: (s: FormSchema) => FormSchema) =>
     setSchema((s) => (s ? fn(s) : s));
-
-  async function onSuggestLogic() {
-    if (!schema) return;
-    setLogicBusy(true);
-    try {
-      setLogicTips((await suggestLogic(schema)).suggestions);
-    } catch (e) {
-      setLogicTips([{ when: "Error", then: (e as Error).message }]);
-    } finally {
-      setLogicBusy(false);
-    }
-  }
-
-  async function onTranslate() {
-    if (!schema) return;
-    setTransBusy(true);
-    setTransNote(null);
-    try {
-      const r = await translateForm(schema, transLang);
-      if (r.translated) {
-        setSchema(r.schema);
-        setTransNote(`Translated to ${transLang}.`);
-      } else {
-        setTransNote(r.note || "Translation unavailable.");
-      }
-    } catch (e) {
-      setTransNote((e as Error).message);
-    } finally {
-      setTransBusy(false);
-    }
-  }
 
   const openMenu = (anchor?: HTMLElement | null, target: MoveTarget | null = null) => {
     setInsertTarget(target);
@@ -2503,30 +2456,6 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
       settings: { ...s.settings, theme: { ...s.settings?.theme, ...p } },
     }));
 
-  async function onAiSend() {
-    const text = aiInput.trim();
-    if (!text || aiBusy || !schema) return;
-    setAiMsgs((m) => [...m, { role: "user", text }]);
-    setAiInput("");
-    setAiBusy(true);
-    try {
-      const res = await editForm(schema, text);
-      setSchema(res.schema);
-      setSelectedId(null);
-      setAiMsgs((m) => [
-        ...m,
-        { role: "assistant", text: res.message, changes: res.changes },
-      ]);
-    } catch (e) {
-      setAiMsgs((m) => [
-        ...m,
-        { role: "assistant", text: (e as Error).message || "Something went wrong." },
-      ]);
-    } finally {
-      setAiBusy(false);
-    }
-  }
-
   /* Dragging: one flat list of the visible rows; sideways movement sets depth. */
   const dragItems = (activeId: string | null) =>
     schema ? flattenVisible(schema.blocks, collapsed, activeId) : [];
@@ -2769,12 +2698,6 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         <div className="ml-auto flex items-center gap-2">
           {!templateMode && (
             <>
-              <button
-                onClick={() => setAiOpen((v) => !v)}
-                className={`btn btn-sm ${aiOpen ? "btn-primary" : "btn-outline"}`}
-              >
-                <Sparkles className="h-4 w-4" /> Ask AI
-              </button>
               <button
                 onClick={onDownload}
                 className="btn btn-outline btn-sm"
@@ -3619,53 +3542,6 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                 </p>
               </fieldset>
 
-              {!templateMode && (
-                <>
-                  <h4 className="mb-3 mt-6 border-t border-line pt-4 text-[11px] font-bold uppercase tracking-wider text-faint">
-                    AI tools
-                  </h4>
-                  <button
-                    onClick={onSuggestLogic}
-                    disabled={logicBusy}
-                    className="btn btn-outline btn-sm w-full"
-                  >
-                    {logicBusy ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="h-4 w-4" />
-                    )}
-                    Suggest logic & branching
-                  </button>
-                  {logicTips && (
-                    <ul className="mt-2 space-y-1.5">
-                      {logicTips.map((t, i) => (
-                        <li key={i} className="rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-2">
-                          <span className="font-semibold">If</span> {t.when} →{" "}
-                          <span className="font-semibold">then</span> {t.then}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <div className="mt-3 flex gap-2">
-                    <input
-                      value={transLang}
-                      onChange={(e) => setTransLang(e.target.value)}
-                      placeholder="Language"
-                      className={fieldCls}
-                    />
-                    <button
-                      onClick={onTranslate}
-                      disabled={transBusy}
-                      className="btn btn-outline btn-sm flex-none"
-                    >
-                      {transBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                      Translate
-                    </button>
-                  </div>
-                  {transNote && <p className="mt-1.5 text-xs text-muted">{transNote}</p>}
-                </>
-              )}
-
               <h4 className="mb-3 mt-6 border-t border-line pt-4 text-[11px] font-bold uppercase tracking-wider text-faint">
                 Design
               </h4>
@@ -3844,103 +3720,6 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
           )}
         </aside>
       </div>
-
-      {aiOpen && (
-        <div className="fixed bottom-0 right-0 top-14 z-40 flex w-[360px] flex-col border-l border-line bg-surface shadow-2xl">
-          <div className="flex items-center gap-2 border-b border-line px-4 py-3">
-            <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#EFEDFE] text-accent-2">
-              <Sparkles className="h-4 w-4" />
-            </span>
-            <div className="flex-1">
-              <div className="text-sm font-semibold tracking-tight">Ask AI</div>
-              <div className="text-[11px] text-faint">Describe a change and I&apos;ll edit the form</div>
-            </div>
-            <button
-              onClick={() => setAiOpen(false)}
-              className="grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-surface-3 hover:text-ink"
-              aria-label="Close"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-
-          <div className="flex-1 space-y-3 overflow-auto px-4 py-4">
-            {aiMsgs.length === 0 && (
-              <div className="rounded-xl bg-surface-2 p-4 text-sm">
-                <p className="mb-2 font-medium text-ink">Tell me what to change.</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    "Add a phone number field",
-                    "Make everything required",
-                    "Add 3 rating questions",
-                    "Remove the company field",
-                  ].map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => setAiInput(s)}
-                      className="rounded-full border border-line bg-surface px-2.5 py-1 text-xs text-ink-2 hover:border-line-2"
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {aiMsgs.map((m, i) => (
-              <div key={i} className={m.role === "user" ? "flex justify-end" : "flex justify-start"}>
-                <div
-                  className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-sm ${
-                    m.role === "user" ? "bg-primary text-white" : "bg-surface-2 text-ink"
-                  }`}
-                >
-                  <div>{m.text}</div>
-                  {m.changes && m.changes.length > 0 && (
-                    <ul className="mt-2 space-y-1">
-                      {m.changes.map((c, j) => (
-                        <li key={j} className="flex items-center gap-1.5 text-xs text-muted">
-                          <Check className="h-3.5 w-3.5 flex-none text-green" />
-                          {c}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-            ))}
-            {aiBusy && (
-              <div className="flex items-center gap-2 text-sm text-muted">
-                <Loader2 className="h-4 w-4 animate-spin" /> Thinking…
-              </div>
-            )}
-          </div>
-
-          <div className="border-t border-line p-3">
-            <div className="relative">
-              <textarea
-                value={aiInput}
-                onChange={(e) => setAiInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    onAiSend();
-                  }
-                }}
-                rows={2}
-                placeholder="Ask AI to edit your form…"
-                className="w-full resize-none rounded-xl border border-line-2 px-3 py-2.5 pr-11 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent-weak"
-              />
-              <button
-                onClick={onAiSend}
-                disabled={aiBusy || !aiInput.trim()}
-                className="absolute bottom-2.5 right-2.5 grid h-8 w-8 place-items-center rounded-lg bg-primary text-white disabled:opacity-40"
-                aria-label="Send"
-              >
-                {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

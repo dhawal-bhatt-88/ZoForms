@@ -12,7 +12,6 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.110.0",
     "@formbuilder/form-schema": "workspace:*",
     "@nestjs/common": "^10.4.4",
     "@nestjs/core": "^10.4.4",
