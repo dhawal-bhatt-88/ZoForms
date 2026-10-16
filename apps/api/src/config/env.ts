@@ -31,9 +31,6 @@ const EnvSchema = z.object({
   // Resend transactional email. Without a key, emails are logged and skipped.
   RESEND_API_KEY: z.string().optional(),
   MAIL_FROM: z.string().default("Frame <onboarding@resend.dev>"),
-  // Meilisearch for response search. Without it, search falls back to Postgres.
-  MEILI_HOST: z.string().optional(),
-  MEILI_KEY: z.string().optional(),
   // Google sign-in — verifies the ID token audience. Without it, the /google
   // endpoint rejects and the web login hides the Google button.
   GOOGLE_CLIENT_ID: z.string().optional(),

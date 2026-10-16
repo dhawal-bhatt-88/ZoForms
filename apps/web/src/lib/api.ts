@@ -197,28 +197,6 @@ export function revokeInvite(id: string) {
   return req<{ ok: boolean }>(`/v1/team/invites/${id}`, { method: "DELETE" });
 }
 
-/* ---------- organization data controls ---------- */
-
-export type OrgSettings = {
-  dataRegion: "us" | "eu";
-  retentionDays: number;
-  brandingHidden: boolean;
-};
-export function getOrgSettings() {
-  return req<OrgSettings>("/v1/settings/org");
-}
-export function updateOrgSettings(patch: Partial<OrgSettings>) {
-  return req<OrgSettings>("/v1/settings/org", {
-    method: "PUT",
-    body: JSON.stringify(patch),
-  });
-}
-export function purgeResponses() {
-  return req<{ ok: boolean; purged: number }>("/v1/settings/org/purge", {
-    method: "POST",
-  });
-}
-
 /* ---------- custom domains ---------- */
 
 export type Domain = {
@@ -313,7 +291,6 @@ export type FormListItem = {
   title: string;
   createdAt: string;
   updatedAt?: string;
-  _count?: { responses: number };
 };
 
 export type FormDetail = {
@@ -471,45 +448,9 @@ export function suggestLogic(schema: FormSchema) {
     body: JSON.stringify({ schema }),
   });
 }
-export function summarizeResponses(formId: string) {
-  return req<{ summary: string; ai: boolean }>("/v1/ai/summarize-responses", {
-    method: "POST",
-    body: JSON.stringify({ formId }),
-  });
-}
-export function responsesCopilot(formId: string, question: string) {
-  return req<{ answer: string; ai: boolean }>("/v1/ai/responses-copilot", {
-    method: "POST",
-    body: JSON.stringify({ formId, question }),
-  });
-}
 export function translateForm(schema: FormSchema, targetLang: string) {
   return req<{ schema: FormSchema; translated: boolean; note?: string }>(
     "/v1/ai/translate-form",
     { method: "POST", body: JSON.stringify({ schema, targetLang }) },
   );
-}
-
-export function listResponses(id: string, q?: string) {
-  const qs = q && q.trim() ? `?q=${encodeURIComponent(q.trim())}` : "";
-  return req<{ id: string; data: Record<string, unknown>; createdAt: string }[]>(
-    `/v1/forms/${id}/responses${qs}`,
-  );
-}
-
-/* ---------- analytics ---------- */
-
-export type Analytics = {
-  views: number;
-  starts: number;
-  submissions: number;
-  completionRate: number;
-  startRate: number;
-  byDevice: { desktop: number; mobile: number; tablet: number };
-  bySource: { source: string; count: number }[];
-  daily: { date: string; views: number; submissions: number }[];
-};
-
-export function getAnalytics(id: string) {
-  return req<Analytics>(`/v1/forms/${id}/analytics`);
 }

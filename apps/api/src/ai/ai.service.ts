@@ -358,59 +358,6 @@ export class AiService {
     return { suggestions: this.logicHeuristic(schema), ai: false };
   }
 
-  /** Summarize a form's responses into themes + a short narrative. */
-  async summarizeResponses(
-    rawSchema: unknown,
-    responses: { data: unknown }[],
-    opts?: { apiKey?: string; model?: string },
-  ): Promise<{ summary: string; ai: boolean }> {
-    const schema = FormSchema.parse(rawSchema);
-    if (!responses.length) return { summary: "No responses to summarize yet.", ai: false };
-    const apiKey = opts?.apiKey || env.ANTHROPIC_API_KEY;
-    if (apiKey) {
-      try {
-        const summary = await this.claudeText(
-          apiKey,
-          opts?.model,
-          `Summarize the key themes, sentiment and notable outliers across these ${responses.length} form responses in 4-6 sentences.\n\n${this.responsesDigest(schema, responses, 60)}`,
-          700,
-        );
-        if (summary.trim()) return { summary: summary.trim(), ai: true };
-      } catch {
-        /* fall back */
-      }
-    }
-    return { summary: this.summaryHeuristic(schema, responses), ai: false };
-  }
-
-  /** Answer a natural-language question about a form's responses. */
-  async answerCopilot(
-    rawSchema: unknown,
-    responses: { data: unknown }[],
-    question: string,
-    opts?: { apiKey?: string; model?: string },
-  ): Promise<{ answer: string; ai: boolean }> {
-    const schema = FormSchema.parse(rawSchema);
-    const q = (question || "").trim();
-    if (!q) throw new BadRequestException("Ask a question about your responses.");
-    if (!responses.length) return { answer: "There are no responses yet.", ai: false };
-    const apiKey = opts?.apiKey || env.ANTHROPIC_API_KEY;
-    if (apiKey) {
-      try {
-        const answer = await this.claudeText(
-          apiKey,
-          opts?.model,
-          `Answer the question using ONLY these ${responses.length} form responses. Be concise and cite counts where relevant.\n\nQuestion: ${q}\n\n${this.responsesDigest(schema, responses, 80)}`,
-          600,
-        );
-        if (answer.trim()) return { answer: answer.trim(), ai: true };
-      } catch {
-        /* fall back */
-      }
-    }
-    return { answer: this.copilotHeuristic(schema, responses, q), ai: false };
-  }
-
   /** Translate a form's copy into another language. */
   async translateForm(
     rawSchema: unknown,
@@ -468,23 +415,6 @@ export class AiService {
     return start >= 0 && end > start ? text.slice(start, end + 1) : text;
   }
 
-  private responsesDigest(
-    schema: TFormSchema,
-    responses: { data: unknown }[],
-    limit: number,
-  ): string {
-    const labels = new Map(schema.blocks.map((b) => [b.id, b.label]));
-    return responses
-      .slice(0, limit)
-      .map((r, i) => {
-        const parts = Object.entries(r.data as Record<string, unknown>).map(
-          ([k, v]) => `${labels.get(k) ?? k}: ${Array.isArray(v) ? v.join(", ") : String(v)}`,
-        );
-        return `#${i + 1} — ${parts.join(" | ")}`;
-      })
-      .join("\n");
-  }
-
   private logicHeuristic(schema: TFormSchema): { when: string; then: string; rationale?: string }[] {
     const out: { when: string; then: string; rationale?: string }[] = [];
     const choices = schema.blocks.filter(
@@ -506,50 +436,5 @@ export class AiService {
       });
     }
     return out;
-  }
-
-  private summaryHeuristic(
-    schema: TFormSchema,
-    responses: { data: unknown }[],
-  ): string {
-    const lines = [`${responses.length} response${responses.length === 1 ? "" : "s"} collected.`];
-    for (const b of schema.blocks) {
-      if (!b.options || !b.options.length) continue;
-      const counts: Record<string, number> = {};
-      for (const r of responses) {
-        const v = (r.data as Record<string, unknown>)[b.id];
-        for (const val of Array.isArray(v) ? v : [v]) {
-          if (val == null || val === "") continue;
-          counts[String(val)] = (counts[String(val)] ?? 0) + 1;
-        }
-      }
-      const top = Object.entries(counts).sort((a, b2) => b2[1] - a[1])[0];
-      if (top) lines.push(`Most common “${b.label}”: ${top[0]} (${top[1]}).`);
-    }
-    lines.push("Add a Claude API key in Settings for a richer narrative summary.");
-    return lines.join(" ");
-  }
-
-  private copilotHeuristic(
-    schema: TFormSchema,
-    responses: { data: unknown }[],
-    question: string,
-  ): string {
-    const q = question.toLowerCase();
-    if (/how many|count|number of/.test(q)) {
-      return `There are ${responses.length} responses. Connect a Claude API key in Settings for detailed answers.`;
-    }
-    // Try to match a question label and report its most common value.
-    const block = schema.blocks.find((b) => q.includes(b.label.toLowerCase()));
-    if (block) {
-      const counts: Record<string, number> = {};
-      for (const r of responses) {
-        const v = (r.data as Record<string, unknown>)[block.id];
-        if (v != null && v !== "") counts[String(v)] = (counts[String(v)] ?? 0) + 1;
-      }
-      const top = Object.entries(counts).sort((a, b2) => b2[1] - a[1])[0];
-      if (top) return `Most answers for “${block.label}” were “${top[0]}” (${top[1]} of ${responses.length}).`;
-    }
-    return `I found ${responses.length} responses. Add a Claude API key in Settings for full copilot answers.`;
   }
 }

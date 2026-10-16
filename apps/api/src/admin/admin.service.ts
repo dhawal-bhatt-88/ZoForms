@@ -16,12 +16,11 @@ export class AdminService {
   async overview() {
     const since = new Date(Date.now() - 13 * 24 * 60 * 60 * 1000);
     since.setHours(0, 0, 0, 0);
-    const [orgs, users, forms, responses, userRows, recentOrgs] =
+    const [orgs, users, forms, userRows, recentOrgs] =
       await Promise.all([
         this.prisma.organization.count(),
         this.prisma.user.count(),
         this.prisma.form.count(),
-        this.prisma.response.count(),
         this.prisma.user.findMany({ where: { createdAt: { gte: since } }, select: { createdAt: true } }),
         this.prisma.organization.findMany({
           orderBy: { createdAt: "desc" },
@@ -44,7 +43,7 @@ export class AdminService {
     }
 
     return {
-      totals: { orgs, users, forms, responses },
+      totals: { orgs, users, forms },
       signups,
       recentOrgs,
     };
@@ -111,19 +110,11 @@ export class AdminService {
     });
     if (!org) throw new NotFoundException("Organization not found");
     const wsIds = org.workspaces.map((w) => w.id);
-    const [forms, responses] = await Promise.all([
-      this.prisma.form.findMany({
-        where: { workspaceId: { in: wsIds } },
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          title: true,
-          createdAt: true,
-          _count: { select: { responses: true } },
-        },
-      }),
-      this.prisma.response.count({ where: { form: { workspaceId: { in: wsIds } } } }),
-    ]);
+    const forms = await this.prisma.form.findMany({
+      where: { workspaceId: { in: wsIds } },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, title: true, createdAt: true },
+    });
     return {
       id: org.id,
       name: org.name,
@@ -133,7 +124,6 @@ export class AdminService {
       hasAiKey: !!org.anthropicApiKey,
       members: org.memberships.map((m) => ({ role: m.role, ...m.user })),
       forms,
-      responses,
     };
   }
 
@@ -242,7 +232,6 @@ export class AdminService {
         id: true,
         title: true,
         createdAt: true,
-        _count: { select: { responses: true } },
         workspace: { select: { org: { select: { id: true, name: true } } } },
       },
     });
@@ -250,7 +239,6 @@ export class AdminService {
       id: f.id,
       title: f.title,
       createdAt: f.createdAt,
-      responses: f._count.responses,
       org: f.workspace.org,
     }));
   }

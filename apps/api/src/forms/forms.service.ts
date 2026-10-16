@@ -18,7 +18,6 @@ import {
   FormSchema,
 } from "@formbuilder/form-schema";
 import { PrismaService } from "../prisma/prisma.service";
-import { SearchService } from "../search/search.service";
 import type { AuthUser } from "../auth/current-user.decorator";
 import { assertCanEdit } from "../auth/can-edit";
 import { describeSchemaError } from "../common/schema-errors";
@@ -42,7 +41,6 @@ export function downloadFileName(title: string, version: number): string {
 export class FormsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly search: SearchService,
     private readonly templates: TemplatesService,
   ) {}
 
@@ -58,7 +56,6 @@ export class FormsService {
         title: true,
         createdAt: true,
         updatedAt: true,
-        _count: { select: { responses: true } },
       },
     });
   }
@@ -213,18 +210,6 @@ export class FormsService {
     return { fileName: downloadFileName(artifact.title, current.version), artifact };
   }
 
-  async listResponses(user: AuthUser, id: string, q?: string) {
-    await this.assertOwned(user, id);
-    if (q && q.trim()) {
-      return this.search.search(id, q);
-    }
-    return this.prisma.response.findMany({
-      where: { formId: id, partial: false },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-    });
-  }
-
   async duplicate(user: AuthUser, id: string) {
     await this.assertCanEdit(user);
     const form = await this.get(user, id);
@@ -271,71 +256,6 @@ export class FormsService {
     await this.assertCanEdit(user);
     await this.prisma.form.delete({ where: { id } });
     return { ok: true };
-  }
-
-  async analytics(user: AuthUser, id: string) {
-    await this.assertOwned(user, id);
-    const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
-    const [views, starts, submissions, deviceGroups, sourceGroups, viewRows, respRows] =
-      await Promise.all([
-        this.prisma.event.count({ where: { formId: id, type: "view" } }),
-        this.prisma.event.count({ where: { formId: id, type: "start" } }),
-        this.prisma.response.count({ where: { formId: id, partial: false } }),
-        this.prisma.event.groupBy({
-          by: ["device"],
-          where: { formId: id, type: "view" },
-          _count: { _all: true },
-        }),
-        this.prisma.event.groupBy({
-          by: ["source"],
-          where: { formId: id, type: "view" },
-          _count: { _all: true },
-        }),
-        this.prisma.event.findMany({
-          where: { formId: id, type: "view", createdAt: { gte: since } },
-          select: { createdAt: true },
-        }),
-        this.prisma.response.findMany({
-          where: { formId: id, partial: false, createdAt: { gte: since } },
-          select: { createdAt: true },
-        }),
-      ]);
-
-    const dayKey = (d: Date) => d.toISOString().slice(0, 10);
-    const days: { date: string; views: number; submissions: number }[] = [];
-    const index: Record<string, number> = {};
-    for (let i = 13; i >= 0; i--) {
-      const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
-      const key = dayKey(d);
-      index[key] = days.length;
-      days.push({ date: key, views: 0, submissions: 0 });
-    }
-    for (const r of viewRows) {
-      const k = index[dayKey(r.createdAt)];
-      if (k !== undefined) days[k].views++;
-    }
-    for (const r of respRows) {
-      const k = index[dayKey(r.createdAt)];
-      if (k !== undefined) days[k].submissions++;
-    }
-
-    const byDevice = { desktop: 0, mobile: 0, tablet: 0 } as Record<string, number>;
-    for (const g of deviceGroups) byDevice[g.device || "desktop"] = g._count._all;
-    const bySource = sourceGroups
-      .map((g) => ({ source: g.source || "direct", count: g._count._all }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 6);
-
-    return {
-      views,
-      starts,
-      submissions,
-      completionRate: views > 0 ? Math.round((submissions / views) * 100) : 0,
-      startRate: views > 0 ? Math.round((starts / views) * 100) : 0,
-      byDevice,
-      bySource,
-      daily: days,
-    };
   }
 
   /* ---------- helpers ---------- */

@@ -50,9 +50,6 @@ model Organization {
   slug            String       @unique
   status           String      @default("active") // active | suspended
   createdAt        DateTime    @default(now())
-  dataRegion       String     @default("us") // us | eu — data residency label
-  retentionDays    Int        @default(0) // 0 = keep responses forever
-  brandingHidden   Boolean    @default(false) // white-label: hide "Made with Frame"
   anthropicApiKey String?
   aiModel         String?
   workspaces      Workspace[]
@@ -135,20 +132,6 @@ model Form {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   versions    FormVersion[]
-  responses   Response[]
-  events      Event[]
-}
-
-model Event {
-  id        String   @id @default(uuid())
-  form      Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
-  formId    String
-  type      String // "view" | "start"
-  device    String? // mobile | tablet | desktop
-  source    String? // referrer host or "direct"
-  createdAt DateTime @default(now())
-
-  @@index([formId, type, createdAt])
 }
 
 // A form or group template. Copied into forms on use, never linked: editing or
@@ -186,21 +169,4 @@ model FormVersion {
 
   // Also stops two concurrent saves from both claiming the next number.
   @@unique([formId, version])
-}
-
-model Response {
-  id          String    @id @default(uuid())
-  form        Form      @relation(fields: [formId], references: [id], onDelete: Cascade)
-  formId      String
-  data        Json
-  meta        Json?
-  partial     Boolean   @default(false)
-  sessionId   String?
-  completedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @default(now()) @updatedAt
-
-  @@unique([formId, sessionId])
-  @@index([formId, createdAt])
-  @@index([formId, partial])
 }

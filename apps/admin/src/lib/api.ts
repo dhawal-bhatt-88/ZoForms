@@ -66,7 +66,7 @@ export async function login(email: string, password: string) {
 /* ---------- types ---------- */
 
 export type Overview = {
-  totals: { orgs: number; users: number; forms: number; responses: number };
+  totals: { orgs: number; users: number; forms: number };
   signups: { date: string; count: number }[];
   recentOrgs: { id: string; name: string; status: string; createdAt: string }[];
 };
@@ -89,8 +89,7 @@ export type OrgDetail = {
   createdAt: string;
   hasAiKey: boolean;
   members: { id: string; email: string; name: string | null; role: string; status: string }[];
-  forms: { id: string; title: string; createdAt: string; _count: { responses: number } }[];
-  responses: number;
+  forms: { id: string; title: string; createdAt: string }[];
 };
 
 export type UserRow = {
@@ -107,7 +106,6 @@ export type AdminForm = {
   id: string;
   title: string;
   createdAt: string;
-  responses: number;
   org: { id: string; name: string };
 };
 

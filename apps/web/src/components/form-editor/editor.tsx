@@ -20,7 +20,6 @@ import { SortableContext, useSortable, type SortingStrategy } from "@dnd-kit/sor
 import {
   ArrowDown,
   ArrowUp,
-  BarChart3,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -29,7 +28,6 @@ import {
   Download,
   FileText,
   GripVertical,
-  Inbox,
   LayoutTemplate,
   Loader2,
   Plus,
@@ -1555,9 +1553,9 @@ function editorContent(s: Partial<FormSchema> | undefined, fallbackTitle: string
 /**
  * The form editor. With `templateId` it edits a template instead ("template
  * mode"): the same canvas, inspector, save rules, Save and Cancel, but Save
- * writes to the template, and what only applies to a form — Download,
- * responses, AI — isn't offered. A group template is edited as a
- * form whose only root item is its group, and it can't gain more root items.
+ * writes to the template, and what only applies to a form — Download and
+ * AI — isn't offered. A group template is edited as a form whose only root
+ * item is its group, and it can't gain more root items.
  */
 export default function FormEditor({ templateId }: { templateId?: string }) {
   const params = useParams();
@@ -2771,12 +2769,6 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         <div className="ml-auto flex items-center gap-2">
           {!templateMode && (
             <>
-              <Link href={`/app/forms/${id}/responses`} onClick={confirmLeave} className="btn btn-ghost btn-sm">
-                <Inbox className="h-4 w-4" /> Responses
-              </Link>
-              <Link href={`/app/forms/${id}/analytics`} onClick={confirmLeave} className="btn btn-ghost btn-sm">
-                <BarChart3 className="h-4 w-4" /> Analytics
-              </Link>
               <button
                 onClick={() => setAiOpen((v) => !v)}
                 className={`btn btn-sm ${aiOpen ? "btn-primary" : "btn-outline"}`}

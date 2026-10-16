@@ -1,11 +1,6 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-} from "@nestjs/common";
+import { ForbiddenException, Injectable } from "@nestjs/common";
 import Anthropic from "@anthropic-ai/sdk";
 import { PrismaService } from "../prisma/prisma.service";
-import { purgeOrg } from "./retention.service";
 import type { AuthUser } from "../auth/current-user.decorator";
 import { env } from "../config/env";
 
@@ -47,61 +42,8 @@ export class SettingsService {
     return this.get(user);
   }
 
-  /* ---------- organization data controls ---------- */
-
-  async getOrg(user: AuthUser) {
-    const org = await this.prisma.organization.findUnique({
-      where: { id: user.orgId },
-      select: { dataRegion: true, retentionDays: true, brandingHidden: true },
-    });
-    return {
-      dataRegion: org?.dataRegion ?? "us",
-      retentionDays: org?.retentionDays ?? 0,
-      brandingHidden: org?.brandingHidden ?? false,
-    };
-  }
-
-  async updateOrg(
-    user: AuthUser,
-    dto: { dataRegion?: string; retentionDays?: number; brandingHidden?: boolean },
-  ) {
-    await this.assertManager(user);
-    const data: {
-      dataRegion?: string;
-      retentionDays?: number;
-      brandingHidden?: boolean;
-    } = {};
-
-    if (dto.dataRegion !== undefined) {
-      if (!["us", "eu"].includes(dto.dataRegion)) {
-        throw new BadRequestException("Region must be 'us' or 'eu'.");
-      }
-      data.dataRegion = dto.dataRegion;
-    }
-    if (dto.retentionDays !== undefined) {
-      const n = Math.floor(Number(dto.retentionDays));
-      if (Number.isNaN(n) || n < 0 || n > 3650) {
-        throw new BadRequestException("Retention must be between 0 and 3650 days.");
-      }
-      data.retentionDays = n;
-    }
-    if (dto.brandingHidden !== undefined) data.brandingHidden = dto.brandingHidden;
-
-    await this.prisma.organization.update({ where: { id: user.orgId }, data });
-    return this.getOrg(user);
-  }
-
-  /** Apply the org's retention policy immediately (manager-only). */
-  async purgeNow(user: AuthUser) {
-    await this.assertManager(user);
-    const org = await this.prisma.organization.findUnique({
-      where: { id: user.orgId },
-      select: { retentionDays: true },
-    });
-    const purged = await purgeOrg(this.prisma, user.orgId, org?.retentionDays ?? 0);
-    return { ok: true, purged };
-  }
-
+  // No callers since the organisation data controls went. Kept: tenancy helpers
+  // stay until the AI settings, the rest of this service, are removed.
   private async assertManager(user: AuthUser) {
     const m = await this.prisma.membership.findFirst({
       where: { orgId: user.orgId, userId: user.sub },

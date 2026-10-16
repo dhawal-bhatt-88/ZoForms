@@ -21,7 +21,7 @@ const ROLE_BLURB: Record<Role, string> = {
   OWNER: "Full access, incl. ownership",
   ADMIN: "Manage team, forms & settings",
   EDITOR: "Create and edit forms",
-  VIEWER: "Read-only access to forms & responses",
+  VIEWER: "Read-only access to forms & templates",
 };
 
 function roleBadge(role: Role): string {

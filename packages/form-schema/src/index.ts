@@ -557,14 +557,14 @@ export interface PageBlock extends NoLeafFields {
    * `block.label` on the `Block` union still types as `string`. An optional
    * `never` would make it `string | undefined`, which breaks code written
    * before pages existed that must not be touched in Phase 7: the AI service
-   * (apps/api/src/ai/ai.service.ts) and the responses page.
+   * (apps/api/src/ai/ai.service.ts).
    *
    * RUNTIME RISK: this is a lie to the type checker. Any code that reads
    * `block.label` on a block that turns out to be a page gets `undefined`,
-   * with no compile error to warn about it. The AI service and the responses
-   * page do exactly that for a paged form's top-level blocks. In-scope code
-   * reads names with `blockName`. See KNOWN-ISSUES.md: revisit this when
-   * those features come back into scope, and make this `label?: never`.
+   * with no compile error to warn about it. The AI service does exactly that
+   * for a paged form's top-level blocks. In-scope code reads names with
+   * `blockName`. See KNOWN-ISSUES.md: revisit this when the AI service comes
+   * back into scope, and make this `label?: never`.
    */
   label: never;
   /** Pages never repeat (contract §12.1). Kept when sent only so the save rules can reject it by name. */

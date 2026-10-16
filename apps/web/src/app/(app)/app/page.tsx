@@ -6,7 +6,6 @@ import Link from "next/link";
 import {
   Copy,
   FileText,
-  Inbox,
   Loader2,
   MoreHorizontal,
   Pencil,
@@ -51,7 +50,7 @@ function relTime(iso?: string) {
   return new Date(iso).toLocaleDateString();
 }
 
-type Sort = "recent" | "name" | "responses";
+type Sort = "recent" | "name";
 
 export default function Dashboard() {
   const router = useRouter();
@@ -91,8 +90,6 @@ export default function Dashboard() {
     if (q) list = list.filter((f) => f.title.toLowerCase().includes(q));
     const sorted = [...list];
     if (sort === "name") sorted.sort((a, b) => a.title.localeCompare(b.title));
-    else if (sort === "responses")
-      sorted.sort((a, b) => (b._count?.responses ?? 0) - (a._count?.responses ?? 0));
     else
       sorted.sort(
         (a, b) =>
@@ -191,7 +188,6 @@ export default function Dashboard() {
         >
           <option value="recent">Recently edited</option>
           <option value="name">Name (A–Z)</option>
-          <option value="responses">Most responses</option>
         </select>
       </div>
 
@@ -353,7 +349,7 @@ export default function Dashboard() {
             </div>
             <h2 className="font-semibold tracking-tight">Delete “{toDelete.title}”?</h2>
             <p className="mt-1 text-sm text-muted">
-              This permanently removes the form and all its responses. This can&apos;t be undone.
+              This permanently removes the form and all its versions. This can&apos;t be undone.
             </p>
             <div className="mt-5 flex items-center justify-end gap-2">
               <button onClick={() => setToDelete(null)} disabled={deleting} className="btn btn-outline btn-sm">
@@ -402,11 +398,6 @@ function FormCard({
         {f.title}
       </h3>
       <div className="relative z-[1] mt-1.5 flex items-center gap-2 text-[13px] text-muted">
-        <span className="inline-flex items-center gap-1">
-          <Inbox className="h-3.5 w-3.5" />
-          {f._count?.responses ?? 0}
-        </span>
-        <span className="text-faint">·</span>
         <span>Edited {relTime(f.updatedAt || f.createdAt)}</span>
       </div>
 

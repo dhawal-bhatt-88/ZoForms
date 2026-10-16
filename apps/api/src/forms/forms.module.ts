@@ -7,8 +7,6 @@ import { AiController } from "../ai/ai.controller";
 import { AiService } from "../ai/ai.service";
 import { SettingsController } from "../settings/settings.controller";
 import { SettingsService } from "../settings/settings.service";
-import { RetentionService } from "../settings/retention.service";
-import { SearchService } from "../search/search.service";
 
 @Module({
   imports: [AuthModule, TemplatesModule],
@@ -21,8 +19,6 @@ import { SearchService } from "../search/search.service";
     FormsService,
     AiService,
     SettingsService,
-    RetentionService,
-    SearchService,
   ],
 })
 export class FormsModule {}

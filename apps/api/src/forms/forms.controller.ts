@@ -6,7 +6,6 @@ import {
   Param,
   Post,
   Put,
-  Query,
   Res,
   UseGuards,
 } from "@nestjs/common";
@@ -57,20 +56,6 @@ export class FormsController {
     res.setHeader("Content-Type", "application/json");
     res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
     return `${JSON.stringify(artifact, null, 2)}\n`;
-  }
-
-  @Get(":id/responses")
-  responses(
-    @CurrentUser() user: AuthUser,
-    @Param("id") id: string,
-    @Query("q") q?: string,
-  ) {
-    return this.forms.listResponses(user, id, q);
-  }
-
-  @Get(":id/analytics")
-  analytics(@CurrentUser() user: AuthUser, @Param("id") id: string) {
-    return this.forms.analytics(user, id);
   }
 
   @Get(":id/versions")

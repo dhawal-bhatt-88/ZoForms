@@ -86,10 +86,9 @@ export default function TenantDetail() {
           </div>
 
           {/* stat strip */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             <Info label="Members" value={org.members.length} />
             <Info label="Forms" value={org.forms.length} />
-            <Info label="Responses" value={org.responses} />
             <Info label="Created" value={new Date(org.createdAt).toLocaleDateString()} />
           </div>
 
@@ -124,7 +123,6 @@ export default function TenantDetail() {
                 {org.forms.map((f) => (
                   <div key={f.id} className="flex items-center gap-3 py-2.5 text-sm">
                     <span className="flex-1 truncate font-medium">{f.title}</span>
-                    <span className="tabular-nums text-muted">{f._count.responses} resp.</span>
                   </div>
                 ))}
               </div>

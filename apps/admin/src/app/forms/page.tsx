@@ -60,7 +60,6 @@ export default function FormsPage() {
               <tr className="border-b border-line text-left text-xs font-semibold uppercase tracking-wider text-faint">
                 <th className="px-4 py-3">Form</th>
                 <th className="px-4 py-3">Tenant</th>
-                <th className="px-4 py-3 text-right">Responses</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
@@ -71,7 +70,6 @@ export default function FormsPage() {
                     <div className="font-medium">{f.title}</div>
                   </td>
                   <td className="px-4 py-3 text-muted">{f.org.name}</td>
-                  <td className="px-4 py-3 text-right tabular-nums text-muted">{f.responses}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="relative inline-flex items-center gap-1">
                       <button
@@ -102,7 +100,7 @@ export default function FormsPage() {
               ))}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-4 py-10 text-center text-sm text-muted">
+                  <td colSpan={3} className="px-4 py-10 text-center text-sm text-muted">
                     No forms found.
                   </td>
                 </tr>
@@ -120,7 +118,7 @@ export default function FormsPage() {
             </div>
             <h2 className="font-semibold tracking-tight">Delete “{confirmDel.title}”?</h2>
             <p className="mt-1 text-sm text-muted">
-              Permanently removes the form and its responses from {confirmDel.org.name}.
+              Permanently removes the form from {confirmDel.org.name}.
             </p>
             <div className="mt-5 flex items-center justify-end gap-2">
               <button onClick={() => setConfirmDel(null)} disabled={busy} className="btn btn-outline btn-sm">

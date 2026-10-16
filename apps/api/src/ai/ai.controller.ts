@@ -36,30 +36,6 @@ export class AiController {
     return this.ai.suggestLogic(body?.schema, cfg);
   }
 
-  @Post("summarize-responses")
-  async summarize(@CurrentUser() user: AuthUser, @Body() body: { formId: string }) {
-    const cfg = await this.settings.resolveAnthropic(user.orgId);
-    const form = await this.forms.get(user, body?.formId);
-    const responses = await this.forms.listResponses(user, body?.formId);
-    return this.ai.summarizeResponses(form.versions[0]?.schema, responses, cfg);
-  }
-
-  @Post("responses-copilot")
-  async copilot(
-    @CurrentUser() user: AuthUser,
-    @Body() body: { formId: string; question?: string },
-  ) {
-    const cfg = await this.settings.resolveAnthropic(user.orgId);
-    const form = await this.forms.get(user, body?.formId);
-    const responses = await this.forms.listResponses(user, body?.formId);
-    return this.ai.answerCopilot(
-      form.versions[0]?.schema,
-      responses,
-      body?.question || "",
-      cfg,
-    );
-  }
-
   @Post("translate-form")
   async translate(
     @CurrentUser() user: AuthUser,
