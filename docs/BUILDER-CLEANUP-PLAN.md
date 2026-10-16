@@ -14,6 +14,21 @@ The builder isn't deployed anywhere (confirmed 16 Oct 2026), so these two holes 
 - **Webhook SSRF (A5):** any signed-in user, viewers included, can make the API request any URL, including internal hosts and the cloud metadata address, and read back the status code.
 - **Anonymous uploads (A1):** `POST /v1/public/uploads` accepts 10 MB files from anyone.
 
+## Progress
+
+| Brief | Status | Commits |
+|---|---|---|
+| 1. Automations and webhooks | Done 16 Oct 2026 | `a2cfd32`, `ab19ce2`, `65ef734` |
+| 2. Hosted publish path | Done 16 Oct 2026 | `f8a6f4f`, `ea6a077`, `18c4331` |
+| 3. Response data and org settings | Done 16 Oct 2026 | `2706c2f`, `08ea1d1`, `ac4fad3` |
+| 4. AI | Next | |
+
+## Before any deployment
+
+Hardening items found during the clean-up. None of them belong to a removal brief, but all must be done before the builder is deployed anywhere:
+- Briefs 1 and 2 must be done. Both are, so the SSRF and the anonymous uploads are closed.
+- **No signed-in route has a rate limit.** Only the eight credential routes are throttled (brief 3). Decide a default limit for the rest of the API.
+
 ## Decisions
 
 | Topic | Decision |
