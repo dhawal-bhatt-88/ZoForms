@@ -27,7 +27,6 @@ import {
   type Block,
   type Condition,
   type FormSchema,
-  type FormSettings,
   type GroupBlock,
   type PageBlock,
   type TemplateRef,
@@ -59,34 +58,13 @@ export function templateFromForm(kind: TemplateKind, form: FormSchema): FormSche
   return kind === "form" ? form : (form.blocks[0] as GroupBlock);
 }
 
-/*
- * Form settings a template never keeps: the theme's `logo` and `cover` images,
- * which identify the organisation the form was made for. The other settings
- * stay.
- */
-export const TEMPLATE_STRIPPED_THEME_SETTINGS = ["logo", "cover"] as const;
-
-function templateSettings(settings: FormSettings | undefined): FormSettings | undefined {
-  if (!settings) return undefined;
-  const kept: Record<string, unknown> = { ...settings };
-  if (settings.theme) {
-    const theme: Record<string, unknown> = { ...settings.theme };
-    for (const key of TEMPLATE_STRIPPED_THEME_SETTINGS) delete theme[key];
-    if (Object.keys(theme).length) kept.theme = theme;
-    else delete kept.theme;
-  }
-  return Object.keys(kept).length ? (kept as FormSettings) : undefined;
-}
-
 /**
  * A template's content as stored: without template references at any depth
- * (a template doesn't carry another template's provenance) and without the
- * theme settings in `TEMPLATE_STRIPPED_THEME_SETTINGS`.
+ * (a template doesn't carry another template's provenance).
  */
 export function cleanTemplateForm(form: FormSchema): FormSchema {
-  const { templateRef: _ref, settings, ...rest } = form;
-  const kept = templateSettings(settings);
-  return { ...rest, ...(kept ? { settings: kept } : {}), blocks: withoutTemplateRefs(form.blocks) };
+  const { templateRef: _ref, ...rest } = form;
+  return { ...rest, blocks: withoutTemplateRefs(form.blocks) };
 }
 
 /** A condition that uses a question outside the blocks it was found in. */

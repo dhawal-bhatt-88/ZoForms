@@ -21,12 +21,6 @@
         "label": "What could we improve?",
         "required": false
       }
-    ],
-    "settings": {
-      "theme": {
-        "accent": "#6D5EFA",
-        "radius": "md"
-      }
-    }
+    ]
   }
 }

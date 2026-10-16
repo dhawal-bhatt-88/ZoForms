@@ -37,13 +37,6 @@
           }
         ]
       }
-    ],
-    "settings": {
-      "submitLabel": "Subscribe",
-      "theme": {
-        "accent": "#2F6BE4",
-        "radius": "lg"
-      }
-    }
+    ]
   }
 }

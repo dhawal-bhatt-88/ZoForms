@@ -45,12 +45,6 @@
         "label": "Anything else you'd like to share?",
         "required": false
       }
-    ],
-    "settings": {
-      "theme": {
-        "accent": "#C4790B",
-        "radius": "md"
-      }
-    }
+    ]
   }
 }

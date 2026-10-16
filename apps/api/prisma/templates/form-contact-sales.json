@@ -49,12 +49,6 @@
         "label": "What are you looking to solve?",
         "required": false
       }
-    ],
-    "settings": {
-      "theme": {
-        "accent": "#C4790B",
-        "radius": "md"
-      }
-    }
+    ]
   }
 }

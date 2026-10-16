@@ -25,12 +25,6 @@
         "label": "Any blockers?",
         "required": false
       }
-    ],
-    "settings": {
-      "theme": {
-        "accent": "#159C56",
-        "radius": "md"
-      }
-    }
+    ]
   }
 }

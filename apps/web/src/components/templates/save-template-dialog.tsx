@@ -18,18 +18,6 @@ import {
 import { Dialog } from "@/components/dialog";
 import { createTemplate, type TemplateSummary } from "@/lib/api";
 
-/** The settings a template doesn't keep, as the author knows them (see `cleanTemplateForm`). */
-function strippedSettings(form: FormSchema): string[] {
-  const s = form.settings;
-  return [
-    s?.theme?.logo?.trim() ? "the logo" : null,
-    s?.theme?.cover?.trim() ? "the cover image" : null,
-  ].filter((x): x is string => x !== null);
-}
-
-const list = (items: string[]) =>
-  items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`;
-
 /**
  * Save a group, or the whole form, as one of the organisation's templates,
  * from what is in the editor now. The form itself is never changed.
@@ -80,7 +68,6 @@ export function SaveTemplateDialog({
           ? `"${blockName(r.block)}" — its logic "${r.before}" is dropped: only one condition is left.`
           : `"${blockName(r.block)}" — its logic "${r.before}" becomes "${r.after}".`,
       ),
-      settings: kind === "form" ? strippedSettings(form) : [],
       problem: problems[0] ?? null,
     };
   }, [kind, form, groupId, phrase]);
@@ -185,13 +172,6 @@ export function SaveTemplateDialog({
             </>
           )}
         </section>
-      )}
-
-      {plan.settings.length > 0 && (
-        <p className="mt-4 rounded-lg bg-surface-2 px-3 py-2 text-[13px] text-ink-2">
-          Templates don&apos;t keep settings that identify your organisation, so{" "}
-          {list(plan.settings)} won&apos;t be included.
-        </p>
       )}
 
       {plan.problem && (

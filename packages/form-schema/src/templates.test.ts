@@ -200,13 +200,13 @@ describe("formFromTemplate", () => {
   it("copies the content with fresh ids and sets templateRef on the form", () => {
     const content = FormSchema.parse({
       title: "Survey",
-      settings: { submitLabel: "Send", theme: { accent: "#123456" } },
+      drafts: { mode: "device" },
       blocks: [household()],
       templateRef: { id: "older", version: 1, name: "Older" },
     });
     const made = formFromTemplate({ id: "sys_form_survey", version: 2, name: "Survey", content });
     expect(made.templateRef).toEqual({ id: "sys_form_survey", version: 2, name: "Survey" });
-    expect(made.settings).toEqual(content.settings);
+    expect(made.drafts).toEqual(content.drafts);
     expect(made.title).toBe("Survey");
     expect(ids(made.blocks).some((id) => ids(content.blocks).includes(id))).toBe(false);
     expect(formProblems(made)).toEqual([]);
@@ -395,7 +395,7 @@ describe("logicWithout", () => {
   });
 });
 
-/* ---------- stored content: templateRef and settings ---------- */
+/* ---------- stored content: templateRef ---------- */
 
 describe("templateRef", () => {
   const ref = { id: "t", version: 2, name: "T" };
@@ -434,32 +434,19 @@ describe("templateRef", () => {
 });
 
 describe("cleanTemplateForm", () => {
-  it("strips the settings that identify the organisation, and template references", () => {
+  it("strips template references and keeps the rest", () => {
     const content = FormSchema.parse({
       title: "F",
       templateRef: { id: "t", version: 1, name: "T" },
-      settings: {
-        submitLabel: "Send",
-        theme: { accent: "#111111", font: "serif", logo: "https://client.example/logo.png", cover: "/uploads/cover.png", customCss: ".x{}" },
-      },
       navigation: { reviewPage: false },
       drafts: { mode: "device" },
       blocks: [group("g", [leaf("q")], { templateRef: { id: "t", version: 1, name: "T" } })],
     });
     const clean = cleanTemplateForm(content);
     expect(clean.templateRef).toBeUndefined();
-    expect(clean.settings).toEqual({
-      submitLabel: "Send",
-      theme: { accent: "#111111", font: "serif", customCss: ".x{}" },
-    });
     expect(clean.navigation).toEqual({ reviewPage: false });
     expect(clean.drafts).toEqual({ mode: "device" });
     expect(JSON.stringify(clean.blocks)).not.toContain("templateRef");
-  });
-
-  it("leaves no empty settings or theme behind", () => {
-    const clean = cleanTemplateForm(FormSchema.parse({ title: "F", settings: { theme: { logo: "x" } }, blocks: [] }));
-    expect(clean).not.toHaveProperty("settings");
   });
 });
 

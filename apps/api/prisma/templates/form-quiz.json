@@ -55,12 +55,6 @@
           }
         ]
       }
-    ],
-    "settings": {
-      "theme": {
-        "accent": "#6D5EFA",
-        "radius": "md"
-      }
-    }
+    ]
   }
 }

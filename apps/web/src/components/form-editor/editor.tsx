@@ -119,7 +119,6 @@ import {
   repeatsOnScoreBlockers,
   repeatSettingsProblems,
   resolveNameClashes,
-  resolveTheme,
   sameContent,
   sameOptionList,
   scoreDeletionBlockers,
@@ -340,51 +339,6 @@ function BlockMenu({
           })}
         </div>
       ))}
-    </div>
-  );
-}
-
-function ColorField({
-  label,
-  value,
-  swatches,
-  onPick,
-}: {
-  label: string;
-  value: string;
-  swatches: string[];
-  onPick: (c: string) => void;
-}) {
-  return (
-    <div className="mb-3">
-      <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">{label}</label>
-      <div className="flex items-center gap-1.5">
-        {swatches.map((c) => (
-          <button
-            key={c}
-            onClick={() => onPick(c)}
-            className="h-6 w-6 rounded-md border-2 transition-transform hover:scale-110"
-            style={{
-              background: c,
-              borderColor:
-                value.toLowerCase() === c.toLowerCase() ? "#1B1D22" : "rgba(0,0,0,0.08)",
-            }}
-            aria-label={`${label} ${c}`}
-          />
-        ))}
-        <label
-          className="relative ml-auto h-6 w-9 cursor-pointer overflow-hidden rounded-md border border-line-2"
-          style={{ background: value }}
-          title="Custom color"
-        >
-          <input
-            type="color"
-            value={value}
-            onChange={(e) => onPick(e.target.value)}
-            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-          />
-        </label>
-      </div>
     </div>
   );
 }
@@ -1528,7 +1482,6 @@ function editorContent(s: Partial<FormSchema> | undefined, fallbackTitle: string
   return {
     title: s?.title || fallbackTitle,
     description: s?.description || undefined,
-    settings: s?.settings,
     blocks: normalizeScores(normalizeConditions(s?.blocks ?? [])),
     navigation: s?.navigation,
     drafts: s?.drafts,
@@ -2426,28 +2379,6 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     patch((s) => ({ ...s, navigation: navigationWithoutDefaults({ ...s.navigation, ...p }) }));
   const showProgress = schema?.navigation?.showProgress ?? NAVIGATION_DEFAULTS.showProgress;
   const progressStyle = schema?.navigation?.progressStyle ?? NAVIGATION_DEFAULTS.progressStyle;
-
-  const updateSettings = (p: {
-    submitLabel?: string;
-  }) => patch((s) => ({ ...s, settings: { ...s.settings, ...p } }));
-  const updateTheme = (p: {
-    accent?: string;
-    background?: string;
-    text?: string;
-    buttonText?: string;
-    font?: "sans" | "serif" | "mono" | "rounded";
-    radius?: "none" | "sm" | "md" | "lg" | "full";
-    width?: "narrow" | "normal" | "wide";
-    logo?: string;
-    cover?: string;
-    inputBg?: string;
-    inputBorder?: string;
-    customCss?: string;
-  }) =>
-    patch((s) => ({
-      ...s,
-      settings: { ...s.settings, theme: { ...s.settings?.theme, ...p } },
-    }));
 
   /* Dragging: one flat list of the visible rows; sideways movement sets depth. */
   const dragItems = (activeId: string | null) =>
@@ -3410,22 +3341,9 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
               <h4 id={SETTINGS_PANE_HEADING_ID} className="mb-3 text-[11px] font-bold uppercase tracking-wider text-faint">
                 Form settings
               </h4>
-              {templateMode && (
-                <p className="mb-3 rounded-lg bg-surface-2 px-3 py-2 text-xs text-ink-2">
-                  Templates don&apos;t keep the logo and cover image, which identify your organisation. Set those on
-                  each form.
-                </p>
-              )}
-              <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Submit button label</label>
-              <input
-                value={schema.settings?.submitLabel ?? ""}
-                onChange={(e) => updateSettings({ submitLabel: e.target.value })}
-                placeholder="Submit"
-                className={`${fieldCls} mb-3`}
-              />
               {paged && (
                 <>
-                  <h4 className="mb-2 mt-5 text-[12.5px] font-semibold text-ink-2">Navigation</h4>
+                  <h4 className="mb-2 text-[12.5px] font-semibold text-ink-2">Navigation</h4>
                   <label className="flex items-start gap-2.5">
                     <input
                       type="checkbox"
@@ -3483,7 +3401,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
               )}
 
               {/* Where unfinished answers are kept: docs/DRAFTS-CONTRACT.md §2. */}
-              <fieldset className="mt-5">
+              <fieldset className={paged ? "mt-5" : undefined}>
                 <legend className="mb-2 text-[12.5px] font-semibold text-ink-2">Save progress</legend>
                 {(
                   [
@@ -3532,177 +3450,6 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                   the form is open&rsquo;.
                 </p>
               </fieldset>
-
-              <h4 className="mb-3 mt-6 border-t border-line pt-4 text-[11px] font-bold uppercase tracking-wider text-faint">
-                Design
-              </h4>
-
-              <ColorField
-                label="Accent"
-                value={schema.settings?.theme?.accent || "#6D5EFA"}
-                swatches={["#6D5EFA", "#2F6BE4", "#159C56", "#E1663E", "#D93F87", "#18181B"]}
-                onPick={(c) => updateTheme({ accent: c })}
-              />
-              <ColorField
-                label="Background"
-                value={schema.settings?.theme?.background || "#F6F7F9"}
-                swatches={["#FFFFFF", "#F6F7F9", "#FAF7F2", "#F2F4FF", "#111318"]}
-                onPick={(c) => updateTheme({ background: c })}
-              />
-              <ColorField
-                label="Text"
-                value={schema.settings?.theme?.text || "#1B1D22"}
-                swatches={["#1B1D22", "#37352F", "#0F172A", "#FFFFFF"]}
-                onPick={(c) => updateTheme({ text: c })}
-              />
-              <ColorField
-                label="Button text"
-                value={schema.settings?.theme?.buttonText || "#FFFFFF"}
-                swatches={["#FFFFFF", "#111318"]}
-                onPick={(c) => updateTheme({ buttonText: c })}
-              />
-
-              <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Font</label>
-              <select
-                value={schema.settings?.theme?.font ?? "sans"}
-                onChange={(e) =>
-                  updateTheme({ font: e.target.value as "sans" | "serif" | "mono" | "rounded" })
-                }
-                className={`${fieldCls} mb-3`}
-              >
-                <option value="sans">Sans</option>
-                <option value="serif">Serif</option>
-                <option value="mono">Mono</option>
-                <option value="rounded">Rounded</option>
-              </select>
-
-              <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Corners</label>
-              <div className="mb-3 grid grid-cols-5 gap-1.5">
-                {(["none", "sm", "md", "lg", "full"] as const).map((r) => {
-                  const px = { none: "0px", sm: "3px", md: "6px", lg: "9px", full: "9999px" }[r];
-                  const active = (schema.settings?.theme?.radius || "md") === r;
-                  return (
-                    <button
-                      key={r}
-                      onClick={() => updateTheme({ radius: r })}
-                      title={r === "none" ? "Square" : r === "full" ? "Pill" : r}
-                      className={`flex h-9 items-center justify-center rounded-lg border ${
-                        active ? "border-accent bg-accent-weak" : "border-line-2"
-                      }`}
-                    >
-                      <span
-                        className="h-4 w-4 border-2"
-                        style={{
-                          borderTopLeftRadius: px,
-                          borderColor: active ? "#6D5EFA" : "#9AA0AA",
-                        }}
-                      />
-                    </button>
-                  );
-                })}
-              </div>
-
-              <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Width</label>
-              <div className="mb-4 flex gap-1.5">
-                {(["narrow", "normal", "wide"] as const).map((w) => (
-                  <button
-                    key={w}
-                    onClick={() => updateTheme({ width: w })}
-                    className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium capitalize ${
-                      (schema.settings?.theme?.width || "normal") === w
-                        ? "border-accent bg-accent-weak text-accent-2"
-                        : "border-line-2 text-muted"
-                    }`}
-                  >
-                    {w}
-                  </button>
-                ))}
-              </div>
-
-              <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Live preview</label>
-              {(() => {
-                const th = resolveTheme(schema.settings?.theme);
-                return (
-                  <div
-                    className="border border-line p-3"
-                    style={{
-                      background: th.background,
-                      borderRadius: th.radius === "9999px" ? "20px" : th.radius,
-                      fontFamily: th.fontFamily,
-                      color: th.text,
-                    }}
-                  >
-                    <div
-                      className="border border-line bg-white p-3"
-                      style={{ borderRadius: th.radius === "9999px" ? "16px" : th.radius }}
-                    >
-                      <div className="mb-2 text-sm font-bold">{schema.title || "Sample form"}</div>
-                      <div
-                        className="mb-2 border border-line-2 px-2 py-1.5 text-xs text-faint"
-                        style={{ borderRadius: th.radius }}
-                      >
-                        Your answer…
-                      </div>
-                      <button
-                        className="w-full py-1.5 text-xs font-semibold"
-                        style={{ background: th.accent, color: th.buttonText, borderRadius: th.radius }}
-                      >
-                        {schema.settings?.submitLabel || "Submit"}
-                      </button>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              <h4 className="mb-3 mt-6 border-t border-line pt-4 text-[11px] font-bold uppercase tracking-wider text-faint">
-                Advanced
-              </h4>
-
-              {!templateMode && (
-                <>
-                  <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Logo URL</label>
-                  <input
-                    value={schema.settings?.theme?.logo ?? ""}
-                    onChange={(e) => updateTheme({ logo: e.target.value })}
-                    placeholder="https://…/logo.png"
-                    className={`${fieldCls} mb-3 font-mono text-xs`}
-                  />
-
-                  <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Cover image URL</label>
-                  <input
-                    value={schema.settings?.theme?.cover ?? ""}
-                    onChange={(e) => updateTheme({ cover: e.target.value })}
-                    placeholder="https://…/cover.jpg"
-                    className={`${fieldCls} mb-3 font-mono text-xs`}
-                  />
-                </>
-              )}
-
-              <ColorField
-                label="Input background"
-                value={schema.settings?.theme?.inputBg || "#FFFFFF"}
-                swatches={["#FFFFFF", "#F6F7F9", "#F2F4FF", "#1C1F26"]}
-                onPick={(c) => updateTheme({ inputBg: c })}
-              />
-              <ColorField
-                label="Input border"
-                value={schema.settings?.theme?.inputBorder || "#ECEDF0"}
-                swatches={["#ECEDF0", "#D1D5DB", "#6D5EFA", "#333844"]}
-                onPick={(c) => updateTheme({ inputBorder: c })}
-              />
-
-              <label className="mb-1.5 mt-1 block text-[12.5px] font-semibold text-ink-2">Custom CSS</label>
-              <textarea
-                value={schema.settings?.theme?.customCss ?? ""}
-                onChange={(e) => updateTheme({ customCss: e.target.value })}
-                placeholder={".frame-form h1 { letter-spacing: -0.02em; }"}
-                rows={4}
-                className={`${fieldCls} resize-none font-mono text-xs`}
-                spellCheck={false}
-              />
-              <p className="mt-1.5 text-xs text-faint">
-                Scoped tip: target <code className="font-mono">.frame-form</code> to style the form.
-              </p>
 
               <p className="mt-6 border-t border-line pt-4 text-center text-sm text-muted">
                 Select a question to edit it, or add one from the canvas.

@@ -35,12 +35,6 @@
           }
         ]
       }
-    ],
-    "settings": {
-      "theme": {
-        "accent": "#C4790B",
-        "radius": "md"
-      }
-    }
+    ]
   }
 }

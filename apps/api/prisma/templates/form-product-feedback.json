@@ -39,12 +39,6 @@
           }
         ]
       }
-    ],
-    "settings": {
-      "theme": {
-        "accent": "#159C56",
-        "radius": "md"
-      }
-    }
+    ]
   }
 }

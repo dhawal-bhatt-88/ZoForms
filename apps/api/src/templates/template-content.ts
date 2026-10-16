@@ -20,9 +20,9 @@ import { describeSchemaError } from "../common/schema-errors";
  * (`normalizeConditions`), every save rule — with a group template checked as
  * the only group of a form without pages, plus the template rules
  * (`templateProblems`): self-contained, and for a group template exactly one
- * group. Template references and the settings a template never keeps are
- * dropped (`cleanTemplateForm`). `previous` is the stored content being
- * replaced: a condition re-sent without its id keeps the one it has.
+ * group. Template references are dropped (`cleanTemplateForm`). `previous`
+ * is the stored content being replaced: a condition re-sent without its id
+ * keeps the one it has.
  */
 export function prepareTemplateContent(kind: TemplateKind, raw: unknown, previous?: unknown): FormSchema | GroupBlock {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {

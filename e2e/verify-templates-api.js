@@ -1,6 +1,6 @@
 // Templates through the API: create, list, get, edit, delete and duplicate for both kinds;
 // version on content saves only; 403 on system templates, 404 across organisations, viewers
-// read-only; every save rule applied to templates; settings a template never keeps; a form
+// read-only; every save rule applied to templates; old settings dropped; a form
 // from a form template; templateRef never in a download or the public form; the seed run
 // twice, and a bad file skipped while the rest load; body limits. API only.
 const fs = require("fs");
@@ -94,9 +94,9 @@ const household = () => ({
     const formContent = {
       title: "Intake",
       templateRef: { id: "x", version: 9, name: "Old" },
+      // Removed with the hosted form (brief 2) and the Design panel (brief 6): accepted, and not stored.
       settings: {
         submitLabel: "Send it",
-        // Removed from FormSettings with the hosted form: accepted, and not stored.
         notifyEmails: ["owner@client.example"],
         redirectUrl: "https://client.example/thanks",
         spamProtection: true,
@@ -108,12 +108,7 @@ const household = () => ({
     const formTpl = r.json;
     check("create form template: 201, version 1", r.status === 201 && formTpl.kind === "form" && formTpl.version === 1, short(r));
     const storedForm = (await prisma.template.findUnique({ where: { id: formTpl?.id } })).content;
-    const s = storedForm.settings;
-    check("stored: the logo and cover, which identify the organisation, are stripped", !("logo" in s.theme) && !("cover" in s.theme), JSON.stringify(s));
-    check("stored: the removed hosted settings are dropped", !("notifyEmails" in s) && !("redirectUrl" in s) && !("spamProtection" in s), JSON.stringify(s));
-    check("stored: the other settings are kept",
-      s.submitLabel === "Send it" && s.theme.accent === "#123456" && Object.keys(s).length === 2 && Object.keys(s.theme).length === 1,
-      JSON.stringify(s));
+    check("stored: the old settings (submit label, theme, hosted settings) are dropped", !("settings" in storedForm), JSON.stringify(storedForm.settings));
     check("stored: no template references in a template, at any depth", !JSON.stringify(storedForm).includes("templateRef"));
 
     // ---------- get and list ----------
@@ -245,9 +240,10 @@ const household = () => ({
     check("conditions follow the new ids; condition ids and logic text kept",
       madeDose.enableWhen.every((c) => formIds.includes(c.question)) && madeDose.enableLogicText === "1 AND (2 OR 3)" &&
       JSON.stringify(madeDose.enableWhen.map((c) => c.id)) === JSON.stringify(walkBlocks(storedForm.blocks).find((e) => e.block.id === "dose").block.enableWhen.map((c) => c.id)));
-    check("its settings are the template's", JSON.stringify(madeSchema.settings) === JSON.stringify(s), JSON.stringify(madeSchema.settings));
+    check("it has no settings", !("settings" in madeSchema), JSON.stringify(madeSchema.settings));
     r = await call("GET", `/v1/forms/${made.id}/artifact`, A);
     check("its download has no templateRef", r.status === 200 && !r.text.includes("templateRef") && !r.text.includes(formTpl.id), short(r));
+    check("…and no settings", r.status === 200 && !("settings" in JSON.parse(r.text)), short(r));
     r = await call("POST", "/v1/forms", A, { templateId: group.id });
     check("a form from a group template: 400", r.status === 400 && /is a group template/.test(r.json.message), short(r));
     r = await call("POST", "/v1/forms", B, { templateId: formTpl.id });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   Block,
+  buildArtifact,
   formProblems,
   isPresentationalType,
   COUNTRY_OPTIONS,
@@ -10,7 +11,6 @@ import {
   misorderedDependents,
   newBlock,
   newBlockId,
-  resolveTheme,
   type LeafBlock as TBlock,
   type Condition,
 } from "./index";
@@ -230,46 +230,23 @@ describe("dependency guards", () => {
   });
 });
 
-describe("FormSettings", () => {
-  it("drops the removed hosted settings from a form saved before, without failing", () => {
-    const saved = FormSchema.parse({
-      title: "Old",
-      settings: {
-        submitLabel: "Send",
-        redirectUrl: "https://client.example/thanks",
-        spamProtection: true,
-        partialSubmissions: true,
-        notifyEmails: ["owner@client.example"],
-      },
-      blocks: [],
-    });
-    expect(saved.settings).toEqual({ submitLabel: "Send" });
-  });
-});
+describe("settings", () => {
+  const old = {
+    title: "Old",
+    settings: {
+      submitLabel: "Send",
+      theme: { accent: "#123456", logo: "https://client.example/logo.png", customCss: ".x{}" },
+      redirectUrl: "https://client.example/thanks",
+      notifyEmails: ["owner@client.example"],
+    },
+    blocks: [],
+  };
 
-describe("resolveTheme", () => {
-  it("falls back to brand defaults on a light background", () => {
-    const t = resolveTheme();
-    expect(t.accent).toBe("#6D5EFA");
-    expect(t.background).toBe("#F6F7F9");
-    expect(t.text).toBe("#1B1D22");
-    expect(t.surface).toBe("#FFFFFF");
+  it("drops settings from content saved before they were removed, without failing", () => {
+    expect(FormSchema.parse(old)).not.toHaveProperty("settings");
   });
 
-  it("adapts text + surface for a dark background", () => {
-    const t = resolveTheme({ background: "#111111" });
-    expect(t.text).toBe("#F4F4F5");
-    expect(t.surface).toBe("#1C1F26");
-  });
-
-  it("caps the card radius so a pill setting never becomes a blob", () => {
-    const t = resolveTheme({ radius: "full" });
-    expect(t.radius).toBe("9999px");
-    expect(t.cardRadius).toBe("28px");
-  });
-
-  it("maps width presets to concrete values", () => {
-    expect(resolveTheme({ width: "narrow" }).maxWidth).toBe("480px");
-    expect(resolveTheme({ width: "wide" }).maxWidth).toBe("820px");
+  it("never exports them", () => {
+    expect(buildArtifact(old, { formId: "f", formVersionId: "v" })).not.toHaveProperty("settings");
   });
 });
