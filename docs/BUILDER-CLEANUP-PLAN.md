@@ -21,7 +21,8 @@ The builder isn't deployed anywhere (confirmed 16 Oct 2026), so these two holes 
 | 1. Automations and webhooks | Done 16 Oct 2026 | `a2cfd32`, `ab19ce2`, `65ef734` |
 | 2. Hosted publish path | Done 16 Oct 2026 | `f8a6f4f`, `ea6a077`, `18c4331` |
 | 3. Response data and org settings | Done 16 Oct 2026 | `2706c2f`, `08ea1d1`, `ac4fad3` |
-| 4. AI | Next | |
+| 4. AI | Done 16 Oct 2026 | `69b2379`, `bb4e5d4` |
+| 5. Custom domains | Next | |
 
 ## Before any deployment
 
