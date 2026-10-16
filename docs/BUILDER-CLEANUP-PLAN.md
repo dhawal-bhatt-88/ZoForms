@@ -22,7 +22,8 @@ The builder isn't deployed anywhere (confirmed 16 Oct 2026), so these two holes 
 | 2. Hosted publish path | Done 16 Oct 2026 | `f8a6f4f`, `ea6a077`, `18c4331` |
 | 3. Response data and org settings | Done 16 Oct 2026 | `2706c2f`, `08ea1d1`, `ac4fad3` |
 | 4. AI | Done 16 Oct 2026 | `69b2379`, `bb4e5d4` |
-| 5. Custom domains | Next | |
+| 5. Custom domains | Done 16 Oct 2026 | `ab802d4`, `cf6c30f` |
+| 6. Block types and form design | Next | |
 
 ## Before any deployment
 
@@ -43,6 +44,7 @@ Hardening items found during the clean-up. None of them belong to a removal brie
 | `Form.slug` | Drop. The download is named from the title and version, e.g. `phq-9-v12.json`, falling back to `form-v12.json` when the title gives nothing usable. |
 | Workspace switcher (B5) | Remove the button, which does nothing. The `Workspace` model stays; several workspaces per organisation would be built when needed. |
 | Unused but cheap columns (B3) | Keep `Invite.invitedById`, `Template.createdBy` and `Workspace.name`. |
+| `Organization.slug` (brief 5) | Keep. It's a random label set at signup that operators search and see in the admin console. No tenant URL or route uses it. |
 | form-schema's self-used exports (B1) | Leave them. Some may be shared vocabulary with the renderer. |
 
 ## The briefs
