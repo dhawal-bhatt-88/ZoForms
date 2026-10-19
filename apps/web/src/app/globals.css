@@ -167,7 +167,10 @@ html {
   }
 
   /* Surface — L284–294, with the builder's white light surface. */
+  /* `--scroll-ground` follows this background for `.scroll-x`, whose shadows
+     mask themselves with an opaque band of it; the two must not drift apart. */
   .surface {
+    --scroll-ground: rgb(var(--zb-surface));
     background: rgb(var(--zb-surface));
     border: 1px solid rgb(var(--zb-rule));
     border-radius: 0.875rem;
@@ -222,6 +225,43 @@ html {
   background-size: 200% 100%;
   background-repeat: no-repeat;
   animation: shimmer 1.6s linear infinite;
+}
+
+/* The one entrance in the product: a toast arriving — L553–562. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/*
+ * The edge of a table that scrolls sideways — L469–487. The two `local` layers
+ * scroll with the content and hide the shadow once that edge is reached, so a
+ * shadow shows on exactly the sides with more to see. No JavaScript.
+ */
+.scroll-x {
+  background-image:
+    linear-gradient(to right, var(--scroll-ground, rgb(var(--zb-surface))) 30%, transparent),
+    linear-gradient(to left, var(--scroll-ground, rgb(var(--zb-surface))) 30%, transparent),
+    radial-gradient(farthest-side at 0 50%, rgb(2 20 17 / 0.14), transparent),
+    radial-gradient(farthest-side at 100% 50%, rgb(2 20 17 / 0.14), transparent);
+  background-position:
+    0 0,
+    100% 0,
+    0 0,
+    100% 0;
+  background-size:
+    2.5rem 100%,
+    2.5rem 100%,
+    0.875rem 100%,
+    0.875rem 100%;
+  background-repeat: no-repeat;
+  background-attachment: local, local, scroll, scroll;
 }
 
 /*

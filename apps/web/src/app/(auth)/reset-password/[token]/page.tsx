@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
-import { Button, Input } from "@formbuilder/ui";
+import { Button, Callout, Field, Input } from "@/components/ui";
 import { resetPassword } from "@/lib/api";
 
 export default function ResetPasswordPage() {
@@ -31,28 +30,26 @@ export default function ResetPasswordPage() {
     <div>
       <div>
         <h1 className="display-sm">Choose a new password</h1>
-        <p className="mt-1 text-sm text-muted">Enter a new password for your account.</p>
+        <p className="body-sm mt-2 text-graphite">Enter a new password for your account.</p>
         <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
-          <div>
-            <label htmlFor="reset-password" className="mb-1.5 block text-[13px] font-semibold text-ink-2">
-              New password
-            </label>
-            <Input
-              id="reset-password"
-              type="password"
-              required
-              className="border-line-2 px-3.5 py-2.5 focus:ring-accent-weak"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 6 characters"
-              autoComplete="new-password"
-            />
-          </div>
+          <Field label="New password" required>
+            {(field) => (
+              <Input
+                {...field}
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="At least 6 characters"
+                autoComplete="new-password"
+              />
+            )}
+          </Field>
           {err && (
-            <p className="rounded-lg bg-fail-wash px-3.5 py-2.5 text-sm text-red">{err}</p>
+            <Callout role="alert" tone="fail" title="Couldn't reset the password">
+              {err}
+            </Callout>
           )}
-          <Button type="submit" disabled={busy} className="h-11 w-full">
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          <Button type="submit" variant="primary" pending={busy} className="w-full py-2.5">
             Reset password &amp; sign in
           </Button>
         </form>

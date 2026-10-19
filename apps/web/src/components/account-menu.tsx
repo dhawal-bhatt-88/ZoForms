@@ -43,7 +43,8 @@ export function AccountMenu({
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       // Here, not in the cleanup: by the time that runs the menu has left the
-      // DOM and taken focus with it, so the check there never sees it inside.
+      // DOM and taken focus with it, so the check there never sees it inside
+      // (docs/ZOBLOCKS-UPSTREAM-NOTES.md).
       returnTo?.focus();
       setOpen(false);
     };

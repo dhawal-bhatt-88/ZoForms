@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { verifyEmail } from "@/lib/api";
+import { buttonClasses } from "@/components/ui";
 
 export default function VerifyEmailPage() {
   const params = useParams();
@@ -25,29 +26,29 @@ export default function VerifyEmailPage() {
     <div className="text-center">
       <div>
         {state === "loading" && (
-          <div className="grid place-items-center py-6 text-muted">
-            <Loader2 className="h-6 w-6 animate-spin" />
+          <div role="status" className="grid place-items-center py-6 text-graphite">
+            <Loader2 aria-hidden="true" className="h-6 w-6 animate-spin" />
             <p className="mt-3 text-sm">Verifying your email…</p>
           </div>
         )}
         {state === "ok" && (
           <>
-            <CheckCircle2 className="mx-auto h-10 w-10 text-green" />
+            <CheckCircle2 aria-hidden="true" className="mx-auto h-10 w-10 text-pass" />
             <h1 className="mt-4 display-sm">Email verified</h1>
-            <p className="mt-1 text-sm text-muted">Your email address is confirmed.</p>
-            <Link href="/app" className="btn btn-primary mt-6 w-full">
+            <p className="body-sm mt-2 text-graphite">Your email address is confirmed.</p>
+            <Link href="/app" className={buttonClasses({ variant: "primary", className: "mt-6 w-full py-2.5" })}>
               Go to your dashboard
             </Link>
           </>
         )}
         {state === "error" && (
           <>
-            <XCircle className="mx-auto h-10 w-10 text-red" />
+            <XCircle aria-hidden="true" className="mx-auto h-10 w-10 text-fail" />
             <h1 className="mt-4 display-sm">
               Couldn&apos;t verify
             </h1>
-            <p className="mt-1 text-sm text-muted">{message}</p>
-            <Link href="/app" className="btn btn-outline mt-6 w-full">
+            <p className="body-sm mt-2 text-graphite">{message}</p>
+            <Link href="/app" className={buttonClasses({ className: "mt-6 w-full py-2.5" })}>
               Back to dashboard
             </Link>
           </>

@@ -3,8 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
-import { Button, Input } from "@formbuilder/ui";
+import { Button, buttonClasses, Callout, Field, Input, Loading, Skeleton } from "@/components/ui";
 import { acceptInvite, getInvite, type InviteInfo } from "@/lib/api";
 
 export default function AcceptInvitePage() {
@@ -45,21 +44,23 @@ export default function AcceptInvitePage() {
         {loadError ? (
           <div className="text-center">
             <h1 className="display-sm">Invite unavailable</h1>
-            <p className="mt-2 text-sm text-muted">{loadError}</p>
-            <Link href="/login" className="btn btn-outline mt-6 w-full">
+            <p className="body-sm mt-2 text-graphite">{loadError}</p>
+            <Link href="/login" className={buttonClasses({ className: "mt-6 w-full py-2.5" })}>
               Go to login
             </Link>
           </div>
         ) : !info ? (
-          <div className="grid place-items-center py-8 text-muted">
-            <Loader2 className="h-5 w-5 animate-spin" />
-          </div>
+          <Loading label="Loading the invite">
+            <Skeleton className="h-8 w-2/3" />
+            <Skeleton className="mt-3 h-4 w-full" />
+            <Skeleton className="mt-8 h-10 w-full" />
+          </Loading>
         ) : (
           <>
             <h1 className="display-sm">
               Join {info.orgName}
             </h1>
-            <p className="mt-1 text-sm text-muted">
+            <p className="body-sm mt-2 text-graphite">
               You&apos;ve been invited as{" "}
               <span className="font-semibold text-ink">{roleLabel}</span> ·{" "}
               {info.email}
@@ -67,43 +68,33 @@ export default function AcceptInvitePage() {
 
             <form onSubmit={onAccept} className="mt-6 flex flex-col gap-4">
               {info.needsAccount && (
-                <div>
-                  <label htmlFor="invite-name" className="mb-1.5 block text-[13px] font-semibold text-ink-2">
-                    Your name
-                  </label>
-                  <Input
-                    id="invite-name"
-                    className="border-line-2 px-3.5 py-2.5 focus:ring-accent-weak"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Ada Lovelace"
-                    autoComplete="name"
-                  />
-                </div>
+                <Field label="Your name">
+                  {(field) => (
+                    <Input {...field} value={name} onChange={(e) => setName(e.target.value)} placeholder="Ada Lovelace" autoComplete="name" />
+                  )}
+                </Field>
               )}
-              <div>
-                <label htmlFor="invite-password" className="mb-1.5 block text-[13px] font-semibold text-ink-2">
-                  {info.needsAccount ? "Choose a password" : "Your password"}
-                </label>
-                <Input
-                  id="invite-password"
-                  type="password"
-                  required
-                  className="border-line-2 px-3.5 py-2.5 focus:ring-accent-weak"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={info.needsAccount ? "At least 6 characters" : "••••••••"}
-                  autoComplete={info.needsAccount ? "new-password" : "current-password"}
-                />
-              </div>
+              <Field label={info.needsAccount ? "Choose a password" : "Your password"} required>
+                {(field) => (
+                  <Input
+                    {...field}
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={info.needsAccount ? "At least 6 characters" : "••••••••"}
+                    autoComplete={info.needsAccount ? "new-password" : "current-password"}
+                  />
+                )}
+              </Field>
 
               {err && (
-                <p className="rounded-lg bg-fail-wash px-3.5 py-2.5 text-sm text-red">{err}</p>
+                <Callout role="alert" tone="fail" title="Couldn't accept the invite">
+                  {err}
+                </Callout>
               )}
 
-              <Button type="submit" disabled={busy} className="h-11 w-full">
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                {busy ? "Joining…" : `Accept & join ${info.orgName}`}
+              <Button type="submit" variant="primary" pending={busy} pendingLabel="Joining…" className="w-full py-2.5">
+                {`Accept & join ${info.orgName}`}
               </Button>
             </form>
           </>
