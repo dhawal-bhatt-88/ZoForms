@@ -155,6 +155,7 @@ No deleted code provides tenant isolation. Tenants come from the signed-in user,
 
 Not clean-up work, so not in any brief:
 - **ESLint:** `next lint` was deprecated and then removed in Next.js 16, and the repo has no ESLint config. Brief 8 removes the broken `lint` scripts. Setting up ESLint (flat config, run directly, across web, admin, API and packages) and fixing what it reports is a separate task.
+- **e2e:** the API's file watcher can restart mid-suite and race the test seed. Run the API without watch mode for e2e.
 
 ## Unblocked afterwards
 
