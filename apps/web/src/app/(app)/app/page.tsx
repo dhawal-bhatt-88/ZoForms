@@ -1,20 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import {
-  Copy,
-  FileText,
-  Loader2,
-  MoreHorizontal,
-  Pencil,
-  Plus,
-  Search,
-  Trash2,
-  Download,
-} from "lucide-react";
+import { Copy, Download, FileText, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import AppShell from "@/components/app-shell";
+import { MenuButton, type MenuItem } from "@/components/menu-button";
 import { NewFormDialog } from "@/components/templates/new-form-dialog";
+import {
+  Button,
+  Callout,
+  ConfirmDialog,
+  EmptyState,
+  Input,
+  Loading,
+  Select,
+  Skeleton,
+  useToast,
+} from "@/components/ui";
 import { useCanEdit } from "@/lib/use-can-edit";
 import {
   deleteForm,
@@ -41,18 +43,24 @@ function relTime(iso?: string) {
 
 type Sort = "recent" | "name";
 
+/**
+ * My forms: a card grid, each card a link into the editor with a ⋯ menu.
+ * Every action reports its outcome in a toast; delete asks first.
+ */
 export default function Dashboard() {
   const [forms, setForms] = useState<FormListItem[]>([]);
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
   // "New form": blank, or from a form template. Not offered to viewers.
   const [newFormOpen, setNewFormOpen] = useState(false);
   const canEdit = useCanEdit();
+  const toast = useToast();
+  const searchId = useId();
+  const sortId = useId();
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<Sort>("recent");
-
   const [toDelete, setToDelete] = useState<FormListItem | null>(null);
-  const [deleting, setDeleting] = useState(false);
 
   async function refresh() {
     try {
@@ -82,279 +90,190 @@ export default function Dashboard() {
     return sorted;
   }, [forms, query, sort]);
 
-  function onCreate() {
-    setNewFormOpen(true);
-  }
-
-  async function onDuplicate(id: string) {
+  async function onDuplicate(f: FormListItem) {
     try {
-      await duplicateForm(id);
-      refresh();
-    } catch {
-      /* ignore */
+      const copy = await duplicateForm(f.id);
+      await refresh();
+      toast.show({ tone: "pass", title: `Duplicated "${f.title}".`, detail: `The copy is "${copy.title}".` });
+    } catch (e) {
+      toast.show({ tone: "fail", title: `Couldn't duplicate "${f.title}".`, detail: (e as Error).message });
     }
   }
 
-  async function onDownload(id: string) {
+  async function onDownload(f: FormListItem) {
     try {
-      await downloadArtifact(id);
-    } catch {
-      /* ignore */
+      const fileName = await downloadArtifact(f.id);
+      toast.show({ tone: "pass", title: `Downloaded "${f.title}".`, detail: fileName });
+    } catch (e) {
+      toast.show({ tone: "fail", title: `Couldn't download "${f.title}".`, detail: (e as Error).message });
     }
   }
 
-  async function onConfirmDelete() {
-    if (!toDelete) return;
-    setDeleting(true);
-    try {
-      await deleteForm(toDelete.id);
-      setForms((f) => f.filter((x) => x.id !== toDelete.id));
-      setToDelete(null);
-    } finally {
-      setDeleting(false);
-    }
-  }
+  const newForm = canEdit && (
+    <Button variant="primary" onClick={() => setNewFormOpen(true)}>
+      <Plus aria-hidden="true" className="h-4 w-4" />
+      New form
+    </Button>
+  );
 
   return (
-    <AppShell
-      title="My forms"
-      actions={
-        canEdit && (
-          <button onClick={onCreate} className="btn btn-primary btn-sm">
-            <Plus className="h-4 w-4" />
-            New form
-          </button>
-        )
-      }
-    >
-      {/* toolbar */}
-      <div className="mb-6 flex flex-wrap items-center gap-2.5">
+    <AppShell title="My forms" actions={newForm}>
+      <div role="search" className="mb-6 flex flex-wrap items-center gap-2.5">
         <div className="relative min-w-[200px] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
-          <input
+          <label htmlFor={searchId} className="sr-only">
+            Search forms
+          </label>
+          <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-graphite-soft" />
+          <Input
+            ref={searchRef}
+            id={searchId}
+            type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search forms…"
-            className="w-full rounded-lg border border-line bg-surface py-2 pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-faint focus:border-accent focus:ring-2 focus:ring-accent/15"
+            className="pl-9"
           />
         </div>
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value as Sort)}
-          className="rounded-lg border border-line bg-surface px-3 py-2 text-[13px] font-medium text-ink-2 outline-none focus:border-accent"
-        >
+        <label htmlFor={sortId} className="sr-only">
+          Sort forms
+        </label>
+        <Select id={sortId} value={sort} onChange={(e) => setSort(e.target.value as Sort)} wrapperClassName="w-auto">
           <option value="recent">Recently edited</option>
           <option value="name">Name (A–Z)</option>
-        </select>
+        </Select>
       </div>
 
       {status === "loading" && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Loading label="Loading your forms" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="rounded-2xl border border-line bg-surface p-5">
-              <div className="mb-4 flex items-center justify-between">
-                <div className="h-9 w-9 animate-pulse rounded-xl bg-surface-3" />
-                <div className="h-5 w-14 animate-pulse rounded-full bg-surface-3" />
-              </div>
-              <div className="h-4 w-3/4 animate-pulse rounded bg-surface-3" />
-              <div className="mt-2 h-3 w-1/2 animate-pulse rounded bg-surface-3" />
-              <div className="mt-5 h-3 w-2/3 animate-pulse rounded bg-surface-3" />
+            <div key={i} className="surface p-5">
+              <Skeleton className="mb-4 h-9 w-9 rounded-lg" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="mt-2 h-3 w-1/2" />
+              <Skeleton className="mt-5 h-3 w-2/3" />
             </div>
           ))}
-        </div>
+        </Loading>
       )}
 
       {status === "error" && (
-        <div className="rounded-xl bg-fail-wash px-4 py-3 text-sm text-red">
-          Couldn&apos;t reach the API. Start it with{" "}
-          <code className="font-mono">pnpm dev</code> (with Postgres running), then reload.
-        </div>
+        <Callout tone="fail" title="Couldn't load your forms">
+          The API didn&apos;t answer. Start it with <code className="font-mono">pnpm dev</code> (with Postgres running),
+          then reload.
+        </Callout>
       )}
 
       {status === "ok" && forms.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-line-2 bg-surface py-16 text-center">
-          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl bg-accent-weak text-accent-2">
-            <FileText className="h-5 w-5" />
-          </div>
-          <p className="mb-1 font-semibold">Create your first form</p>
-          <p className="mb-5 text-sm text-muted">
-            Start from scratch or from a template.
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            {canEdit && (
-              <button onClick={onCreate} className="btn btn-primary btn-sm">
-                <Plus className="h-4 w-4" /> New form
-              </button>
-            )}
-          </div>
-        </div>
+        <EmptyState
+          title={canEdit ? "Create your first form" : "No forms yet"}
+          body={
+            canEdit
+              ? "Start from scratch or from a template. Every save keeps a version you can go back to."
+              : "Forms your organisation makes will appear here."
+          }
+          actions={newForm}
+        />
       )}
 
       {status === "ok" && forms.length > 0 && visible.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-line-2 py-16 text-center text-sm text-muted">
-          No forms match your search.
-        </div>
+        <EmptyState
+          title={`No forms match "${query.trim()}"`}
+          body="Try another word, or clear the search to see every form."
+          actions={<Button onClick={() => setQuery("")}>Clear search</Button>}
+        />
       )}
 
       {status === "ok" && visible.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {visible.map((f) => (
             <FormCard
               key={f.id}
               form={f}
-              onDuplicate={() => onDuplicate(f.id)}
-              onDownload={() => onDownload(f.id)}
+              canEdit={canEdit}
+              onDuplicate={() => onDuplicate(f)}
+              onDownload={() => onDownload(f)}
               onDelete={() => setToDelete(f)}
             />
           ))}
-        </div>
+        </ul>
       )}
 
       {newFormOpen && <NewFormDialog onClose={() => setNewFormOpen(false)} />}
 
-      {/* delete confirm */}
       {toDelete && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4 backdrop-blur-sm"
-          onClick={() => !deleting && setToDelete(null)}
-        >
-          <div
-            className="w-full max-w-sm rounded-2xl border border-line bg-surface p-6 shadow-pop"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-3 grid h-10 w-10 place-items-center rounded-xl bg-fail-wash text-red">
-              <Trash2 className="h-5 w-5" />
-            </div>
-            <h2 className="font-semibold tracking-tight">Delete “{toDelete.title}”?</h2>
-            <p className="mt-1 text-sm text-muted">
-              This permanently removes the form and all its versions. This can&apos;t be undone.
-            </p>
-            <div className="mt-5 flex items-center justify-end gap-2">
-              <button onClick={() => setToDelete(null)} disabled={deleting} className="btn btn-outline btn-sm">
-                Cancel
-              </button>
-              <button
-                onClick={onConfirmDelete}
-                disabled={deleting}
-                className="btn btn-sm bg-red text-paper hover:opacity-90"
-              >
-                {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          title={`Delete "${toDelete.title}"?`}
+          consequence="This permanently removes the form and all its saved versions. Files you've already downloaded aren't affected. This can't be undone."
+          confirmLabel="Delete form"
+          onConfirm={async () => {
+            await deleteForm(toDelete.id);
+            setForms((list) => list.filter((x) => x.id !== toDelete.id));
+            toast.show({ tone: "pass", title: `Deleted "${toDelete.title}".` });
+            // Its card, and the ⋯ button that opened this, are gone: focus
+            // would otherwise fall to the page itself.
+            requestAnimationFrame(() => searchRef.current?.focus());
+          }}
+          onClose={() => setToDelete(null)}
+        />
       )}
     </AppShell>
   );
 }
 
+/**
+ * A form, as a card that is itself the link into the editor. The link covers
+ * the card, so its focus ring follows the card's corners, and the title and
+ * date sit beneath it so a click on them opens the form; only the ⋯ menu sits
+ * above it. The hover lift is allowed here because the whole card is a link.
+ */
 function FormCard({
   form: f,
+  canEdit,
   onDuplicate,
   onDownload,
   onDelete,
 }: {
   form: FormListItem;
+  canEdit: boolean;
   onDuplicate: () => void;
   onDownload: () => void;
   onDelete: () => void;
 }) {
-  const [menu, setMenu] = useState(false);
+  const href = `/app/forms/${f.id}/edit`;
+  const open = canEdit ? "Edit" : "Open";
+  const items: MenuItem[] = canEdit
+    ? [
+        { label: "Edit", icon: Pencil, href },
+        { label: "Duplicate", icon: Copy, onSelect: onDuplicate },
+        { label: "Download", icon: Download, onSelect: onDownload },
+        "separator",
+        { label: "Delete…", icon: Trash2, onSelect: onDelete, danger: true },
+      ]
+    : [
+        { label: "Open", icon: FileText, href },
+        { label: "Download", icon: Download, onSelect: onDownload },
+      ];
 
   return (
-    <div className="group relative flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)] transition-all duration-200 hover:-translate-y-0.5 hover:border-line-2 hover:shadow-pop">
-      <Link href={`/app/forms/${f.id}/edit`} className="absolute inset-0 z-0 rounded-2xl" aria-label={`Edit ${f.title}`} />
+    <li className="surface group relative flex flex-col p-5 transition-[transform,box-shadow,border-color] duration-300 ease-out-expo hover:-translate-y-0.5 hover:border-rule-strong hover:shadow-[0_12px_32px_-16px_rgb(2_20_17/0.25)] motion-reduce:hover:translate-y-0">
+      <Link
+        href={href}
+        className="absolute inset-0 z-0 rounded-[0.875rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-deep focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
+        aria-label={`${open} ${f.title}`}
+      />
 
-      <div className="relative z-[1] mb-4 flex items-start justify-between gap-2">
-        <span className="grid h-9 w-9 place-items-center rounded-xl bg-surface-2 text-muted transition-colors group-hover:bg-accent-weak group-hover:text-accent-2">
-          <FileText className="h-[18px] w-[18px]" />
-        </span>
-      </div>
+      <span aria-hidden="true" className="mb-4 grid h-9 w-9 place-items-center rounded-lg bg-accent-wash text-brand-deep">
+        <FileText className="h-[18px] w-[18px]" strokeWidth={2} />
+      </span>
 
-      <h3 className="relative z-[1] line-clamp-2 font-semibold leading-snug tracking-tight">
+      <h3 className="line-clamp-2 font-display text-[0.9375rem] font-semibold leading-snug tracking-[-0.008em]">
         {f.title}
       </h3>
-      <div className="relative z-[1] mt-1.5 flex items-center gap-2 text-[13px] text-muted">
-        <span>Edited {relTime(f.updatedAt || f.createdAt)}</span>
-      </div>
+      <p className="body-sm mt-1.5 text-graphite">Edited {relTime(f.updatedAt || f.createdAt)}</p>
 
-      <div className="relative z-10 mt-4 flex items-center justify-end border-t border-line pt-3">
-        <div className="flex flex-none items-center gap-1">
-          <div className="relative">
-            <button
-              onClick={() => setMenu((v) => !v)}
-              className="grid h-7 w-7 place-items-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-ink"
-              title="More"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </button>
-            {menu && (
-              <>
-                <div className="fixed inset-0 z-20" onClick={() => setMenu(false)} />
-                <div className="absolute bottom-9 right-0 z-30 w-44 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-pop">
-                  <MenuItem icon={Pencil} label="Edit" href={`/app/forms/${f.id}/edit`} />
-                  <MenuItem
-                    icon={Copy}
-                    label="Duplicate"
-                    onClick={() => {
-                      onDuplicate();
-                      setMenu(false);
-                    }}
-                  />
-                  <div className="my-1 h-px bg-line" />
-                  <MenuItem
-                    icon={Trash2}
-                    label="Delete"
-                    danger
-                    onClick={() => {
-                      onDelete();
-                      setMenu(false);
-                    }}
-                  />
-                  <MenuItem
-                    icon={Download}
-                    label="Download"
-                    onClick={() => {
-                      onDownload();
-                      setMenu(false);
-                    }}
-                  />
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+      <div className="relative z-10 mt-4 flex items-center justify-end border-t border-rule pt-3">
+        <MenuButton label={`More actions for "${f.title}"`} items={items} placement="above" />
       </div>
-    </div>
-  );
-}
-
-function MenuItem({
-  icon: Icon,
-  label,
-  href,
-  onClick,
-  danger,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  href?: string;
-  onClick?: () => void;
-  danger?: boolean;
-}) {
-  const cls = `flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13.5px] font-medium transition-colors ${
-    danger ? "text-red hover:bg-fail-wash" : "text-ink-2 hover:bg-surface-2 hover:text-ink"
-  }`;
-  if (href)
-    return (
-      <Link href={href} className={cls}>
-        <Icon className="h-4 w-4" /> {label}
-      </Link>
-    );
-  return (
-    <button onClick={onClick} className={cls}>
-      <Icon className="h-4 w-4" /> {label}
-    </button>
+    </li>
   );
 }

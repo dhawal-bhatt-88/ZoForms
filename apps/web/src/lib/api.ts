@@ -277,7 +277,8 @@ export function saveSchema(id: string, schema: FormSchema) {
  * Download the form's latest *saved* version as a JSON file. Read-only: never
  * saves and never includes unsaved editor changes.
  */
-export async function downloadArtifact(id: string) {
+/** Downloads the latest saved version's artifact and returns the file name it was saved as. */
+export async function downloadArtifact(id: string): Promise<string> {
   const res = await apiFetch(`/v1/forms/${id}/artifact`);
   const disposition = res.headers.get("Content-Disposition") ?? "";
   const fileName = /filename="([^"]+)"/.exec(disposition)?.[1] ?? "form.json";
@@ -287,6 +288,7 @@ export async function downloadArtifact(id: string) {
   a.download = fileName;
   a.click();
   URL.revokeObjectURL(url);
+  return fileName;
 }
 
 /* ---------- templates ---------- */

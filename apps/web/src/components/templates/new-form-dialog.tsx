@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FilePlus2, Loader2 } from "lucide-react";
+import { FilePlus2 } from "lucide-react";
 import { Dialog } from "@/components/dialog";
+import { Button, Callout, Loading, Skeleton } from "@/components/ui";
 import { createForm, createFormFromTemplate, listTemplates, type TemplateSummary } from "@/lib/api";
 import { PreviewPane, useTemplateDetail } from "./template-preview";
 import { filterTemplates, TemplateChoices, TemplateSearch } from "./template-list";
@@ -56,21 +57,26 @@ export function NewFormDialog({ onClose, initial }: { onClose: () => void; initi
       width="max-w-4xl"
       footer={
         <>
-          {error && (
-            <p role="alert" className="mr-auto text-sm text-red">
-              Couldn&apos;t create the form: {error}
-            </p>
-          )}
-          <button onClick={onClose} disabled={creating} className="btn btn-outline btn-sm">
+          <Button size="sm" onClick={() => !creating && onClose()} aria-disabled={creating || undefined}>
             Cancel
-          </button>
-          <button onClick={create} disabled={creating || (!!templateId && !detail)} className="btn btn-primary btn-sm">
-            {creating && <Loader2 className="h-4 w-4 animate-spin" />}
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={create}
+            pending={creating}
+            reason={templateId && !detail && !previewError ? "Waiting for the template to load." : undefined}
+          >
             {templateId ? "Use this template" : "Create blank form"}
-          </button>
+          </Button>
         </>
       }
     >
+      {error && (
+        <Callout role="alert" tone="fail" title="Couldn't create the form" className="mb-4">
+          {error}
+        </Callout>
+      )}
       <div className="grid gap-4 md:grid-cols-[280px_minmax(0,1fr)]">
         <div className="flex min-h-0 flex-col gap-3">
           <TemplateSearch value={query} onChange={setQuery} label="Search form templates" />
@@ -86,19 +92,23 @@ export function NewFormDialog({ onClose, initial }: { onClose: () => void; initi
                     type="button"
                     aria-pressed={selected === BLANK}
                     onClick={() => setSelected(BLANK)}
-                    className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm font-semibold transition-colors ${
-                      selected === BLANK ? "border-accent bg-accent-weak" : "border-transparent hover:bg-surface-2"
+                    className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-[0.8125rem] font-semibold text-ink transition-colors duration-200 ${
+                      selected === BLANK ? "border-brand-deep bg-accent-wash" : "border-transparent hover:bg-paper-sunk"
                     }`}
                   >
-                    <FilePlus2 className="h-4 w-4 text-muted" /> Blank form
+                    <FilePlus2 aria-hidden="true" className="h-4 w-4 text-graphite-soft" /> Blank form
                   </button>
                 </li>
               }
               empty={
                 loadError ? (
-                  <span className="text-red">Couldn&apos;t load templates: {loadError}</span>
+                  <span className="text-fail">Couldn&apos;t load templates: {loadError}</span>
                 ) : !templates ? (
-                  <Loader2 className="mx-auto h-5 w-5 animate-spin" aria-label="Loading templates" />
+                  <Loading label="Loading templates" className="space-y-2 text-left">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                  </Loading>
                 ) : templates.length ? (
                   <>No form templates match &ldquo;{query}&rdquo;.</>
                 ) : (
@@ -108,11 +118,11 @@ export function NewFormDialog({ onClose, initial }: { onClose: () => void; initi
             />
           </div>
         </div>
-        <section aria-label="Preview" className="max-h-[60vh] min-h-[240px] overflow-y-auto rounded-xl border border-line bg-bg p-4">
+        <section aria-label="Preview" className="max-h-[60vh] min-h-[240px] overflow-y-auto rounded-xl border border-rule bg-paper p-4">
           {templateId ? (
             <PreviewPane id={templateId} detail={detail} error={previewError} />
           ) : (
-            <p className="py-10 text-center text-sm text-muted">A blank form, ready for your first question.</p>
+            <p className="body-sm py-10 text-center text-graphite">A blank form, ready for your first question.</p>
           )}
         </section>
       </div>

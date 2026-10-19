@@ -134,7 +134,7 @@ const HEALTH = {
     ]), JSON.stringify(removed));
     const rewritten = await saveDialog.locator("[data-rewritten-logic] li").allInnerTexts();
     check("confirmation: the logic regenerated from what is left", JSON.stringify(rewritten) === JSON.stringify([`"How many times?" — its logic "1 AND (2 OR 3)" becomes "1 AND 2".`]), JSON.stringify(rewritten));
-    await saveDialog.getByLabel("Description (optional)").fill("Smoking history, with quit attempts");
+    await saveDialog.getByLabel(/^Description/).fill("Smoking history, with quit attempts");
     await saveDialog.getByRole("button", { name: "Save without them" }).click();
     await saveDialog.waitFor({ state: "detached" });
     await page.getByText(`Saved "Smoking details" to your organisation's templates.`).waitFor();

@@ -1,7 +1,6 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
 import {
   blockName,
   cleanTemplateForm,
@@ -16,6 +15,7 @@ import {
   type GroupBlock,
 } from "@formbuilder/form-schema";
 import { Dialog } from "@/components/dialog";
+import { Button, Callout, Field, Input, Textarea } from "@/components/ui";
 import { createTemplate, type TemplateSummary } from "@/lib/api";
 
 /**
@@ -45,8 +45,7 @@ export function SaveTemplateDialog({
   onSaved: (template: TemplateSummary) => void;
   onClose: () => void;
 }) {
-  const nameId = useId();
-  const descriptionId = useId();
+  const changesId = useId();
 
   const plan = useMemo(() => {
     const group = kind === "group" ? (findBlock(form.blocks, groupId ?? "")?.block as GroupBlock | undefined) : undefined;
@@ -109,62 +108,53 @@ export function SaveTemplateDialog({
       width="max-w-lg"
       footer={
         <>
-          <button onClick={onClose} disabled={saving} className="btn btn-outline btn-sm">
+          <Button size="sm" onClick={() => !saving && onClose()} aria-disabled={saving || undefined}>
             Cancel
-          </button>
-          <button onClick={save} disabled={saving || !name.trim() || !!plan.problem} className="btn btn-primary btn-sm">
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={save}
+            pending={saving}
+            reason={plan.problem ? "This can't be saved as a template yet." : !name.trim() ? "A template needs a name." : undefined}
+          >
             {changes ? "Save without them" : "Save template"}
-          </button>
+          </Button>
         </>
       }
     >
       <form
+        className="flex flex-col gap-4"
         onSubmit={(e) => {
           e.preventDefault();
           save();
         }}
       >
-        <label htmlFor={nameId} className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">
-          Template name
-        </label>
-        <input
-          id={nameId}
-          data-autofocus
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          maxLength={200}
-          required
-          className="input mb-3 w-full"
-        />
-        <label htmlFor={descriptionId} className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">
-          Description <span className="font-normal text-muted">(optional)</span>
-        </label>
-        <textarea
-          id={descriptionId}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          maxLength={2000}
-          rows={2}
-          className="input w-full resize-none"
-        />
+        <Field label="Template name" required>
+          {(field) => <Input {...field} data-autofocus value={name} onChange={(e) => setName(e.target.value)} maxLength={200} />}
+        </Field>
+        <Field label="Description">
+          {(field) => (
+            <Textarea {...field} value={description} onChange={(e) => setDescription(e.target.value)} maxLength={2000} rows={2} />
+          )}
+        </Field>
       </form>
 
       {changes && (
-        <section aria-labelledby={`${nameId}-changes`} className="mt-4 rounded-xl border border-warn/30 bg-warn-wash px-3.5 py-3">
-          <h3 id={`${nameId}-changes`} className="text-sm font-semibold text-ink">
+        <section aria-labelledby={changesId} className="mt-4 rounded-r-xl border border-l-[3px] border-warn/25 border-l-warn bg-warn-wash px-4 py-3">
+          <h3 id={changesId} className="text-[0.8125rem] font-semibold text-warn">
             Some conditions won&apos;t be included
           </h3>
-          <p className="mt-0.5 text-[13px] text-ink-2">A template can only use questions inside it.</p>
-          <ul className="mt-2 list-disc space-y-1 pl-5 text-[13px] text-ink-2" data-removed-conditions>
+          <p className="body-sm mt-0.5 text-graphite">A template can only use questions inside it.</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-[0.8125rem] text-ink" data-removed-conditions>
             {plan.removed.map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ul>
           {plan.rewritten.length > 0 && (
             <>
-              <p className="mt-2.5 text-[13px] font-semibold text-ink">Logic that changes</p>
-              <ul className="mt-1 list-disc space-y-1 pl-5 text-[13px] text-ink-2" data-rewritten-logic>
+              <p className="mt-2.5 text-[0.8125rem] font-semibold text-ink">Logic that changes</p>
+              <ul className="mt-1 list-disc space-y-1 pl-5 text-[0.8125rem] text-ink" data-rewritten-logic>
                 {plan.rewritten.map((line) => (
                   <li key={line}>{line}</li>
                 ))}
@@ -175,14 +165,14 @@ export function SaveTemplateDialog({
       )}
 
       {plan.problem && (
-        <p role="alert" className="mt-4 rounded-lg bg-fail-wash px-3 py-2 text-sm text-red">
-          This can&apos;t be saved as a template yet: {plan.problem}
-        </p>
+        <Callout role="alert" tone="fail" title="This can't be saved as a template yet" className="mt-4">
+          {plan.problem}
+        </Callout>
       )}
       {error && (
-        <p role="alert" className="mt-4 rounded-lg bg-fail-wash px-3 py-2 text-sm text-red">
-          Couldn&apos;t save the template: {error}
-        </p>
+        <Callout role="alert" tone="fail" title="Couldn't save the template" className="mt-4">
+          {error}
+        </Callout>
       )}
     </Dialog>
   );

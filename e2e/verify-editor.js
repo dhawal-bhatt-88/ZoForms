@@ -150,8 +150,8 @@ async function waitFor(url) {
     // --- dashboard Download works ---
     const page2 = await ctx.newPage();
     await page2.goto(`${WEB}/app`);
-    await page2.getByTitle("More").first().click();
-    const [dl] = await Promise.all([page2.waitForEvent("download"), page2.getByRole("button", { name: "Download" }).click()]);
+    await page2.getByRole("button", { name: /^More actions for "/ }).first().click();
+    const [dl] = await Promise.all([page2.waitForEvent("download"), page2.getByRole("menuitem", { name: "Download" }).click()]);
     const dash = JSON.parse(fs.readFileSync(await dl.path(), "utf8"));
     check("dashboard Download -> latest saved artifact", dash.formId === form.id && dash.formVersionId === (await latestId()) && dl.suggestedFilename() === `ui-verify-v${await latestVersion()}.json`, dl.suggestedFilename());
 
@@ -162,8 +162,8 @@ async function waitFor(url) {
     const restoreBtns = page2.getByRole("button", { name: "Restore" });
     check("restore disabled on current version", await restoreBtns.nth(0).isDisabled());
     const before = await rows();
-    page2.once("dialog", (d) => d.accept());
     await restoreBtns.nth(1).click(); // v1: empty description
+    await page2.getByRole("alertdialog").getByRole("button", { name: "Restore" }).click();
     await page2.waitForURL(`**/app/forms/${form.id}/edit`);
     await page2.getByText("All changes saved").waitFor();
     const top = await prisma.formVersion.findFirst({ where: { formId: form.id }, orderBy: { version: "desc" } });

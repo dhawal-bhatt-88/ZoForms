@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useId, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Dialog } from "@/components/dialog";
+import { Button, Callout, Loading, Skeleton } from "@/components/ui";
 import { listTemplates, type TemplateDetail, type TemplateSummary } from "@/lib/api";
 import { PreviewPane, useTemplateDetail } from "./template-preview";
 import { filterTemplates, TemplateChoices, TemplateSearch } from "./template-list";
@@ -10,8 +10,9 @@ import { filterTemplates, TemplateChoices, TemplateSearch } from "./template-lis
 /**
  * "From template…": choose a group template — system ones and the
  * organisation's — preview it, and insert it as a group, or as a new page.
- * "Insert as page" is offered only when `asPage` is null; otherwise it is
- * disabled, with `asPage` as the reason shown under it.
+ * "Insert as page" is offered only when `asPage` is null; otherwise it stays
+ * focusable but blocked, with `asPage` as the reason shown under it and bound
+ * to it (`Button`'s `reason`).
  */
 export function TemplatePicker({
   asPage,
@@ -28,7 +29,6 @@ export function TemplatePicker({
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
   const { detail, error } = useTemplateDetail(selected);
-  const reasonId = useId();
 
   useEffect(() => {
     listTemplates("group")
@@ -49,25 +49,24 @@ export function TemplatePicker({
       width="max-w-4xl"
       footer={
         <>
-          {asPage && (
-            <p id={reasonId} className="mr-auto text-[13px] text-muted">
-              {asPage}
-            </p>
-          )}
-          <button onClick={onClose} className="btn btn-outline btn-sm">
+          <Button size="sm" onClick={onClose}>
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
+            size="sm"
             onClick={() => detail && onInsert(detail, "page")}
-            disabled={!detail || !!asPage}
-            aria-describedby={asPage ? reasonId : undefined}
-            className="btn btn-outline btn-sm"
+            reason={asPage ?? (!detail ? "Choose a template first." : undefined)}
           >
             Insert as page
-          </button>
-          <button onClick={() => detail && onInsert(detail, "group")} disabled={!detail} className="btn btn-primary btn-sm">
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => detail && onInsert(detail, "group")}
+            reason={!detail ? "Choose a template first." : undefined}
+          >
             Insert as group
-          </button>
+          </Button>
         </>
       }
     >
@@ -75,11 +74,15 @@ export function TemplatePicker({
         <div className="flex min-h-0 flex-col gap-3">
           <TemplateSearch value={query} onChange={setQuery} label="Search group templates" />
           {loadError ? (
-            <p className="rounded-lg bg-fail-wash px-3 py-2 text-sm text-red">Couldn&apos;t load templates: {loadError}</p>
+            <Callout tone="fail" title="Couldn't load templates">
+              {loadError}
+            </Callout>
           ) : !templates ? (
-            <div className="grid place-items-center py-8 text-muted">
-              <Loader2 className="h-5 w-5 animate-spin" aria-label="Loading templates" />
-            </div>
+            <Loading label="Loading templates" className="space-y-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </Loading>
           ) : (
             <div className="max-h-[52vh] overflow-y-auto">
               <TemplateChoices
@@ -96,7 +99,7 @@ export function TemplatePicker({
             </div>
           )}
         </div>
-        <section aria-label="Preview" className="max-h-[60vh] min-h-[240px] overflow-y-auto rounded-xl border border-line bg-bg p-4">
+        <section aria-label="Preview" className="max-h-[60vh] min-h-[240px] overflow-y-auto rounded-xl border border-rule bg-paper p-4">
           <PreviewPane id={selected} detail={detail} error={error} />
         </section>
       </div>

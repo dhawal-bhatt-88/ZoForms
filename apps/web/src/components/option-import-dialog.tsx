@@ -9,12 +9,15 @@ import {
   type Option,
   type ParsedImport,
 } from "@formbuilder/form-schema";
+import { Dialog } from "@/components/dialog";
+import { Button } from "@/components/ui";
 
 /**
  * The preview before options are imported from a file (contract §13.9). Every
  * row shows its code — as given, or generated — and its label, with any flags.
- * Apply stays disabled while a row is flagged: the author fixes the file and
- * chooses it again. Nothing is stored until the form is saved.
+ * Apply is blocked while a row is flagged, with the reason under it: the author
+ * fixes the file and chooses it again. Nothing is stored until the form is
+ * saved. On the shared `Dialog`, so focus moves in, stays in and comes back.
  */
 export function OptionImportDialog({
   fileName,
@@ -51,104 +54,86 @@ export function OptionImportDialog({
         : null;
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="import-title"
-        className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-surface p-5 shadow-pop"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === "Escape" && onClose()}
-      >
-        <h2 id="import-title" className="text-base font-semibold">
-          Import {plural}
-          {owner ? ` for ${owner}` : ""} from “{fileName}”
-        </h2>
-
-        {!parsed.ok ? (
-          <p role="alert" className="mt-2 text-sm text-red">
-            {parsed.message}
-          </p>
-        ) : (
-          <>
-            <fieldset className="mt-3 flex flex-wrap gap-4 text-sm">
-              <legend className="sr-only">How to import</legend>
-              {(
-                [
-                  ["add", `Add to existing ${plural}`],
-                  ["replace", `Replace all ${plural}`],
-                ] as const
-              ).map(([value, text]) => (
-                <label key={value} className="flex items-center gap-1.5">
-                  <input
-                    type="radio"
-                    name="import-mode"
-                    value={value}
-                    checked={mode === value}
-                    onChange={() => setMode(value)}
-                    autoFocus={value === "add"}
-                    className="accent-brand-deep"
-                  />
-                  {text}
-                </label>
-              ))}
-            </fieldset>
-            <p className="mt-2 text-xs text-muted" aria-live="polite">
-              {preview.length} {preview.length === 1 ? "row" : "rows"}
-              {flagged ? ` · ${flagged} flagged` : ""}
-              {mode === "replace" ? ` · replaces the ${existing.length} current ${plural}` : ""}
-            </p>
-            {parsed.hint && <p className="mt-1.5 text-xs text-warn">{parsed.hint}</p>}
-            <div className="mt-2 min-h-0 flex-1 overflow-auto rounded-lg border border-line">
-              <table className="w-full text-left text-xs">
-                <caption className="sr-only">Rows read from the file</caption>
-                <thead className="sticky top-0 bg-surface-2 text-[11px] uppercase tracking-wider text-faint">
-                  <tr>
-                    <th scope="col" className="px-2 py-1.5 font-semibold">Line</th>
-                    <th scope="col" className="px-2 py-1.5 font-semibold">Code</th>
-                    <th scope="col" className="px-2 py-1.5 font-semibold">Label</th>
-                    <th scope="col" className="px-2 py-1.5 font-semibold">Problem</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {preview.map((r) => (
-                    <tr key={r.line} data-flagged={r.flags.length > 0 || undefined} className="border-t border-line align-top data-[flagged]:bg-fail-wash">
-                      <td className="px-2 py-1 tabular-nums text-muted">{r.line}</td>
-                      <td className="px-2 py-1 font-mono">
-                        {r.code}
-                        {r.generated && <span className="ml-1 font-sans text-faint">(generated)</span>}
-                      </td>
-                      <td className="whitespace-pre-wrap break-words px-2 py-1">{r.label}</td>
-                      <td className="px-2 py-1 text-red">{r.flags.join(" ")}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-
-        {blocked && (
-          <p id="import-blocked" className="mt-2 text-sm text-red">
-            {blocked}
-          </p>
-        )}
-        <div className="mt-4 flex justify-end gap-2">
-          <button onClick={onClose} className="btn btn-outline btn-sm" autoFocus={!parsed.ok}>
+    <Dialog
+      title={`Import ${plural}${owner ? ` for ${owner}` : ""} from “${fileName}”`}
+      onClose={onClose}
+      width="max-w-2xl"
+      footer={
+        <>
+          <Button size="sm" onClick={onClose} data-autofocus={!parsed.ok || undefined}>
             Cancel
-          </button>
+          </Button>
           {parsed.ok && (
-            <button
-              onClick={() => onApply(mode, preview)}
-              disabled={!canApply}
-              aria-describedby={blocked ? "import-blocked" : undefined}
-              className="btn btn-primary btn-sm disabled:opacity-40"
-            >
+            <Button variant="primary" size="sm" onClick={() => onApply(mode, preview)} reason={canApply ? undefined : (blocked ?? `Nothing to import.`)}>
               {mode === "add" ? `Add ${preview.length}` : `Replace with ${preview.length}`}
-            </button>
+            </Button>
           )}
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+      {!parsed.ok ? (
+        <p role="alert" className="text-[0.8125rem] text-fail">
+          {parsed.message}
+        </p>
+      ) : (
+        <>
+          <fieldset className="flex flex-wrap gap-x-5 gap-y-2 text-[0.8125rem] text-ink">
+            <legend className="sr-only">How to import</legend>
+            {(
+              [
+                ["add", `Add to existing ${plural}`],
+                ["replace", `Replace all ${plural}`],
+              ] as const
+            ).map(([value, text]) => (
+              <label key={value} className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  name="import-mode"
+                  value={value}
+                  checked={mode === value}
+                  onChange={() => setMode(value)}
+                  data-autofocus={value === "add" || undefined}
+                  className="h-4 w-4 accent-brand-deep"
+                />
+                {text}
+              </label>
+            ))}
+          </fieldset>
+          <p className="tabular mt-2 text-[0.75rem] text-graphite" aria-live="polite">
+            {preview.length} {preview.length === 1 ? "row" : "rows"}
+            {flagged ? ` · ${flagged} flagged` : ""}
+            {mode === "replace" ? ` · replaces the ${existing.length} current ${plural}` : ""}
+          </p>
+          {parsed.hint && <p className="mt-1.5 text-[0.75rem] text-warn">{parsed.hint}</p>}
+          <div className="surface scroll-x relative mt-3 max-h-[50vh] overflow-auto">
+            <table className="w-full text-left text-[0.75rem]">
+              <caption className="sr-only">Rows read from the file</caption>
+              <thead className="sticky top-0 bg-paper-sunk">
+                <tr>
+                  {["Line", "Code", "Label", "Problem"].map((h) => (
+                    <th key={h} scope="col" className="border-b border-rule px-3 py-2 font-mono text-[0.625rem] font-medium uppercase tracking-[0.11em] text-graphite-soft">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {preview.map((r) => (
+                  <tr key={r.line} data-flagged={r.flags.length > 0 || undefined} className="border-t border-rule align-top data-[flagged]:bg-fail-wash">
+                    <td className="tabular px-3 py-1.5 text-graphite">{r.line}</td>
+                    <td className="px-3 py-1.5 font-mono text-ink">
+                      {r.code}
+                      {r.generated && <span className="ml-1 font-sans text-graphite-soft">(generated)</span>}
+                    </td>
+                    <td className="whitespace-pre-wrap break-words px-3 py-1.5 text-ink">{r.label}</td>
+                    <td className="px-3 py-1.5 text-fail">{r.flags.join(" ")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </Dialog>
   );
 }

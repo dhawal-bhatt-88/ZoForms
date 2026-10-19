@@ -3,12 +3,26 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Copy, Eye, FileText, Layers, Loader2, Pencil, PenLine, Trash2 } from "lucide-react";
+import { Copy, Eye, FileText, Layers, Pencil, PenLine, Trash2 } from "lucide-react";
 import AppShell from "@/components/app-shell";
 import { Dialog } from "@/components/dialog";
 import { MenuButton } from "@/components/menu-button";
 import { PreviewPane, useTemplateDetail } from "@/components/templates/template-preview";
 import { filterTemplates, TemplateSearch } from "@/components/templates/template-list";
+import {
+  Button,
+  buttonClasses,
+  Callout,
+  ConfirmDialog,
+  EmptyState,
+  Field,
+  Input,
+  Loading,
+  Skeleton,
+  StatusChip,
+  Textarea,
+  useToast,
+} from "@/components/ui";
 import { useCanEdit } from "@/lib/use-can-edit";
 import {
   createFormFromTemplate,
@@ -33,17 +47,17 @@ const updated = (iso: string) =>
  * own, which its authors edit, rename, duplicate and delete. Each tab lists
  * form templates and group templates separately. A form template starts a new
  * form; a group template is inserted from the form editor ("From template…").
- * Viewers can browse and preview, and see no write actions.
+ * Viewers can browse and preview, and see no write actions. Every action
+ * reports its outcome in a toast.
  */
 export default function TemplatesPage() {
   const router = useRouter();
   const canEdit = useCanEdit();
+  const toast = useToast();
   const [templates, setTemplates] = useState<TemplateSummary[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [tab, setTab] = useState<TemplateScope>("system");
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("");
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [previewing, setPreviewing] = useState<TemplateSummary | null>(null);
   const [renaming, setRenaming] = useState<TemplateSummary | null>(null);
@@ -69,29 +83,27 @@ export default function TemplatesPage() {
   );
   const count = (scope: TemplateScope) => (templates ?? []).filter((t) => t.scope === scope).length;
 
-  /** Run an action, showing what happened in the status line, or why it failed. */
-  async function act(key: string, run: () => Promise<string | void>) {
+  /** Run an action and say how it went: `run` returns the success message, or throws. */
+  async function act(key: string, failure: string, run: () => Promise<string | void>) {
     setBusy(key);
-    setError(null);
-    setStatus("");
     try {
       const message = await run();
-      if (message) setStatus(message);
+      if (message) toast.show({ tone: "pass", title: message });
     } catch (e) {
-      setError((e as Error).message);
+      toast.show({ tone: "fail", title: failure, detail: (e as Error).message });
     } finally {
       setBusy(null);
     }
   }
 
   const use = (t: TemplateSummary) =>
-    act(`use-${t.id}`, async () => {
+    act(`use-${t.id}`, `Couldn't start a form from "${t.name}".`, async () => {
       const form = await createFormFromTemplate(t.id);
       router.push(`/app/forms/${form.id}/edit`);
     });
 
   const duplicate = (t: TemplateSummary) =>
-    act(`duplicate-${t.id}`, async () => {
+    act(`duplicate-${t.id}`, `Couldn't duplicate "${t.name}".`, async () => {
       const copy = await duplicateTemplate(t.id);
       await refresh();
       setTab("organisation");
@@ -108,14 +120,19 @@ export default function TemplatesPage() {
   }
 
   return (
-    <AppShell title="Templates">
-      <p className="mb-5 text-sm text-muted">
-        Start a form from a template, or insert a group template into a form with &ldquo;From template…&rdquo; in the
-        editor. Templates are copied, never linked: changing one later doesn&apos;t change forms made from it.
-      </p>
-
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
-        <div role="tablist" aria-label="Templates" className="flex gap-1 rounded-lg border border-line bg-surface p-0.5">
+    <AppShell
+      title="Templates"
+      lede={
+        <>
+          Start a form from a template, or insert a group template into a form with &ldquo;From template…&rdquo; in the
+          editor. Templates are copied, never linked: changing one later doesn&apos;t change forms made from it.
+        </>
+      }
+    >
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        {/* The ARIA tabs pattern with one shared panel: arrows, Home and End
+            move between tabs; the selected one is the only tab stop. */}
+        <div role="tablist" aria-label="Templates" className="inline-flex items-center gap-0.5 rounded-lg border border-rule bg-paper-sunk p-0.5">
           {TABS.map(({ scope, label }, i) => (
             <button
               key={scope}
@@ -129,12 +146,15 @@ export default function TemplatesPage() {
               tabIndex={tab === scope ? 0 : -1}
               onClick={() => setTab(scope)}
               onKeyDown={(e) => onTabKey(e, i)}
-              className={`rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors ${
-                tab === scope ? "bg-ink text-paper" : "text-muted hover:text-ink"
+              className={`rounded-md px-3 py-1.5 text-[0.8125rem] font-medium transition-colors duration-200 ${
+                // Marked like the rail's current item: the wash and the accent
+                // text, which stay distinct in both themes (paper on paper-sunk
+                // all but disappears in dark).
+                tab === scope ? "bg-accent-wash text-brand-deep shadow-sm" : "text-graphite hover:text-ink"
               }`}
             >
               {label}
-              <span className={`ml-1.5 tabular-nums ${tab === scope ? "text-paper/60" : "text-faint"}`}>{count(scope)}</span>
+              <span className={`tabular ml-1.5 ${tab === scope ? "text-brand-deep" : "text-graphite-soft"}`}>{count(scope)}</span>
             </button>
           ))}
         </div>
@@ -143,32 +163,33 @@ export default function TemplatesPage() {
         </div>
       </div>
 
-      <p role="status" className={status ? "mb-4 rounded-lg bg-pass-wash px-3 py-2 text-sm text-green" : "sr-only"}>
-        {status}
-      </p>
-      {error && (
-        <p role="alert" className="mb-4 rounded-lg bg-fail-wash px-3 py-2 text-sm text-red">
-          {error}
-        </p>
-      )}
-
       <div role="tabpanel" id={`${baseId}-panel`} aria-labelledby={`${baseId}-tab-${tab}`}>
         {loadError ? (
-          <p className="rounded-lg bg-fail-wash px-3 py-2 text-sm text-red">Couldn&apos;t load templates: {loadError}</p>
+          <Callout tone="fail" title="Couldn't load templates">
+            {loadError}
+          </Callout>
         ) : !templates ? (
-          <div className="grid place-items-center py-16 text-muted">
-            <Loader2 className="h-5 w-5 animate-spin" aria-label="Loading templates" />
-          </div>
+          <Loading label="Loading templates" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="surface p-5">
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="mt-3 h-3 w-full" />
+                <Skeleton className="mt-2 h-3 w-4/5" />
+                <Skeleton className="mt-6 h-8 w-1/2" />
+              </div>
+            ))}
+          </Loading>
         ) : (
           (["form", "group"] as const).map((kind) => {
             const list = inTab.filter((t) => t.kind === kind);
             const title = kind === "form" ? "Forms" : "Groups";
+            const Icon = kind === "form" ? FileText : Layers;
             return (
               <section key={kind} aria-labelledby={`${baseId}-${kind}`} className="mb-9">
-                <h2 id={`${baseId}-${kind}`} className="mb-3 flex items-center gap-2 text-base font-semibold tracking-tight">
-                  {kind === "form" ? <FileText className="h-4 w-4 text-muted" /> : <Layers className="h-4 w-4 text-muted" />}
+                <h2 id={`${baseId}-${kind}`} className="mb-3 flex items-center gap-2 font-display text-[0.9375rem] font-semibold tracking-[-0.008em]">
+                  <Icon aria-hidden="true" className="h-4 w-4 text-graphite-soft" />
                   {title}
-                  <span className="text-sm font-normal text-faint">{list.length}</span>
+                  <span className="tabular text-[0.8125rem] font-normal text-graphite-soft">{list.length}</span>
                 </h2>
                 {list.length ? (
                   <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -187,17 +208,7 @@ export default function TemplatesPage() {
                     ))}
                   </ul>
                 ) : (
-                  <p className="rounded-2xl border border-dashed border-line-2 px-6 py-8 text-center text-sm text-muted">
-                    {query.trim()
-                      ? `No ${kind} templates match "${query.trim()}".`
-                      : tab === "system"
-                        ? `There are no system ${kind} templates yet.`
-                        : !canEdit
-                          ? `Your organisation has no ${kind} templates yet.`
-                          : kind === "form"
-                          ? "No form templates yet. In the form editor, choose Save form as template from the ⋯ menu, or duplicate a system template."
-                          : "No group templates yet. On the canvas, choose Save as template from a group's ⋯ menu."}
-                  </p>
+                  <EmptyState className="py-8" {...emptyText(kind, tab, query.trim(), canEdit)} />
                 )}
               </section>
             );
@@ -225,44 +236,40 @@ export default function TemplatesPage() {
           onRenamed={async (t) => {
             setRenaming(null);
             await refresh();
-            setStatus(`Saved the name and description of "${t.name}".`);
+            toast.show({ tone: "pass", title: `Saved the name and description of "${t.name}".` });
           }}
         />
       )}
       {deleting && (
-        <Dialog
+        <ConfirmDialog
           title={`Delete "${deleting.name}"?`}
-          description="Forms already made from it, or with it inserted, don't change. This can't be undone."
+          consequence="Forms already made from it, or with it inserted, don't change. This can't be undone."
+          confirmLabel="Delete template"
+          onConfirm={async () => {
+            await deleteTemplate(deleting.id);
+            await refresh();
+            toast.show({ tone: "pass", title: `Deleted "${deleting.name}".` });
+            // The card and its ⋯ button are gone; the tab is the nearest place to stand.
+            requestAnimationFrame(() => tabRefs.current[tab]?.focus());
+          }}
           onClose={() => setDeleting(null)}
-          busy={busy === `delete-${deleting.id}`}
-          width="max-w-sm"
-          footer={
-            <>
-              <button onClick={() => setDeleting(null)} disabled={!!busy} className="btn btn-outline btn-sm">
-                Cancel
-              </button>
-              <button
-                onClick={() =>
-                  act(`delete-${deleting.id}`, async () => {
-                    await deleteTemplate(deleting.id);
-                    const name = deleting.name;
-                    setDeleting(null);
-                    await refresh();
-                    return `Deleted "${name}".`;
-                  })
-                }
-                disabled={!!busy}
-                className="btn btn-sm bg-red text-paper hover:opacity-90"
-              >
-                {busy === `delete-${deleting.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                Delete
-              </button>
-            </>
-          }
         />
       )}
     </AppShell>
   );
+}
+
+/** What an empty section says, and what to do about it. */
+function emptyText(kind: "form" | "group", tab: TemplateScope, query: string, canEdit: boolean): { title: string; body?: string } {
+  if (query) return { title: `No ${kind} templates match "${query}".`, body: "Try another word, or clear the search." };
+  if (tab === "system") return { title: `There are no system ${kind} templates yet.` };
+  if (!canEdit) return { title: `Your organisation has no ${kind} templates yet.` };
+  return kind === "form"
+    ? {
+        title: "No form templates yet.",
+        body: "In the form editor, choose Save form as template from the ⋯ menu, or duplicate a system template.",
+      }
+    : { title: "No group templates yet.", body: "On the canvas, choose Save as template from a group's ⋯ menu." };
 }
 
 function TemplateCard({
@@ -287,54 +294,54 @@ function TemplateCard({
 }) {
   const own = t.scope === "organisation";
   return (
-    <li className="flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-[0_1px_2px_rgba(16,24,40,0.04)]" data-template-id={t.id}>
+    <li className="surface flex flex-col p-5" data-template-id={t.id}>
       <div className="mb-1.5 flex items-start justify-between gap-2">
-        <h3 className="font-semibold leading-snug tracking-tight">{t.name}</h3>
-        <span className="flex-none rounded-full bg-surface-3 px-2 py-0.5 text-[11px] font-semibold text-ink-2">
-          {t.kind === "form" ? "Form" : "Group"}
-        </span>
+        <h3 className="font-display text-[0.9375rem] font-semibold leading-snug tracking-[-0.008em]">{t.name}</h3>
+        <StatusChip className="flex-none">{t.kind === "form" ? "Form" : "Group"}</StatusChip>
       </div>
       <div className="flex-1">
-        {t.description && <p className="line-clamp-3 text-sm text-muted">{t.description}</p>}
-        <p className="mt-2 text-xs text-faint">Updated {updated(t.updatedAt)}</p>
+        {t.description && <p className="body-sm line-clamp-3 text-graphite">{t.description}</p>}
+        <p className="mt-2 text-[0.75rem] text-graphite-soft">Updated {updated(t.updatedAt)}</p>
       </div>
-      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-3">
-        <button onClick={onPreview} className="btn btn-outline btn-sm" aria-label={`Preview "${t.name}"`}>
-          <Eye className="h-4 w-4" /> Preview
-        </button>
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-rule pt-3">
+        <Button size="sm" onClick={onPreview} aria-label={`Preview "${t.name}"`}>
+          <Eye aria-hidden="true" className="h-3.5 w-3.5" /> Preview
+        </Button>
         {canEdit && t.kind === "form" && (
-          <button onClick={onUse} disabled={!!busy} className="btn btn-primary btn-sm" aria-label={`Use "${t.name}" for a new form`}>
-            {busy === `use-${t.id}` && <Loader2 className="h-4 w-4 animate-spin" />}
+          <Button variant="primary" size="sm" onClick={onUse} pending={busy === `use-${t.id}`} aria-label={`Use "${t.name}" for a new form`}>
             Use
-          </button>
+          </Button>
         )}
         {!canEdit ? null : own ? (
           <>
-            <Link href={`/app/templates/${t.id}/edit`} className="btn btn-outline btn-sm" aria-label={`Edit "${t.name}"`}>
-              <Pencil className="h-4 w-4" /> Edit
+            <Link href={`/app/templates/${t.id}/edit`} className={buttonClasses({ size: "sm" })} aria-label={`Edit "${t.name}"`}>
+              <Pencil aria-hidden="true" className="h-3.5 w-3.5" /> Edit
             </Link>
             <div className="ml-auto">
               <MenuButton
                 label={`More actions for "${t.name}"`}
+                placement="above"
                 items={[
                   { label: "Rename…", icon: PenLine, onSelect: onRename },
                   { label: "Duplicate", icon: Copy, onSelect: onDuplicate },
-                  { label: "Delete…", icon: Trash2, onSelect: onDelete },
+                  "separator",
+                  { label: "Delete…", icon: Trash2, onSelect: onDelete, danger: true },
                 ]}
               />
             </div>
           </>
         ) : (
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={onDuplicate}
-            disabled={!!busy}
-            className="btn btn-ghost btn-sm"
+            pending={busy === `duplicate-${t.id}`}
             title="Duplicate to my templates"
             aria-label={`Duplicate "${t.name}" to my templates`}
           >
-            {busy === `duplicate-${t.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
+            <Copy aria-hidden="true" className="h-3.5 w-3.5" />
             Duplicate
-          </button>
+          </Button>
         )}
       </div>
     </li>
@@ -366,28 +373,27 @@ function PreviewDialog({
       width="max-w-3xl"
       footer={
         <>
-          <button onClick={onClose} className="btn btn-outline btn-sm">
+          <Button size="sm" onClick={onClose}>
             Close
-          </button>
+          </Button>
           {!canEdit ? null : t.scope === "system" ? (
-            <button onClick={onDuplicate} disabled={!!busy} className="btn btn-outline btn-sm">
-              <Copy className="h-4 w-4" /> Duplicate to my templates
-            </button>
+            <Button size="sm" onClick={onDuplicate} pending={busy === `duplicate-${t.id}`}>
+              <Copy aria-hidden="true" className="h-3.5 w-3.5" /> Duplicate to my templates
+            </Button>
           ) : (
-            <Link href={`/app/templates/${t.id}/edit`} className="btn btn-outline btn-sm">
-              <Pencil className="h-4 w-4" /> Edit
+            <Link href={`/app/templates/${t.id}/edit`} className={buttonClasses({ size: "sm" })}>
+              <Pencil aria-hidden="true" className="h-3.5 w-3.5" /> Edit
             </Link>
           )}
           {canEdit && t.kind === "form" && (
-            <button onClick={onUse} disabled={!!busy} className="btn btn-primary btn-sm">
-              {busy === `use-${t.id}` && <Loader2 className="h-4 w-4 animate-spin" />}
+            <Button variant="primary" size="sm" onClick={onUse} pending={busy === `use-${t.id}`}>
               Use for a new form
-            </button>
+            </Button>
           )}
         </>
       }
     >
-      <section aria-label="Preview" className="rounded-xl border border-line bg-bg p-4">
+      <section aria-label="Preview" className="rounded-xl border border-rule bg-paper p-4">
         <PreviewPane id={t.id} detail={detail} error={error} />
       </section>
     </Dialog>
@@ -403,15 +409,14 @@ function RenameDialog({
   onClose: () => void;
   onRenamed: (t: TemplateSummary) => void;
 }) {
-  const nameId = useId();
-  const descriptionId = useId();
   const [name, setName] = useState(t.name);
   const [description, setDescription] = useState(t.description ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const blank = !name.trim();
 
   async function save() {
-    if (!name.trim() || saving) return;
+    if (blank || saving) return;
     setSaving(true);
     setError(null);
     try {
@@ -429,50 +434,35 @@ function RenameDialog({
       busy={saving}
       footer={
         <>
-          <button onClick={onClose} disabled={saving} className="btn btn-outline btn-sm">
+          <Button size="sm" onClick={() => !saving && onClose()} aria-disabled={saving || undefined}>
             Cancel
-          </button>
-          <button onClick={save} disabled={saving || !name.trim()} className="btn btn-primary btn-sm">
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+          </Button>
+          <Button variant="primary" size="sm" onClick={save} pending={saving} reason={blank ? "A template needs a name." : undefined}>
             Save
-          </button>
+          </Button>
         </>
       }
     >
       <form
+        className="flex flex-col gap-4"
         onSubmit={(e) => {
           e.preventDefault();
           save();
         }}
       >
-        <label htmlFor={nameId} className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">
-          Name
-        </label>
-        <input
-          id={nameId}
-          data-autofocus
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          maxLength={200}
-          required
-          className="input mb-3 w-full"
-        />
-        <label htmlFor={descriptionId} className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">
-          Description <span className="font-normal text-muted">(optional)</span>
-        </label>
-        <textarea
-          id={descriptionId}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          maxLength={2000}
-          rows={3}
-          className="input w-full resize-none"
-        />
+        <Field label="Name" required>
+          {(field) => <Input {...field} data-autofocus value={name} onChange={(e) => setName(e.target.value)} maxLength={200} />}
+        </Field>
+        <Field label="Description">
+          {(field) => (
+            <Textarea {...field} value={description} onChange={(e) => setDescription(e.target.value)} maxLength={2000} rows={3} />
+          )}
+        </Field>
       </form>
       {error && (
-        <p role="alert" className="mt-3 rounded-lg bg-fail-wash px-3 py-2 text-sm text-red">
-          Couldn&apos;t save: {error}
-        </p>
+        <Callout role="alert" tone="fail" title="Couldn't save" className="mt-4">
+          {error}
+        </Callout>
       )}
     </Dialog>
   );
