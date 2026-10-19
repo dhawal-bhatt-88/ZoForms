@@ -61,15 +61,21 @@ export default function ForgotPasswordPage() {
                 Enter your email and we&apos;ll send you a reset link.
               </p>
               <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
-                <Input
-                  type="email"
-                  required
-                  className="border-line-2 px-3.5 py-2.5 focus:ring-accent-weak"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@company.com"
-                  autoComplete="email"
-                />
+                <div>
+                  <label htmlFor="forgot-email" className="mb-1.5 block text-[13px] font-semibold text-ink-2">
+                    Email
+                  </label>
+                  <Input
+                    id="forgot-email"
+                    type="email"
+                    required
+                    className="border-line-2 px-3.5 py-2.5 focus:ring-accent-weak"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@company.com"
+                    autoComplete="email"
+                  />
+                </div>
                 <Button type="submit" disabled={busy} className="h-11 w-full">
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                   Send reset link

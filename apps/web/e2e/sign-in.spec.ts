@@ -15,9 +15,22 @@ test.describe("sign-in", () => {
   test("the sign-in page shows its email and password fields", async ({ page }) => {
     await page.goto("/login");
 
-    await expect(page.locator('input[type="email"]')).toBeVisible();
-    await expect(page.locator('input[type="password"]')).toBeVisible();
+    await expect(page.getByLabel("Email")).toHaveAttribute("type", "email");
+    await expect(page.getByLabel("Password")).toHaveAttribute("type", "password");
     await expect(page.getByRole("button", { name: /log in/i })).toBeVisible();
+  });
+
+  test("the other auth forms that need no API name their fields too", async ({ page }) => {
+    await page.goto("/signup");
+    await expect(page.getByLabel("Name")).toBeVisible();
+    await expect(page.getByLabel("Email")).toHaveAttribute("type", "email");
+    await expect(page.getByLabel("Password")).toHaveAttribute("type", "password");
+
+    await page.goto("/forgot-password");
+    await expect(page.getByLabel("Email")).toHaveAttribute("type", "email");
+
+    await page.goto("/reset-password/smoke-test");
+    await expect(page.getByLabel("New password")).toHaveAttribute("type", "password");
   });
 
   test("`/` signed in ends on the app", async ({ page }) => {

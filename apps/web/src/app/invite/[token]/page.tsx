@@ -73,10 +73,11 @@ export default function AcceptInvitePage() {
               <form onSubmit={onAccept} className="mt-6 flex flex-col gap-4">
                 {info.needsAccount && (
                   <div>
-                    <label className="mb-1.5 block text-[13px] font-semibold text-ink-2">
+                    <label htmlFor="invite-name" className="mb-1.5 block text-[13px] font-semibold text-ink-2">
                       Your name
                     </label>
                     <Input
+                      id="invite-name"
                       className="border-line-2 px-3.5 py-2.5 focus:ring-accent-weak"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
@@ -86,10 +87,11 @@ export default function AcceptInvitePage() {
                   </div>
                 )}
                 <div>
-                  <label className="mb-1.5 block text-[13px] font-semibold text-ink-2">
+                  <label htmlFor="invite-password" className="mb-1.5 block text-[13px] font-semibold text-ink-2">
                     {info.needsAccount ? "Choose a password" : "Your password"}
                   </label>
                   <Input
+                    id="invite-password"
                     type="password"
                     required
                     className="border-line-2 px-3.5 py-2.5 focus:ring-accent-weak"

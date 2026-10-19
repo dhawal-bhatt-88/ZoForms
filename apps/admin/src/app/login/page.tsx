@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { login } from "@/lib/api";
 
 export default function AdminLogin() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [busy, setBusy] = useState(false);
@@ -41,8 +39,11 @@ export default function AdminLogin() {
           <h1 className="mb-1 text-lg font-semibold tracking-tight">Sign in</h1>
           <p className="mb-5 text-sm text-muted">Admin accounts only.</p>
 
-          <label className="mb-1.5 block text-[13px] font-medium text-ink-2">Email</label>
+          <label htmlFor="admin-email" className="mb-1.5 block text-[13px] font-medium text-ink-2">
+            Email
+          </label>
           <input
+            id="admin-email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -50,8 +51,11 @@ export default function AdminLogin() {
             className="input mb-4 w-full"
             autoFocus
           />
-          <label className="mb-1.5 block text-[13px] font-medium text-ink-2">Password</label>
+          <label htmlFor="admin-password" className="mb-1.5 block text-[13px] font-medium text-ink-2">
+            Password
+          </label>
           <input
+            id="admin-password"
             type="password"
             value={pw}
             onChange={(e) => setPw(e.target.value)}

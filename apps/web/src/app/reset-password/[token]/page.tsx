@@ -38,15 +38,21 @@ export default function ResetPasswordPage() {
           <h1 className="text-xl font-semibold tracking-tight">Choose a new password</h1>
           <p className="mt-1 text-sm text-muted">Enter a new password for your account.</p>
           <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4">
-            <Input
-              type="password"
-              required
-              className="border-line-2 px-3.5 py-2.5 focus:ring-accent-weak"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="At least 6 characters"
-              autoComplete="new-password"
-            />
+            <div>
+              <label htmlFor="reset-password" className="mb-1.5 block text-[13px] font-semibold text-ink-2">
+                New password
+              </label>
+              <Input
+                id="reset-password"
+                type="password"
+                required
+                className="border-line-2 px-3.5 py-2.5 focus:ring-accent-weak"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="At least 6 characters"
+                autoComplete="new-password"
+              />
+            </div>
             {err && (
               <p className="rounded-lg bg-[#FCECEC] px-3.5 py-2.5 text-sm text-red">{err}</p>
             )}

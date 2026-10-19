@@ -81,8 +81,11 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           >
             {isSignup && (
               <div>
-                <label className="mb-1.5 block text-[13px] font-semibold text-ink-2">Name</label>
+                <label htmlFor="auth-name" className="mb-1.5 block text-[13px] font-semibold text-ink-2">
+                  Name
+                </label>
                 <Input
+                  id="auth-name"
                   className={input}
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -92,8 +95,11 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
               </div>
             )}
             <div>
-              <label className="mb-1.5 block text-[13px] font-semibold text-ink-2">Email</label>
+              <label htmlFor="auth-email" className="mb-1.5 block text-[13px] font-semibold text-ink-2">
+                Email
+              </label>
               <Input
+                id="auth-email"
                 type="email"
                 required
                 className={input}
@@ -105,7 +111,9 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             </div>
             <div>
               <div className="mb-1.5 flex items-center justify-between">
-                <label className="block text-[13px] font-semibold text-ink-2">Password</label>
+                <label htmlFor="auth-password" className="block text-[13px] font-semibold text-ink-2">
+                  Password
+                </label>
                 {!isSignup && (
                   <Link
                     href="/forgot-password"
@@ -116,6 +124,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
                 )}
               </div>
               <Input
+                id="auth-password"
                 type="password"
                 required
                 className={input}

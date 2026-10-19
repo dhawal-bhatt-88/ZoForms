@@ -3,7 +3,7 @@ import { join } from "path";
 import { HttpException } from "@nestjs/common";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { TemplateKind } from "@formbuilder/form-schema";
-import { prepareTemplateContent, sameTemplateContent } from "./template-content";
+import { prepareTemplateContent } from "./template-content";
 
 /**
  * System templates are made by us, one JSON file each:
@@ -23,6 +23,27 @@ type SystemTemplateFile = {
   description: string | null;
   content: unknown;
 };
+
+/** `value` as JSON with every object's keys sorted, so two values compare equal whatever their key order. */
+function canonicalJson(value: unknown): string {
+  const sorted = (v: unknown): unknown =>
+    Array.isArray(v)
+      ? v.map(sorted)
+      : typeof v === "object" && v !== null
+        ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sorted((v as Record<string, unknown>)[k])]))
+        : v;
+  return JSON.stringify(sorted(value));
+}
+
+/**
+ * True when the stored content is exactly the content the file gives, as JSON.
+ * Not parsed through the schema first: a key the schema now drops would be
+ * stripped from the stored side and the stale row never rewritten. Key order
+ * is ignored, because Postgres `jsonb` doesn't keep it.
+ */
+export function sameStoredContent(stored: unknown, fromFile: unknown): boolean {
+  return canonicalJson(stored) === canonicalJson(fromFile);
+}
 
 /** A file that wasn't loaded, and why. `id` is its id when that could be read, so its template is kept. */
 export type SkippedFile = { file: string; id?: string; reason: string };
@@ -112,7 +133,7 @@ export async function seedSystemTemplates(
       counts.created += 1;
       continue;
     }
-    const contentChanged = existing.kind !== t.kind || !sameTemplateContent(t.kind, existing.content, t.content);
+    const contentChanged = existing.kind !== t.kind || !sameStoredContent(existing.content, t.content);
     const detailsChanged = existing.name !== t.name || existing.description !== t.description;
     if (!contentChanged && !detailsChanged) {
       counts.unchanged += 1;
