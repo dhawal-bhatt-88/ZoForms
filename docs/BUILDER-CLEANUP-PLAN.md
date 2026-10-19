@@ -23,7 +23,8 @@ The builder isn't deployed anywhere (confirmed 16 Oct 2026), so these two holes 
 | 3. Response data and org settings | Done 16 Oct 2026 | `2706c2f`, `08ea1d1`, `ac4fad3` |
 | 4. AI | Done 16 Oct 2026 | `69b2379`, `bb4e5d4` |
 | 5. Custom domains | Done 16 Oct 2026 | `ab802d4`, `cf6c30f` |
-| 6. Block types and form design | Next | |
+| 6. Block types and form design | Done 19 Oct 2026 | `a028089`, `bb5e336`, `1641af1`, `237b389` |
+| 7. Static pages and homepage | Next | |
 
 ## Before any deployment
 
@@ -110,7 +111,9 @@ Run one at a time, in this order. Each ends with one forward Prisma migration th
 ### 8. Tidy-up and docs (B1–B5)
 
 - knip's confirmed findings (B1): unused files, dependencies and exports, including what the earlier briefs left unused (`validateSubmission`, `withoutBuilderFields`, `optionsFromLabels`). Check `prettier` isn't used by editors before removing it.
-- The `redis` service; the broken `lint` script; tracked `tsbuildinfo` files (untrack them and add them to `.gitignore`); the workspace switcher button; the billing 404 check in `verify-body-limits.js`.
+- **The template seeder:** it compares parsed content, so a stored row that differs from its JSON file only by keys the schema now drops is never rewritten (since brief 6, all 16 system-template rows still hold old `settings`). Compare the stored JSON with the file's JSON as written, then reseed.
+- The unused `isScoredGroup` import in the editor; `README.md`'s "33 block types"; the `e2e/README.md` row for `verify-renderer-types`.
+- The `redis` service; the broken `lint` script (set up ESLint or remove the script); tracked `tsbuildinfo` files (untrack them and add them to `.gitignore`); the workspace switcher button; the billing 404 check in `verify-body-limits.js`.
 - Add the missing variables to the `.env` examples: `PUBLIC_TENANT_URL`, `GOOGLE_CLIENT_ID`, `RESEND_API_KEY`, `MAIL_FROM`, `CORS_ORIGINS`, `NODE_ENV`, `NEXT_PUBLIC_GOOGLE_CLIENT_ID`.
 - **Docs, last, so they describe what's left:**
   - rewrite README, GETTING-STARTED and DEPLOY for the SDK architecture;
