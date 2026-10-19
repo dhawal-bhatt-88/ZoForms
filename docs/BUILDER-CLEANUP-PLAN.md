@@ -45,6 +45,7 @@ Hardening items found during the clean-up. None of them belong to a removal brie
 | `Form.slug` | Drop. The download is named from the title and version, e.g. `phq-9-v12.json`, falling back to `form-v12.json` when the title gives nothing usable. |
 | Workspace switcher (B5) | Remove the button, which does nothing. The `Workspace` model stays; several workspaces per organisation would be built when needed. |
 | Unused but cheap columns (B3) | Keep `Invite.invitedById`, `Template.createdBy` and `Workspace.name`. |
+| Product name (brief 7) | **Zowork Forms**, replacing "Frame" in every user-visible place: page titles, sidebar, logo, auth pages, admin and emails. Internal names (`frame_token`, code types) stay. |
 | `Organization.slug` (brief 5) | Keep. It's a random label set at signup that operators search and see in the admin console. No tenant URL or route uses it. |
 | form-schema's self-used exports (B1) | Leave them. Some may be shared vocabulary with the renderer. |
 
@@ -112,6 +113,7 @@ Run one at a time, in this order. Each ends with one forward Prisma migration th
 
 - knip's confirmed findings (B1): unused files, dependencies and exports, including what the earlier briefs left unused (`validateSubmission`, `withoutBuilderFields`, `optionsFromLabels`). Check `prettier` isn't used by editors before removing it.
 - **The template seeder:** it compares parsed content, so a stored row that differs from its JSON file only by keys the schema now drops is never rewritten (since brief 6, all 16 system-template rows still hold old `settings`). Compare the stored JSON with the file's JSON as written, then reseed.
+- **Accessibility bug:** the sign-in form's labels aren't linked to their fields (no `htmlFor`/`id`), so screen readers don't announce the field names. Link them, and check the other auth forms for the same fault.
 - The unused `isScoredGroup` import in the editor; `README.md`'s "33 block types"; the `e2e/README.md` row for `verify-renderer-types`.
 - The `redis` service; the broken `lint` script (set up ESLint or remove the script); tracked `tsbuildinfo` files (untrack them and add them to `.gitignore`); the workspace switcher button; the billing 404 check in `verify-body-limits.js`.
 - Add the missing variables to the `.env` examples: `PUBLIC_TENANT_URL`, `GOOGLE_CLIENT_ID`, `RESEND_API_KEY`, `MAIL_FROM`, `CORS_ORIGINS`, `NODE_ENV`, `NEXT_PUBLIC_GOOGLE_CLIENT_ID`.
