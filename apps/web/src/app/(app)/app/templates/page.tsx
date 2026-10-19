@@ -18,6 +18,8 @@ import {
   Field,
   Input,
   Loading,
+  segmentClasses,
+  segmentTrackClasses,
   Skeleton,
   StatusChip,
   Textarea,
@@ -132,7 +134,7 @@ export default function TemplatesPage() {
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         {/* The ARIA tabs pattern with one shared panel: arrows, Home and End
             move between tabs; the selected one is the only tab stop. */}
-        <div role="tablist" aria-label="Templates" className="inline-flex items-center gap-0.5 rounded-lg border border-rule bg-paper-sunk p-0.5">
+        <div role="tablist" aria-label="Templates" className={segmentTrackClasses()}>
           {TABS.map(({ scope, label }, i) => (
             <button
               key={scope}
@@ -146,12 +148,8 @@ export default function TemplatesPage() {
               tabIndex={tab === scope ? 0 : -1}
               onClick={() => setTab(scope)}
               onKeyDown={(e) => onTabKey(e, i)}
-              className={`rounded-md px-3 py-1.5 text-[0.8125rem] font-medium transition-colors duration-200 ${
-                // Marked like the rail's current item: the wash and the accent
-                // text, which stay distinct in both themes (paper on paper-sunk
-                // all but disappears in dark).
-                tab === scope ? "bg-accent-wash text-brand-deep shadow-sm" : "text-graphite hover:text-ink"
-              }`}
+              // The selected tab's border is its state indicator (upstream note 6).
+              className={segmentClasses({ selected: tab === scope })}
             >
               {label}
               <span className={`tabular ml-1.5 ${tab === scope ? "text-brand-deep" : "text-graphite-soft"}`}>{count(scope)}</span>

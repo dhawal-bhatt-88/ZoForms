@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -20,7 +20,6 @@ import { SortableContext, useSortable, type SortingStrategy } from "@dnd-kit/sor
 import {
   ArrowDown,
   ArrowUp,
-  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -29,7 +28,6 @@ import {
   FileText,
   GripVertical,
   LayoutTemplate,
-  Loader2,
   Plus,
   Search,
   Trash2,
@@ -170,10 +168,34 @@ import { GridColumnsEditor } from "@/components/grid-columns-editor";
 import { ScoresPanel } from "@/components/scores-panel";
 import { Switch } from "@/components/switch";
 import { MenuButton, type MenuItem } from "@/components/menu-button";
+import { Dialog } from "@/components/dialog";
+import { ThemeToggle } from "@/components/theme-toggle";
+import {
+  Button,
+  buttonClasses,
+  Callout,
+  Checkbox,
+  EmptyState,
+  ConfirmDialog,
+  controlClasses,
+  Field,
+  Input,
+  Loading,
+  segmentClasses,
+  segmentTrackClasses,
+  Select,
+  Skeleton,
+  StatusChip,
+  Textarea,
+  useToast,
+} from "@/components/ui";
+import { cn } from "@formbuilder/ui";
 import { SaveTemplateDialog } from "@/components/templates/save-template-dialog";
 import { TemplatePicker } from "@/components/templates/template-picker";
 import { canEditAs, useMe } from "@/lib/use-can-edit";
 import { SETTINGS_PANE_HEADING_ID, SETTINGS_PANE_ID, SettingsPaneHandle, useSettingsPane } from "./settings-pane";
+import { SaveStatus, useSaveAnnouncement } from "./save-status";
+import { LeaveLink } from "./leave-link";
 import { BlockPreview, DropLine, GroupBox, ICONS, MAX_INDENT_LEVELS } from "./canvas-preview";
 import {
   ApiError,
@@ -186,6 +208,9 @@ import {
   type TemplateKind,
   type TemplateScope,
 } from "@/lib/api";
+
+/** A notice's meaning: an edit refused, a save or download failed, or a neutral note. */
+type NoticeTone = "warn" | "fail" | "info";
 
 type CatalogItem = {
   // Pages are added with their own control, never from the block menu.
@@ -786,56 +811,35 @@ function DeleteGroupDialog({
   const inside = walkBlocks(group.blocks);
   const name = group.label.trim() || "this group";
   const conditionNote = lostConditionsNote(group, blocks, questionsWhom(group.blocks));
+  const count = `${inside.length} ${inside.length === 1 ? "block" : "blocks"}`;
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="delete-group-title"
-        className="w-full max-w-md rounded-2xl bg-surface p-5 shadow-pop"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === "Escape" && onClose()}
-      >
-        <h2 id="delete-group-title" className="text-base font-semibold">
-          Delete the group &quot;{name}&quot;?
-        </h2>
-        <p className="mt-1 text-sm text-muted">
-          It contains {inside.length} {inside.length === 1 ? "block" : "blocks"}. Choose what happens to them.
-        </p>
-        <div className="mt-4 flex flex-col gap-2">
-          <button
-            autoFocus
-            onClick={onKeep}
-            className="rounded-xl border border-line-2 px-4 py-3 text-left hover:border-accent hover:bg-accent-weak"
-          >
-            <span className="block text-sm font-semibold">Group only (keep questions)</span>
-            <span className="mt-0.5 block text-[13px] text-muted">
-              Its contents move up to where the group is now, in the same order.
-            </span>
-            {conditionNote && (
-              <span className="mt-1.5 block rounded-md bg-warn-wash px-2 py-1.5 text-[13px] text-ink-2">
-                {conditionNote}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={onDeleteAll}
-            className="rounded-xl border border-line-2 px-4 py-3 text-left hover:border-red hover:bg-fail-wash"
-          >
-            <span className="block text-sm font-semibold text-red">Group and its questions</span>
-            <span className="mt-0.5 block text-[13px] text-muted">
-              Deletes the group and all {inside.length} {inside.length === 1 ? "block" : "blocks"} inside it.
-            </span>
-          </button>
-        </div>
-        <div className="mt-4 flex justify-end">
-          <button onClick={onClose} className="btn btn-outline btn-sm">
-            Cancel
-          </button>
-        </div>
+    <Dialog
+      title={`Delete the group "${name}"?`}
+      description={`It contains ${count}. Choose what happens to them.`}
+      onClose={onClose}
+      footer={
+        <Button size="sm" onClick={onClose}>
+          Cancel
+        </Button>
+      }
+    >
+      <div className="flex flex-col gap-2">
+        <ChoiceCard
+          autoFocus
+          title="Group only (keep questions)"
+          body="Its contents move up to where the group is now, in the same order."
+          notes={conditionNote ? [conditionNote] : []}
+          onClick={onKeep}
+        />
+        <ChoiceCard
+          danger
+          title="Group and its questions"
+          body={`Deletes the group and all ${count} inside it.`}
+          onClick={onDeleteAll}
+        />
       </div>
-    </div>
+    </Dialog>
   );
 }
 
@@ -875,89 +879,187 @@ function DeletePageDialog({
       )}.`
     : null;
 
+  const count = `${inside.length} ${inside.length === 1 ? "block" : "blocks"}`;
+
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="delete-page-title"
-        className="w-full max-w-md rounded-2xl bg-surface p-5 shadow-pop"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === "Escape" && onClose()}
-      >
-        <h2 id="delete-page-title" className="text-base font-semibold">
-          Delete the page &quot;{name}&quot;?
-        </h2>
-        <p className="mt-1 text-sm text-muted">
-          It contains {inside.length} {inside.length === 1 ? "block" : "blocks"}. Choose what happens to them.
-        </p>
-        <div className="mt-4 flex flex-col gap-2">
-          <button
-            autoFocus
-            onClick={onKeep}
-            className="rounded-xl border border-line-2 px-4 py-3 text-left hover:border-accent hover:bg-accent-weak"
-          >
-            <span className="block text-sm font-semibold">
-              Page only (move contents to the {first ? "next" : "previous"} page)
-            </span>
-            <span className="mt-0.5 block text-[13px] text-muted">
-              {first
-                ? `Its contents move to the start of "${destination?.title ?? "the next page"}", in the same order.`
-                : `Its contents move to the end of "${destination?.title ?? "the previous page"}", in the same order.`}
-            </span>
-            {[lostNote, gainedNote].filter(Boolean).map((note) => (
-              <span key={note} className="mt-1.5 block rounded-md bg-warn-wash px-2 py-1.5 text-[13px] text-ink-2">
-                {note}
-              </span>
-            ))}
-          </button>
-          <button
-            onClick={onDeleteAll}
-            className="rounded-xl border border-line-2 px-4 py-3 text-left hover:border-red hover:bg-fail-wash"
-          >
-            <span className="block text-sm font-semibold text-red">Page and its contents</span>
-            <span className="mt-0.5 block text-[13px] text-muted">
-              Deletes the page and all {inside.length} {inside.length === 1 ? "block" : "blocks"} on it.
-            </span>
-          </button>
-        </div>
-        <div className="mt-4 flex justify-end">
-          <button onClick={onClose} className="btn btn-outline btn-sm">
-            Cancel
-          </button>
-        </div>
+    <Dialog
+      title={`Delete the page "${name}"?`}
+      description={`It contains ${count}. Choose what happens to them.`}
+      onClose={onClose}
+      footer={
+        <Button size="sm" onClick={onClose}>
+          Cancel
+        </Button>
+      }
+    >
+      <div className="flex flex-col gap-2">
+        <ChoiceCard
+          autoFocus
+          title={`Page only (move contents to the ${first ? "next" : "previous"} page)`}
+          body={
+            first
+              ? `Its contents move to the start of "${destination?.title ?? "the next page"}", in the same order.`
+              : `Its contents move to the end of "${destination?.title ?? "the previous page"}", in the same order.`
+          }
+          notes={[lostNote, gainedNote].filter((n): n is string => !!n)}
+          onClick={onKeep}
+        />
+        <ChoiceCard
+          danger
+          title="Page and its contents"
+          body={`Deletes the page and all ${count} on it.`}
+          onClick={onDeleteAll}
+        />
       </div>
-    </div>
+    </Dialog>
   );
 }
 
 /** The confirm before a single-page form becomes a paged one. */
 function PagingDialog({ onConfirm, onClose }: { onConfirm: () => void; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="paging-title"
-        className="w-full max-w-sm rounded-2xl bg-surface p-5 shadow-pop"
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === "Escape" && onClose()}
-      >
-        <h2 id="paging-title" className="text-base font-semibold">
-          Split this form into pages?
-        </h2>
-        <p className="mt-1.5 text-sm text-muted">
-          Your questions will move to Page 1, and a new, empty Page 2 is added after it.
-        </p>
-        <div className="mt-4 flex justify-end gap-2">
-          <button onClick={onClose} className="btn btn-outline btn-sm">
+    <Dialog
+      title="Split this form into pages?"
+      description="Your questions will move to Page 1, and a new, empty Page 2 is added after it."
+      onClose={onClose}
+      width="max-w-sm"
+      footer={
+        <>
+          <Button size="sm" onClick={onClose}>
             Cancel
-          </button>
-          <button autoFocus onClick={onConfirm} className="btn btn-primary btn-sm">
+          </Button>
+          <Button size="sm" variant="primary" data-autofocus onClick={onConfirm}>
             Add pages
-          </button>
+          </Button>
+        </>
+      }
+    />
+  );
+}
+
+/**
+ * The editor as it loads: the top bar, the canvas and the pane in outline, so
+ * nothing moves when they arrive. Announced once, as a whole.
+ */
+function EditorSkeleton({ label, paneWidth }: { label: string; paneWidth: number }) {
+  return (
+    <Loading label={label} className="flex h-screen flex-col bg-paper">
+      <div className="flex h-14 flex-none items-center gap-3 border-b border-rule bg-surface px-4">
+        <Skeleton className="h-8 w-8 rounded-lg" />
+        <Skeleton className="h-5 w-48" />
+        <Skeleton className="h-4 w-28" />
+        <div className="ml-auto flex items-center gap-2">
+          <Skeleton className="h-8 w-16 rounded-lg" />
+          <Skeleton className="h-8 w-24 rounded-lg" />
+          <Skeleton className="h-8 w-16 rounded-lg" />
+          <Skeleton className="h-8 w-14 rounded-lg" />
         </div>
       </div>
+      <div className="grid min-h-0 flex-1" style={{ gridTemplateColumns: `minmax(0,1fr) ${paneWidth}px` }}>
+        <div className="overflow-hidden px-6 py-8">
+          <div className="mx-auto max-w-[680px] rounded-[0.875rem] border border-rule bg-surface p-8">
+            <Skeleton className="h-8 w-2/3" />
+            <Skeleton className="mt-3 h-4 w-1/2" />
+            <div className="mt-8 flex flex-col gap-3">
+              {[0, 1, 2].map((i) => (
+                <Skeleton key={i} className="h-20 w-full rounded-xl" />
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-col gap-3 border-l border-rule bg-surface p-4">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-9 w-full rounded-lg" />
+          <Skeleton className="h-9 w-full rounded-lg" />
+          <Skeleton className="h-24 w-full rounded-lg" />
+        </div>
+      </div>
+    </Loading>
+  );
+}
+
+/**
+ * One of a delete dialog's two choices: a card that is a button, with what
+ * the choice changes in a warning beside it, bound to it as its description
+ * (a button can't hold a callout). The destructive choice is the fail
+ * colour's text and border, never a filled red.
+ */
+function ChoiceCard({
+  title,
+  body,
+  notes = [],
+  danger = false,
+  autoFocus = false,
+  onClick,
+}: {
+  title: string;
+  body: string;
+  /** What this choice changes beyond the obvious, e.g. conditions that stop applying. */
+  notes?: string[];
+  danger?: boolean;
+  autoFocus?: boolean;
+  onClick: () => void;
+}) {
+  const notesId = useId();
+  return (
+    <div>
+      <button
+        type="button"
+        data-autofocus={autoFocus || undefined}
+        onClick={onClick}
+        aria-describedby={notes.length ? notesId : undefined}
+        className={cn(
+          "w-full rounded-xl border bg-surface px-4 py-3 text-left transition-[background-color,border-color] duration-200",
+          danger ? "border-fail/40 hover:border-fail hover:bg-fail-wash" : "border-rule-strong hover:border-brand-deep hover:bg-accent-wash",
+        )}
+      >
+        <span className={cn("block text-[0.8125rem] font-semibold", danger ? "text-fail" : "text-ink")}>{title}</span>
+        <span className="body-sm mt-0.5 block text-graphite">{body}</span>
+      </button>
+      {notes.length > 0 && (
+        <div id={notesId} className="mt-1.5">
+          <Callout tone="warn" title="What this changes" items={notes} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A heading's level, H1 to H3: a radio group on `segmentClasses`, so the
+ * chosen level is a state to a screen reader and a border to the eye, not a
+ * colour alone. One tab stop; the arrow keys move the choice, as in any radio group.
+ */
+function HeadingLevel({ value, onChange, labelledBy }: { value: number; onChange: (level: number) => void; labelledBy: string }) {
+  const radios = useRef<(HTMLButtonElement | null)[]>([]);
+  const levels = [1, 2, 3];
+  function onKey(e: React.KeyboardEvent, i: number) {
+    const step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const next = (i + step + levels.length) % levels.length;
+    onChange(levels[next]);
+    radios.current[next]?.focus();
+  }
+  return (
+    <div role="radiogroup" aria-labelledby={labelledBy} className={segmentTrackClasses("flex w-full")}>
+      {levels.map((level, i) => (
+        <button
+          key={level}
+          ref={(el) => {
+            radios.current[i] = el;
+          }}
+          type="button"
+          role="radio"
+          aria-checked={value === level}
+          tabIndex={value === level ? 0 : -1}
+          onClick={() => onChange(level)}
+          onKeyDown={(e) => onKey(e, i)}
+          className={segmentClasses({ selected: value === level, size: "sm", className: "flex-1" })}
+        >
+          H{level}
+        </button>
+      ))}
     </div>
   );
 }
@@ -985,10 +1087,19 @@ function PositionPanel({
   const [destination, setDestination] = useState("");
   const pageAt = blocks.findIndex((b) => b.id === blockId && isPage(b));
   const allowed = (t: MoveTarget | null) => (rootLocked && t?.parentId === null ? null : t);
-  const up = allowed(stepMove(blocks, blockId, -1));
-  const down = allowed(stepMove(blocks, blockId, 1));
+  const rawUp = stepMove(blocks, blockId, -1);
+  const rawDown = stepMove(blocks, blockId, 1);
+  const up = allowed(rawUp);
+  const down = allowed(rawDown);
   const destinations = moveDestinations(blocks, blockId).filter((d) => !(rootLocked && d.id === null));
   const ROOT = "__top_level__";
+  const destinationName = (d: (typeof destinations)[number]) => (d.id === null ? "Top level (outside any group)" : d.path.join(" › "));
+  // A path is the author's own labels and can outgrow the select at any width, so the choice is also written out in full.
+  const chosen = destinations.find((d) => (d.id ?? ROOT) === destination);
+  const chosenId = useId();
+  // Why a step isn't offered: the end of the form, or (in a group template) the edge of its one group.
+  const stepReason = (raw: MoveTarget | null, end: "top" | "bottom") =>
+    raw ? "It can't leave the template's group." : `It's already at the ${end}.`;
 
   function moveInto() {
     if (!destination) return;
@@ -1000,66 +1111,59 @@ function PositionPanel({
     setDestination("");
   }
 
+  // Two equal columns, so neither label wraps at the pane's narrowest; a reason sits under its button.
+  const steps = (onUp: (() => void) | null, onDown: (() => void) | null, upReason: string, downReason: string) => (
+    <div className="grid grid-cols-2 items-start gap-1.5">
+      <Button size="sm" className="w-full" onClick={() => onUp?.()} reason={onUp ? undefined : upReason}>
+        <ArrowUp aria-hidden="true" className="h-3.5 w-3.5" /> Move up
+      </Button>
+      <Button size="sm" className="w-full" onClick={() => onDown?.()} reason={onDown ? undefined : downReason}>
+        <ArrowDown aria-hidden="true" className="h-3.5 w-3.5" /> Move down
+      </Button>
+    </div>
+  );
+
   if (pageAt >= 0) {
     return (
-      <div className="mt-3 border-t border-line pt-3">
-        <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-faint">Position</h4>
-        <div className="flex gap-1.5">
-          <button
-            onClick={() => onMovePage(-1)}
-            disabled={pageAt === 0}
-            className="btn btn-outline btn-sm flex-1 disabled:opacity-40"
-          >
-            <ArrowUp className="h-3.5 w-3.5" /> Move up
-          </button>
-          <button
-            onClick={() => onMovePage(1)}
-            disabled={pageAt === blocks.length - 1}
-            className="btn btn-outline btn-sm flex-1 disabled:opacity-40"
-          >
-            <ArrowDown className="h-3.5 w-3.5" /> Move down
-          </button>
-        </div>
+      <div className="mt-3 border-t border-rule pt-3">
+        <h4 className="eyebrow mb-2 text-graphite-soft">Position</h4>
+        {steps(
+          pageAt > 0 ? () => onMovePage(-1) : null,
+          pageAt < blocks.length - 1 ? () => onMovePage(1) : null,
+          "It's already the first page.",
+          "It's already the last page.",
+        )}
       </div>
     );
   }
 
   return (
-    <div className="mt-3 border-t border-line pt-3">
-      <h4 className="mb-2 text-[11px] font-bold uppercase tracking-wider text-faint">Position</h4>
-      <div className="mb-2 flex gap-1.5">
-        <button
-          onClick={() => up && onMove(up)}
-          disabled={!up}
-          className="btn btn-outline btn-sm flex-1 disabled:opacity-40"
-        >
-          <ArrowUp className="h-3.5 w-3.5" /> Move up
-        </button>
-        <button
-          onClick={() => down && onMove(down)}
-          disabled={!down}
-          className="btn btn-outline btn-sm flex-1 disabled:opacity-40"
-        >
-          <ArrowDown className="h-3.5 w-3.5" /> Move down
-        </button>
-      </div>
-      <div className="flex gap-1.5">
-        <select
+    <div className="mt-3 border-t border-rule pt-3">
+      <h4 className="eyebrow mb-2 text-graphite-soft">Position</h4>
+      {steps(up ? () => onMove(up) : null, down ? () => onMove(down) : null, stepReason(rawUp, "top"), stepReason(rawDown, "bottom"))}
+      <div className="mt-2 flex flex-col items-start gap-1.5">
+        <Select
+          size="sm"
           aria-label="Move to"
+          aria-describedby={chosen ? chosenId : undefined}
           value={destination}
           onChange={(e) => setDestination(e.target.value)}
-          className="min-w-0 flex-1 rounded-lg border border-line-2 bg-surface px-2 py-1.5 text-[13px] outline-none focus:border-accent"
         >
           <option value="">Move to…</option>
           {destinations.map((d) => (
             <option key={d.id ?? ROOT} value={d.id ?? ROOT}>
-              {d.id === null ? "Top level (outside any group)" : d.path.join(" › ")}
+              {destinationName(d)}
             </option>
           ))}
-        </select>
-        <button onClick={moveInto} disabled={!destination} className="btn btn-outline btn-sm disabled:opacity-40">
+        </Select>
+        {chosen && (
+          <p id={chosenId} className="break-words text-[0.75rem] text-graphite">
+            To the end of <span className="text-ink">{destinationName(chosen)}</span>
+          </p>
+        )}
+        <Button size="sm" onClick={moveInto} reason={destination ? undefined : "Choose a page or group above first."}>
           Move
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -1104,8 +1208,8 @@ function retarget(
   return { ...id, question: source.id, operator, answer: keep ? c.answer : firstAnswer(source) };
 }
 
-const logicField =
-  "min-w-0 flex-1 rounded-lg border border-line-2 bg-surface px-2 py-1.5 text-[13px] outline-none focus:border-accent";
+/** A condition's text and number boxes; its selects are the kit's `Select` at the same size. */
+const logicField = controlClasses({ size: "sm" });
 
 /**
  * Number box that lets the author clear and retype without the value snapping
@@ -1158,11 +1262,11 @@ function AnswerInput({
     // Entries are told apart by position: an option's code may still be empty.
     const current = typeof value === "string" && value ? options.findIndex((o) => o.code === value) : -1;
     return (
-      <select
+      <Select
+        size="sm"
         aria-label={label}
         value={current >= 0 ? String(current) : ""}
         onChange={(e) => onChange(pick(source, Number(e.target.value)))}
-        className={logicField}
       >
         {current < 0 && <option value="">{typeof value === "string" && value ? value : "Choose…"}</option>}
         {options.map((o, k) => (
@@ -1170,7 +1274,7 @@ function AnswerInput({
             {o.label}
           </option>
         ))}
-      </select>
+      </Select>
     );
   }
   if (NUMERIC_SOURCE_TYPES.includes(source.type)) {
@@ -1318,17 +1422,17 @@ function ConditionsPanel({
   // Nothing comes before the first page, so it's always shown (contract §3.2).
   if (isPage(block) && blocks[0]?.id === block.id && !conditions.length) {
     return (
-      <div className="border-t border-line pt-3">
-        <h4 className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-faint">Logic</h4>
-        <p className="text-xs text-muted">The first page can&apos;t have conditions — it is always shown.</p>
+      <div className="border-t border-rule pt-3">
+        <h4 className="eyebrow mb-1.5 text-graphite-soft">Logic</h4>
+        <p className="text-[0.75rem] text-graphite">The first page can&apos;t have conditions — it is always shown.</p>
       </div>
     );
   }
 
   return (
-    <div className="border-t border-line pt-3">
-      <h4 className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-faint">Logic</h4>
-      <p className="mb-2 text-[12.5px] font-semibold text-ink-2">Show this {noun} only when…</p>
+    <div className="border-t border-rule pt-3">
+      <h4 className="eyebrow mb-1.5 text-graphite-soft">Logic</h4>
+      <p className="mb-2 text-[0.8125rem] font-medium text-ink">Show this {noun} only when…</p>
 
       <div className="flex flex-col gap-2">
         {conditions.map((c, i) => {
@@ -1340,38 +1444,41 @@ function ConditionsPanel({
           const refused = refusal?.key === key ? refusal.message : null;
           const refusalId = `condition-refusal-${block.id}-${key}`;
           return (
-            <div key={key} className="rounded-lg border border-line bg-surface-2 p-2">
+            <div key={key} data-condition className="rounded-lg border border-rule bg-paper-sunk p-2">
               <div className="mb-1.5 flex items-center justify-between gap-1.5">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Condition {n}</span>
-                <button
+                <span className="eyebrow text-graphite-soft">Condition {n}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
                   onClick={() => removeCondition(i)}
-                  className="grid h-7 w-7 flex-none place-items-center rounded-md text-faint hover:bg-surface-3 hover:text-ink"
+                  className="text-graphite hover:text-ink"
                   aria-label={`Remove condition ${n}`}
                   aria-describedby={refused ? refusalId : undefined}
                 >
-                  <X className="h-4 w-4" />
-                </button>
+                  <X aria-hidden="true" className="h-4 w-4" />
+                </Button>
               </div>
-              <select
-                aria-label={`Condition ${n} question`}
-                value={c.question}
-                onChange={(e) => {
-                  const next = findBlock(blocks, e.target.value)!.block;
-                  const ops = sourceOperators(next) ?? [];
-                  setAt(i, retarget(c, next, ops.includes(c.operator) ? c.operator : "exists", firstAnswer));
-                }}
-                className={`${logicField} mb-1.5 w-full`}
-              >
-                {!eligible && <option value={c.question}>{source ? blockName(source) : "Missing question"}</option>}
-                {sourceOptions}
-              </select>
-              <div className="flex items-center gap-1.5">
-                <select
+              {/* One control per line: side by side, the pane's narrowest width clipped "is greater than". */}
+              <div className="flex flex-col gap-1.5">
+                <Select
+                  size="sm"
+                  aria-label={`Condition ${n} question`}
+                  value={c.question}
+                  onChange={(e) => {
+                    const next = findBlock(blocks, e.target.value)!.block;
+                    const ops = sourceOperators(next) ?? [];
+                    setAt(i, retarget(c, next, ops.includes(c.operator) ? c.operator : "exists", firstAnswer));
+                  }}
+                >
+                  {!eligible && <option value={c.question}>{source ? blockName(source) : "Missing question"}</option>}
+                  {sourceOptions}
+                </Select>
+                <Select
+                  size="sm"
                   aria-label={`Condition ${n} operator`}
                   value={c.operator}
                   disabled={!source}
                   onChange={(e) => source && setAt(i, retarget(c, source, e.target.value as ConditionOperator, firstAnswer))}
-                  className={logicField}
                 >
                   {!operators.includes(c.operator) && <option value={c.operator}>{OPERATOR_TEXT[c.operator]}</option>}
                   {operators.map((op) => (
@@ -1379,7 +1486,7 @@ function ConditionsPanel({
                       {OPERATOR_TEXT[op]}
                     </option>
                   ))}
-                </select>
+                </Select>
                 {c.operator !== "exists" && source && (
                   <AnswerInput
                     label={`Condition ${n} answer`}
@@ -1392,7 +1499,7 @@ function ConditionsPanel({
               </div>
               <div id={refusalId} aria-live="polite">
                 {refused && (
-                  <p className="mt-1.5 flex items-start gap-1 text-xs text-red">
+                  <p data-field-error className="mt-1.5 flex items-start gap-1 text-[0.75rem] text-fail">
                     <CircleAlert aria-hidden="true" className="mt-px h-3.5 w-3.5 flex-none" />
                     {refused}
                   </p>
@@ -1404,65 +1511,46 @@ function ConditionsPanel({
       </div>
 
       {sources.length ? (
-        <button
-          ref={addButton}
-          onClick={addCondition}
-          className="mt-2 flex items-center gap-1.5 text-sm font-medium text-accent-2 hover:underline"
-        >
-          <Plus className="h-4 w-4" /> Add condition
-        </button>
+        <Button ref={addButton} variant="ghost" size="sm" onClick={addCondition} className="-ml-2.5 mt-1.5">
+          <Plus aria-hidden="true" className="h-3.5 w-3.5" /> Add condition
+        </Button>
       ) : (
         !hiddenByRepeats && (
-          <p className="text-xs text-muted">
+          <p className="text-[0.75rem] text-graphite">
             Only questions before this {noun} can be used. Add or move a question before it first.
           </p>
         )
       )}
 
       {conditions.length >= 2 && (
-        <div className="mt-3">
-          <label htmlFor={fieldId} className="mb-1 block text-xs font-semibold text-ink-2">
-            Logic
-          </label>
-          <textarea
-            id={fieldId}
-            value={text}
-            rows={2}
-            spellCheck={false}
-            autoComplete="off"
-            aria-invalid={logicError ? true : undefined}
-            aria-describedby={`${fieldId}-hint ${fieldId}-error`}
-            onChange={(e) => typeLogic(e.target.value)}
-            onBlur={(e) => {
-              clearTimeout(timer.current);
-              setChecked(e.target.value);
-            }}
-            className={`block w-full resize-y rounded-lg border bg-surface px-2.5 py-1.5 font-mono text-[13px] outline-none focus:ring-2 focus:ring-accent-weak ${
-              logicError ? "border-red focus:border-red" : "border-line-2 focus:border-accent"
-            }`}
-          />
-          <p id={`${fieldId}-hint`} className="mt-1 text-xs text-muted">
-            {LOGIC_HINT}
-          </p>
-          <div id={`${fieldId}-error`} aria-live="polite">
-            {logicError && (
-              <p className="mt-1 flex items-start gap-1 text-xs text-red">
-                <CircleAlert aria-hidden="true" className="mt-px h-3.5 w-3.5 flex-none" />
-                {logicError}
-              </p>
-            )}
-          </div>
-        </div>
+        <Field id={fieldId} label="Logic" optional={false} hint={LOGIC_HINT} error={logicError} liveError className="mt-3">
+          {(field) => (
+            <Textarea
+              {...field}
+              mono
+              value={text}
+              rows={2}
+              spellCheck={false}
+              autoComplete="off"
+              onChange={(e) => typeLogic(e.target.value)}
+              onBlur={(e) => {
+                clearTimeout(timer.current);
+                setChecked(e.target.value);
+              }}
+              className="block px-2.5 py-1.5 text-[0.8125rem]"
+            />
+          )}
+        </Field>
       )}
 
       {problems.map((p, i) => (
-        <p key={i} className="mt-2 text-xs text-red">
+        <p key={i} data-field-error className="mt-2 text-[0.75rem] text-fail">
           {p}
         </p>
       ))}
 
       {hiddenByRepeats && (
-        <p className="mt-2 text-xs text-muted">
+        <p className="mt-2 text-[0.75rem] text-graphite">
           Some questions aren&apos;t listed because they&apos;re inside a repeating group this block isn&apos;t in.
         </p>
       )}
@@ -1512,6 +1600,11 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   );
   // A template that can't be saved here: a system template, or anything for a viewer. No Save or Cancel.
   const readOnlyTemplate = templateMode && (template?.scope === "system" || !canEdit);
+  // A viewer, by role: if `me` failed, the API decides, so an author is never locked out by a network blip.
+  const viewer = user.status === "ready" && user.me.role === "VIEWER";
+  // Nothing here can be saved: no Save or Cancel, never dirty, no warning on leaving.
+  const readOnly = readOnlyTemplate || viewer;
+  const toast = useToast();
 
   const [schema, setSchema] = useState<FormSchema | null>(null);
   // The latest saved version's content: the baseline for dirty-state and Cancel.
@@ -1519,9 +1612,16 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  // A message under the header; `blocks` are questions to offer "jump to" links for.
-  // `info` notes are neutral (e.g. a setting switched for the author); the rest are refusals.
-  const [notice, setNotice] = useState<{ text: string; blocks?: Block[]; tone?: "info" } | null>(null);
+  // A message under the header; `blocks` are questions to offer "jump to" links for. Its tone is
+  // its meaning: `warn` an edit that was refused (nothing is broken, it just didn't happen), `fail`
+  // a save or download that failed, `info` a neutral note (e.g. a setting switched for the author).
+  const [notice, setNotice] = useState<{ id: number; text: string; blocks?: Block[]; tone: NoticeTone } | null>(null);
+  const noticeCount = useRef(0);
+  /** Show a notice; a refusal unless `tone` says otherwise. A new id remounts it, so it is announced even if the words repeat. */
+  const notify = ({ tone = "warn", ...rest }: { text: string; blocks?: Block[]; tone?: NoticeTone }) =>
+    setNotice({ ...rest, tone, id: ++noticeCount.current });
+  // The standing note on a screen that can't be saved, until dismissed.
+  const [readOnlyNoteDismissed, setReadOnlyNoteDismissed] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuQuery, setMenuQuery] = useState("");
@@ -1554,9 +1654,6 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
           setSchema(latest);
           setSaved(latest);
           setSelectedId(latest.blocks[0]?.id ?? null);
-          if (t.scope === "system") {
-            setNotice({ tone: "info", text: "This is a system template, so it can't be changed. Duplicate it from Templates to make your own copy." });
-          }
         })
         .catch(() => setLoadError(true));
       return;
@@ -1579,11 +1676,18 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
 
   // Nothing is persisted until Save, so "dirty" = editor differs from the latest
   // saved version, compared the same key-order-insensitive way the API does.
-  // A template that can't be saved here (`readOnlyTemplate`) is never dirty: there is nothing to lose by leaving.
+  // A screen that can't be saved (`readOnly`) is never dirty: there is nothing to lose by leaving.
   const dirty = useMemo(
-    () => !readOnlyTemplate && !!schema && !!saved && !sameContent(schema, saved),
-    [schema, saved, readOnlyTemplate],
+    () => !readOnly && !!schema && !!saved && !sameContent(schema, saved),
+    [schema, saved, readOnly],
   );
+  const saveAnnouncement = useSaveAnnouncement(dirty);
+  // Cancel and Save, blocked for one reason, say it once.
+  const saveReasonId = useId();
+  // The Cancel confirmation is open.
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
+  // A grid column's type change waiting for the author's answer (it would remove the column's options).
+  const [typeChange, setTypeChange] = useState<{ blockId: string; index: number; type: GridColumnType; warning: string } | null>(null);
 
   // With no autosave, closing or reloading the tab would silently lose edits.
   useEffect(() => {
@@ -1596,15 +1700,8 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
 
-  /** Guard the editor's in-app links: the App Router has no navigation-blocking API. */
-  function confirmLeave(e: React.MouseEvent) {
-    if (dirty && !confirm("Leave without saving? Your unsaved changes will be lost.")) {
-      e.preventDefault();
-    }
-  }
-
   async function onSave() {
-    if (!schema || !dirty || saving || readOnlyTemplate) return;
+    if (!schema || !dirty || saving || readOnly) return;
     // Baseline is what was sent, so edits made while the request is in flight stay dirty.
     const sent = schema;
     setSaving(true);
@@ -1623,6 +1720,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
       }
       setSaved(stored);
       setSchema((s) => (s === sent ? stored : s));
+      saveAnnouncement.announce("Changes saved.");
     } catch (e) {
       if (e instanceof ApiError && e.code === "NO_CHANGES") {
         // Identical to the current version: nothing to save. Its empty codes get
@@ -1630,11 +1728,12 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         const filled = FormSchema.parse(sent);
         setSaved(filled);
         setSchema((s) => (s === sent ? filled : s));
+        saveAnnouncement.announce("Changes saved.");
       } else if (e instanceof ApiError && e.code === "VERSION_CONFLICT") {
         // Keep the unsaved edits; the author decides whether to reload.
-        setNotice({ text: e.message });
+        notify({ tone: "fail", text: e.message });
       } else {
-        setNotice({ text: `Couldn't save: ${(e as Error).message}` });
+        notify({ tone: "fail", text: `Couldn't save: ${(e as Error).message}` });
       }
     } finally {
       setSaving(false);
@@ -1643,9 +1742,15 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
 
   function onCancel() {
     if (!saved || !dirty) return;
-    if (!confirm("Discard unsaved changes? This cannot be undone.")) return;
+    setConfirmingCancel(true);
+  }
+
+  /** Cancel, confirmed: back to the latest saved version. */
+  function discardChanges() {
+    if (!saved) return;
     setSchema(saved);
     setNotice(null);
+    saveAnnouncement.announce("Changes discarded.");
   }
 
   async function onDownload() {
@@ -1653,7 +1758,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     try {
       await downloadArtifact(id); // latest saved version, never the unsaved editor state
     } catch (e) {
-      setNotice({ text: `Couldn't download: ${(e as Error).message}` });
+      notify({ tone: "fail", text: `Couldn't download: ${(e as Error).message}` });
     } finally {
       setDownloading(false);
     }
@@ -1764,7 +1869,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     patch((s) => ({ ...s, blocks: named }));
     if (as === "group" && picking.parentId) expand(picking.parentId);
     setSelectedId(group.id);
-    setNotice({ tone: "info", text: `Inserted a copy of "${t.name}".` });
+    toast.show({ tone: "pass", title: `Inserted a copy of "${t.name}".` });
   }
 
   /** A condition in words for the save-as-template list: `"Do you smoke?" is Yes`. */
@@ -1851,7 +1956,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   function refuseForScores(uses: ReturnType<typeof scoreDeletionBlockers>, before = ""): boolean {
     if (!uses.length) return false;
     const groups = uses.map((u) => u.group).filter((g, k, all) => all.findIndex((x) => x.id === g.id) === k);
-    setNotice({ text: `${before}${uses.map(scoreUseMessage).join(" ")}`, blocks: groups });
+    notify({ text: `${before}${uses.map(scoreUseMessage).join(" ")}`, blocks: groups });
     return true;
   }
 
@@ -1869,7 +1974,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
       if (p.type && p.type !== current.type) {
         const deps = dependentsOf(schema.blocks, bid);
         if (deps.length) {
-          setNotice({
+          notify({
             text: `Can't change the type of "${blockName(current)}" — these questions have conditions that depend on it:`,
             blocks: deps,
           });
@@ -1992,7 +2097,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         const inUse = codeOrigins.current.get(originKey(bid, ref, i)) ?? option.code.trim();
         const deps = isSourceList(ref) && inUse ? dependentsOf(schema.blocks, bid, (c) => c.answer === inUse) : [];
         if (deps.length) {
-          setNotice({
+          notify({
             text: `Can't remove "${option.label}" — these blocks have conditions that use it:`,
             blocks: deps,
           });
@@ -2035,7 +2140,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   async function readImportFile(bid: string, ref: OptionListRef, plural: string, file: File, owner?: string) {
     const kind = file.name.toLowerCase().match(/\.(csv|txt)$/)?.[1] as "csv" | "txt" | undefined;
     if (!kind) {
-      setNotice({ text: `Choose a .csv or .txt file — "${file.name}" isn't one.` });
+      notify({ text: `Choose a .csv or .txt file — "${file.name}" isn't one.` });
       return;
     }
     const text = await file.text(); // UTF-8; a leading byte-order mark is dropped by the parser
@@ -2050,7 +2155,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     const deps =
       mode === "replace" && isSourceList(ref) ? replaceBlockers(schema.blocks, bid, next.map((o) => o.code)) : [];
     if (deps.length) {
-      setNotice({
+      notify({
         text: `Can't replace the ${plural} — these blocks have conditions that use a code that isn't in the file:`,
         blocks: deps,
       });
@@ -2093,11 +2198,14 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
       const column = block && isGrid(block) ? block.columns?.[i] : undefined;
       if (!column) return;
       const warning = columnTypeChangeWarning(column, i, type);
-      if (warning && !window.confirm(warning)) return;
-      forgetOrigins(bid);
-      updateColumns(bid, (columns) => columns.map((c, k) => (k === i ? withColumnType(c, type) : c)));
+      if (warning) setTypeChange({ blockId: bid, index: i, type, warning });
+      else changeColumnType(bid, i, type);
     },
   });
+  function changeColumnType(bid: string, i: number, type: GridColumnType) {
+    forgetOrigins(bid);
+    updateColumns(bid, (columns) => columns.map((c, k) => (k === i ? withColumnType(c, type) : c)));
+  }
 
   /** For the condition editor: the code of option `index` of `sourceId`, generated first if empty. */
   function pickAnswer(sourceId: string, index: number): string {
@@ -2117,7 +2225,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     if (!groupTemplate || !schema) return false;
     const root = schema.blocks[0];
     if (bid !== root?.id && target?.parentId !== null) return false;
-    setNotice({ text: "A group template holds exactly one group: it stays, and everything else goes inside it." });
+    notify({ text: "A group template holds exactly one group: it stays, and everything else goes inside it." });
     return true;
   }
 
@@ -2136,7 +2244,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     }
     const deps = deletionBlockers(schema.blocks, bid);
     if (deps.length) {
-      setNotice({
+      notify({
         text: `Can't delete "${blockName(current)}" — these questions have conditions that depend on it:`,
         blocks: deps,
       });
@@ -2170,7 +2278,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     const group = findBlock(schema.blocks, gid)?.block;
     const deps = deletionBlockers(schema.blocks, gid);
     if (deps.length) {
-      setNotice({
+      notify({
         text: `Can't delete "${group ? blockName(group) : "the group"}" and its questions — these questions outside it have conditions that depend on something inside it:`,
         blocks: deps,
       });
@@ -2188,21 +2296,21 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
    */
   function refuseStructureEdit(breaks: { order: Block[]; prefix: Block[]; score: Block[] }, action: string): boolean {
     if (breaks.order.length) {
-      setNotice({
+      notify({
         text: `Can't ${action} — these questions would end up before a question their conditions depend on:`,
         blocks: breaks.order,
       });
       return true;
     }
     if (breaks.prefix.length) {
-      setNotice({
+      notify({
         text: `Can't ${action} — these blocks would have conditions on a question inside a repeating group they aren't in:`,
         blocks: breaks.prefix,
       });
       return true;
     }
     if (breaks.score.length) {
-      setNotice({
+      notify({
         text: `Can't ${action} — these groups have scores whose formulas use a question that would be out of their reach:`,
         blocks: breaks.score,
       });
@@ -2227,7 +2335,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     try {
       next = moveBlockInTree(schema.blocks, bid, target.parentId, target.index);
     } catch (e) {
-      setNotice({ text: (e as Error).message });
+      notify({ text: (e as Error).message });
       return;
     }
     if (refuseStructureEdit(structureBreaks(schema.blocks, next), `move "${blockName(moving)}" there`)) return;
@@ -2238,7 +2346,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     const { blocks: resolved, renamed } = resolveNameClashes(schema.blocks, next, moved);
     patch((s) => ({ ...s, blocks: withNames(resolved) }));
     if (renamed.length) {
-      setNotice({
+      notify({
         tone: "info",
         text: renamed.map((r) => `"${r.from}" is already used there, so the moved question is now named "${r.to}".`).join(" "),
         blocks: renamed.map((r) => findBlock(resolved, r.id)!.block),
@@ -2259,7 +2367,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     if (on) {
       const deps = repeatsOnBlockers(schema.blocks, gid);
       if (deps.length) {
-        setNotice({
+        notify({
           text: `Can't make "${blockName(group)}" repeat — these blocks outside it have conditions that use a question inside it:`,
           blocks: deps,
         });
@@ -2268,7 +2376,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
       // A score outside it can't use a question in a repeating group (contract §17.2, §17.9).
       const scored = repeatsOnScoreBlockers(schema.blocks, gid);
       if (scored.length) {
-        setNotice({
+        notify({
           text: `Can't make "${blockName(group)}" repeat — these groups have scores whose formulas use a question inside it:`,
           blocks: scored,
         });
@@ -2292,7 +2400,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
    */
   function applyPageEdit(edit: PageEdit): boolean {
     if (!edit.ok) {
-      setNotice({ text: edit.message, blocks: edit.dependents.length ? edit.dependents : undefined });
+      notify({ text: edit.message, blocks: edit.dependents.length ? edit.dependents : undefined });
       return false;
     }
     patch((s) => ({ ...s, blocks: edit.blocks }));
@@ -2362,7 +2470,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     patch((s) => ({ ...s, blocks, ...(switchDrafts ? { drafts: undefined } : {}) }));
     setSelectedId(null);
     if (switchDrafts) {
-      setNotice({
+      notify({
         tone: "info",
         text: "Saving progress on the server needs pages, so it's been switched to 'Only while the form is open'.",
       });
@@ -2410,13 +2518,37 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   // The save's scoring rules (contract §17.6–§17.8), each shown under its field.
   const scoreIssues = useMemo(() => (schema ? scoreProblems(walkBlocks(schema.blocks)) : []), [schema]);
 
-  // Until the member arrives too: the pane's width comes with them, and it mustn't jump after the first paint.
-  if (!schema || user.status === "loading")
+  if (loadError) {
+    const back = templateMode ? { href: "/app/templates", label: "Back to Templates" } : { href: "/app", label: "Back to My forms" };
     return (
-      <div className="grid h-screen place-items-center text-muted">
-        {loadError ? (templateMode ? "Couldn't load this template." : "Couldn't load this form.") : <Loader2 className="h-5 w-5 animate-spin" />}
+      <div className="grid min-h-screen place-items-center bg-paper p-6">
+        <Callout
+          role="alert"
+          tone="fail"
+          title={templateMode ? "Couldn't load this template" : "Couldn't load this form"}
+          className="w-full max-w-md"
+          action={
+            <Link href={back.href} className={buttonClasses({ size: "sm" })}>
+              {back.label}
+            </Link>
+          }
+        >
+          It may have been deleted, or the address may be wrong. Open it again from the list.
+        </Callout>
       </div>
     );
+  }
+  // Until the member arrives too: the pane's width comes with them, and it mustn't jump after the first paint.
+  if (!schema || user.status === "loading")
+    return <EditorSkeleton label={templateMode ? "Loading the template" : "Loading the form"} paneWidth={pane.width} />;
+
+  // The standing note on a screen nothing can be saved from.
+  const readOnlyNote =
+    templateMode && template?.scope === "system"
+      ? "This is a system template, so it can't be changed. Duplicate it from Templates to make your own copy."
+      : viewer
+        ? "You have view access, so changes here can't be saved."
+        : null;
 
   const selectedEntry = selectedId ? findBlock(schema.blocks, selectedId) : undefined;
   const selected = selectedEntry?.block ?? null;
@@ -2570,83 +2702,81 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     return stack[0].children;
   }
   const draggedBlock = drag ? findBlock(schema.blocks, drag.activeId)?.block : undefined;
-  const fieldCls =
-    "w-full rounded-lg border border-line-2 px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent-weak";
+  // The pane's fields: one gap between them, and a section's rule above it.
+  const paneField = "mb-3";
+  const paneSection = "mb-4 border-t border-rule pt-3";
 
   return (
     <div className="flex h-screen flex-col bg-bg">
       {/* Top bar */}
-      <header className="flex h-14 flex-none items-center gap-3 border-b border-line bg-surface px-4">
-        <Link
+      <header className="flex h-14 flex-none items-center gap-3 border-b border-rule bg-surface px-4">
+        <LeaveLink
           href={templateMode ? "/app/templates" : "/app"}
-          onClick={confirmLeave}
-          className="grid h-9 w-9 flex-none place-items-center rounded-lg text-ink-2 hover:bg-surface-3"
+          dirty={dirty}
+          className={buttonClasses({ variant: "ghost", size: "icon", className: "h-9 w-9 flex-none text-graphite hover:text-ink" })}
           aria-label={templateMode ? "Back to templates" : "Back"}
         >
-          <ChevronLeft className="h-4 w-4" />
-        </Link>
+          <ChevronLeft aria-hidden="true" className="h-4 w-4" />
+        </LeaveLink>
         {templateMode ? (
-          <h1 className="flex min-w-0 items-center gap-2 text-[15px] font-semibold tracking-tight">
-            <LayoutTemplate className="h-4 w-4 flex-none text-accent-2" aria-hidden="true" />
+          <h1 className="flex min-w-0 items-center gap-2 font-display text-[0.9375rem] font-semibold tracking-[-0.008em]">
+            <LayoutTemplate className="h-4 w-4 flex-none text-brand-deep" aria-hidden="true" />
             <span className="truncate">Template: {template?.name}</span>
-            <span className="flex-none rounded-full bg-surface-3 px-2 py-0.5 text-[11px] font-semibold text-ink-2">
-              {groupTemplate ? "Group" : "Form"}
-            </span>
+            <StatusChip className="flex-none">{groupTemplate ? "Group" : "Form"}</StatusChip>
           </h1>
         ) : (
           <input
             value={schema.title}
             onChange={(e) => patch((s) => ({ ...s, title: e.target.value }))}
             aria-label="Form title"
-            className="min-w-0 max-w-[280px] flex-none rounded-md px-2 py-1 text-[15px] font-semibold tracking-tight outline-none hover:bg-surface-3 focus:bg-surface-3"
+            className="min-w-0 max-w-[280px] flex-none rounded-md border border-transparent px-2 py-1 font-display text-[0.9375rem] font-semibold tracking-[-0.008em] outline-none transition-colors duration-200 hover:bg-paper-sunk focus:border-brand-deep focus:bg-surface focus:ring-[3px] focus:ring-brand/20"
             spellCheck={false}
           />
         )}
-        <span className="flex items-center gap-1.5 text-xs text-faint">
-          {saving ? (
-            <>
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Saving…
-            </>
-          ) : dirty ? (
-            <>
-              <span className="h-1.5 w-1.5 rounded-full bg-amber" /> Unsaved changes
-            </>
-          ) : (
-            <>
-              <Check className="h-3.5 w-3.5 text-green" /> All changes saved
-            </>
-          )}
-        </span>
+        {readOnly ? (
+          <StatusChip tone="locked" className="flex-none">
+            View only
+          </StatusChip>
+        ) : (
+          <SaveStatus state={saving ? "saving" : dirty ? "dirty" : "saved"} announcement={saveAnnouncement.text} />
+        )}
 
         <div className="ml-auto flex items-center gap-2">
+          <ThemeToggle />
           {!templateMode && (
             <>
-              <button
-                onClick={onDownload}
-                className="btn btn-outline btn-sm"
-                title="Download the latest saved version"
-              >
-                {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              <Button size="sm" onClick={onDownload} pending={downloading} pendingLabel="Download" title="Download the latest saved version">
+                <Download aria-hidden="true" className="h-3.5 w-3.5" />
                 Download
-              </button>
+              </Button>
               {canEdit && (
                 <MenuButton
                   label="More form actions"
-                  className="btn btn-outline btn-sm px-2"
+                  className={buttonClasses({ size: "sm", className: "px-2" })}
                   items={[{ label: "Save form as template…", icon: LayoutTemplate, onSelect: () => setSavingAsTemplate({ kind: "form" }) }]}
                 />
               )}
             </>
           )}
-          {!readOnlyTemplate && (
+          {!readOnly && (
             <>
-              <button onClick={onCancel} disabled={!dirty || saving} className="btn btn-outline btn-sm">
+              {(!dirty || saving) && (
+                <span id={saveReasonId} className="text-[0.6875rem] text-graphite">
+                  {saving ? "Saving your changes…" : "No changes to save"}
+                </span>
+              )}
+              <Button size="sm" onClick={onCancel} reasonId={!dirty || saving ? saveReasonId : undefined}>
                 Cancel
-              </button>
-              <button onClick={onSave} disabled={!dirty || saving} className="btn btn-primary btn-sm">
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              </Button>
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={onSave}
+                pending={saving}
+                reasonId={!dirty && !saving ? saveReasonId : undefined}
+              >
                 Save
-              </button>
+              </Button>
             </>
           )}
         </div>
@@ -2672,6 +2802,25 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         />
       )}
       {confirmPaging && <PagingDialog onConfirm={convertToPages} onClose={() => setConfirmPaging(false)} />}
+      {confirmingCancel && (
+        <ConfirmDialog
+          title="Discard unsaved changes?"
+          consequence="Your edits since the last save will be lost. This can't be undone."
+          confirmLabel="Discard changes"
+          onConfirm={async () => discardChanges()}
+          onClose={() => setConfirmingCancel(false)}
+        />
+      )}
+      {typeChange && (
+        <ConfirmDialog
+          // The warning is a question and its consequence: 'Change "X" to short text? Its 3 options will be removed.'
+          title={`${typeChange.warning.split("? ")[0]}?`}
+          consequence={typeChange.warning.split("? ").slice(1).join("? ")}
+          confirmLabel="Change to short text"
+          onConfirm={async () => changeColumnType(typeChange.blockId, typeChange.index, typeChange.type)}
+          onClose={() => setTypeChange(null)}
+        />
+      )}
       {picking && <TemplatePicker asPage={insertAsPageRefusal()} onInsert={insertTemplate} onClose={() => setPicking(null)} />}
       {savingAsTemplate && (
         <SaveTemplateDialog
@@ -2682,7 +2831,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
           onClose={() => setSavingAsTemplate(null)}
           onSaved={(t) => {
             setSavingAsTemplate(null);
-            setNotice({ tone: "info", text: `Saved "${t.name}" to your organisation's templates.` });
+            toast.show({ tone: "pass", title: `Saved "${t.name}" to your organisation's templates.` });
           }}
         />
       )}
@@ -2698,30 +2847,32 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         />
       )}
 
-      {notice && (
-        <div
-          role={notice.tone === "info" ? "status" : "alert"}
-          className={`flex flex-none items-center gap-3 border-b px-4 py-2 text-sm ${
-            notice.tone === "info"
-              ? "border-warn/30 bg-warn-wash text-ink-2"
-              : "border-fail/30 bg-fail-wash text-red"
-          }`}
-        >
-          <span className="flex flex-1 flex-wrap items-center gap-x-2 gap-y-1">
-            {notice.text}
-            {notice.blocks?.map((b) => (
-              <button
-                key={b.id}
-                onClick={() => jumpTo(b.id)}
-                className="rounded-md border border-fail/30 bg-surface px-2 py-0.5 text-xs font-medium text-ink-2 hover:border-red"
-              >
-                {blockName(b)} →
-              </button>
-            ))}
-          </span>
-          <button onClick={() => setNotice(null)} aria-label="Dismiss" className="hover:opacity-70">
-            <X className="h-4 w-4" />
-          </button>
+      {((readOnlyNote && !readOnlyNoteDismissed) || notice) && (
+        <div className="flex flex-none flex-col gap-2 border-b border-rule bg-paper px-4 py-2.5">
+          {readOnlyNote && !readOnlyNoteDismissed && (
+            <Callout role="status" tone="info" title={readOnlyNote} onDismiss={() => setReadOnlyNoteDismissed(true)} />
+          )}
+          {notice && (
+            <Callout
+              key={notice.id}
+              // Nothing else announces these: a refusal or a failure interrupts, a note waits.
+              role={notice.tone === "info" ? "status" : "alert"}
+              tone={notice.tone}
+              title={notice.text}
+              onDismiss={() => setNotice(null)}
+              action={
+                notice.blocks?.length ? (
+                  <div className="flex flex-wrap gap-1.5">
+                    {notice.blocks.map((b) => (
+                      <Button key={b.id} size="sm" onClick={() => jumpTo(b.id)}>
+                        {blockName(b)} →
+                      </Button>
+                    ))}
+                  </div>
+                ) : undefined
+              }
+            />
+          )}
         </div>
       )}
 
@@ -2869,85 +3020,80 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
           id={SETTINGS_PANE_ID}
           // Named by whichever heading it shows; the handle uses the same one.
           aria-labelledby={SETTINGS_PANE_HEADING_ID}
-          className="overflow-auto border-l border-line bg-surface p-4"
+          className="overflow-auto border-l border-rule bg-surface p-4"
         >
           {selected ? (
             <div key={selected.id}>
-              <h4 id={SETTINGS_PANE_HEADING_ID} className="mb-3 text-[11px] font-bold uppercase tracking-wider text-faint">
+              <h4 id={SETTINGS_PANE_HEADING_ID} className="eyebrow mb-3 text-graphite-soft">
                 {inspectorHeading(selected)}
               </h4>
-              <label htmlFor="block-label" className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">
-                {isPage(selected) ? "Title" : "Label"}
-              </label>
-              <input
+              <Field
                 id="block-label"
-                value={blockName(selected)}
-                onChange={(e) =>
-                  updateBlock(selected.id, isPage(selected) ? { title: e.target.value } : { label: e.target.value })
+                label={isPage(selected) ? "Title" : "Label"}
+                optional={false}
+                hint={
+                  selected.type === "image"
+                    ? "Also read aloud to screen-reader users — describe what the image shows."
+                    : selected.type === "video"
+                      ? "Read aloud to screen-reader users — describe what the video is about."
+                      : selected.type === "audio"
+                        ? "Read aloud to screen-reader users — say what the recording is."
+                        : undefined
                 }
-                onFocus={(e) => (e.currentTarget.dataset.atFocus = e.currentTarget.value)}
-                onBlur={(e) => {
-                  if (e.currentTarget.value !== e.currentTarget.dataset.atFocus) labelLeft(selected.id);
-                }}
-                className={`${fieldCls} ${["image", "video", "audio"].includes(selected.type) ? "mb-1.5" : "mb-3"}`}
-              />
-              {selected.type === "image" && (
-                <p className="mb-3 text-xs text-muted">
-                  Also read aloud to screen-reader users — describe what the image shows.
-                </p>
-              )}
-              {selected.type === "video" && (
-                <p className="mb-3 text-xs text-muted">
-                  Read aloud to screen-reader users — describe what the video is about.
-                </p>
-              )}
-              {selected.type === "audio" && (
-                <p className="mb-3 text-xs text-muted">
-                  Read aloud to screen-reader users — say what the recording is.
-                </p>
-              )}
+                className={paneField}
+              >
+                {(field) => (
+                  <Input
+                    {...field}
+                    value={blockName(selected)}
+                    onChange={(e) =>
+                      updateBlock(selected.id, isPage(selected) ? { title: e.target.value } : { label: e.target.value })
+                    }
+                    onFocus={(e) => (e.currentTarget.dataset.atFocus = e.currentTarget.value)}
+                    onBlur={(e) => {
+                      if (e.currentTarget.value !== e.currentTarget.dataset.atFocus) labelLeft(selected.id);
+                    }}
+                  />
+                )}
+              </Field>
 
               {/* A question's name, for score formulas (contract §17.8): only within reach of a scored group. */}
               {isAnswerable(selected) && isWithinScoreReach(schema.blocks, selected.id) && (() => {
                 const problem = scoreIssues.find((p) => p.blockId === selected.id && p.field === "name")?.detail;
                 const status = nameStatus?.blockId === selected.id ? nameStatus.text : null;
                 return (
-                  <div className="mb-3">
-                    <label htmlFor="block-name" className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">
-                      Name
-                    </label>
-                    <input
+                  <div className={paneField}>
+                    <Field
                       id="block-name"
-                      value={typeof selected.name === "string" ? selected.name : ""}
-                      placeholder={newQuestions.current.has(selected.id) ? "Given when you set the label" : undefined}
-                      spellCheck={false}
-                      autoCapitalize="off"
-                      autoComplete="off"
-                      onFocus={() => nameFocus(selected.id)}
-                      onChange={(e) => {
-                        updateBlock(selected.id, { name: e.target.value });
-                        setNameStatus(null);
-                      }}
-                      onBlur={() => nameLeave(selected.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") e.currentTarget.blur();
-                      }}
-                      aria-invalid={problem ? true : undefined}
-                      aria-describedby="block-name-help block-name-error block-name-status"
-                      className={`${fieldCls} font-mono aria-[invalid=true]:border-red`}
-                    />
-                    <p id="block-name-help" className="mt-1.5 text-xs text-muted">
-                      Used in score formulas. Lower-case letters, digits and _, starting with a letter.
-                    </p>
-                    <div id="block-name-error" aria-live="polite">
-                      {problem && (
-                        <p className="mt-1.5 flex items-start gap-1 text-xs text-red">
-                          <CircleAlert aria-hidden="true" className="mt-px h-3.5 w-3.5 flex-none" />
-                          {problem}
-                        </p>
+                      label="Name"
+                      optional={false}
+                      hint="Used in score formulas. Lower-case letters, digits and _, starting with a letter."
+                      error={problem}
+                      liveError
+                      describedBy="block-name-status"
+                    >
+                      {(field) => (
+                        <Input
+                          {...field}
+                          mono
+                          value={typeof selected.name === "string" ? selected.name : ""}
+                          placeholder={newQuestions.current.has(selected.id) ? "Given when you set the label" : undefined}
+                          spellCheck={false}
+                          autoCapitalize="off"
+                          autoComplete="off"
+                          onFocus={() => nameFocus(selected.id)}
+                          onChange={(e) => {
+                            updateBlock(selected.id, { name: e.target.value });
+                            setNameStatus(null);
+                          }}
+                          onBlur={() => nameLeave(selected.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") e.currentTarget.blur();
+                          }}
+                        />
                       )}
-                    </div>
-                    <p id="block-name-status" role="status" aria-live="polite" className="mt-1 text-xs text-ink-2">
+                    </Field>
+                    <p id="block-name-status" role="status" aria-live="polite" className="mt-1 text-[0.75rem] text-ink">
                       {status}
                     </p>
                   </div>
@@ -2956,8 +3102,8 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
 
               {/* Repeating groups (contract §12): groups only, never pages. */}
               {isGroup(selected) && (
-                <div className="mb-4 border-t border-line pt-3">
-                  <div className="flex items-center justify-between text-[13.5px]">
+                <div className={paneSection}>
+                  <div className="flex items-center justify-between text-[0.8125rem] font-medium">
                     <span id="repeats-label">Repeats</span>
                     <Switch
                       checked={!!selected.repeats}
@@ -2966,39 +3112,41 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                       onChange={(on) => setRepeats(selected.id, on)}
                     />
                   </div>
-                  <p id="repeats-help" className="mt-1 text-xs text-muted">
+                  <p id="repeats-help" className="mt-1 text-[0.75rem] text-graphite">
                     Respondents fill this group&apos;s questions once per entry, and can add and remove entries.
                   </p>
 
                   {isRepeatingGroup(selected) && (
                     <div className="mt-3 flex flex-col gap-3">
                       <div>
-                        <label htmlFor="repeat-label" className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">
-                          Name for one entry
-                        </label>
-                        <input
+                        <Field
                           id="repeat-label"
-                          value={selected.repeatLabel ?? ""}
-                          onChange={(e) => updateBlock(selected.id, { repeatLabel: e.target.value })}
-                          aria-invalid={!!repeatProblem("repeatLabel")}
-                          aria-describedby="repeat-label-help repeat-label-preview repeat-label-error"
-                          className={fieldCls}
-                        />
-                        <p id="repeat-label-help" className="mt-1.5 text-xs text-muted">
-                          Write it as it would appear mid-sentence, e.g. <em>patient</em>. Use lower case unless
-                          it&apos;s a name or acronym.
-                        </p>
+                          label="Name for one entry"
+                          optional={false}
+                          hint={
+                            <>
+                              Write it as it would appear mid-sentence, e.g. <em>patient</em>. Use lower case unless
+                              it&apos;s a name or acronym.
+                            </>
+                          }
+                          error={repeatProblem("repeatLabel")}
+                          errorRole="alert"
+                          describedBy={repeatPreviewText(selected.repeatLabel) ? "repeat-label-preview" : undefined}
+                        >
+                          {(field) => (
+                            <Input
+                              {...field}
+                              value={selected.repeatLabel ?? ""}
+                              onChange={(e) => updateBlock(selected.id, { repeatLabel: e.target.value })}
+                            />
+                          )}
+                        </Field>
                         {repeatPreviewText(selected.repeatLabel) && (
                           <p
                             id="repeat-label-preview"
-                            className="mt-1.5 rounded-md bg-surface-3 px-2 py-1 text-xs text-ink-2"
+                            className="mt-1.5 rounded-md bg-paper-sunk px-2 py-1 text-[0.75rem] text-ink"
                           >
                             {repeatPreviewText(selected.repeatLabel)}
-                          </p>
-                        )}
-                        {repeatProblem("repeatLabel") && (
-                          <p id="repeat-label-error" role="alert" className="mt-1.5 text-xs text-red">
-                            {repeatProblem("repeatLabel")}
                           </p>
                         )}
                       </div>
@@ -3009,32 +3157,28 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                           ["maxOccurs", "Maximum entries", "No limit", "Leave blank for no limit."],
                         ] as const
                       ).map(([field, label, placeholder, help]) => (
-                        <div key={field}>
-                          <label htmlFor={`repeat-${field}`} className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">
-                            {label}
-                          </label>
-                          <input
-                            id={`repeat-${field}`}
-                            type="number"
-                            inputMode="numeric"
-                            min={field === "minOccurs" ? 0 : 1}
-                            step={1}
-                            value={selected[field] ?? ""}
-                            placeholder={placeholder}
-                            onChange={(e) => updateBlock(selected.id, { [field]: parseCount(e.target.value) })}
-                            aria-invalid={!!repeatProblem(field)}
-                            aria-describedby={`repeat-${field}-help repeat-${field}-error`}
-                            className={fieldCls}
-                          />
-                          <p id={`repeat-${field}-help`} className="mt-1.5 text-xs text-muted">
-                            {help}
-                          </p>
-                          {repeatProblem(field) && (
-                            <p id={`repeat-${field}-error`} role="alert" className="mt-1.5 text-xs text-red">
-                              {repeatProblem(field)}
-                            </p>
+                        <Field
+                          key={field}
+                          id={`repeat-${field}`}
+                          label={label}
+                          optional={false}
+                          hint={help}
+                          error={repeatProblem(field)}
+                          errorRole="alert"
+                        >
+                          {(props) => (
+                            <Input
+                              {...props}
+                              type="number"
+                              inputMode="numeric"
+                              min={field === "minOccurs" ? 0 : 1}
+                              step={1}
+                              value={selected[field] ?? ""}
+                              placeholder={placeholder}
+                              onChange={(e) => updateBlock(selected.id, { [field]: parseCount(e.target.value) })}
+                            />
                           )}
-                        </div>
+                        </Field>
                       ))}
                     </div>
                   )}
@@ -3057,108 +3201,104 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                 is left alone. Cleared help text is removed, never stored as "".
               */}
               {isAnswerable(selected) && (
-                <>
-                  <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Help text</label>
-                  <input
-                    value={selected.description ?? ""}
-                    onChange={(e) => updateBlock(selected.id, { description: e.target.value || undefined })}
-                    placeholder="Optional"
-                    className={`${fieldCls} mb-4`}
-                  />
-                </>
+                // Its own span, so the label's text is "Help text" whatever the optional marker says.
+                <Field id="block-help" label={<span>Help text</span>} optional className="mb-4">
+                  {(field) => (
+                    <Input
+                      {...field}
+                      value={selected.description ?? ""}
+                      onChange={(e) => updateBlock(selected.id, { description: e.target.value || undefined })}
+                    />
+                  )}
+                </Field>
               )}
 
               {["text", "title", "label"].includes(selected.type) && (
-                <div className="mb-4">
-                  <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Content</label>
-                  <textarea
-                    value={selected.content ?? ""}
-                    onChange={(e) => updateBlock(selected.id, { content: e.target.value })}
-                    rows={selected.type === "text" ? 3 : 1}
-                    className={`${fieldCls} resize-none`}
-                  />
-                  {selectedDisplayProblem && (
-                    <p role="alert" className="mt-1.5 text-xs text-red">
-                      {selectedDisplayProblem}
-                    </p>
+                <Field
+                  id="block-content"
+                  label="Content"
+                  optional={false}
+                  error={selectedDisplayProblem}
+                  errorRole="alert"
+                  className="mb-4"
+                >
+                  {(field) => (
+                    <Textarea
+                      {...field}
+                      value={selected.content ?? ""}
+                      onChange={(e) => updateBlock(selected.id, { content: e.target.value })}
+                      rows={selected.type === "text" ? 3 : 1}
+                      className="resize-none"
+                    />
                   )}
-                </div>
+                </Field>
               )}
 
               {["image", "video", "audio"].includes(selected.type) && (
-                <div className="mb-4">
-                  <label htmlFor="block-url" className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">
-                    URL
-                  </label>
-                  <input
-                    id="block-url"
-                    value={selected.content ?? ""}
-                    onChange={(e) => updateBlock(selected.id, { content: e.target.value })}
-                    placeholder={
-                      selected.type === "image"
-                        ? "https://… or a path on your app's server, e.g. /images/logo.png"
-                        : selected.type === "video"
-                          ? "YouTube or Vimeo link, or an .mp4 / .webm address"
-                          : "An .mp3, .m4a, .ogg or .wav address"
-                    }
-                    aria-invalid={!!selectedDisplayProblem}
-                    className={`${fieldCls} font-mono text-xs`}
-                  />
-                  {/* Audio-only content needs a text alternative (contract §11, WCAG 1.2.1). */}
-                  {selected.type === "audio" && (
-                    <p className="mt-1.5 text-xs text-muted">
-                      Add a transcript in a Text block next to it so everyone can follow.
-                    </p>
+                <Field
+                  id="block-url"
+                  label="URL"
+                  optional={false}
+                  // Audio-only content needs a text alternative (contract §11, WCAG 1.2.1).
+                  hint={selected.type === "audio" ? "Add a transcript in a Text block next to it so everyone can follow." : undefined}
+                  error={selectedDisplayProblem}
+                  errorRole="alert"
+                  className="mb-4"
+                >
+                  {(field) => (
+                    <Input
+                      {...field}
+                      mono
+                      value={selected.content ?? ""}
+                      onChange={(e) => updateBlock(selected.id, { content: e.target.value })}
+                      placeholder={
+                        selected.type === "image"
+                          ? "https://… or a path on your app's server, e.g. /images/logo.png"
+                          : selected.type === "video"
+                            ? "YouTube or Vimeo link, or an .mp4 / .webm address"
+                            : "An .mp3, .m4a, .ogg or .wav address"
+                      }
+                      className="text-[0.8125rem]"
+                    />
                   )}
-                  {selectedDisplayProblem && (
-                    <p role="alert" className="mt-1.5 text-xs text-red">
-                      {selectedDisplayProblem}
-                    </p>
-                  )}
-                </div>
+                </Field>
               )}
 
               {selected.type === "heading" && (
                 <div className="mb-4">
-                  <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Level</label>
-                  <div className="flex gap-1.5">
-                    {[1, 2, 3].map((l) => (
-                      <button
-                        key={l}
-                        onClick={() => updateBlock(selected.id, { level: l })}
-                        className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium ${
-                          (selected.level || 2) === l
-                            ? "border-accent bg-accent-weak text-accent-2"
-                            : "border-line-2 text-muted"
-                        }`}
-                      >
-                        H{l}
-                      </button>
-                    ))}
-                  </div>
+                  <span id="heading-level-label" className="mb-1.5 block text-[0.8125rem] font-medium text-ink">
+                    Level
+                  </span>
+                  <HeadingLevel
+                    labelledBy="heading-level-label"
+                    value={selected.level || 2}
+                    onChange={(level) => updateBlock(selected.id, { level })}
+                  />
                 </div>
               )}
 
               {selected.type === "scale" && (
                 <div className="mb-4 grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Min</label>
-                    <input
-                      type="number"
-                      value={selected.min ?? 1}
-                      onChange={(e) => updateBlock(selected.id, { min: Number(e.target.value) })}
-                      className={fieldCls}
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Max</label>
-                    <input
-                      type="number"
-                      value={selected.max ?? 5}
-                      onChange={(e) => updateBlock(selected.id, { max: Number(e.target.value) })}
-                      className={fieldCls}
-                    />
-                  </div>
+                  <Field id="scale-min" label="Min" optional={false}>
+                    {(field) => (
+                      <Input
+                        {...field}
+                        type="number"
+                        value={selected.min ?? 1}
+                        onChange={(e) => updateBlock(selected.id, { min: Number(e.target.value) })}
+                      />
+                    )}
+                  </Field>
+                  <Field id="scale-max" label="Max" optional={false}>
+                    {(field) => (
+                      <Input
+                        {...field}
+                        type="number"
+                        value={selected.max ?? 5}
+                        onChange={(e) => updateBlock(selected.id, { max: Number(e.target.value) })}
+                      />
+                    )}
+                  </Field>
                 </div>
               )}
 
@@ -3253,7 +3393,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                 const required = !!selected.required || complete;
                 return (
                   <>
-                    <div className="flex items-center justify-between border-t border-line py-3 text-[13.5px]">
+                    <div className="flex items-center justify-between border-t border-rule py-3 text-[0.8125rem] font-medium">
                       <span id="required-label">Required</span>
                       <Switch
                         checked={required}
@@ -3264,8 +3404,8 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                       />
                     </div>
                     {completeLabel && (
-                      <div className="border-t border-line py-3 text-[13.5px]">
-                        <div className="flex items-center justify-between">
+                      <div className="border-t border-rule py-3 text-[0.8125rem]">
+                        <div className="flex items-center justify-between font-medium">
                           <span id="complete-label">{completeLabel}</span>
                           <Switch
                             checked={complete}
@@ -3274,7 +3414,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                             onChange={(on) => updateBlock(selected.id, { completeRequired: on || undefined })}
                           />
                         </div>
-                        <p id="complete-help" className="mt-1 text-xs text-muted">
+                        <p id="complete-help" className="mt-1 text-[0.75rem] text-graphite">
                           {selected.type === "matrix"
                             ? "Respondents must answer every row. This also makes the question required."
                             : "Respondents must rank every option. This also makes the question required."}
@@ -3303,95 +3443,87 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
               )}
               {isPage(selected) &&
                 (pages.length === 1 ? (
-                  <button
-                    onClick={removePages}
-                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line-2 px-3 py-1.5 text-sm font-medium text-ink-2 hover:bg-surface-3"
-                  >
+                  <Button onClick={removePages} size="sm" className="mt-3 w-full">
                     Remove pages
-                  </button>
+                  </Button>
                 ) : (
-                  <button
-                    onClick={() => setDeletingPageId(selected.id)}
-                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line-2 px-3 py-1.5 text-sm font-medium text-red hover:bg-fail-wash"
-                  >
-                    <Trash2 className="h-4 w-4" /> Delete page…
-                  </button>
+                  <Button onClick={() => setDeletingPageId(selected.id)} variant="danger" size="sm" className="mt-3 w-full">
+                    <Trash2 aria-hidden="true" className="h-3.5 w-3.5" /> Delete page…
+                  </Button>
                 ))}
               {isGroup(selected) && !(groupTemplate && selected.id === schema.blocks[0]?.id) && (
-                <button
-                  onClick={() => setDeletingGroupId(selected.id)}
-                  className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line-2 px-3 py-1.5 text-sm font-medium text-red hover:bg-fail-wash"
-                >
-                  <Trash2 className="h-4 w-4" /> Delete group…
-                </button>
+                <Button onClick={() => setDeletingGroupId(selected.id)} variant="danger" size="sm" className="mt-3 w-full">
+                  <Trash2 aria-hidden="true" className="h-3.5 w-3.5" /> Delete group…
+                </Button>
               )}
             </div>
           ) : groupTemplate ? (
             <div>
-              <h4 id={SETTINGS_PANE_HEADING_ID} className="mb-3 text-[11px] font-bold uppercase tracking-wider text-faint">
+              <h4 id={SETTINGS_PANE_HEADING_ID} className="eyebrow mb-3 text-graphite-soft">
                 Group template
               </h4>
-              <p className="text-sm text-muted">
+              <p className="body-sm text-graphite">
                 A group template has no form settings: forms it&apos;s inserted into keep their own. Select a block to edit it.
               </p>
             </div>
           ) : (
             <div>
-              <h4 id={SETTINGS_PANE_HEADING_ID} className="mb-3 text-[11px] font-bold uppercase tracking-wider text-faint">
+              <h4 id={SETTINGS_PANE_HEADING_ID} className="eyebrow mb-3 text-graphite-soft">
                 Form settings
               </h4>
               {paged && (
                 <>
-                  <h4 className="mb-2 text-[12.5px] font-semibold text-ink-2">Navigation</h4>
+                  <h4 className="mb-2 text-[0.8125rem] font-medium text-ink">Navigation</h4>
                   <label className="flex items-start gap-2.5">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={schema.navigation?.showProgress ?? NAVIGATION_DEFAULTS.showProgress}
                       onChange={(e) => updateNavigation({ showProgress: e.target.checked })}
-                      className="mt-0.5 h-4 w-4 accent-brand-deep"
+                      className="-mt-0.5"
                     />
                     <span>
-                      <span className="block text-[12.5px] font-semibold text-ink-2">Show progress</span>
-                      <span className="block text-xs text-muted">
+                      <span className="block text-[0.8125rem] font-medium text-ink">Show progress</span>
+                      <span className="block text-[0.75rem] text-graphite">
                         Shows &lsquo;Step 2 of 5&rsquo; above each page title
                       </span>
                     </span>
                   </label>
                   {/* Kept (not reset) while progress is off, so it comes back as it was. */}
-                  <fieldset disabled={!showProgress} className="ml-[26px] mt-2.5 disabled:opacity-50">
-                    <legend className="text-[12.5px] font-semibold text-ink-2">Progress style</legend>
+                  <fieldset
+                    disabled={!showProgress}
+                    className={cn("ml-[34px] mt-2.5", !showProgress && "text-graphite-soft")}
+                  >
+                    <legend className="text-[0.8125rem] font-medium">Progress style</legend>
                     {(
                       [
                         ["caption", "Text only (“Step 2 of 5”)"],
                         ["bar", "Bar and text"],
                       ] as const
                     ).map(([value, label]) => (
-                      <label key={value} className="mt-1.5 flex items-center gap-2 text-[12.5px] text-ink-2">
+                      <label key={value} className="mt-1.5 flex items-center gap-2 text-[0.8125rem]">
                         <input
                           type="radio"
                           name="progress-style"
                           value={value}
                           checked={progressStyle === value}
                           onChange={() => updateNavigation({ progressStyle: value })}
-                          className="h-3.5 w-3.5 accent-brand-deep"
+                          className="h-4 w-4 accent-brand-deep"
                         />
                         {label}
                       </label>
                     ))}
-                    <span className="mt-1 block text-xs text-muted">
+                    <span className="mt-1 block text-[0.75rem] text-graphite">
                       The client&apos;s app can override this with its own setting.
                     </span>
                   </fieldset>
                   <label className="mt-3 flex items-start gap-2.5">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={schema.navigation?.reviewPage ?? NAVIGATION_DEFAULTS.reviewPage}
                       onChange={(e) => updateNavigation({ reviewPage: e.target.checked })}
-                      className="mt-0.5 h-4 w-4 accent-brand-deep"
+                      className="-mt-0.5"
                     />
                     <span>
-                      <span className="block text-[12.5px] font-semibold text-ink-2">Review page before submit</span>
-                      <span className="block text-xs text-muted">
+                      <span className="block text-[0.8125rem] font-medium text-ink">Review page before submit</span>
+                      <span className="block text-[0.75rem] text-graphite">
                         Respondents check their answers before submitting
                       </span>
                     </span>
@@ -3401,7 +3533,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
 
               {/* Where unfinished answers are kept: docs/DRAFTS-CONTRACT.md §2. */}
               <fieldset className={paged ? "mt-5" : undefined}>
-                <legend className="mb-2 text-[12.5px] font-semibold text-ink-2">Save progress</legend>
+                <legend className="mb-2 text-[0.8125rem] font-medium text-ink">Save progress</legend>
                 {(
                   [
                     ["session", "Only while the form is open", "Answers survive a page refresh, but not closing the tab."],
@@ -3419,10 +3551,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                 ).map(([mode, label, help]) => {
                   const available = draftModeAvailable(mode, schema.blocks);
                   return (
-                    <label
-                      key={mode}
-                      className={`mt-2 flex items-start gap-2.5 ${available ? "" : "opacity-50"}`}
-                    >
+                    <label key={mode} className="mt-2 flex items-start gap-2.5">
                       <input
                         type="radio"
                         name="draft-mode"
@@ -3430,29 +3559,29 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                         checked={(schema.drafts?.mode ?? DEFAULT_DRAFT_MODE) === mode}
                         disabled={!available}
                         onChange={() => updateDrafts(mode)}
-                        className="mt-0.5 h-4 w-4 accent-brand-deep"
+                        className="mt-0.5 h-4 w-4 flex-none accent-brand-deep disabled:cursor-not-allowed"
                       />
                       <span>
-                        <span className="block text-[12.5px] font-semibold text-ink-2">{label}</span>
-                        <span className="block text-xs text-muted">{help}</span>
+                        <span className={cn("block text-[0.8125rem] font-medium", available ? "text-ink" : "text-graphite-soft")}>{label}</span>
+                        <span className={cn("block text-[0.75rem]", available ? "text-graphite" : "text-graphite-soft")}>{help}</span>
                         {!available && (
-                          <span className="mt-0.5 block text-xs font-medium text-ink-2">
-                            Available for forms with pages
-                          </span>
+                          <span className="mt-0.5 block text-[0.75rem] font-medium text-ink">Available for forms with pages</span>
                         )}
                       </span>
                     </label>
                   );
                 })}
-                <p className="mt-2.5 text-xs text-muted">
+                <p className="mt-2.5 text-[0.75rem] text-graphite">
                   If the app hasn&apos;t been set up for the option chosen, the form falls back to &lsquo;Only while
                   the form is open&rsquo;.
                 </p>
               </fieldset>
 
-              <p className="mt-6 border-t border-line pt-4 text-center text-sm text-muted">
-                Select a question to edit it, or add one from the canvas.
-              </p>
+              <EmptyState
+                className="mt-6 px-4 py-8"
+                title="Nothing selected"
+                body="Select a question to edit it, or add one from the canvas."
+              />
             </div>
           )}
         </aside>

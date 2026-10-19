@@ -82,6 +82,8 @@ const yes = (question, id) => ({ ...(id ? { id } : {}), question, operator: "=",
     const select = (id) => card(id).click({ position: { x: 60, y: 12 } });
     const aside = page.locator("aside");
     const saveBtn = page.getByRole("button", { name: "Save", exact: true });
+    // Blocked with a reason (aria-disabled), not disabled: it stays focusable.
+    const saveBlocked = async () => (await saveBtn.getAttribute("aria-disabled")) === "true";
     const logic = page.getByRole("textbox", { name: "Logic", exact: true });
     const error = page.locator(`#logic-text-${IDS.diet}-error`);
     const errorText = async () => (await error.innerText()).trim();
@@ -135,7 +137,7 @@ const yes = (question, id) => ({ ...(id ? { id } : {}), question, operator: "=",
     check("the All/Any choice is gone", (await aside.getByRole("button", { name: /^(All|Any)$/ }).count()) === 0 && (await aside.getByText("of these are true").count()) === 0);
     check("conditions are numbered, each card's only button is Remove (no move controls)",
       JSON.stringify(await numbered()) === '["Condition 1","Condition 2"]'
-      && JSON.stringify(await aside.locator("div.rounded-lg.border.bg-surface-2").evaluateAll((cards) => cards.flatMap((c) => [...c.querySelectorAll("button")].map((b) => b.getAttribute("aria-label")))))
+      && JSON.stringify(await aside.locator("[data-condition]").evaluateAll((cards) => cards.flatMap((c) => [...c.querySelectorAll("button")].map((b) => b.getAttribute("aria-label")))))
         === '["Remove condition 1","Remove condition 2"]');
 
     // ---------- accessibility ----------
@@ -151,7 +153,7 @@ const yes = (question, id) => ({ ...(id ? { id } : {}), question, operator: "=",
     check("adding a third condition leaves the text and says it isn't used",
       (await logic.inputValue()) === "1 AND 2" && (await errorText()) === "Condition 3 isn't used.", await errorText());
     check("an error sets aria-invalid, shows an icon and a red border, not colour alone",
-      (await logic.getAttribute("aria-invalid")) === "true" && (await error.locator("svg").count()) === 1 && (await logic.getAttribute("class")).includes("border-red"));
+      (await logic.getAttribute("aria-invalid")) === "true" && (await error.locator("svg").count()) === 1 && (await logic.getAttribute("class")).includes("border-fail"));
     await named(3, "question").selectOption(IDS.smoker);
     await named(3, "operator").selectOption("=");
     await named(3, "answer").selectOption("Yes");
@@ -238,7 +240,7 @@ const yes = (question, id) => ({ ...(id ? { id } : {}), question, operator: "=",
       (await named(1, "question").inputValue()) === IDS.attend && (await named(1, "operator").inputValue()) === "="
       && (await named(1, "answer").locator("option:checked").textContent()) === "Yes"
       && (await named(2, "question").inputValue()) === IDS.smoker && (await named(3, "question").inputValue()) === IDS.consent);
-    check("after reload: Save is disabled (nothing changed)", await saveBtn.isDisabled());
+    check("after reload: Save is disabled (nothing changed)", await saveBlocked());
 
     // ---------- download: the §15.4 shapes ----------
     const ids = (await stored(formId)).blocks.find((b) => b.id === IDS.diet).enableWhen.map((c) => c.id);
@@ -392,7 +394,7 @@ const yes = (question, id) => ({ ...(id ? { id } : {}), question, operator: "=",
     await page.getByText("All changes saved").waitFor();
     await select("d");
     check("created through the API (2 conditions, no ids or text, enableBehavior any): Logic shows 1 OR 2, Save disabled",
-      (await logic.inputValue()) === "1 OR 2" && await saveBtn.isDisabled(), await logic.inputValue());
+      (await logic.inputValue()) === "1 OR 2" && await saveBlocked(), await logic.inputValue());
 
     // A version stored before this change, never saved through the new API: no ids, no text.
     const legacyFormId = await create("Stored before logic text");
@@ -401,7 +403,7 @@ const yes = (question, id) => ({ ...(id ? { id } : {}), question, operator: "=",
     await page.goto(`${WEB}/app/forms/${legacyFormId}/edit`);
     await page.getByText("All changes saved").waitFor();
     await select("d");
-    check("stored without ids or text: opens with Logic 1 OR 2 and Save disabled", (await logic.inputValue()) === "1 OR 2" && await saveBtn.isDisabled(), await logic.inputValue());
+    check("stored without ids or text: opens with Logic 1 OR 2 and Save disabled", (await logic.inputValue()) === "1 OR 2" && await saveBlocked(), await logic.inputValue());
     const legacyArt = (await download()).art.blocks.find((b) => b.id === "d");
     check("…and downloads with ids c1, c2 and enableBehavior any",
       JSON.stringify(legacyArt.enableWhen.map((c) => c.id)) === '["c1","c2"]' && legacyArt.enableBehavior === "any", JSON.stringify(legacyArt));

@@ -8,6 +8,7 @@
 export { controlClasses } from "./control";
 export { Button, buttonClasses, type ButtonSize, type ButtonVariant } from "./button";
 export { Field, Input } from "./field";
+export { segmentClasses, segmentTrackClasses, type SegmentSize } from "./segment";
 export { Select } from "./select";
 export { Textarea } from "./textarea";
 export { Checkbox } from "./checkbox";

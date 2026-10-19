@@ -71,7 +71,7 @@ const SINGLE = {
     const page_ = await ctx.newPage();
     const P = page_;
     P.on("pageerror", (e) => check("no page errors", false, e.message));
-    // Accept native confirms: Cancel's "Discard unsaved changes?" and the leave-page warning.
+    // Accept the browser's leave-page warning; Cancel asks in the editor's own dialog.
     P.on("dialog", (d) => d.accept());
 
     const card = (id) => P.locator(`[data-block-id="${id}"]`);
@@ -160,7 +160,8 @@ const SINGLE = {
     await P.getByRole("button", { name: "Move", exact: true }).click();
     const s1 = await structure();
     check('"Move to…" moves a question into a group on another page', s1.includes("[Medication] |   Medication name |   Dosage |     Dose (mg) |     Schedule |       How often? |       Taken with food? |     Anything else? | [Lifestyle]"), s1);
-    await P.getByRole("button", { name: "Cancel", exact: true }).click();
+    await P.locator("header").getByRole("button", { name: "Cancel", exact: true }).click();
+    await P.getByRole("alertdialog", { name: "Discard unsaved changes?" }).getByRole("button", { name: "Discard changes" }).click();
 
     // ---------- 4. keyboard moves between pages; refused page moves ----------
     await open(threeId);

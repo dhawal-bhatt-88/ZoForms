@@ -18,7 +18,8 @@ import { cn } from "@formbuilder/ui";
  *   - `forwardRef`, for React 18.
  */
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+/** `danger-ghost` is a destructive action among quiet ones (a card's delete): no fill until hovered. */
+export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "danger-ghost";
 /** `sm` for controls in a table row or beside a field; `icon` is square, for a glyph alone. */
 export type ButtonSize = "sm" | "md" | "icon";
 
@@ -54,7 +55,11 @@ export function buttonClasses({
     !blocked && variant === "ghost" && "text-brand-deep hover:bg-accent-wash",
     // Never a filled red: red only ever means critical, and the word carries it.
     !blocked && variant === "danger" && "border-fail/30 bg-fail-wash text-fail hover:bg-fail-wash/70",
+    !blocked && variant === "danger-ghost" && "text-graphite hover:bg-fail-wash hover:text-fail",
     blocked && "cursor-not-allowed border-rule bg-paper-sunk text-graphite-soft",
+    // A native `disabled` is for an icon among others (a card's Move up at the
+    // top), where a written reason has no room: drawn faint, not hidden.
+    "disabled:cursor-not-allowed disabled:text-rule-strong disabled:hover:bg-transparent",
     className,
   );
 }
@@ -68,6 +73,11 @@ type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
    * `aria-describedby`, so a keyboard or screen-reader user finds out why.
    */
   reason?: string;
+  /**
+   * Blocked, with the reason shown elsewhere under this id: for two buttons
+   * blocked for one reason (the editor's Cancel and Save), which say it once.
+   */
+  reasonId?: string;
   /** The action is running: a spinner, and no second click. */
   pending?: boolean;
   /** The label while pending; defaults to the button's own. */
@@ -75,11 +85,11 @@ type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 export const Button = forwardRef<HTMLButtonElement, Props>(function Button(
-  { variant = "secondary", size = "md", reason, pending = false, pendingLabel, className, children, type = "button", onClick, ...props },
+  { variant = "secondary", size = "md", reason, reasonId: sharedReasonId, pending = false, pendingLabel, className, children, type = "button", onClick, ...props },
   ref,
 ) {
   const reasonId = `${useId()}-reason`;
-  const blocked = Boolean(reason);
+  const blocked = Boolean(reason || sharedReasonId);
   const inert = blocked || pending;
 
   const button = (
@@ -89,7 +99,7 @@ export const Button = forwardRef<HTMLButtonElement, Props>(function Button(
       type={type}
       aria-disabled={inert || undefined}
       aria-busy={pending || undefined}
-      aria-describedby={blocked ? reasonId : props["aria-describedby"]}
+      aria-describedby={reason ? reasonId : (sharedReasonId ?? props["aria-describedby"])}
       onClick={inert ? (event) => event.preventDefault() : onClick}
       className={buttonClasses({ variant, size, blocked, className: cn(pending && "cursor-progress", className) })}
     >
@@ -98,7 +108,7 @@ export const Button = forwardRef<HTMLButtonElement, Props>(function Button(
     </button>
   );
 
-  if (!blocked) return button;
+  if (!reason) return button;
 
   return (
     <span className="inline-flex flex-col items-start gap-1">

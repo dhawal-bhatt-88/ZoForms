@@ -88,7 +88,7 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     // The inspector's heading (textContent: the CSS upper-cases it), and how often a phrase appears in it.
     const inspectorHeading = () => P.locator("aside h4").first().textContent();
     const timesShown = async (phrase) => (await P.locator("aside").innerText()).toLowerCase().split(phrase.toLowerCase()).length - 1;
-    const redMessages = () => P.locator("aside .text-red").count();
+    const redMessages = () => P.locator("aside [data-field-error]").count();
     const logicSays = (noun) => P.locator("aside").getByText(`Show this ${noun} only when…`, { exact: true }).isVisible();
     const requiredToggle = () => P.locator("aside").getByRole("switch");
     const cardOf = (label) => cards.filter({ has: P.locator("span.truncate", { hasText: new RegExp(`^${label.replace(/[?()]/g, "\\$&")}$`) }) }).first();
@@ -139,7 +139,7 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     await P.getByRole("button", { name: "Dismiss" }).click();
 
     await urlInput.fill(`  ${YOUTUBE}  `);
-    check("video: a recognised YouTube link clears the message", (await inline().count()) === 0 && (await urlInput.getAttribute("aria-invalid")) === "false");
+    check("video: a recognised YouTube link clears the message", (await inline().count()) === 0 && (await urlInput.getAttribute("aria-invalid")) !== "true");
     check("video canvas: YouTube shows its ID and start time", (await preview("Welcome from the team").innerText()) === "YouTube video · dQw4w9WgXcQ · from 1:30",
       await preview("Welcome from the team").innerText());
 

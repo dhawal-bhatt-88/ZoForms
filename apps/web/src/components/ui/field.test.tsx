@@ -49,6 +49,59 @@ describe("Field's bindings", () => {
     expect(screen.getByRole("textbox", { name: "Email" })).toHaveProperty("required", true);
   });
 
+  it("takes the caller's id, and builds the hint's and error's from it", () => {
+    render(
+      <Field id="block-name" label="Name" hint="Used in formulas" error="Taken" optional={false}>
+        {(field) => <Input {...field} />}
+      </Field>,
+    );
+    const input = screen.getByRole("textbox", { name: "Name" });
+    expect(input.id).toBe("block-name");
+    expect(input.getAttribute("aria-describedby")).toBe("block-name-hint block-name-error");
+  });
+
+  it("`optional` marks a field that isn't required, and `optional={false}` doesn't", () => {
+    render(
+      <>
+        <Field label="Help text" optional>{(field) => <Input {...field} />}</Field>
+        <Field label="Label" optional={false}>{(field) => <Input {...field} />}</Field>
+      </>,
+    );
+    expect(screen.getByRole("textbox", { name: "Help text optional" })).toHaveProperty("required", false);
+    expect(screen.getByRole("textbox", { name: "Label" })).toHaveProperty("required", false);
+  });
+
+  it("a live error's region is there, and described by, before there is a message", () => {
+    const { rerender } = render(
+      <Field id="logic" label="Logic" optional={false} liveError>
+        {(field) => <Input {...field} />}
+      </Field>,
+    );
+    const region = document.getElementById("logic-error")!;
+    expect(region.getAttribute("aria-live")).toBe("polite");
+    expect(screen.getByRole("textbox").getAttribute("aria-describedby")).toBe("logic-error");
+    rerender(
+      <Field id="logic" label="Logic" optional={false} liveError error="Close the bracket.">
+        {(field) => <Input {...field} />}
+      </Field>,
+    );
+    expect(document.getElementById("logic-error")).toBe(region);
+    expect(region.textContent).toBe("Close the bracket.");
+  });
+
+  it("adds the caller's own descriptions after its own", () => {
+    render(
+      <>
+        <Field label="Name" hint="Lower case" describedBy="status" optional={false}>
+          {(field) => <Input {...field} />}
+        </Field>
+        <p id="status">2 formulas updated.</p>
+      </>,
+    );
+    const ids = screen.getByRole("textbox", { name: "Name" }).getAttribute("aria-describedby")!.split(" ");
+    expect(ids.map((id) => document.getElementById(id)?.textContent)).toEqual(["Lower case", "2 formulas updated."]);
+  });
+
   it("gives each field its own ids", () => {
     render(
       <>

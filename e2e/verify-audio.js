@@ -93,7 +93,7 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     // The inspector's heading (textContent: the CSS upper-cases it), and how often a phrase appears in it.
     const inspectorHeading = () => P.locator("aside h4").first().textContent();
     const timesShown = async (phrase) => (await P.locator("aside").innerText()).toLowerCase().split(phrase.toLowerCase()).length - 1;
-    const redMessages = () => P.locator("aside .text-red").count();
+    const redMessages = () => P.locator("aside [data-field-error]").count();
     const logicSays = (noun) => P.locator("aside").getByText(`Show this ${noun} only when…`, { exact: true }).isVisible();
     const cardOf = (label) => cards.filter({ has: P.locator("span.truncate", { hasText: new RegExp(`^${label.replace(/[?()]/g, "\\$&")}$`) }) }).first();
     // The preview is the last truncated span on the card; the first is the card's own label.
@@ -145,7 +145,7 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     await P.getByRole("button", { name: "Dismiss" }).click();
 
     await urlInput.fill(`  ${RELATIVE}  `);
-    check("audio: a recognised file clears the message", (await inline().count()) === 0 && (await urlInput.getAttribute("aria-invalid")) === "false");
+    check("audio: a recognised file clears the message", (await inline().count()) === 0 && (await urlInput.getAttribute("aria-invalid")) !== "true");
     check("audio canvas: a file on the app's server shows its trimmed path", (await preview("Welcome message").innerText()) === `Audio file · ${RELATIVE}`,
       await preview("Welcome message").innerText());
 

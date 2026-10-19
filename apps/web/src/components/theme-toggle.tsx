@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Moon, Sun } from "lucide-react";
 import { applyTheme, readStoredTheme, resolveTheme, writeTheme, type Theme } from "@/lib/theme";
+import { segmentClasses, segmentTrackClasses } from "@/components/ui";
 
 /**
  * Light or dark.
@@ -13,6 +14,10 @@ import { applyTheme, readStoredTheme, resolveTheme, writeTheme, type Theme } fro
  * With nothing stored, the boot script follows `prefers-color-scheme`. The
  * class is applied before first paint by that script (app/layout.tsx); this
  * component only handles changes. See lib/theme.ts for why it's a cookie.
+ *
+ * Adapted: the selected segment is marked with `segmentClasses`' border
+ * (docs/ZOBLOCKS-UPSTREAM-NOTES.md, note 6), and it is a radio group to the
+ * keyboard too: one tab stop, the arrow keys move the choice.
  */
 
 const CHOICES: readonly { value: Theme; label: string; Icon: typeof Sun }[] = [
@@ -30,29 +35,38 @@ export function ThemeToggle() {
     if (resolved === "light" || resolved === "dark") setChoice(resolved);
   }, []);
 
+  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const select = (value: Theme) => {
     setChoice(value);
     writeTheme(value);
     applyTheme(value);
   };
 
+  function onKey(e: React.KeyboardEvent, i: number) {
+    const step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const next = (i + step + CHOICES.length) % CHOICES.length;
+    select(CHOICES[next].value);
+    buttons.current[next]?.focus();
+  }
+
   return (
-    <div
-      role="radiogroup"
-      aria-label="Colour theme"
-      className="inline-flex items-center gap-0.5 rounded-lg border border-rule bg-paper-sunk p-0.5"
-    >
-      {CHOICES.map(({ value, label, Icon }) => (
+    <div role="radiogroup" aria-label="Colour theme" className={segmentTrackClasses()}>
+      {CHOICES.map(({ value, label, Icon }, i) => (
         <button
           key={value}
+          ref={(el) => {
+            buttons.current[i] = el;
+          }}
           type="button"
           role="radio"
           aria-checked={choice === value}
           aria-label={label}
+          tabIndex={choice === value ? 0 : -1}
           onClick={() => select(value)}
-          className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors duration-200 ${
-            choice === value ? "bg-paper text-ink shadow-sm" : "text-graphite-soft hover:text-graphite"
-          }`}
+          onKeyDown={(e) => onKey(e, i)}
+          className={segmentClasses({ selected: choice === value, size: "icon" })}
         >
           <Icon aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={2} />
         </button>

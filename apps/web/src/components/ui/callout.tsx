@@ -1,4 +1,4 @@
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, X } from "lucide-react";
 import { cn } from "@formbuilder/ui";
 
 /*
@@ -12,8 +12,11 @@ import { cn } from "@formbuilder/ui";
  * draw no accent edge (docs/ZOBLOCKS-UPSTREAM-NOTES.md).
  *
  * No `role="alert"`: the toast is the announcement, this is the detail a
- * reader works from. Where nothing else announces it (inside a modal dialog),
- * the caller passes `role="alert"` itself.
+ * reader works from. Where nothing else announces it (inside a modal dialog,
+ * or the editor's notices), the caller passes `role` itself.
+ *
+ * Also adapted: `onDismiss` adds a "Dismiss" button, for a message the reader
+ * may clear once read.
  */
 export function Callout({
   tone = "info",
@@ -22,6 +25,7 @@ export function Callout({
   action,
   className,
   role,
+  onDismiss,
   children,
 }: {
   tone?: "info" | "fail" | "warn" | "pass";
@@ -31,6 +35,7 @@ export function Callout({
   action?: React.ReactNode;
   className?: string;
   role?: "alert" | "status";
+  onDismiss?: () => void;
   children?: React.ReactNode;
 }) {
   return (
@@ -42,9 +47,20 @@ export function Callout({
         tone === "fail" && "border-fail/25 border-l-fail bg-fail-wash",
         tone === "warn" && "border-warn/25 border-l-warn bg-warn-wash",
         tone === "pass" && "border-pass/25 border-l-pass bg-pass-wash",
+        onDismiss && "relative pr-11",
         className,
       )}
     >
+      {onDismiss && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Dismiss"
+          className="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-md text-graphite transition-colors duration-200 hover:bg-paper-sunk hover:text-ink"
+        >
+          <X aria-hidden="true" className="h-4 w-4" strokeWidth={2} />
+        </button>
+      )}
       <p
         className={cn(
           "text-[0.8125rem] font-semibold",

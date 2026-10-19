@@ -75,7 +75,7 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     // The inspector's heading (textContent: the CSS upper-cases it), and how often a phrase appears in it.
     const inspectorHeading = () => P.locator("aside h4").first().textContent();
     const timesShown = async (phrase) => (await P.locator("aside").innerText()).toLowerCase().split(phrase.toLowerCase()).length - 1;
-    const redMessages = () => P.locator("aside .text-red").count();
+    const redMessages = () => P.locator("aside [data-field-error]").count();
     const logicSays = (noun) => P.locator("aside").getByText(`Show this ${noun} only when…`, { exact: true }).isVisible();
     const cardOf = (label) => cards.filter({ has: P.locator("span.truncate", { hasText: new RegExp(`^${label.replace(/[?()]/g, "\\$&")}$`) }) }).first();
     const select = (label) => cardOf(label).locator("span.truncate").click();
@@ -156,7 +156,8 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     await add("Short answer"); await rename("Full name");
     check("a question is still headed Question, and its Logic says 'this question'", (await inspectorHeading()) === "Question" && await logicSays("question"));
     check("help text shown on a question", await helpField().isVisible());
-    const help = P.locator("aside input[placeholder='Optional']");
+    // Marked optional in its label, not by a placeholder.
+    const help = P.locator("#block-help");
     await help.fill("As on your ID");
     await help.fill("");
     await add("Heading 2");
@@ -167,7 +168,7 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     check("heading preview: its text, at its level, not an input",
       (await heading.locator("div.font-bold.text-lg", { hasText: "Before you arrive" }).count()) === 1 && !(await heading.innerText()).includes("Short answer"),
       await heading.innerText());
-    await P.locator("aside").getByRole("button", { name: "H1", exact: true }).click();
+    await P.locator("aside").getByRole("radio", { name: "H1", exact: true }).click();
     check("heading preview: level 1 is larger", (await heading.locator("div.font-bold.text-2xl", { hasText: "Before you arrive" }).count()) === 1);
     await add("Title");
     const titleCard = () => cards.last();

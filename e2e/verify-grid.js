@@ -60,20 +60,16 @@ const NOTE = "Changing a code after the form is in use will not match answers al
     });
     const P = await ctx.newPage();
     P.on("pageerror", (e) => check("no page errors", false, e.message));
-    // Only the type-change confirmation may open a dialog, and only when a step expects it.
-    let confirmAnswer = null;
-    const confirms = [];
+    // No native dialog but the browser's own "leave with unsaved changes?" warning:
+    // the editor asks in its own dialogs, and an alert would mean a label ran as HTML.
     P.on("dialog", async (d) => {
-      // The editor's own "leave with unsaved changes?" guard is not a label running as HTML.
       if (d.type() === "beforeunload") { await d.accept(); return; }
-      if (confirmAnswer === null) {
-        check("no unexpected dialogs (an alert would mean a label ran as HTML)", false, `${d.type()}: ${d.message()}`);
-        await d.dismiss();
-        return;
-      }
-      confirms.push({ type: d.type(), message: d.message() });
-      if (confirmAnswer) await d.accept(); else await d.dismiss();
+      check("no unexpected native dialogs (an alert would mean a label ran as HTML)", false, `${d.type()}: ${d.message()}`);
+      await d.dismiss();
     });
+    // The type-change confirmations the editor showed, in its own dialog: what each said.
+    const confirms = [];
+    const confirmDialog = P.getByRole("alertdialog");
 
     const aside = P.locator("aside");
     const saveBtn = P.getByRole("button", { name: "Save", exact: true });
@@ -126,12 +122,16 @@ const NOTE = "Changing a code after the form is in use will not match answers al
         await aside.getByRole("button", { name: `Remove option ${values.length + 1}, column ${i + 1}` }).click();
       }
     };
+    // `answer`: true confirms, false cancels, null expects no confirmation.
     const changeType = async (i, type, answer = null) => {
-      confirmAnswer = answer;
       await typeOf(i).focus();
       await typeOf(i).selectOption(type);
       await frame();
-      confirmAnswer = null;
+      if (!(await confirmDialog.count())) return;
+      confirms.push({ title: await confirmDialog.getByRole("heading").innerText(), text: await confirmDialog.innerText() });
+      if (answer === null) check("no unexpected confirmation", false, JSON.stringify(confirms.at(-1)));
+      await confirmDialog.getByRole("button", { name: answer ? "Change to short text" : "Cancel", exact: true }).click();
+      await frame();
     };
 
     // ================= insert menu =================
@@ -200,7 +200,7 @@ const NOTE = "Changing a code after the form is in use will not match answers al
     model.push({ code: "sought_help", label: "Sought help?", type: "radio", required: false, options: [["yes", "Yes"], ["no", "No"], ["not_sure", "Not sure"]] });
     await expectColumns("adding radio column 4");
     check("one column of each type, some required", JSON.stringify(model.map((c) => [c.type, c.required])) === '[["text",true],["dropdown",false],["radio",true],["radio",false]]');
-    check("dirty after grid edits: Save enabled", !(await saveBtn.isDisabled()) && (await P.getByText("Unsaved changes").count()) === 1);
+    check("dirty after grid edits: Save enabled", (await saveBtn.getAttribute("aria-disabled")) !== "true" && (await P.getByText("Unsaved changes").count()) === 1);
     await aside.locator("fieldset", { has: P.locator("legend", { hasText: /^Columns$/ }) }).screenshot({ path: `${OUT}/grid-2-inspector-columns.png` });
 
     // Accessible names carry the column's position or label.
@@ -284,7 +284,8 @@ const NOTE = "Changing a code after the form is in use will not match answers al
     await expectColumns("Short text → Dropdown (placeholder options, codes empty)");
 
     await changeType(2, "text", false);
-    check("Radio → Short text asks first, with the exact text", JSON.stringify(confirms) === JSON.stringify([{ type: "confirm", message: 'Change "Used in the last 30 days?" to short text? Its 2 options will be removed.' }]), JSON.stringify(confirms));
+    check("Radio → Short text asks first, with the exact text", confirms.length === 1 && confirms[0].title === 'Change "Used in the last 30 days?" to short text?'
+      && confirms[0].text.includes("Its 2 options will be removed."), JSON.stringify(confirms));
     check("Cancel leaves the type control on Radio", (await typeOf(2).inputValue()) === "radio");
     await expectColumns("cancelling Radio → Short text (nothing changes)");
     check("focus returns to the type control after Cancel", (await focused()) === "grid-col-2-type", await focused());
@@ -416,10 +417,9 @@ const NOTE = "Changing a code after the form is in use will not match answers al
       await refusal.waitFor({ timeout: 10000 }).catch(() => {});
       check(`refused: ${name} — shown inline, and the API's 400 has the same text`, inline === 1 && (await refusal.count()) === 1,
         `inline ${inline}; banner: ${await P.getByRole("alert").filter({ hasText: "Couldn't save" }).allTextContents()}`);
-      confirmAnswer = true;
-      await P.getByRole("button", { name: "Cancel", exact: true }).click();
+      await P.locator("header").getByRole("button", { name: "Cancel", exact: true }).click();
+      await P.getByRole("alertdialog", { name: "Discard unsaved changes?" }).getByRole("button", { name: "Discard changes" }).click();
       await P.getByText("All changes saved").waitFor({ timeout: 10000 });
-      confirmAnswer = null;
     }
     check("no version stored for any refused save", (await prisma.formVersion.count({ where: { formId } })) === versionsBefore);
     await expectColumns("cancelling every refused edit");
@@ -571,7 +571,6 @@ const NOTE = "Changing a code after the form is in use will not match answers al
     }
 
     // ================= labels are plain text =================
-    confirmAnswer = null;
     const xssId = await create("Labels as text");
     const r = await put(xssId, { title: "Labels as text", blocks: [{ id: "g", type: "grid", label: HTML, rows: opts("Row"), columns: [
       { code: "c", label: HTML, type: "radio", options: [{ code: "o", label: HTML }] }] }] });

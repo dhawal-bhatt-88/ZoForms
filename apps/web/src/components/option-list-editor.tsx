@@ -3,6 +3,8 @@
 import { memo, useMemo, useRef } from "react";
 import { Plus, Upload, X } from "lucide-react";
 import type { Option, OptionProblem } from "@formbuilder/form-schema";
+import { cn } from "@formbuilder/ui";
+import { Button, controlClasses } from "@/components/ui";
 
 export type RowHandlers = {
   onLabel: (index: number, label: string) => void;
@@ -100,17 +102,17 @@ export function OptionListEditor({
   return (
     // min-w-0: a fieldset is min-content wide by default, which pushed the inspector sideways.
     <fieldset className="mb-4 min-w-0">
-      <legend className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">
+      <legend className="mb-1.5 block text-[0.8125rem] font-medium text-ink">
         {heading}
         {owner && <span className="sr-only"> for {owner}</span>}
       </legend>
       {listProblem && (
-        <p role="alert" className="mb-1.5 text-xs text-red">
+        <p role="alert" data-field-error className="mb-1.5 text-[0.75rem] text-fail">
           {listProblem.detail}
         </p>
       )}
       {options.length > 0 && (
-        <div className="mb-1 flex gap-1.5 pr-[38px] text-[11px] font-semibold uppercase tracking-wider text-faint" aria-hidden>
+        <div className="eyebrow mb-1 flex gap-1.5 pr-[38px] text-graphite-soft" aria-hidden>
           <span className="w-24 flex-none">Code</span>
           <span className="flex-1">Label</span>
         </div>
@@ -134,29 +136,21 @@ export function OptionListEditor({
             handlers={stable}
           />
         ))}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <button
-            type="button"
-            onClick={onAdd}
-            className="flex items-center gap-1.5 text-sm font-medium text-accent-2 hover:underline"
-          >
-            <Plus className="h-4 w-4" /> Add {noun}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <Button variant="ghost" size="sm" onClick={onAdd} className="-ml-2.5">
+            <Plus aria-hidden="true" className="h-3.5 w-3.5" /> Add {noun}
             {/* Words, not punctuation: browsers may put a space before an out-of-flow span. */}
             {owner && <span className="sr-only"> to {owner}</span>}
-          </button>
-          <button
-            type="button"
-            onClick={() => fileInput.current?.click()}
-            className="flex items-center gap-1.5 text-sm font-medium text-accent-2 hover:underline"
-          >
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => fileInput.current?.click()} className="-ml-2.5">
             {/* The visible text starts the accessible name (WCAG 2.5.3); the list tells a matrix's two apart. */}
-            <Upload className="h-4 w-4" /> Import from file
+            <Upload aria-hidden="true" className="h-3.5 w-3.5" /> Import from file
             <span className="sr-only">
               {" "}
               into {heading.toLowerCase()}
               {owner ? ` for ${owner}` : ""}
             </span>
-          </button>
+          </Button>
           <input
             ref={fileInput}
             type="file"
@@ -173,7 +167,7 @@ export function OptionListEditor({
         </div>
       </div>
       {!sharedNoteId && <CodeChangeNote id={`${idPrefix}-note`} />}
-      <p role="status" aria-live="polite" className="mt-1 text-xs text-ink-2">
+      <p role="status" aria-live="polite" className="mt-1 text-[0.75rem] text-ink">
         {status}
       </p>
     </fieldset>
@@ -183,14 +177,20 @@ export function OptionListEditor({
 /** The standing note under code fields (contract §13.8). */
 export function CodeChangeNote({ id, className = "mt-2" }: { id: string; className?: string }) {
   return (
-    <p id={id} className={`${className} text-xs text-muted`}>
+    <p id={id} className={`${className} text-[0.75rem] text-graphite`}>
       Changing a code after the form is in use will not match answers already stored under the old code.
     </p>
   );
 }
 
-const field =
-  "min-w-0 rounded-lg border border-line-2 px-2.5 py-1.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent-weak aria-[invalid=true]:border-red";
+/**
+ * A row's field: the kit's control at table size. `leading-5` on every field
+ * keeps code, label and score one height, though the code and score text is
+ * smaller than the label's. It goes last: a font size after it would drop it
+ * (tailwind-merge reads a size as setting the line height too).
+ */
+const field = (invalid: boolean, className: string) =>
+  controlClasses({ size: "sm", invalid, className: cn("min-w-0", className, "leading-5") });
 
 /**
  * One option: code, label, remove. Re-renders only when its own values or
@@ -265,8 +265,8 @@ export const OptionRow = memo(function OptionRow({
           }}
           aria-invalid={!!codeError}
           aria-describedby={[codeError ? `${base}-code-error` : "", noteId ?? `${idPrefix}-note`].filter(Boolean).join(" ")}
-          // leading-5: as tall as the label field beside it, though its text is smaller.
-          className={`${field} w-24 flex-none font-mono text-xs leading-5`}
+          // Mono: a code is an identifier, compared down the column.
+          className={field(!!codeError, "w-24 flex-none font-mono text-[0.75rem]")}
         />
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1">
           <input
@@ -284,11 +284,11 @@ export const OptionRow = memo(function OptionRow({
             aria-invalid={!!labelError}
             aria-describedby={labelError ? `${base}-label-error` : undefined}
             // Grows from 8rem; narrower only when the pane is (min-w-0 keeps it inside the row).
-            className={`${field} flex-[1_1_8rem]`}
+            className={field(!!labelError, "w-auto flex-[1_1_8rem]")}
           />
           {showScore && (
             <div data-score className="flex flex-none items-center gap-1.5">
-              <label htmlFor={`${base}-score`} className="text-xs font-medium text-muted">
+              <label htmlFor={`${base}-score`} className="text-[0.75rem] font-medium text-graphite">
                 Score
               </label>
               <input
@@ -309,33 +309,34 @@ export const OptionRow = memo(function OptionRow({
                 // About 6 characters wide. text-xs, as the code field: at text-sm in
                 // Instrument Sans, "Score" and the field outgrow the label at the
                 // narrowest pane. leading-5 keeps the fields one height.
-                className={`${field} w-[calc(6ch+1.25rem)] flex-none px-2 text-xs leading-5 tabular-nums`}
+                className={field(!!scoreError, "w-[calc(6ch+1.25rem)] flex-none px-2 text-[0.75rem] tabular-nums")}
               />
             </div>
           )}
         </div>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => h.onRemove(i)}
-          // Centred on the fields' line (they are 34px, the button 32px), wherever the score is.
-          className="mt-px grid h-8 w-8 flex-none place-items-center rounded-lg text-faint hover:bg-surface-3 hover:text-ink"
+          // Centred on the fields' line, wherever the score is.
+          className="h-8 w-8 flex-none text-graphite hover:text-ink"
           aria-label={`Remove ${noun} ${i + 1}${of}`}
         >
-          <X className="h-4 w-4" />
-        </button>
+          <X aria-hidden="true" className="h-4 w-4" />
+        </Button>
       </div>
       {codeError && (
-        <p id={`${base}-code-error`} role="alert" className="mt-1 text-xs text-red">
+        <p id={`${base}-code-error`} role="alert" data-field-error className="mt-1 text-[0.75rem] text-fail">
           {codeError}
         </p>
       )}
       {labelError && (
-        <p id={`${base}-label-error`} role="alert" className="mt-1 text-xs text-red">
+        <p id={`${base}-label-error`} role="alert" data-field-error className="mt-1 text-[0.75rem] text-fail">
           {labelError}
         </p>
       )}
       {scoreError && (
-        <p id={`${base}-score-error`} role="alert" className="mt-1 text-xs text-red">
+        <p id={`${base}-score-error`} role="alert" data-field-error className="mt-1 text-[0.75rem] text-fail">
           {scoreError}
         </p>
       )}

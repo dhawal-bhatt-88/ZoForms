@@ -12,6 +12,7 @@ import {
 } from "@formbuilder/form-schema";
 import { OptionRow, type RowHandlers } from "./option-list-editor";
 import { Switch } from "./switch";
+import { Button, Select } from "./ui";
 
 /**
  * The inspector's editor for a grid's columns (contract §14.6). Each column
@@ -19,7 +20,8 @@ import { Switch } from "./switch";
  * same way (§13.8) — then its type, a Required switch, Move up / Move down,
  * and, for radio and dropdown, its own option editor (`renderOptions`).
  * Columns can't be imported from a file. The editor page owns the rules: it
- * asks before a choice column becomes text, and fills an empty code when a
+ * asks before a choice column becomes text (a `ConfirmDialog`, which puts
+ * focus back on the type select whatever the answer), and fills an empty code when a
  * changed label is left. The note about changing codes is the page's, once
  * for the whole grid (`noteId`). Everything shown here is plain text.
  */
@@ -75,9 +77,9 @@ export function GridColumnsEditor({
 
   return (
     <fieldset ref={root} className="mb-4 min-w-0">
-      <legend className="mb-1.5 block text-[12.5px] font-semibold text-ink-2">Columns</legend>
+      <legend className="mb-1.5 block text-[0.8125rem] font-medium text-ink">Columns</legend>
       {listProblem && (
-        <p role="alert" className="mb-1.5 text-xs text-red">
+        <p role="alert" data-field-error className="mb-1.5 text-[0.75rem] text-fail">
           {listProblem.detail}
         </p>
       )}
@@ -91,10 +93,10 @@ export function GridColumnsEditor({
               role="group"
               aria-labelledby={`${base}-heading`}
               data-grid-column={i}
-              className="rounded-lg border border-line bg-surface-2 p-2.5"
+              className="rounded-lg border border-rule bg-paper-sunk p-2.5"
             >
               <div className="mb-1.5 flex items-center justify-between">
-                <span id={`${base}-heading`} className="text-[11px] font-bold uppercase tracking-wider text-faint">
+                <span id={`${base}-heading`} className="eyebrow text-graphite-soft">
                   Column {i + 1}
                 </span>
                 <div className="flex gap-0.5">
@@ -102,10 +104,11 @@ export function GridColumnsEditor({
                     const id = `${base}-move-${direction === -1 ? "up" : "down"}`;
                     const to = i + direction;
                     return (
-                      <button
+                      <Button
                         key={direction}
                         id={id}
-                        type="button"
+                        variant="ghost"
+                        size="icon"
                         disabled={to < 0 || to >= columns.length}
                         onClick={() => {
                           onMove(i, direction);
@@ -113,10 +116,10 @@ export function GridColumnsEditor({
                           refocus(`grid-col-${to}-move-${direction === -1 ? "up" : "down"}`, `grid-col-${to}-move-${direction === -1 ? "down" : "up"}`);
                         }}
                         aria-label={`Move column ${i + 1} ${direction === -1 ? "up" : "down"}`}
-                        className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-surface-3 hover:text-ink disabled:opacity-30"
+                        className="text-graphite hover:text-ink"
                       >
-                        {direction === -1 ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-                      </button>
+                        {direction === -1 ? <ArrowUp aria-hidden="true" className="h-4 w-4" /> : <ArrowDown aria-hidden="true" className="h-4 w-4" />}
+                      </Button>
                     );
                   })}
                 </div>
@@ -133,24 +136,21 @@ export function GridColumnsEditor({
                 handlers={stable}
               />
               <div className="mt-2 flex items-center justify-between gap-2">
-                <select
+                <Select
+                  size="sm"
                   id={`${base}-type`}
                   aria-label={`Column ${i + 1} type`}
                   value={column.type}
-                  onChange={(e) => {
-                    onType(i, e.target.value as GridColumnType);
-                    // A confirmation may have taken focus; it comes back here, whatever the answer.
-                    refocus(`${base}-type`);
-                  }}
-                  className="min-w-0 rounded-lg border border-line-2 bg-surface px-2 py-1.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent-weak"
+                  onChange={(e) => onType(i, e.target.value as GridColumnType)}
+                  wrapperClassName="min-w-0 flex-1"
                 >
                   {GRID_COLUMN_TYPES.map((t) => (
                     <option key={t} value={t}>
                       {GRID_COLUMN_TYPE_LABELS[t]}
                     </option>
                   ))}
-                </select>
-                <span className="flex items-center gap-2 text-[13px]">
+                </Select>
+                <span className="flex flex-none items-center gap-2 text-[0.8125rem] font-medium">
                   <span aria-hidden>Required</span>
                   <Switch
                     id={`${base}-required`}
@@ -164,13 +164,9 @@ export function GridColumnsEditor({
             </div>
           );
         })}
-        <button
-          type="button"
-          onClick={onAdd}
-          className="flex items-center gap-1.5 self-start text-sm font-medium text-accent-2 hover:underline"
-        >
-          <Plus className="h-4 w-4" /> Add column
-        </button>
+        <Button variant="ghost" size="sm" onClick={onAdd} className="-ml-2.5 self-start">
+          <Plus aria-hidden="true" className="h-3.5 w-3.5" /> Add column
+        </Button>
       </div>
     </fieldset>
   );

@@ -40,9 +40,12 @@ async function waitFor(url) {
     let schemaPuts = 0;
     page.on("request", (r) => { if (r.method() === "PUT" && r.url().endsWith("/schema")) schemaPuts++; });
 
-    const status = page.locator("header span.text-faint").first();
-    const saveBtn = page.getByRole("button", { name: "Save", exact: true });
-    const cancelBtn = page.getByRole("button", { name: "Cancel", exact: true });
+    const status = page.locator("[data-save-state]");
+    // In the top bar: a confirmation dialog has a Cancel of its own.
+    const saveBtn = page.locator("header").getByRole("button", { name: "Save", exact: true });
+    const cancelBtn = page.locator("header").getByRole("button", { name: "Cancel", exact: true });
+    // Save and Cancel are blocked with a reason (aria-disabled), not disabled: they stay focusable.
+    const blocked = async (button) => (await button.getAttribute("aria-disabled")) === "true";
     const downloadBtn = page.getByRole("button", { name: "Download", exact: true });
     const desc = page.getByPlaceholder("Add a description…");
 
@@ -55,8 +58,10 @@ async function waitFor(url) {
     await page.goto(`${WEB}/app/forms/${form.id}/edit`);
     await status.getByText("All changes saved").waitFor();
     check("loads clean: 'All changes saved'", true);
-    check("Save disabled when not dirty", await saveBtn.isDisabled());
-    check("Cancel disabled when not dirty", await cancelBtn.isDisabled());
+    check("Save blocked when not dirty", await blocked(saveBtn));
+    check("Cancel blocked when not dirty", await blocked(cancelBtn));
+    check("…with the reason, said once for both", (await saveBtn.getAttribute("aria-describedby")) === (await cancelBtn.getAttribute("aria-describedby"))
+      && (await page.locator(`[id="${await saveBtn.getAttribute("aria-describedby")}"]`).innerText()) === "No changes to save");
     check("Download enabled when not dirty", await downloadBtn.isEnabled());
     check("no Publish button", (await page.getByRole("button", { name: /Publish/ }).count()) === 0);
 
@@ -67,12 +72,12 @@ async function waitFor(url) {
     await sleep(1500); // well past the old 650ms autosave debounce
     check("typing creates no versions", (await rows()) === 1 && schemaPuts === 0, `rows=${await rows()} puts=${schemaPuts}`);
     check("shows 'Unsaved changes'", await status.getByText("Unsaved changes").isVisible());
-    check("Save enabled when dirty", await saveBtn.isEnabled());
+    check("Save enabled when dirty", !(await blocked(saveBtn)));
     check("Download still enabled when dirty", await downloadBtn.isEnabled());
 
     // --- editing back to the saved content is not dirty (content compare, not "touched") ---
     for (let i = 0; i < 5; i++) await desc.press("Backspace");
-    check("reverting an edit by hand -> not dirty", await saveBtn.isDisabled());
+    check("reverting an edit by hand -> not dirty", await blocked(saveBtn));
     await desc.press("End"); await desc.pressSequentially("Hello", { delay: 30 });
 
     // --- edit without saving -> Download returns the previous saved version ---
@@ -90,21 +95,22 @@ async function waitFor(url) {
     await saveBtn.click();
     await status.getByText("All changes saved").waitFor();
     check("save creates exactly one version", (await rows()) === 2 && schemaPuts === 1, `rows=${await rows()} puts=${schemaPuts}`);
-    check("Save disabled again after save", await saveBtn.isDisabled());
+    check("Save blocked again after save", await blocked(saveBtn));
     const d3 = JSON.parse((await download(() => downloadBtn.click())).text);
     check("download now has saved edit", d3.description === "Hello");
     check("formVersionId changed after save", d3.formVersionId !== a1.formVersionId && d3.formVersionId === (await latestId()));
 
-    // --- Cancel: confirmation, dismiss keeps edits, accept reverts ---
+    // --- Cancel: a confirmation dialog; its Cancel keeps the edits, confirming reverts ---
     await desc.press("End"); await desc.pressSequentially(" world", { delay: 30 });
-    let dialogMsg = "";
-    page.once("dialog", (d) => { dialogMsg = d.message(); d.dismiss(); });
+    const discard = page.getByRole("alertdialog", { name: "Discard unsaved changes?" });
     await cancelBtn.click();
-    await sleep(200);
-    check("Cancel asks for confirmation", dialogMsg === "Discard unsaved changes? This cannot be undone.", dialogMsg);
-    check("dismissing keeps edits", (await desc.inputValue()) === "Hello world");
-    page.once("dialog", (d) => d.accept());
+    await discard.waitFor();
+    check("Cancel asks for confirmation, saying what is lost", (await discard.innerText()).includes("Your edits since the last save will be lost. This can't be undone."), await discard.innerText());
+    await discard.getByRole("button", { name: "Cancel", exact: true }).click();
+    check("dismissing keeps edits", (await desc.inputValue()) === "Hello world" && (await discard.count()) === 0);
+    check("…and focus goes back to Cancel", await cancelBtn.evaluate((b) => b === document.activeElement));
     await cancelBtn.click();
+    await discard.getByRole("button", { name: "Discard changes" }).click();
     await status.getByText("All changes saved").waitFor();
     check("accepting reverts to latest saved version", (await desc.inputValue()) === "Hello");
     check("Cancel created no version", (await rows()) === 2);
@@ -125,7 +131,7 @@ async function waitFor(url) {
     await saveBtn.click();
     await page.getByText(conflictMsg).waitFor();
     check("409 VERSION_CONFLICT -> shows reload message", true);
-    check("conflict keeps unsaved edits", (await desc.inputValue()) === "Hello!?" && (await saveBtn.isEnabled()), await desc.inputValue());
+    check("conflict keeps unsaved edits", (await desc.inputValue()) === "Hello!?" && !(await blocked(saveBtn)), await desc.inputValue());
     await page.unroute("**/v1/forms/*/schema");
 
     // --- real 409s from the API carry the codes the editor relies on ---
@@ -134,12 +140,13 @@ async function waitFor(url) {
     check("API 409 body carries code NO_CHANGES", same.status === 409 && (await same.json()).code === "NO_CHANGES");
 
     // --- in-app navigation guard + beforeunload while dirty ---
-    let leaveMsg = "";
-    page.once("dialog", (d) => { leaveMsg = d.message(); d.dismiss(); });
     await page.getByRole("link", { name: "Back" }).click();
+    const leave = page.getByRole("alertdialog", { name: "Leave without saving?" });
+    await leave.waitFor();
+    check("in-app link while dirty asks to confirm", (await leave.innerText()).includes("Your unsaved changes will be lost."), await leave.innerText());
+    await leave.getByRole("button", { name: "Cancel", exact: true }).click();
     await sleep(500);
-    check("in-app link while dirty asks to confirm", leaveMsg.startsWith("Leave without saving?"), leaveMsg);
-    check("dismiss keeps you in the editor", page.url().endsWith("/edit"));
+    check("dismiss keeps you in the editor", page.url().endsWith("/edit") && (await leave.count()) === 0);
 
     let unloadType = "";
     page.once("dialog", (d) => { unloadType = d.type(); d.dismiss(); });

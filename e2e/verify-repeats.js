@@ -334,7 +334,7 @@ const seed = () => ({
       !["pname", "kname", "kage", "allergy"].some((v) => values.includes(v)) && values.includes("address"), JSON.stringify(values));
     await aside.getByRole("button", { name: "Remove condition" }).last().click();
     await select("cost");
-    check("no Logic problems shown on a dependent two repeats in", (await aside.locator(".text-red").count()) === 0);
+    check("no Logic problems shown on a dependent two repeats in", (await aside.locator("[data-field-error]").count()) === 0);
 
     // ---------- move guards ----------
     const before2 = JSON.stringify([await depth("pnote"), await depth("hasKids"), await depth("allergy")]);

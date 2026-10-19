@@ -15,13 +15,12 @@ import {
   type ScoreUnanswered,
 } from "@formbuilder/form-schema";
 import { Switch } from "@/components/switch";
+import { Button, controlClasses, Select } from "@/components/ui";
 
 const FORMULA_HINT = "Use question names, numbers, + - * / and brackets, e.g. q1 + q2";
 /** How long after the author stops typing a formula is checked (as the logic field, contract §15.6). */
 const FORMULA_CHECK_DELAY_MS = 500;
 
-const field =
-  "w-full rounded-lg border border-line-2 bg-surface px-2.5 py-1.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent-weak aria-[invalid=true]:border-red";
 
 /**
  * The group inspector's Scores panel (contract §17.9): the group's scores, each
@@ -62,10 +61,10 @@ export function ScoresPanel({
   }
 
   return (
-    <div className="mb-4 border-t border-line pt-3">
-      <h4 className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-faint">Scores</h4>
+    <div className="mb-4 border-t border-rule pt-3">
+      <h4 className="eyebrow mb-1.5 text-graphite-soft">Scores</h4>
       {!scores.length && (
-        <p className="mb-2 text-xs text-muted">
+        <p className="mb-2 text-[0.75rem] text-graphite">
           Calculate a score from this group&apos;s answers, such as a questionnaire total.
         </p>
       )}
@@ -88,22 +87,17 @@ export function ScoresPanel({
           />
         ))}
       </div>
-      <button
-        ref={addButton}
-        type="button"
-        onClick={add}
-        className="mt-2 flex items-center gap-1.5 text-sm font-medium text-accent-2 hover:underline"
-      >
-        <Plus className="h-4 w-4" /> Add score
-      </button>
+      <Button ref={addButton} variant="ghost" size="sm" onClick={add} className="-ml-2.5 mt-1.5">
+        <Plus aria-hidden="true" className="h-3.5 w-3.5" /> Add score
+      </Button>
       {scores.length > 0 && (
-        <details className="mt-2 text-xs text-muted">
-          <summary className="cursor-pointer select-none text-ink-2">Question names ({questions.length})</summary>
+        <details className="mt-2 text-[0.75rem] text-graphite">
+          <summary className="cursor-pointer select-none text-ink">Question names ({questions.length})</summary>
           {questions.length ? (
             <ul className="mt-1.5 flex flex-col gap-1">
               {questions.map(({ block, name }) => (
                 <li key={block.id} className="flex min-w-0 items-baseline gap-2">
-                  <code className="flex-none rounded bg-surface-3 px-1 font-mono text-[12px] text-ink">{name ?? "—"}</code>
+                  <code className="flex-none rounded bg-paper-sunk px-1 font-mono text-[0.75rem] text-ink">{name ?? "—"}</code>
                   <span className="min-w-0 truncate" title={blockName(block)}>
                     {blockName(block)}
                   </span>
@@ -172,23 +166,18 @@ function ScoreEditor({
   }
 
   return (
-    <fieldset className="min-w-0 rounded-lg border border-line bg-surface-2 p-2.5">
+    <fieldset className="min-w-0 rounded-lg border border-rule bg-paper-sunk p-2.5">
       <legend className="sr-only">Score {n}</legend>
       <div className="mb-1.5 flex items-center justify-between gap-1.5">
-        <span aria-hidden className="text-[11px] font-bold uppercase tracking-wider text-muted">
+        <span aria-hidden className="eyebrow text-graphite-soft">
           Score {n}
         </span>
-        <button
-          type="button"
-          onClick={onRemove}
-          className="grid h-7 w-7 flex-none place-items-center rounded-md text-faint hover:bg-surface-3 hover:text-ink"
-          aria-label={`Remove ${named}`}
-        >
-          <X className="h-4 w-4" />
-        </button>
+        <Button variant="ghost" size="icon" onClick={onRemove} className="text-graphite hover:text-ink" aria-label={`Remove ${named}`}>
+          <X aria-hidden="true" className="h-4 w-4" />
+        </Button>
       </div>
 
-      <label htmlFor={`${base}-label`} className="mb-1 block text-xs font-semibold text-ink-2">
+      <label htmlFor={`${base}-label`} className="mb-1 block text-[0.75rem] font-medium text-ink">
         Label
       </label>
       <input
@@ -197,16 +186,16 @@ function ScoreEditor({
         onChange={(e) => onChange({ ...score, label: e.target.value })}
         aria-invalid={labelError ? true : undefined}
         aria-describedby={labelError ? `${base}-label-error` : undefined}
-        className={field}
+        className={controlClasses({ size: "sm", invalid: !!labelError })}
       />
       {labelError && (
-        <p id={`${base}-label-error`} role="alert" className="mt-1 flex items-start gap-1 text-xs text-red">
+        <p id={`${base}-label-error`} role="alert" data-field-error className="mt-1 flex items-start gap-1 text-[0.75rem] text-fail">
           <CircleAlert aria-hidden="true" className="mt-px h-3.5 w-3.5 flex-none" />
           {labelError}
         </p>
       )}
 
-      <label htmlFor={`${base}-formula`} className="mb-1 mt-2.5 block text-xs font-semibold text-ink-2">
+      <label htmlFor={`${base}-formula`} className="mb-1 mt-2.5 block text-[0.75rem] font-medium text-ink">
         Formula
       </label>
       {/*
@@ -227,16 +216,19 @@ function ScoreEditor({
           clearTimeout(timer.current);
           setChecked(e.target.value);
         }}
-        className={`block max-h-48 min-h-[3.25rem] w-full resize-y overflow-y-auto break-words rounded-lg border bg-surface px-2.5 py-1.5 font-mono text-[13px] outline-none [field-sizing:content] [overflow-wrap:anywhere] focus:ring-2 focus:ring-accent-weak ${
-          formulaError ? "border-red focus:border-red" : "border-line-2 focus:border-accent"
-        }`}
+        className={controlClasses({
+          size: "sm",
+          mono: true,
+          invalid: !!formulaError,
+          className: "block max-h-48 min-h-[3.25rem] resize-y overflow-y-auto break-words [field-sizing:content] [overflow-wrap:anywhere]",
+        })}
       />
-      <p id={`${base}-formula-hint`} className="mt-1 text-xs text-muted">
+      <p id={`${base}-formula-hint`} className="mt-1 text-[0.75rem] text-graphite">
         {FORMULA_HINT}
       </p>
       <div id={`${base}-formula-error`} aria-live="polite">
         {formulaError && (
-          <p className="mt-1 flex items-start gap-1 text-xs text-red">
+          <p data-field-error className="mt-1 flex items-start gap-1 text-[0.75rem] text-fail">
             <CircleAlert aria-hidden="true" className="mt-px h-3.5 w-3.5 flex-none" />
             {formulaError}
           </p>
@@ -248,7 +240,7 @@ function ScoreEditor({
           {missing.map((p) => {
             const question = findBlock(blocks, p.blockId)?.block;
             return (
-              <li key={p.blockId} className="flex flex-col items-start gap-1 text-xs text-red">
+              <li key={p.blockId} data-field-error className="flex flex-col items-start gap-1 text-[0.75rem] text-fail">
                 <span className="flex items-start gap-1">
                   <CircleAlert aria-hidden="true" className="mt-px h-3.5 w-3.5 flex-none" />
                   <span>
@@ -257,13 +249,9 @@ function ScoreEditor({
                   </span>
                 </span>
                 {question && (
-                  <button
-                    type="button"
-                    onClick={() => onJump(p.blockId)}
-                    className="ml-[18px] max-w-[calc(100%-18px)] truncate rounded-md border border-fail/30 bg-surface px-2 py-0.5 font-medium text-ink-2 hover:border-red"
-                  >
+                  <Button size="sm" onClick={() => onJump(p.blockId)} className="ml-[18px] block max-w-[calc(100%-18px)] truncate">
                     {blockName(question)} →
-                  </button>
+                  </Button>
                 )}
               </li>
             );
@@ -272,7 +260,7 @@ function ScoreEditor({
       )}
 
       <fieldset className="mt-2.5 min-w-0">
-        <legend className="mb-1 text-xs font-semibold text-ink-2">If a question is unanswered</legend>
+        <legend className="mb-1 text-[0.75rem] font-medium text-ink">If a question is unanswered</legend>
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
           {(
             [
@@ -287,7 +275,7 @@ function ScoreEditor({
                 value={value}
                 checked={score.unanswered === value}
                 onChange={() => onChange({ ...score, unanswered: value })}
-                className="h-3.5 w-3.5 accent-brand-deep"
+                className="h-4 w-4 accent-brand-deep"
               />
               {label}
             </label>
@@ -296,27 +284,29 @@ function ScoreEditor({
       </fieldset>
 
       <div className="mt-2.5 flex items-center justify-between gap-2">
-        <label htmlFor={`${base}-decimals`} className="text-xs font-semibold text-ink-2">
+        <label htmlFor={`${base}-decimals`} className="text-[0.75rem] font-medium text-ink">
           Decimal places
         </label>
-        <select
+        <Select
+          size="sm"
           id={`${base}-decimals`}
           value={score.decimals ?? 0}
           onChange={(e) => {
             const decimals = Number(e.target.value);
             onChange({ ...score, decimals: decimals === 0 ? undefined : decimals });
           }}
-          className="rounded-lg border border-line-2 bg-surface px-2 py-1 text-sm outline-none focus:border-accent"
+          wrapperClassName="w-auto"
+          className="w-[4.5rem]"
         >
           {[0, 1, 2, 3, 4].map((d) => (
             <option key={d} value={d}>
               {d}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
-      <div className="mt-2.5 flex items-center justify-between gap-2 text-[13px]">
+      <div className="mt-2.5 flex items-center justify-between gap-2 text-[0.8125rem]">
         <span id={`${base}-show`}>Show to respondent after submit</span>
         <Switch
           checked={!!score.showToRespondent}
