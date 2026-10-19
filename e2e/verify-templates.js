@@ -240,7 +240,8 @@ const HEALTH = {
       (await bugCard.getByRole("button", { name: /More actions/ }).count()) === 0);
     await bugCard.getByRole("button", { name: 'Preview "Bug Report"' }).click();
     const preview = page.getByRole("dialog", { name: "Bug Report" });
-    await preview.getByText("Steps to reproduce").waitFor();
+    // Exact: the dialog's description ("…a summary, steps to reproduce and a severity.") contains the words too.
+    await preview.getByText("Steps to reproduce", { exact: true }).waitFor();
     check("system template preview: no Edit", (await preview.getByRole("link", { name: /Edit/ }).count()) === 0);
     await preview.getByRole("button", { name: "Close", exact: true }).last().click(); // the footer button; the × is named Close too
     await bugCard.getByRole("button", { name: 'Duplicate "Bug Report" to my templates' }).click();

@@ -25,7 +25,7 @@ The builder isn't deployed anywhere (confirmed 16 Oct 2026), so these two holes 
 | 5. Custom domains | Done 16 Oct 2026 | `ab802d4`, `cf6c30f` |
 | 6. Block types and form design | Done 19 Oct 2026 | `a028089`, `bb5e336`, `1641af1`, `237b389` |
 | 7. Static pages and homepage | Done 19 Oct 2026 | `1ceb8fc`, `a17054b`, `6dbf79c` |
-| 8. Tidy-up and docs | Next | |
+| 8. Tidy-up and docs | Done 19 Oct 2026 | `e0b410e`, `15caffb`, `f30b2fb`, `3f08724` and the commit marking it done |
 
 ## Before any deployment
 
