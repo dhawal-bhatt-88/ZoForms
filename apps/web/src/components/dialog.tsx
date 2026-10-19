@@ -76,7 +76,7 @@ export function Dialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-ink/40 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4 backdrop-blur-sm"
       onClick={() => !busy && onClose()}
     >
       <div

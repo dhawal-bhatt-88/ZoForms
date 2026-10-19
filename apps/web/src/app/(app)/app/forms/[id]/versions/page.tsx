@@ -76,7 +76,7 @@ export default function VersionsPage() {
         </div>
       )}
       {status === "error" && (
-        <div className="rounded-xl bg-[#FCECEC] px-4 py-3 text-sm text-red">
+        <div className="rounded-xl bg-fail-wash px-4 py-3 text-sm text-red">
           Couldn&apos;t load version history.
         </div>
       )}
@@ -102,7 +102,7 @@ export default function VersionsPage() {
                     <div className="flex items-center gap-2 text-sm font-medium">
                       {v.label || "Saved"}
                       {i === 0 && (
-                        <span className="rounded-full bg-[#E7F6ED] px-2 py-0.5 text-[11px] font-semibold text-green">
+                        <span className="rounded-full bg-pass-wash px-2 py-0.5 text-[11px] font-semibold text-green">
                           Current
                         </span>
                       )}

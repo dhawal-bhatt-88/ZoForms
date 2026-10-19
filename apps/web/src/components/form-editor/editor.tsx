@@ -496,7 +496,7 @@ function PageBox({
                 e.stopPropagation();
                 onDelete();
               }}
-              className={`${iconButton} hover:!bg-[#FCECEC] hover:!text-red`}
+              className={`${iconButton} hover:!bg-fail-wash hover:!text-red`}
               aria-label="Delete page"
             >
               <Trash2 className="h-4 w-4" />
@@ -561,7 +561,7 @@ function CanvasCard({
             "rounded-lg px-1.5 py-2.5"
           : `rounded-xl border p-3.5 ${
               selected
-                ? "border-accent bg-white ring-2 ring-accent-weak"
+                ? "border-accent bg-surface ring-2 ring-accent-weak"
                 : "border-transparent hover:border-line-2 hover:bg-surface-2"
             }`
       } ${isDragging && !group ? "opacity-40" : ""}`}
@@ -660,7 +660,7 @@ function CanvasCard({
                 e.stopPropagation();
                 onDelete();
               }}
-              className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-[#FCECEC] hover:text-red"
+              className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-fail-wash hover:text-red"
               aria-label={group ? "Delete group" : "Delete"}
             >
               <Trash2 className="h-4 w-4" />
@@ -705,7 +705,7 @@ function DragGhost({ block }: { block: Block }) {
   const Icon = ICONS[block.type];
   const inside = isGroup(block) ? walkBlocks(block.blocks).length : 0;
   return (
-    <div className="flex h-full items-start gap-2 rounded-xl border border-accent bg-white px-3.5 py-2.5 shadow-pop">
+    <div className="flex h-full items-start gap-2 rounded-xl border border-accent bg-surface px-3.5 py-2.5 shadow-pop">
       <span className="grid h-[22px] w-[22px] flex-none place-items-center rounded-md bg-accent-weak text-accent-2">
         <Icon className="h-3.5 w-3.5" />
       </span>
@@ -814,14 +814,14 @@ function DeleteGroupDialog({
               Its contents move up to where the group is now, in the same order.
             </span>
             {conditionNote && (
-              <span className="mt-1.5 block rounded-md bg-[#FBF0D9] px-2 py-1.5 text-[13px] text-ink-2">
+              <span className="mt-1.5 block rounded-md bg-warn-wash px-2 py-1.5 text-[13px] text-ink-2">
                 {conditionNote}
               </span>
             )}
           </button>
           <button
             onClick={onDeleteAll}
-            className="rounded-xl border border-line-2 px-4 py-3 text-left hover:border-red hover:bg-[#FCECEC]"
+            className="rounded-xl border border-line-2 px-4 py-3 text-left hover:border-red hover:bg-fail-wash"
           >
             <span className="block text-sm font-semibold text-red">Group and its questions</span>
             <span className="mt-0.5 block text-[13px] text-muted">
@@ -906,14 +906,14 @@ function DeletePageDialog({
                 : `Its contents move to the end of "${destination?.title ?? "the previous page"}", in the same order.`}
             </span>
             {[lostNote, gainedNote].filter(Boolean).map((note) => (
-              <span key={note} className="mt-1.5 block rounded-md bg-[#FBF0D9] px-2 py-1.5 text-[13px] text-ink-2">
+              <span key={note} className="mt-1.5 block rounded-md bg-warn-wash px-2 py-1.5 text-[13px] text-ink-2">
                 {note}
               </span>
             ))}
           </button>
           <button
             onClick={onDeleteAll}
-            className="rounded-xl border border-line-2 px-4 py-3 text-left hover:border-red hover:bg-[#FCECEC]"
+            className="rounded-xl border border-line-2 px-4 py-3 text-left hover:border-red hover:bg-fail-wash"
           >
             <span className="block text-sm font-semibold text-red">Page and its contents</span>
             <span className="mt-0.5 block text-[13px] text-muted">
@@ -2703,8 +2703,8 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
           role={notice.tone === "info" ? "status" : "alert"}
           className={`flex flex-none items-center gap-3 border-b px-4 py-2 text-sm ${
             notice.tone === "info"
-              ? "border-[#EAD9AE] bg-[#FBF0D9] text-ink-2"
-              : "border-[#F5C2C2] bg-[#FCECEC] text-red"
+              ? "border-warn/30 bg-warn-wash text-ink-2"
+              : "border-fail/30 bg-fail-wash text-red"
           }`}
         >
           <span className="flex flex-1 flex-wrap items-center gap-x-2 gap-y-1">
@@ -2713,7 +2713,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
               <button
                 key={b.id}
                 onClick={() => jumpTo(b.id)}
-                className="rounded-md border border-[#F5C2C2] bg-white px-2 py-0.5 text-xs font-medium text-ink-2 hover:border-red"
+                className="rounded-md border border-fail/30 bg-surface px-2 py-0.5 text-xs font-medium text-ink-2 hover:border-red"
               >
                 {blockName(b)} →
               </button>
@@ -3312,7 +3312,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                 ) : (
                   <button
                     onClick={() => setDeletingPageId(selected.id)}
-                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line-2 px-3 py-1.5 text-sm font-medium text-red hover:bg-[#FCECEC]"
+                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line-2 px-3 py-1.5 text-sm font-medium text-red hover:bg-fail-wash"
                   >
                     <Trash2 className="h-4 w-4" /> Delete page…
                   </button>
@@ -3320,7 +3320,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
               {isGroup(selected) && !(groupTemplate && selected.id === schema.blocks[0]?.id) && (
                 <button
                   onClick={() => setDeletingGroupId(selected.id)}
-                  className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line-2 px-3 py-1.5 text-sm font-medium text-red hover:bg-[#FCECEC]"
+                  className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-line-2 px-3 py-1.5 text-sm font-medium text-red hover:bg-fail-wash"
                 >
                   <Trash2 className="h-4 w-4" /> Delete group…
                 </button>
@@ -3348,7 +3348,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                       type="checkbox"
                       checked={schema.navigation?.showProgress ?? NAVIGATION_DEFAULTS.showProgress}
                       onChange={(e) => updateNavigation({ showProgress: e.target.checked })}
-                      className="mt-0.5 h-4 w-4 accent-[#6D5EFA]"
+                      className="mt-0.5 h-4 w-4 accent-brand-deep"
                     />
                     <span>
                       <span className="block text-[12.5px] font-semibold text-ink-2">Show progress</span>
@@ -3373,7 +3373,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                           value={value}
                           checked={progressStyle === value}
                           onChange={() => updateNavigation({ progressStyle: value })}
-                          className="h-3.5 w-3.5 accent-[#6D5EFA]"
+                          className="h-3.5 w-3.5 accent-brand-deep"
                         />
                         {label}
                       </label>
@@ -3387,7 +3387,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                       type="checkbox"
                       checked={schema.navigation?.reviewPage ?? NAVIGATION_DEFAULTS.reviewPage}
                       onChange={(e) => updateNavigation({ reviewPage: e.target.checked })}
-                      className="mt-0.5 h-4 w-4 accent-[#6D5EFA]"
+                      className="mt-0.5 h-4 w-4 accent-brand-deep"
                     />
                     <span>
                       <span className="block text-[12.5px] font-semibold text-ink-2">Review page before submit</span>
@@ -3430,7 +3430,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                         checked={(schema.drafts?.mode ?? DEFAULT_DRAFT_MODE) === mode}
                         disabled={!available}
                         onChange={() => updateDrafts(mode)}
-                        className="mt-0.5 h-4 w-4 accent-[#6D5EFA]"
+                        className="mt-0.5 h-4 w-4 accent-brand-deep"
                       />
                       <span>
                         <span className="block text-[12.5px] font-semibold text-ink-2">{label}</span>

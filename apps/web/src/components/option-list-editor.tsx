@@ -306,8 +306,10 @@ export const OptionRow = memo(function OptionRow({
                 }}
                 aria-invalid={!!scoreError}
                 aria-describedby={scoreError ? `${base}-score-error` : undefined}
-                // About 6 characters wide.
-                className={`${field} w-[calc(6ch+1.25rem)] flex-none px-2 tabular-nums`}
+                // About 6 characters wide. text-xs, as the code field: at text-sm in
+                // Instrument Sans, "Score" and the field outgrow the label at the
+                // narrowest pane. leading-5 keeps the fields one height.
+                className={`${field} w-[calc(6ch+1.25rem)] flex-none px-2 text-xs leading-5 tabular-nums`}
               />
             </div>
           )}

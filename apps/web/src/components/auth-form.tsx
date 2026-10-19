@@ -136,7 +136,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             </div>
 
             {err && (
-              <p className="rounded-lg bg-[#FCECEC] px-3.5 py-2.5 text-sm text-red">{err}</p>
+              <p className="rounded-lg bg-fail-wash px-3.5 py-2.5 text-sm text-red">{err}</p>
             )}
 
             <Button type="submit" disabled={busy} className="h-11 w-full">

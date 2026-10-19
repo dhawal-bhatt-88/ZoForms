@@ -151,7 +151,7 @@ export function SaveTemplateDialog({
       </form>
 
       {changes && (
-        <section aria-labelledby={`${nameId}-changes`} className="mt-4 rounded-xl border border-[#EAD9AE] bg-[#FBF0D9] px-3.5 py-3">
+        <section aria-labelledby={`${nameId}-changes`} className="mt-4 rounded-xl border border-warn/30 bg-warn-wash px-3.5 py-3">
           <h3 id={`${nameId}-changes`} className="text-sm font-semibold text-ink">
             Some conditions won&apos;t be included
           </h3>
@@ -175,12 +175,12 @@ export function SaveTemplateDialog({
       )}
 
       {plan.problem && (
-        <p role="alert" className="mt-4 rounded-lg bg-[#FCECEC] px-3 py-2 text-sm text-red">
+        <p role="alert" className="mt-4 rounded-lg bg-fail-wash px-3 py-2 text-sm text-red">
           This can&apos;t be saved as a template yet: {plan.problem}
         </p>
       )}
       {error && (
-        <p role="alert" className="mt-4 rounded-lg bg-[#FCECEC] px-3 py-2 text-sm text-red">
+        <p role="alert" className="mt-4 rounded-lg bg-fail-wash px-3 py-2 text-sm text-red">
           Couldn&apos;t save the template: {error}
         </p>
       )}

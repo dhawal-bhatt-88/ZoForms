@@ -105,7 +105,7 @@ const SINGLE = {
       getComputedStyle(document.querySelector('[data-group-box="g_dose"]')).backgroundColor,
       getComputedStyle(document.querySelector('[data-group-box="g_sched"]')).backgroundColor,
     ]);
-    check("groups inside a page keep the box style, levels counted from the page", shade[0] === "rgb(243, 244, 246)" && shade[1] === "rgb(255, 255, 255)", shade.join(" / "));
+    check("groups inside a page keep the box style, levels counted from the page", shade[0] === "rgb(238, 243, 241)" && shade[1] === "rgb(255, 255, 255)", shade.join(" / "));
     const pageStyle = await P.evaluate(() => getComputedStyle(document.querySelector('[data-page-box="p1"]')).borderTopWidth);
     check("a page is visually stronger than a group box (2px border)", pageStyle === "2px", pageStyle);
     check("each page has an Add to row inside it", await pageBox("p3").getByRole("button", { name: 'Add to "Lifestyle"' }).isVisible());

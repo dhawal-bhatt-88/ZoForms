@@ -75,7 +75,7 @@ export function TemplatePicker({
         <div className="flex min-h-0 flex-col gap-3">
           <TemplateSearch value={query} onChange={setQuery} label="Search group templates" />
           {loadError ? (
-            <p className="rounded-lg bg-[#FCECEC] px-3 py-2 text-sm text-red">Couldn&apos;t load templates: {loadError}</p>
+            <p className="rounded-lg bg-fail-wash px-3 py-2 text-sm text-red">Couldn&apos;t load templates: {loadError}</p>
           ) : !templates ? (
             <div className="grid place-items-center py-8 text-muted">
               <Loader2 className="h-5 w-5 animate-spin" aria-label="Loading templates" />

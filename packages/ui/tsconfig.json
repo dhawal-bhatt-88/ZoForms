@@ -8,5 +8,5 @@
     "noEmit": true,
     "declaration": false
   },
-  "include": ["src", "preset.ts"]
+  "include": ["src", "preset.ts", "preset-zoblocks.ts", "frame-components.ts"]
 }

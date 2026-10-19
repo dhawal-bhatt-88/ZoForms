@@ -87,7 +87,7 @@ export function OptionImportDialog({
                     checked={mode === value}
                     onChange={() => setMode(value)}
                     autoFocus={value === "add"}
-                    className="accent-[#6D5EFA]"
+                    className="accent-brand-deep"
                   />
                   {text}
                 </label>
@@ -98,7 +98,7 @@ export function OptionImportDialog({
               {flagged ? ` · ${flagged} flagged` : ""}
               {mode === "replace" ? ` · replaces the ${existing.length} current ${plural}` : ""}
             </p>
-            {parsed.hint && <p className="mt-1.5 text-xs text-[#8A5A00]">{parsed.hint}</p>}
+            {parsed.hint && <p className="mt-1.5 text-xs text-warn">{parsed.hint}</p>}
             <div className="mt-2 min-h-0 flex-1 overflow-auto rounded-lg border border-line">
               <table className="w-full text-left text-xs">
                 <caption className="sr-only">Rows read from the file</caption>
@@ -112,7 +112,7 @@ export function OptionImportDialog({
                 </thead>
                 <tbody>
                   {preview.map((r) => (
-                    <tr key={r.line} data-flagged={r.flags.length > 0 || undefined} className="border-t border-line align-top data-[flagged]:bg-[#FCECEC]">
+                    <tr key={r.line} data-flagged={r.flags.length > 0 || undefined} className="border-t border-line align-top data-[flagged]:bg-fail-wash">
                       <td className="px-2 py-1 tabular-nums text-muted">{r.line}</td>
                       <td className="px-2 py-1 font-mono">
                         {r.code}

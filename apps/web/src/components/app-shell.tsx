@@ -10,6 +10,7 @@ import {
   Users,
 } from "lucide-react";
 import { logout, me, resendVerification } from "@/lib/api";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 type Me = Awaited<ReturnType<typeof me>>;
 
@@ -55,7 +56,7 @@ export default function AppShell({
       {/* Sidebar */}
       <aside className="sticky top-0 hidden h-screen w-[236px] flex-none flex-col border-r border-line bg-surface md:flex">
         <div className="flex items-center gap-2.5 px-5 pb-4 pt-5">
-          <span className="grid h-8 w-8 place-items-center rounded-[9px] bg-primary text-[15px] font-bold text-white shadow-sm">
+          <span className="grid h-8 w-8 place-items-center rounded-[9px] bg-primary text-[15px] font-bold text-paper shadow-sm">
             Z
           </span>
           <span className="text-[15px] font-semibold tracking-tight">Zowork Forms</span>
@@ -92,7 +93,7 @@ export default function AppShell({
               onClick={() => setMenuOpen((v) => !v)}
               className="flex w-full items-center gap-2.5 rounded-lg border border-transparent px-2 py-2 text-left transition-colors hover:border-line hover:bg-surface-2"
             >
-              <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-ink text-xs font-semibold text-white">
+              <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-ink text-xs font-semibold text-paper">
                 {initial}
               </span>
               <span className="min-w-0 flex-1">
@@ -126,10 +127,13 @@ export default function AppShell({
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-10 flex h-14 flex-none items-center gap-3 border-b border-line bg-surface/80 px-6 backdrop-blur-md">
           <h1 className="text-[15px] font-semibold tracking-tight">{title}</h1>
-          <div className="ml-auto flex items-center gap-2">{actions}</div>
+          <div className="ml-auto flex items-center gap-2">
+            {actions}
+            <ThemeToggle />
+          </div>
         </header>
         {user && !user.emailVerified && !dismissed && (
-          <div className="border-b border-amber/20 bg-[#FBF0D9]">
+          <div className="border-b border-amber/20 bg-warn-wash">
             <div className="mx-auto flex w-full max-w-[1200px] flex-wrap items-center gap-3 px-6 py-2.5 text-sm sm:px-8">
               <span className="font-medium text-amber">Verify your email</span>
               <span className="text-ink-2">

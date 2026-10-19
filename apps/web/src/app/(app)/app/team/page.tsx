@@ -29,9 +29,9 @@ function roleBadge(role: Role): string {
     case "OWNER":
       return "bg-accent-weak text-accent-2";
     case "ADMIN":
-      return "bg-[#E7F6ED] text-green";
+      return "bg-pass-wash text-green";
     case "EDITOR":
-      return "bg-[#FBF0D9] text-amber";
+      return "bg-warn-wash text-amber";
     default:
       return "bg-surface-3 text-ink-2";
   }
@@ -149,7 +149,7 @@ export default function TeamPage() {
         </div>
       )}
       {status === "error" && (
-        <div className="rounded-xl bg-[#FCECEC] px-4 py-3 text-sm text-red">
+        <div className="rounded-xl bg-fail-wash px-4 py-3 text-sm text-red">
           Couldn&apos;t load your team.
         </div>
       )}
@@ -226,7 +226,7 @@ export default function TeamPage() {
                       <span className="truncate text-sm font-medium">{m.name || m.email}</span>
                       {m.isYou && <span className="text-xs text-faint">you</span>}
                       {m.status === "suspended" && (
-                        <span className="rounded-full bg-[#FCECEC] px-2 py-0.5 text-[11px] font-semibold text-red">
+                        <span className="rounded-full bg-fail-wash px-2 py-0.5 text-[11px] font-semibold text-red">
                           suspended
                         </span>
                       )}

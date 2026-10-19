@@ -1,9 +1,9 @@
 import type { Config } from "tailwindcss";
-import framePreset from "@formbuilder/ui/preset";
+import zoblocksPreset from "@formbuilder/ui/preset-zoblocks";
 
-// Design tokens live in @formbuilder/ui (preset.ts).
+// Design tokens live in @formbuilder/ui (preset-zoblocks.ts): the ZoBlocks palette.
 export default {
-  presets: [framePreset],
+  presets: [zoblocksPreset],
   content: {
     // Resolve these globs from this file's folder, not the process's working
     // directory. Without it, `next dev` started from anywhere but apps/web scans

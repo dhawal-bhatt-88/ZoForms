@@ -29,7 +29,7 @@ export function Switch({
       <span
         aria-hidden
         // left-0: without it the knob starts from the button's centre and ends up outside the track.
-        className={`absolute left-0 top-0.5 h-4 w-4 rounded-full bg-white shadow-soft transition-transform ${checked ? "translate-x-[18px]" : "translate-x-0.5"}`}
+        className={`absolute left-0 top-0.5 h-4 w-4 rounded-full bg-paper shadow-soft transition-transform ${checked ? "translate-x-[18px]" : "translate-x-0.5"}`}
       />
     </button>
   );

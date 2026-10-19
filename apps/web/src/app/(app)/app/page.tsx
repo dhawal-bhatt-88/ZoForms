@@ -165,7 +165,7 @@ export default function Dashboard() {
       )}
 
       {status === "error" && (
-        <div className="rounded-xl bg-[#FCECEC] px-4 py-3 text-sm text-red">
+        <div className="rounded-xl bg-fail-wash px-4 py-3 text-sm text-red">
           Couldn&apos;t reach the API. Start it with{" "}
           <code className="font-mono">pnpm dev</code> (with Postgres running), then reload.
         </div>
@@ -215,14 +215,14 @@ export default function Dashboard() {
       {/* delete confirm */}
       {toDelete && (
         <div
-          className="fixed inset-0 z-50 grid place-items-center bg-ink/40 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4 backdrop-blur-sm"
           onClick={() => !deleting && setToDelete(null)}
         >
           <div
             className="w-full max-w-sm rounded-2xl border border-line bg-surface p-6 shadow-pop"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-3 grid h-10 w-10 place-items-center rounded-xl bg-[#FCECEC] text-red">
+            <div className="mb-3 grid h-10 w-10 place-items-center rounded-xl bg-fail-wash text-red">
               <Trash2 className="h-5 w-5" />
             </div>
             <h2 className="font-semibold tracking-tight">Delete “{toDelete.title}”?</h2>
@@ -236,7 +236,7 @@ export default function Dashboard() {
               <button
                 onClick={onConfirmDelete}
                 disabled={deleting}
-                className="btn btn-sm bg-red text-white hover:opacity-90"
+                className="btn btn-sm bg-red text-paper hover:opacity-90"
               >
                 {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                 Delete
@@ -344,7 +344,7 @@ function MenuItem({
   danger?: boolean;
 }) {
   const cls = `flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13.5px] font-medium transition-colors ${
-    danger ? "text-red hover:bg-[#FCECEC]" : "text-ink-2 hover:bg-surface-2 hover:text-ink"
+    danger ? "text-red hover:bg-fail-wash" : "text-ink-2 hover:bg-surface-2 hover:text-ink"
   }`;
   if (href)
     return (

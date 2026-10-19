@@ -130,11 +130,11 @@ export default function TemplatesPage() {
               onClick={() => setTab(scope)}
               onKeyDown={(e) => onTabKey(e, i)}
               className={`rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors ${
-                tab === scope ? "bg-ink text-white" : "text-muted hover:text-ink"
+                tab === scope ? "bg-ink text-paper" : "text-muted hover:text-ink"
               }`}
             >
               {label}
-              <span className={`ml-1.5 tabular-nums ${tab === scope ? "text-white/60" : "text-faint"}`}>{count(scope)}</span>
+              <span className={`ml-1.5 tabular-nums ${tab === scope ? "text-paper/60" : "text-faint"}`}>{count(scope)}</span>
             </button>
           ))}
         </div>
@@ -143,18 +143,18 @@ export default function TemplatesPage() {
         </div>
       </div>
 
-      <p role="status" className={status ? "mb-4 rounded-lg bg-[#E7F6ED] px-3 py-2 text-sm text-green" : "sr-only"}>
+      <p role="status" className={status ? "mb-4 rounded-lg bg-pass-wash px-3 py-2 text-sm text-green" : "sr-only"}>
         {status}
       </p>
       {error && (
-        <p role="alert" className="mb-4 rounded-lg bg-[#FCECEC] px-3 py-2 text-sm text-red">
+        <p role="alert" className="mb-4 rounded-lg bg-fail-wash px-3 py-2 text-sm text-red">
           {error}
         </p>
       )}
 
       <div role="tabpanel" id={`${baseId}-panel`} aria-labelledby={`${baseId}-tab-${tab}`}>
         {loadError ? (
-          <p className="rounded-lg bg-[#FCECEC] px-3 py-2 text-sm text-red">Couldn&apos;t load templates: {loadError}</p>
+          <p className="rounded-lg bg-fail-wash px-3 py-2 text-sm text-red">Couldn&apos;t load templates: {loadError}</p>
         ) : !templates ? (
           <div className="grid place-items-center py-16 text-muted">
             <Loader2 className="h-5 w-5 animate-spin" aria-label="Loading templates" />
@@ -252,7 +252,7 @@ export default function TemplatesPage() {
                   })
                 }
                 disabled={!!busy}
-                className="btn btn-sm bg-red text-white hover:opacity-90"
+                className="btn btn-sm bg-red text-paper hover:opacity-90"
               >
                 {busy === `delete-${deleting.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                 Delete
@@ -470,7 +470,7 @@ function RenameDialog({
         />
       </form>
       {error && (
-        <p role="alert" className="mt-3 rounded-lg bg-[#FCECEC] px-3 py-2 text-sm text-red">
+        <p role="alert" className="mt-3 rounded-lg bg-fail-wash px-3 py-2 text-sm text-red">
           Couldn&apos;t save: {error}
         </p>
       )}

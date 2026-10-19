@@ -18,7 +18,7 @@ export default function Error({
   return (
     <div className="grid min-h-screen place-items-center px-6 text-center">
       <div className="max-w-md">
-        <span className="eyebrow">Something went wrong</span>
+        <span className="eyebrow text-brand-deep">Something went wrong</span>
         <h1 className="mt-4 text-2xl font-bold tracking-tight text-ink">
           This page hit an unexpected error
         </h1>

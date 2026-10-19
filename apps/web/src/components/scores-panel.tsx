@@ -260,7 +260,7 @@ function ScoreEditor({
                   <button
                     type="button"
                     onClick={() => onJump(p.blockId)}
-                    className="ml-[18px] max-w-[calc(100%-18px)] truncate rounded-md border border-[#F5C2C2] bg-white px-2 py-0.5 font-medium text-ink-2 hover:border-red"
+                    className="ml-[18px] max-w-[calc(100%-18px)] truncate rounded-md border border-fail/30 bg-surface px-2 py-0.5 font-medium text-ink-2 hover:border-red"
                   >
                     {blockName(question)} →
                   </button>
@@ -287,7 +287,7 @@ function ScoreEditor({
                 value={value}
                 checked={score.unanswered === value}
                 onChange={() => onChange({ ...score, unanswered: value })}
-                className="h-3.5 w-3.5 accent-[#6D5EFA]"
+                className="h-3.5 w-3.5 accent-brand-deep"
               />
               {label}
             </label>

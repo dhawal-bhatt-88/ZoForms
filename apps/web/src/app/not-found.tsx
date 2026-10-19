@@ -4,7 +4,7 @@ export default function NotFound() {
   return (
     <div className="grid min-h-screen place-items-center px-6 text-center">
       <div className="max-w-md">
-        <span className="eyebrow">404</span>
+        <span className="eyebrow text-brand-deep">404</span>
         <h1 className="mt-4 text-2xl font-bold tracking-tight text-ink">
           Page not found
         </h1>

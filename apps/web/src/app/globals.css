@@ -2,23 +2,128 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===========================================================================
+ * Zowork Forms, in the ZoBlocks family.
+ *
+ * Ported from github.com/zoworkhq/zoblocks at 9aaefe0,
+ * apps/app/src/app/globals.css. Compare against that file on the next sync.
+ * Line references below are to it.
+ *
+ * Its rules carry over with the values:
+ *   - `trace` is dark-panel only: the luminous teal has no contrast on paper.
+ *   - Red only ever means critical, and never carries meaning alone: every
+ *     coloured thing also has a word or an icon.
+ *
+ * What differs, and why:
+ *   - Tailwind 3, not 4. Each colour is an RGB channel triplet (`--zb-*`), so
+ *     the preset can write `rgb(var(--zb-x) / <alpha-value>)` and opacity
+ *     modifiers keep working. The hex is beside each triplet for diffing.
+ *   - `--zb-surface` is white in light, not `paper`: the builder's cards and
+ *     canvas sit on the page and need the step between the two.
+ *   - The type-scale classes sit in `@layer components`, so a utility on the
+ *     same element can still override them, as is normal in Tailwind 3.
+ *     (ZoBlocks' are unlayered, so there a size utility beside `.eyebrow`
+ *     loses; ports here leave such utilities out to render the same.)
+ * ======================================================================== */
+
+/* Light — L85–137. */
 :root {
-  --bg: #f6f7f9;
-  --surface: #ffffff;
-  --ink: #1b1d22;
-  --muted: #6b7280;
-  --line: #ecedf0;
-  --accent: #6d5efa;
+  --zb-paper: 247 249 248; /* #f7f9f8 */
+  --zb-paper-sunk: 238 243 241; /* #eef3f1 */
+  --zb-surface: 255 255 255; /* #ffffff; ZoBlocks' .surface is paper here */
+  --zb-rule: 221 229 226; /* #dde5e2 */
+  --zb-rule-strong: 195 208 204; /* #c3d0cc */
+  --zb-shimmer: 253 254 254; /* #fdfefe */
+
+  --zb-ink: 8 17 15; /* #08110f */
+  --zb-graphite: 90 107 103; /* #5a6b67 */
+  --zb-graphite-soft: 92 109 104; /* #5c6d68 */
+
+  --zb-brand: 16 185 149; /* #10b995 */
+  --zb-brand-deep: 6 118 98; /* #067662, --site-accent-text */
+  --zb-accent-solid: 6 118 98; /* #067662 */
+  --zb-accent-on: 255 255 255; /* #ffffff */
+  --zb-accent-wash: 232 246 241; /* #e8f6f1 */
+  --zb-electric: 11 114 133; /* #0b7285 */
+  --zb-critical: 179 38 30; /* #b3261e */
+  --zb-critical-wash: 253 234 234; /* #fdeaea */
+  --zb-warn: 161 92 7; /* #a15c07 */
+  --zb-warn-wash: 253 243 227; /* #fdf3e3 */
+  --zb-pass: 15 122 95; /* #0f7a5f */
+  --zb-pass-wash: 230 245 239; /* #e6f5ef */
+
+  /* The primary action is the accent; hover darkens rather than dims. */
+  --zb-cta: 6 118 98; /* #067662 */
+  --zb-cta-hover: 10 93 79; /* #0a5d4f */
+
+  --zb-panel: 8 17 15; /* #08110f */
+  --zb-panel-raised: 13 26 24; /* #0d1a18 */
+  --zb-panel-rule: 29 48 45; /* #1d302d */
+  --zb-panel-fg: 232 244 241; /* #e8f4f1 */
+  --zb-panel-muted: 139 156 152; /* #8b9c98 */
+  --zb-trace: 45 212 176; /* #2dd4b0 */
+  --zb-critical-lum: 251 113 133; /* #fb7185 */
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  color-scheme: light;
 }
 
+/* Dark — L144–197. The page drops below the panel rather than matching it. */
+.dark {
+  --zb-paper: 8 11 16; /* #080b10 */
+  --zb-paper-sunk: 13 18 25; /* #0d1219 */
+  --zb-surface: 14 20 27; /* #0e141b, .dark .surface */
+  --zb-rule: 29 39 51; /* #1d2733 */
+  --zb-rule-strong: 44 55 68; /* #2c3744 */
+  --zb-shimmer: 26 36 50; /* #1a2432 */
+
+  --zb-ink: 237 242 247; /* #edf2f7 */
+  --zb-graphite: 162 174 187; /* #a2aebb */
+  --zb-graphite-soft: 133 146 161; /* #8592a1 */
+
+  --zb-brand: 45 212 176; /* #2dd4b0 */
+  --zb-brand-deep: 108 231 203; /* #6ce7cb */
+  /* Inverted on purpose: filled shapes take the light ground and dark ink. */
+  --zb-accent-solid: 108 231 203; /* #6ce7cb */
+  --zb-accent-on: 8 17 15; /* #08110f */
+  --zb-accent-wash: 15 42 37; /* #0f2a25 */
+  --zb-electric: 115 216 255; /* #73d8ff */
+  --zb-critical: 251 113 133; /* #fb7185 */
+  --zb-critical-wash: 44 18 22; /* #2c1216 */
+  --zb-warn: 251 191 36; /* #fbbf24 */
+  --zb-warn-wash: 42 32 16; /* #2a2010 */
+  --zb-pass: 74 222 128; /* #4ade80 */
+  --zb-pass-wash: 15 42 28; /* #0f2a1c */
+
+  --zb-cta: 108 231 203; /* #6ce7cb */
+  --zb-cta-hover: 164 243 223; /* #a4f3df */
+
+  --zb-panel: 21 26 33; /* #151a21 */
+  --zb-panel-raised: 28 35 44; /* #1c232c */
+  --zb-panel-rule: 48 59 71; /* #303b47 */
+  --zb-panel-fg: 237 242 247; /* #edf2f7 */
+  --zb-panel-muted: 150 163 179; /* #96a3b3 */
+  --zb-trace: 45 212 176; /* #2dd4b0 */
+  --zb-critical-lum: 251 113 133; /* #fb7185 */
+
+  color-scheme: dark;
+}
+
+/* Base — L203–210. */
 html,
 body {
   padding: 0;
   margin: 0;
-  background: var(--bg);
-  color: var(--ink);
-  font-family: var(--font-hanken), -apple-system, BlinkMacSystemFont, "Segoe UI",
-    Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+body {
+  background: rgb(var(--zb-paper));
+  color: rgb(var(--zb-ink));
+  font-family: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  letter-spacing: -0.005em;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
@@ -31,11 +136,217 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Type scale — L232–272. `.eyebrow` is in the preset's component plugin. */
+@layer components {
+  .display-sm {
+    font-family: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
+    font-size: clamp(1.375rem, 2.2vw, 1.875rem);
+    line-height: 1.12;
+    letter-spacing: -0.025em;
+    font-weight: 600;
+    text-wrap: balance;
+  }
+  .lede {
+    font-size: clamp(1.0625rem, 1.5vw, 1.25rem);
+    line-height: 1.55;
+    color: rgb(var(--zb-graphite));
+    letter-spacing: -0.011em;
+  }
+  .body {
+    font-size: 0.9375rem;
+    line-height: 1.65;
+    letter-spacing: -0.005em;
+  }
+  .body-sm {
+    font-size: 0.8125rem;
+    line-height: 1.55;
+  }
+  /* Digits that line up. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Surface — L284–294, with the builder's white light surface. */
+  .surface {
+    background: rgb(var(--zb-surface));
+    border: 1px solid rgb(var(--zb-rule));
+    border-radius: 0.875rem;
+    box-shadow: 0 1px 2px -1px rgb(2 20 17 / 0.04);
+  }
+
+  /* A link inside a paragraph — L536–544. Underlined at rest, not on hover:
+     colour can't be the only thing setting a link apart (WCAG 1.4.1). */
+  .link {
+    color: rgb(var(--zb-brand-deep));
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    text-decoration-thickness: 1px;
+  }
+  .link:hover {
+    text-decoration-thickness: 2px;
+  }
+}
+
+/* A result arriving — L365–377. */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.rise-in {
+  animation: rise-in 240ms var(--ease-out-expo) both;
+}
+
+/* Loading, as distinct from disabled — L391–409. A sweep travels; a pulse
+   reads as "you may not touch this". */
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+.shimmer {
+  background-image: linear-gradient(
+    90deg,
+    transparent 20%,
+    rgb(var(--zb-shimmer)) 50%,
+    transparent 80%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: shimmer 1.6s linear infinite;
+}
+
+/*
+ * The rail, when it is a panel over the page — L430–457.
+ *
+ * Opening flips `visibility` with no delay, so the panel is focusable the
+ * instant React's effect runs (`.focus()` on a hidden element does nothing);
+ * closing delays it by the length of the slide, so it is painted on its way out.
+ */
+@media (max-width: 63.999rem) {
+  .rail-panel {
+    position: fixed;
+    inset-block: 0;
+    left: 0;
+    z-index: 50;
+    display: flex;
+    width: 17rem;
+    max-width: 85vw;
+    overflow-y: auto;
+    padding: 1.25rem;
+    background: rgb(var(--zb-paper));
+    border-right: 1px solid rgb(var(--zb-rule));
+    visibility: hidden;
+    transform: translateX(-100%);
+    transition:
+      transform 300ms var(--ease-out-expo),
+      visibility 0s linear 300ms;
+  }
+  .rail-panel[data-open="true"] {
+    visibility: visible;
+    transform: none;
+    box-shadow: 0 24px 60px -20px rgb(2 20 17 / 0.35);
+    transition:
+      transform 300ms var(--ease-out-expo),
+      visibility 0s;
+  }
+}
+
+/* Reduced motion — L489–522. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* Removed rather than shortened: a collapsed shimmer freezes as a bright
+     stripe, and a collapsed rise-in stays at its transparent first frame. */
+  .shimmer {
+    background-image: none;
+    animation: none;
+  }
+  .rise-in {
+    animation: none;
+  }
+  /* The closing panel's 300ms `visibility` delay isn't a duration, so the
+     blanket rule above doesn't reach it. */
+  .rail-panel,
+  .rail-panel[data-open="true"] {
+    transition: none;
+  }
+}
+
+/* Scrollbars at the weight of a rule — L578–601. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--zb-rule-strong)) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--zb-rule-strong));
+  background-clip: content-box;
+  border: 3px solid transparent;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--zb-graphite-soft));
+  background-clip: content-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Autofill in this product's colours — L614–621. The builder's fields sit on
+   `surface` (ZoBlocks' on `paper`), so that is the colour painted in. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: rgb(var(--zb-ink));
+  -webkit-box-shadow: 0 0 0 100px rgb(var(--zb-surface)) inset;
+  caret-color: rgb(var(--zb-ink));
+  transition: background-color 100000s ease-in-out 0s;
+}
+
+/* Focus that is always visible, as a floor — L636–642. In `base`, so anything
+   that styles its own focus (`focus:outline-none` and a ring) wins. */
+@layer base {
+  /* A field with no background class of its own sits on `surface`, not the
+     browser's default. In light the default was white, which is what the
+     builder's fields were drawn against; in dark it is the browser's grey. */
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"]),
+  textarea,
+  select {
+    background-color: rgb(var(--zb-surface));
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--zb-brand-deep));
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
 /* While the editor's settings pane is being resized: the resize cursor everywhere, no text selected,
    and embedded previews (iframes) don't take the pointer. */
 .pane-resizing, .pane-resizing * { cursor: col-resize !important; user-select: none !important; }
 .pane-resizing iframe { pointer-events: none; }
-
-@media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
-}

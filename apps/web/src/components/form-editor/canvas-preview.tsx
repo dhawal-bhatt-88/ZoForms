@@ -170,7 +170,7 @@ export function BlockPreview({ block }: { block: Block }) {
     );
   if (block.type === "rating")
     return (
-      <div className="flex gap-1.5 text-[#e2c14d]">
+      <div className="flex gap-1.5 text-warn">
         {[0, 1, 2, 3, 4].map((i) => (
           <Star key={i} className="h-6 w-6" />
         ))}

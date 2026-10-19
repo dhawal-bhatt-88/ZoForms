@@ -49,7 +49,7 @@ export function useTemplateDetail(id: string | null) {
 /** The preview area of a picker: the chosen template, a spinner while it loads, or why it couldn't. */
 export function PreviewPane({ id, detail, error }: { id: string | null; detail?: TemplateDetail; error: string | null }) {
   if (!id) return <p className="py-10 text-center text-sm text-muted">Choose a template to preview it.</p>;
-  if (error) return <p className="rounded-lg bg-[#FCECEC] px-3 py-2 text-sm text-red">Couldn&apos;t load this template: {error}</p>;
+  if (error) return <p className="rounded-lg bg-fail-wash px-3 py-2 text-sm text-red">Couldn&apos;t load this template: {error}</p>;
   if (!detail)
     return (
       <div className="grid place-items-center py-10 text-muted">
