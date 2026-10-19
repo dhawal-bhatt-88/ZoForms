@@ -2,7 +2,7 @@
 
 Defects found in the ZoBlocks console (`github.com/zoworkhq/zoblocks`, `apps/app`) while porting its components into Zowork Forms. All line numbers are at commit `9aaefe0`. Nothing here has been filed upstream.
 
-Each port in this repo names its ZoBlocks source in a header comment. Notes 1–6 are fixed in the ports. Local additions, after the notes, are not defects: they are tokens the builder needs that ZoBlocks doesn't have. Contrast ratios are WCAG 2.2 relative-luminance ratios, measured from the hex values in `apps/app/src/app/globals.css`.
+Each port in this repo names its ZoBlocks source in a header comment. Notes 1–6 are fixed in the ports; note 7 is open (restyle 4). Local additions, after the notes, are not defects: they are tokens the builder needs that ZoBlocks doesn't have. Contrast ratios are WCAG 2.2 relative-luminance ratios, measured from the hex values in `apps/app/src/app/globals.css`.
 
 ## 1. Callout's info tone draws no accent edge
 
@@ -39,6 +39,13 @@ Each port in this repo names its ZoBlocks source in a header comment. Notes 1–
 - **File:** `apps/app/src/components/ThemeToggle.tsx`, lines 55 and 68.
 - **What's wrong:** the selected segment is marked by a `paper` fill on the `paper-sunk` track (line 68 on line 55's track), plus a change of icon colour from `graphite-soft` to `ink`. In dark mode the fill is 1.05:1 against the track (`#080b10` on `#0d1219`) and the icon colour change is 2.81:1 (`#edf2f7` against `#8592a1`); neither reaches the 3:1 WCAG 1.4.11 asks of a state indicator, so which theme is chosen is hard to see. In light mode the fill is 1.06:1, but the icon colour change is 3.50:1, so the state is perceivable there. `aria-checked` gives the state to assistive technology in both themes.
 - **Fix used here:** the selected segment gets a 1px `border-brand-deep`: 4.96:1 against the `paper-sunk` track in light mode and 12.46:1 in dark, so the state clears 3:1 in both themes. Every segment carries a border, transparent until selected, so choosing one moves nothing. It lives in one class helper, `segmentClasses` (`apps/web/src/components/ui/segment.ts`), not a component, because the builder's segmented controls have different semantics: the ThemeToggle and a heading's level are radio groups, the Templates screen's are tabs. All three use it. Before this, the builder's Templates tabs marked the selected tab with `accent-wash` and `brand-deep` text, which was still under 3:1 (1.23:1 against the track in dark mode, 1.01:1 in light). Upstream, the same border would apply to every segmented control built this way.
+
+## 7. Field borders are under 3:1, and the console's palette is outside the contrast gate
+
+- **Files:** `apps/app/src/components/ui/control.ts`, line 31 (`border-rule-strong`), with the colour at `apps/app/src/app/globals.css` lines 89 (light, `#c3d0cc`) and 148 (dark, `#2c3744`).
+- **What's wrong:** a text field, select or textarea is drawn by its border alone, and the border is `rule-strong`: 1.50:1 against `paper` in light mode, and 1.53:1 against the `.surface` colour in dark mode (1.63:1 against dark `paper`). WCAG 1.4.11 asks 3:1 for the visual information needed to identify a control, so an empty field is hard to find, especially in dark mode. The same colour draws the Checkbox's ring (note 4) and the colour fields' swatches and inputs (`ColorField.tsx`, `ColorPicker.tsx`).
+- **Why nothing caught it:** ZoBlocks' contrast gate (`packages/tokens/src/validate/`, run by `pnpm gen --strict` in `verify.yml`) checks the component library's tokens, not the console's own palette. The library already has the right answer: `--zb-field-border` is `border-strong`, which the gate holds to 3:1 (4.76:1 in light, 3.26:1 in dark, `packages/tokens/src/contrast.json`). The console's `--site-*` colours in `globals.css` are checked only by the axe sweep (`e2e/app-a11y.spec.ts`), and axe measures text contrast, not the 3:1 for controls. So any console colour that draws a control, rather than text, is checked by nothing.
+- **Fix used here:** to come in restyle 4, CP2. The builder's contrast gate (`apps/web/scripts/contrast.mjs`) reads the ported palette and holds every control boundary to 3:1, which is how this was found. Upstream, two changes would close it: a field-border colour in the console's palette that clears 3:1 on `paper` and `.surface` in both themes, used by `control.ts` and the colour fields; and the library gate's pair list run over `apps/app/src/app/globals.css` too, so the console's colours are held to the bar the library's are.
 
 ## Local additions
 

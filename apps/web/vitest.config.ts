@@ -7,5 +7,6 @@ export default defineConfig({
   esbuild: { jsx: "automatic" },
   // The `@/` alias from tsconfig.json.
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
-  test: { include: ["src/**/*.test.ts", "src/**/*.test.tsx"] },
+  // scripts/: the contrast gate's own tests.
+  test: { include: ["src/**/*.test.ts", "src/**/*.test.tsx", "scripts/**/*.test.mjs"] },
 });

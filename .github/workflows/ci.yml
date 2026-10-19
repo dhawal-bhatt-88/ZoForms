@@ -37,6 +37,12 @@ jobs:
       - name: Validate Prisma schema
         run: pnpm --filter api exec prisma validate
 
+      # Every colour pair the web app composes, in light and dark, measured from
+      # globals.css (apps/web/scripts/contrast.mjs). Also fails if the committed
+      # contrast.json is out of date. Needs no server.
+      - name: Contrast gate
+        run: pnpm --filter web contrast:check
+
       - name: Typecheck
         run: pnpm typecheck
 
