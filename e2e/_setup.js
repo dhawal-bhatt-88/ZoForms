@@ -76,4 +76,4 @@ function atLeast(version, minimum) {
   return true;
 }
 
-module.exports = { ROOT, OUT, API, WEB, PrismaClient, chromium, launchBrowser, saveArtifact, code, opts, noIds, hasIds, ZF_RENDERER, rendererVersion, atLeast, RENDERER_CORE };
+module.exports = { ROOT, OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, opts, noIds, hasIds, ZF_RENDERER, rendererVersion, atLeast, RENDERER_CORE };

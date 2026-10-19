@@ -64,7 +64,7 @@ export function flattenVisible(
 }
 
 /** Where a drag would put the active block: its depth, and the page or group it lands in. */
-export type Projection = { depth: number; parentId: string | null; index: number };
+type Projection = { depth: number; parentId: string | null; index: number };
 
 /**
  * Where the dragged block lands if dropped now. `offsetX` is how far it has been

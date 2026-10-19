@@ -7,7 +7,7 @@ import { StaticCanvas } from "@/components/form-editor/canvas-preview";
 import { getTemplate, type TemplateDetail } from "@/lib/api";
 
 /** A template's content, read-only, as the editor's canvas shows it. */
-export function TemplatePreview({ template }: { template: TemplateDetail }) {
+function TemplatePreview({ template }: { template: TemplateDetail }) {
   if (template.kind === "group") return <StaticCanvas blocks={[template.content as GroupBlock]} />;
   const form = template.content as FormSchema;
   return (

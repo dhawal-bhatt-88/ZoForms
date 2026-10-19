@@ -46,7 +46,7 @@ export function sameStoredContent(stored: unknown, fromFile: unknown): boolean {
 }
 
 /** A file that wasn't loaded, and why. `id` is its id when that could be read, so its template is kept. */
-export type SkippedFile = { file: string; id?: string; reason: string };
+type SkippedFile = { file: string; id?: string; reason: string };
 
 /** One file read and checked: the template, or why it can't be loaded. */
 function readFile(dir: string, file: string): { template: SystemTemplateFile } | { skipped: SkippedFile } {

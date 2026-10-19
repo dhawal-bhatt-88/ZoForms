@@ -13,7 +13,7 @@ import type { AuthUser } from "../auth/current-user.decorator";
 import { prepareTemplateContent, sameTemplateContent } from "./template-content";
 
 /** "system": made by us, seen by every organisation, read-only. "organisation": the caller's own. */
-export type TemplateScope = "system" | "organisation";
+type TemplateScope = "system" | "organisation";
 
 const NAME_MAX = 200;
 const DESCRIPTION_MAX = 2000;

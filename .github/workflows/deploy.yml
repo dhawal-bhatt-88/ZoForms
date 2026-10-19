@@ -3,14 +3,16 @@ name: Deploy
 # Builds one image per app, pushes them to GitHub Container Registry (GHCR),
 # then SSHes into the EC2 host and restarts the docker-compose stack.
 #
+# Manual only (Actions → Deploy → Run workflow): the builder isn't deployed
+# anywhere, and mustn't be until the API's signed-in routes have a rate limit
+# (see DEPLOY.md). Don't add a push trigger before then.
+#
 # Required repo settings (see DEPLOY.md):
 #   Variables : NEXT_PUBLIC_API_URL, NEXT_PUBLIC_TENANT_URL, NEXT_PUBLIC_GOOGLE_CLIENT_ID (optional)
 #   Secrets   : EC2_HOST, EC2_USER, EC2_SSH_KEY
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
 
 concurrency:
   group: deploy-production
@@ -76,7 +78,7 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           source: "deploy/docker-compose.prod.yml"
-          target: "frame"
+          target: "zowork-forms"
           strip_components: 1
 
       - name: Pull images & restart the stack
@@ -87,7 +89,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             set -e
-            cd ~/frame
+            cd ~/zowork-forms
             # Log in to GHCR with the run's ephemeral token (valid for this run),
             # so the box can pull the private images — no long-lived creds on disk.
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin

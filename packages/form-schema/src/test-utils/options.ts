@@ -9,7 +9,7 @@
  */
 import type { Option } from "../index";
 
-export function code(label: string): string {
+function code(label: string): string {
   return label
     .toLowerCase()
     .replace(/\s+/g, "_")

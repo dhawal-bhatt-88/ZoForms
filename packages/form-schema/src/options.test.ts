@@ -10,7 +10,6 @@ import {
   generateCode,
   newBlock,
   optionListProblems,
-  optionsFromLabels,
   placeholderOptions,
   problemsBesideContent,
   renameOptionCode,
@@ -110,10 +109,6 @@ describe("fillCodes", () => {
 
   it("never regenerates: an existing code stays whatever its label says", () => {
     expect(fillCodes(raw(["yes", "Absolutely"]))).toEqual(raw(["yes", "Absolutely"]));
-  });
-
-  it("fills codes straight away for real labels (templates, import)", () => {
-    expect(optionsFromLabels("Yes", "No")).toEqual(opts("Yes", "No"));
   });
 });
 

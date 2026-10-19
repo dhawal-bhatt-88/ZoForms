@@ -164,11 +164,6 @@ function scoreContext(blocks: readonly Block[]): ScoreContext {
   return { entries, byId, reach, behind, reachedBy };
 }
 
-/** The questions within reach of group `groupId` (§17.2), in reading order. */
-export function scoreReach(blocks: readonly Block[], groupId: string): Block[] {
-  return (scoreContext(blocks).reach.get(groupId) ?? []).map((e) => e.block);
-}
-
 /** A question's name, when it has one. */
 function nameOf(block: Block): string | undefined {
   return typeof block.name === "string" && block.name.trim() ? block.name : undefined;

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  ChevronsUpDown,
   LayoutGrid,
   LayoutTemplate,
   LogOut,
@@ -62,22 +61,7 @@ export default function AppShell({
           <span className="text-[15px] font-semibold tracking-tight">Zowork Forms</span>
         </div>
 
-        {/* Workspace */}
-        <div className="px-3">
-          <button className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors hover:bg-surface-2">
-            <span className="grid h-7 w-7 flex-none place-items-center rounded-md bg-gradient-to-br from-accent to-accent-2 text-xs font-bold text-white">
-              {initial}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[13px] font-semibold leading-tight">
-                {user?.name || "My workspace"}
-              </span>
-            </span>
-            <ChevronsUpDown className="h-3.5 w-3.5 flex-none text-faint" />
-          </button>
-        </div>
-
-        <nav className="mt-4 flex flex-col gap-0.5 px-3">
+        <nav className="mt-2 flex flex-col gap-0.5 px-3">
           {NAV.map((n) => {
             const active = n.exact ? pathname === n.href : pathname.startsWith(n.href);
             const Icon = n.icon;

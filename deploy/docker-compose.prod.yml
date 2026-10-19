@@ -1,8 +1,8 @@
-name: frame
+name: zowork-forms
 
 # Single-box deployment: Postgres + API + web + admin, all on one EC2 host.
 # Image refs (IMAGE_*) are injected by the Deploy workflow; everything else
-# comes from ~/frame/.env.prod (see deploy/.env.prod.example).
+# comes from ~/zowork-forms/.env.prod (see deploy/.env.prod.example).
 
 services:
   db:

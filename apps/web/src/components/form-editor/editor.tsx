@@ -78,7 +78,6 @@ import {
   isPage,
   isPaged,
   isRepeatingGroup,
-  isScoredGroup,
   isWithinScoreReach,
   logicTreeToText,
   makePaged,

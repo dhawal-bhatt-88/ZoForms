@@ -22,7 +22,7 @@ const SAVE_DELAY_MS = 500;
 /** On <html> while a drag is in progress: col-resize everywhere and no text selection (globals.css). */
 const RESIZING_CLASS = "pane-resizing";
 
-export type SettingsPane = ReturnType<typeof useSettingsPane>;
+type SettingsPane = ReturnType<typeof useSettingsPane>;
 
 /**
  * The editor's resizable settings pane: its width, and the handle's props.

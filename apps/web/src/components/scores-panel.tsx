@@ -16,7 +16,7 @@ import {
 } from "@formbuilder/form-schema";
 import { Switch } from "@/components/switch";
 
-export const FORMULA_HINT = "Use question names, numbers, + - * / and brackets, e.g. q1 + q2";
+const FORMULA_HINT = "Use question names, numbers, + - * / and brackets, e.g. q1 + q2";
 /** How long after the author stops typing a formula is checked (as the logic field, contract §15.6). */
 const FORMULA_CHECK_DELAY_MS = 500;
 

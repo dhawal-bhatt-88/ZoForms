@@ -235,15 +235,6 @@ export function fillCodes<T extends Option>(options: readonly T[], reserved: Ite
 }
 
 /**
- * Coded options from real labels, codes generated straight away:
- * `optionsFromLabels("Yes", "No")`. For templates and imports — not for
- * placeholders, which start with an empty code (`placeholderOptions`).
- */
-export function optionsFromLabels(...labels: string[]): Option[] {
-  return fillCodes(labels.map((label) => ({ code: "", label })));
-}
-
-/**
  * Placeholder options for a new block or a new row — "Option 1", "Option 2"
  * … — with empty codes (contract §13.3), so each code is made from the label
  * the author types, not from the placeholder.
@@ -991,30 +982,6 @@ export function withoutTemplateRefs(blocks: readonly Block[]): Block[] {
   });
 }
 
-/**
- * The blocks without anything only the builder uses, at any depth: template
- * references, question names (contract §17.8) and formula text (§17.7). For
- * what respondents are sent.
- */
-export function withoutBuilderFields(blocks: readonly Block[]): Block[] {
-  return blocks.map((block) => {
-    if (!isContainer(block)) {
-      if (block.name === undefined) return block;
-      const { name: _name, ...rest } = block;
-      return rest as Block;
-    }
-    const { templateRef: _ref, ...rest } = block as GroupBlock;
-    const scores = Array.isArray(rest.scores)
-      ? rest.scores.map((s) => {
-          if (typeof s !== "object" || s === null || !("formulaText" in s)) return s;
-          const { formulaText: _text, ...kept } = s;
-          return kept as Score;
-        })
-      : rest.scores;
-    return { ...rest, ...(scores !== undefined ? { scores } : {}), blocks: withoutBuilderFields(block.blocks) } as Block;
-  });
-}
-
 /* ---------- condition logic (contract §15) ---------- */
 
 /**
@@ -1335,11 +1302,6 @@ export function newBlock(
 export function addGridColumn(columns: readonly GridColumn[]): GridColumn[] {
   const [{ label }] = placeholderOptions("Column", 1, columns);
   return [...columns, { code: "", label, type: "text" }];
-}
-
-/** The list without the column at `index`. */
-export function removeGridColumn(columns: readonly GridColumn[], index: number): GridColumn[] {
-  return columns.filter((_, k) => k !== index);
 }
 
 /** The column at `index` moved one place up (-1) or down (1); unchanged at either end. */

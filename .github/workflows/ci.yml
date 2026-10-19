@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   build:
-    name: Lint · typecheck · build
+    name: Typecheck · test · build
     runs-on: ubuntu-latest
     # prisma validate / generate resolve env("DATABASE_URL") at parse time.
     # No DB is contacted during CI — this is just a placeholder to satisfy it.

@@ -32,7 +32,7 @@ const LATEST_VERSION = { orderBy: { version: "desc" }, take: 1 } as const;
  * at version 12 is "phq-9-adult-v12.json"; a title that leaves nothing gives
  * "form-v12.json".
  */
-export function downloadFileName(title: string, version: number): string {
+function downloadFileName(title: string, version: number): string {
   const stem = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   return `${stem || "form"}-v${version}.json`;
 }

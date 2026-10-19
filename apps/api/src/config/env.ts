@@ -28,7 +28,7 @@ const EnvSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().optional(),
 });
 
-export type Env = z.infer<typeof EnvSchema>;
+type Env = z.infer<typeof EnvSchema>;
 
 function load(): Env {
   // docker-compose substitutes unset interpolated vars with an empty string;

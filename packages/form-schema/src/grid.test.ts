@@ -20,7 +20,6 @@ import {
   optionListProblems,
   problemsBesideContent,
   questionNumbers,
-  removeGridColumn,
   sameContent,
   sourceOperators,
   updateGridColumn,
@@ -323,15 +322,6 @@ describe("editing columns keeps every column's type, options and required", () =
     expect(addGridColumn([{ code: "", label: "Column 2", type: "text" }])[1].label).toBe("Column 3");
   });
 
-  it("removeGridColumn removes one; the rest keep their fields, in order", () => {
-    for (let i = 0; i < COLUMNS.length; i += 1) {
-      const removed = removeGridColumn(COLUMNS, i);
-      expect(removed.map((c) => c.code)).toEqual(COLUMNS.filter((_, k) => k !== i).map((c) => c.code));
-      expectKept(removed, COLUMNS.filter((_, k) => k !== i));
-    }
-    expect(removeGridColumn([COLUMNS[0]], 0)).toEqual([]);
-  });
-
   it("moveGridColumn swaps with a neighbour; each column carries its fields; the ends don't move", () => {
     const down = moveGridColumn(COLUMNS, 1, 1);
     expect(down.map((c) => c.code)).toEqual(["first_age", "recent", "frequency", "help"]);
@@ -349,7 +339,7 @@ describe("editing columns keeps every column's type, options and required", () =
   it("returns new lists and leaves the input untouched", () => {
     const copy = JSON.stringify(COLUMNS);
     for (const next of [
-      addGridColumn(COLUMNS), removeGridColumn(COLUMNS, 1), moveGridColumn(COLUMNS, 1, 1),
+      addGridColumn(COLUMNS), moveGridColumn(COLUMNS, 1, 1),
       updateGridColumn(COLUMNS, 1, { label: "x" }),
     ]) expect(next).not.toBe(COLUMNS);
     expect(JSON.stringify(COLUMNS)).toBe(copy);

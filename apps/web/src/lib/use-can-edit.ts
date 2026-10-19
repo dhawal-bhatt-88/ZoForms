@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import { me } from "./api";
 
-export type Me = Awaited<ReturnType<typeof me>>;
+type Me = Awaited<ReturnType<typeof me>>;
 
 /**
  * The signed-in member, fetched once: "loading" until it arrives, then the
  * member, or "failed" (the editor then lays itself out with the defaults).
  */
-export type MeState = { status: "loading" } | { status: "ready"; me: Me } | { status: "failed" };
+type MeState = { status: "loading" } | { status: "ready"; me: Me } | { status: "failed" };
 
 export function useMe(): MeState {
   const [state, setState] = useState<MeState>({ status: "loading" });

@@ -15,6 +15,7 @@ import {
   formProblems,
   formulaNamesInText,
   formulaTerms,
+  formulaTextError,
   formulaToText,
   generateQuestionName,
   groupFromTemplate,
@@ -30,13 +31,12 @@ import {
   repeatsOnScoreBlockers,
   resolveNameClashes,
   scoreDeletionBlockers,
-  scoreReach,
+  scoreableQuestions,
   scoreTypeChangeBlockers,
   scoreUseMessage,
   structureBreaks,
   walkBlocks,
   withArtifactScores,
-  withoutBuilderFields,
 } from "./index";
 
 /* ---------- the parser, on its own ---------- */
@@ -289,9 +289,18 @@ const derived = (blocks: readonly Block[], id = "g") => groupOf(withArtifactScor
 const noTrees = (blocks: readonly Block[]) =>
   walkBlocks(blocks).every((e) => !(e.block.scores ?? []).some((s) => typeof s === "object" && s !== null && "formula" in s));
 
+/** The ids of the questions group `id`'s formulas can use, as the editor lists them. */
+const reachIds = (blocks: readonly Block[], id: string) => scoreableQuestions(blocks, id).map((q) => q.block.id);
+
 describe("reach (§17.2)", () => {
   it("includes nested plain groups, and excludes nested repeats and anything outside", () => {
-    expect(scoreReach(phq(), "g").map((b) => b.id)).toEqual(["b1", "b2", "b3", "note"]);
+    expect(reachIds(phq(), "g")).toEqual(["b1", "b2", "b3"]);
+    // "note" is within reach but can't be scored; "count" is behind a nested repeat; "outside" is outside.
+    expect(formulaTextError(phq(), "g", "note")).toBe(
+      `"note" can't be scored. Use number, scale, rating, choice, dropdown, checkbox, multiselect or matrix questions.`,
+    );
+    expect(formulaTextError(phq(), "g", "count")).toBe(`"count" is in a repeating group, so this score can't use it.`);
+    expect(formulaTextError(phq(), "g", "outside")).toBe(`There's no question named "outside" in this group.`);
   });
 
   it("includes a scored repeating group's own questions, but not a repeat nested in it", () => {
@@ -313,8 +322,8 @@ describe("reach (§17.2)", () => {
         },
       ],
     }).blocks;
-    expect(scoreReach(blocks, "r").map((b) => b.id)).toEqual(["age", "w"]);
-    expect(scoreReach(blocks, "r2").map((b) => b.id)).toEqual(["amount"]);
+    expect(reachIds(blocks, "r")).toEqual(["age", "w"]);
+    expect(reachIds(blocks, "r2")).toEqual(["amount"]);
   });
 });
 
@@ -642,14 +651,6 @@ describe("the artifact", () => {
     const noId = JSON.parse(JSON.stringify(good));
     delete noId.blocks[0].scores[0].id;
     expect(FormArtifact.safeParse(noId).error?.issues[0].message).toBe('Group "PHQ", score "Total score": It has no id.');
-  });
-
-  it("strips names and formula text from what respondents are sent", () => {
-    const sent = withoutBuilderFields(content().blocks);
-    const json = JSON.stringify(sent);
-    expect(json).not.toContain('"name"');
-    expect(json).not.toContain("formulaText");
-    expect((sent[0] as GroupBlock).scores![0].label).toBe("Total score");
   });
 });
 

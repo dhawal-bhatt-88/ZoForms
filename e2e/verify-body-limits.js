@@ -51,11 +51,6 @@ const kb = (n) => "x".repeat(n * 1024);
     check("over 10 MB on the save route is refused (413), naming that limit", r.status === 413 && (await message(r)) === "The request is too large. The limit is 10 MB.", `${r.status}`);
     r = await save(JSON.stringify({ title: "Small", blocks: [{ id: "c", type: "choice", label: "C", options: opts("Yes", "No") }] }));
     check("a normal save still works (200)", r.status === 200, `${r.status}`);
-
-    // ---------- billing is gone ----------
-    r = await fetch(API + "/v1/billing/webhook", { method: "POST", headers: json, body: "{}" });
-    const billing = await fetch(API + "/v1/billing", { headers: H });
-    check("the old billing routes no longer exist (404)", r.status === 404 && billing.status === 404, `${r.status} ${billing.status}`);
   } catch (e) {
     check("script ran without error", false, e.stack);
   } finally {

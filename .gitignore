@@ -15,6 +15,7 @@ build/
 .next/
 .turbo/
 coverage/
+*.tsbuildinfo
 
 # Test artifacts (Playwright)
 test-results/

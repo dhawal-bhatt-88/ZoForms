@@ -1,9 +1,9 @@
 import type { FormSchema, GroupBlock } from "@formbuilder/form-schema";
 
-export const API_URL =
+const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
-export type User = { id: string; email: string; name: string | null };
+type User = { id: string; email: string; name: string | null };
 
 /* ---------- token ---------- */
 
@@ -230,7 +230,7 @@ export type FormListItem = {
   updatedAt?: string;
 };
 
-export type FormDetail = {
+type FormDetail = {
   id: string;
   title: string;
   createdAt: string;

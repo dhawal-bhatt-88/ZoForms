@@ -1,7 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { env } from "../config/env";
 
-export type MailMessage = {
+type MailMessage = {
   to: string | string[];
   subject: string;
   html: string;
