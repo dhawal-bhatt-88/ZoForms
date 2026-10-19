@@ -120,3 +120,14 @@ export function frameComponents(resolve: (colors: Record<string, any>) => FrameC
     });
   });
 }
+
+/**
+ * Only the `.eyebrow`, for a preset whose app has its own buttons and fields:
+ * the web app's kit (`apps/web/src/components/ui`) replaced `.btn*` and
+ * `.input` there. The admin app's preset still takes everything above.
+ */
+export function frameEyebrow(eyebrow: Rule) {
+  return plugin(({ addComponents }) => {
+    addComponents({ ".eyebrow": eyebrow });
+  });
+}

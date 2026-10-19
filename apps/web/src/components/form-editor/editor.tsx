@@ -196,7 +196,7 @@ import { canEditAs, useMe } from "@/lib/use-can-edit";
 import { SETTINGS_PANE_HEADING_ID, SETTINGS_PANE_ID, SettingsPaneHandle, useSettingsPane } from "./settings-pane";
 import { SaveStatus, useSaveAnnouncement } from "./save-status";
 import { LeaveLink } from "./leave-link";
-import { BlockPreview, DropLine, GroupBox, ICONS, MAX_INDENT_LEVELS } from "./canvas-preview";
+import { BlockChips, BlockIcon, BlockPreview, DropLine, GroupBox, PAGE_BOX, PAGE_HEADER, PageLabel, RequiredMark } from "./canvas-preview";
 import {
   ApiError,
   downloadArtifact,
@@ -287,7 +287,13 @@ function catalogLabel(item: CatalogItem): string {
   return item.label ?? (item.type === "group" ? "Group" : BLOCK_META[item.type].label);
 }
 
-/** Notion-style slash / insert menu. Filters the catalog by a query string. */
+/**
+ * The insert menu: a ZoBlocks popover holding a search box and the catalog,
+ * filtered as the author types. The ARIA combobox pattern: focus stays in the
+ * search box; Up and Down move the active block (wrapping), Enter inserts it
+ * (the first match until the arrows move), Escape and Tab close the menu. How
+ * many blocks match is said politely as the author types.
+ */
 function BlockMenu({
   query,
   onQuery,
@@ -301,6 +307,8 @@ function BlockMenu({
   onClose: () => void;
   pos: { left: number; top: number };
 }) {
+  const baseId = useId();
+  const [active, setActive] = useState(0);
   const q = query.trim().toLowerCase();
   const groups = CATALOG.map((g) => ({
     group: g.group,
@@ -312,57 +320,104 @@ function BlockMenu({
   })).filter((g) => g.items.length > 0);
 
   const flat = groups.flatMap((g) => g.items);
+  const optionId = (i: number) => `${baseId}-option-${i}`;
+  const listId = `${baseId}-list`;
 
+  // A new query starts from the first match again.
+  useEffect(() => setActive(0), [q]);
+  // The active option stays in view as the arrows move it.
+  useEffect(() => {
+    document.getElementById(optionId(active))?.scrollIntoView({ block: "nearest" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active]);
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (flat.length) setActive((a) => (a + (e.key === "ArrowDown" ? 1 : -1) + flat.length) % flat.length);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (flat[active]) onPick(flat[active]);
+    } else if (e.key === "Escape" || e.key === "Tab") {
+      if (e.key === "Escape") e.preventDefault();
+      onClose();
+    }
+  }
+
+  let index = -1;
   return (
     <div
+      data-block-menu
       style={{ position: "fixed", left: pos.left, top: pos.top }}
-      className="z-40 max-h-[420px] w-[320px] overflow-auto rounded-xl border border-line bg-surface p-1.5 shadow-pop"
+      className="rise-in surface z-40 flex max-h-[420px] w-[320px] flex-col overflow-hidden shadow-[0_18px_44px_-18px_rgb(2_20_17/0.28)]"
       onMouseDown={(e) => e.preventDefault()}
     >
-      <div className="sticky top-0 -mx-1.5 -mt-1.5 mb-1 flex items-center gap-2 border-b border-line bg-surface px-3 py-2">
-        <Search className="h-4 w-4 text-faint" />
+      <div className="flex flex-none items-center gap-2 border-b border-rule px-3 py-2">
+        <Search aria-hidden="true" className="h-4 w-4 flex-none text-graphite-soft" />
         <input
           autoFocus
+          role="combobox"
+          aria-label="Search blocks"
+          aria-expanded="true"
+          aria-controls={listId}
+          aria-autocomplete="list"
+          aria-activedescendant={flat[active] ? optionId(active) : undefined}
           value={query}
           onChange={(e) => onQuery(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") onClose();
-            if (e.key === "Enter" && flat[0]) {
-              e.preventDefault();
-              onPick(flat[0]);
-            }
-          }}
+          onKeyDown={onKeyDown}
           placeholder="Search blocks…"
-          className="w-full bg-transparent text-sm outline-none placeholder:text-faint"
+          className="w-full bg-transparent text-[0.875rem] text-ink outline-none placeholder:text-graphite-soft"
+          spellCheck={false}
         />
       </div>
-      {groups.length === 0 && (
-        <div className="px-3 py-4 text-center text-sm text-muted">No blocks match “{query}”.</div>
-      )}
-      {groups.map((g) => (
-        <div key={g.group} className="mb-1">
-          <div className="px-2 pb-0.5 pt-1.5 text-[10.5px] font-bold uppercase tracking-wider text-faint">
-            {g.group}
-          </div>
-          {g.items.map((it, i) => {
-            const Icon = it.template ? LayoutTemplate : ICONS[it.type];
-            const label = catalogLabel(it);
-            return (
-              <button
-                key={it.type + i}
-                data-block-type={it.template ? undefined : it.type}
-                onClick={() => onPick(it)}
-                className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left text-sm text-ink-2 transition-colors hover:bg-accent-weak hover:text-accent-2"
-              >
-                <span className="grid h-7 w-7 flex-none place-items-center rounded-md bg-surface-3 text-muted">
-                  <Icon className="h-4 w-4" />
-                </span>
-                <span className="flex-1">{label}</span>
-              </button>
-            );
-          })}
+      <div className="min-h-0 overflow-y-auto p-1.5">
+        {groups.length === 0 && (
+          <p className="px-3 py-4 text-center text-[0.8125rem] text-graphite">No blocks match “{query}”.</p>
+        )}
+        <div role="listbox" id={listId} aria-label="Blocks">
+          {groups.map((g) => (
+            <div key={g.group} role="group" aria-labelledby={`${baseId}-${g.group}`} className="mb-1 last:mb-0">
+              <div id={`${baseId}-${g.group}`} className="eyebrow px-2 pb-1 pt-2 text-graphite-soft">
+                {g.group}
+              </div>
+              {g.items.map((it) => {
+                const i = ++index;
+                const label = catalogLabel(it);
+                return (
+                  <div
+                    key={`${it.type}-${label}`}
+                    id={optionId(i)}
+                    role="option"
+                    aria-selected={i === active}
+                    data-block-type={it.template ? undefined : it.type}
+                    onClick={() => onPick(it)}
+                    onMouseMove={() => i !== active && setActive(i)}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1.5 text-[0.8125rem] transition-colors duration-150",
+                      i === active ? "bg-accent-wash text-ink" : "text-graphite",
+                    )}
+                  >
+                    {it.template ? (
+                      <span aria-hidden="true" className="grid h-[22px] w-[22px] flex-none place-items-center rounded-md bg-accent-wash text-brand-deep">
+                        <LayoutTemplate className="h-3.5 w-3.5" />
+                      </span>
+                    ) : (
+                      <BlockIcon type={it.type} />
+                    )}
+                    <span data-label className="flex-1">
+                      {label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
         </div>
-      ))}
+      </div>
+      {/* Said once the author has typed: "3 blocks", or that nothing matches. */}
+      <p aria-live="polite" className="sr-only">
+        {q ? (flat.length ? `${flat.length} ${flat.length === 1 ? "block" : "blocks"}` : "No blocks match") : ""}
+      </p>
     </div>
   );
 }
@@ -422,46 +477,41 @@ function PageBox({
   const page = item.block as PageBlock;
   const name = page.title.trim() || `Page ${pageNumber}`;
   const hiddenCount = item.collapsed ? walkBlocks(page.blocks).length : 0;
-  const iconButton =
-    "grid h-7 w-7 flex-none place-items-center rounded-md text-muted hover:bg-surface hover:text-ink disabled:opacity-30";
   return (
     <section
       data-page-box={page.id}
       data-drop-target={dropTarget || undefined}
-      className={`relative rounded-2xl border-2 bg-surface transition-[border-color,box-shadow] ${
-        dropTarget
-          ? "border-accent ring-2 ring-accent/30"
-          : selected
-            ? "border-accent ring-2 ring-accent-weak"
-            : "border-ink/15"
-      }`}
+      className={cn(PAGE_BOX, dropTarget || selected ? "border-brand-deep ring-[3px] ring-brand/20" : "border-rule-strong")}
     >
       <div
         ref={setNodeRef}
         data-block-id={page.id}
         data-depth={0}
         onClick={onSelect}
-        className={`flex cursor-pointer items-center gap-2 bg-ink/[0.045] px-3 py-2 ${
-          item.collapsed ? "rounded-[14px]" : "rounded-t-[14px] border-b border-ink/10"
-        } ${dropTarget ? "bg-accent-weak" : ""}`}
+        className={cn(
+          PAGE_HEADER,
+          "cursor-pointer",
+          item.collapsed ? "rounded-[0.75rem]" : "rounded-t-[0.75rem] border-b border-rule",
+          dropTarget ? "bg-accent-wash" : "bg-paper-sunk",
+        )}
       >
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             onToggle();
           }}
           aria-expanded={!item.collapsed}
           aria-label={item.collapsed ? `Expand page "${name}"` : `Collapse page "${name}"`}
-          className={iconButton}
+          className={CARD_ICON}
         >
-          {item.collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          {item.collapsed ? <ChevronRight aria-hidden="true" className="h-4 w-4" /> : <ChevronDown aria-hidden="true" className="h-4 w-4" />}
         </button>
-        <span className="flex-none text-[12px] font-bold uppercase tracking-wider text-muted">
-          Page {pageNumber}
-        </span>
-        <span aria-hidden="true" className="flex-none text-faint">
+        <PageLabel number={pageNumber} />
+        <span aria-hidden="true" className="flex-none text-graphite-soft">
           ·
         </span>
+        {/* The page's own keyboard stop: focusing its title selects the page. */}
         <input
           value={page.title}
           aria-label={`Page ${pageNumber} title`}
@@ -469,62 +519,62 @@ function PageBox({
           onChange={(e) => onTitle(e.target.value)}
           onClick={(e) => e.stopPropagation()}
           onFocus={onSelect}
-          className="min-w-0 flex-1 truncate rounded-md bg-transparent px-1 py-0.5 text-[15px] font-semibold outline-none hover:bg-surface focus:bg-surface"
+          className="min-w-0 flex-1 truncate rounded-md border border-transparent bg-transparent px-1 py-0.5 text-[0.9375rem] font-semibold text-ink outline-none transition-colors duration-200 ease-out-expo placeholder:text-graphite-soft hover:bg-surface focus:border-brand-deep focus:bg-surface"
           spellCheck={false}
         />
-        {!!page.enableWhen?.length && (
-          <span className="flex-none rounded-full bg-accent-weak px-2 py-0.5 text-[11px] font-semibold text-accent-2">
-            Conditional
-          </span>
-        )}
+        <BlockChips block={page} />
         {item.collapsed && (
-          <span className="flex-none text-xs text-muted">
+          <span className="flex-none text-[0.75rem] text-graphite">
             {hiddenCount} {hiddenCount === 1 ? "block" : "blocks"} inside
           </span>
         )}
         <div className="flex flex-none items-center gap-0.5">
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               onMove(-1);
             }}
             disabled={!canMoveUp}
-            className={iconButton}
+            className={CARD_ICON}
             aria-label="Move page up"
           >
-            <ArrowUp className="h-4 w-4" />
+            <ArrowUp aria-hidden="true" className="h-4 w-4" />
           </button>
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               onMove(1);
             }}
             disabled={!canMoveDown}
-            className={iconButton}
+            className={CARD_ICON}
             aria-label="Move page down"
           >
-            <ArrowDown className="h-4 w-4" />
+            <ArrowDown aria-hidden="true" className="h-4 w-4" />
           </button>
           {onlyPage ? (
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onRemovePages();
               }}
-              className="rounded-md px-2 py-1 text-xs font-medium text-muted hover:bg-surface hover:text-ink"
+              className={buttonClasses({ variant: "ghost", size: "sm", className: "text-graphite ease-out-expo hover:text-ink" })}
             >
               Remove pages
             </button>
           ) : (
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete();
               }}
-              className={`${iconButton} hover:!bg-fail-wash hover:!text-red`}
+              className={CARD_DELETE}
               aria-label="Delete page"
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 aria-hidden="true" className="h-4 w-4" />
             </button>
           )}
         </div>
@@ -533,6 +583,11 @@ function PageBox({
     </section>
   );
 }
+
+/** The canvas's icon controls: the kit's ghost icon button, with the ZoBlocks hover easing. */
+const CARD_ICON = buttonClasses({ variant: "ghost", size: "icon", className: "h-7 w-7 flex-none text-graphite ease-out-expo hover:text-ink" });
+/** Delete, among them: quiet until hovered, then the fail colour. */
+const CARD_DELETE = buttonClasses({ variant: "danger-ghost", size: "icon", className: "h-7 w-7 flex-none ease-out-expo" });
 
 function CanvasCard({
   item,
@@ -554,7 +609,8 @@ function CanvasCard({
   selected: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
-  onSelect: () => void;
+  /** Select this block; `toPane` also takes focus to its settings (a keyboard selection). */
+  onSelect: (toPane: boolean) => void;
   onDelete: () => void;
   onMove: (direction: -1 | 1) => void;
   onToggle: () => void;
@@ -569,126 +625,130 @@ function CanvasCard({
   const { attributes, listeners, setNodeRef, isDragging } = useSortable({ id: item.id });
   const block = item.block;
   const group = isGroup(block) ? block : null;
-  const depth = item.depth;
-  const level = item.level;
-  const Icon = ICONS[block.type];
   const hiddenCount = group && item.collapsed ? walkBlocks(group.blocks).length : 0;
+  const unlabelled = !!group && !group.label.trim();
+  const name = unlabelled ? "Unlabelled group" : blockName(block);
+  const kind = inspectorHeading(block).toLowerCase();
 
   return (
     <div
       ref={setNodeRef}
       data-block-id={block.id}
-      data-depth={depth}
-      onClick={onSelect}
-      className={`group relative cursor-pointer transition-colors ${
+      data-depth={item.depth}
+      onClick={() => onSelect(false)}
+      className={cn(
+        "group relative cursor-pointer transition-[background-color,border-color,box-shadow] duration-200 ease-out-expo",
+        // A group's card is the header inside its box; the box shows selection.
         group
-          ? // A group's card is the header inside its box; the box shows selection.
-            "rounded-lg px-1.5 py-2.5"
-          : `rounded-xl border p-3.5 ${
-              selected
-                ? "border-accent bg-surface ring-2 ring-accent-weak"
-                : "border-transparent hover:border-line-2 hover:bg-surface-2"
-            }`
-      } ${isDragging && !group ? "opacity-40" : ""}`}
+          ? "rounded-[0.625rem] px-1.5 py-2.5"
+          : cn(
+              "rounded-[0.625rem] border p-3.5",
+              selected ? "border-brand-deep bg-surface ring-[3px] ring-brand/20" : "border-transparent hover:border-rule-strong hover:bg-surface",
+            ),
+        isDragging && !group && "opacity-40",
+      )}
     >
+      {/*
+        The keyboard's way in, as on the My forms cards: a button over the whole
+        card, so its focus ring follows the card's corners. Enter or Space selects
+        the block and takes focus to its settings. The pointer passes through it
+        (the card's own click selects), and the card's controls sit above it.
+      */}
+      <button
+        type="button"
+        data-select-block
+        aria-label={`Edit ${kind}${number !== undefined ? ` ${number}` : ""}: ${name}`}
+        aria-current={selected || undefined}
+        aria-controls={SETTINGS_PANE_ID}
+        onClick={(e) => {
+          e.stopPropagation();
+          // A click from the keyboard has no pointer, so detail is 0.
+          onSelect(e.detail === 0);
+        }}
+        className="pointer-events-none absolute inset-0 rounded-[0.625rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-deep focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+      />
       {dropLine && <DropLine at={dropLine} />}
-      <div className={`flex items-center gap-2 ${group ? "" : "mb-2.5"} pr-[88px]`}>
+      <div className={cn("flex items-center gap-2 pr-[88px]", !group && "mb-2.5")}>
+        {/* For the pointer only: the keyboard moves blocks with Move up, Move down and Move to…. */}
         <button
           {...attributes}
           {...listeners}
+          tabIndex={-1}
           onClick={(e) => e.stopPropagation()}
-          className="cursor-grab text-faint opacity-0 transition-opacity hover:text-ink focus-visible:opacity-100 group-hover:opacity-100 active:cursor-grabbing"
+          className="relative cursor-grab text-graphite-soft opacity-0 transition-opacity duration-200 ease-out-expo hover:text-ink active:cursor-grabbing group-focus-within:opacity-100 group-hover:opacity-100"
           aria-label="Drag to reorder"
         >
-          <GripVertical className="h-4 w-4" />
+          <GripVertical aria-hidden="true" className="h-4 w-4" />
         </button>
         {group && (
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               onToggle();
             }}
             aria-expanded={!item.collapsed}
             aria-label={item.collapsed ? `Expand group "${group.label}"` : `Collapse group "${group.label}"`}
-            className="grid h-6 w-6 flex-none place-items-center rounded-md text-muted hover:bg-surface-3 hover:text-ink"
+            className={cn(CARD_ICON, "relative h-6 w-6 p-1")}
           >
-            {item.collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            {item.collapsed ? <ChevronRight aria-hidden="true" className="h-4 w-4" /> : <ChevronDown aria-hidden="true" className="h-4 w-4" />}
           </button>
         )}
-        <span className="grid h-[22px] w-[22px] flex-none place-items-center rounded-md bg-accent-weak text-accent-2">
-          <Icon className="h-3.5 w-3.5" />
-        </span>
+        <BlockIcon type={block.type} />
         {number !== undefined && (
-          <span className="flex-none text-[13px] font-semibold tabular-nums text-muted">{number}.</span>
+          <span className="flex-none text-[0.8125rem] font-semibold tabular-nums text-graphite">{number}.</span>
         )}
-        <span className={`min-w-0 truncate font-semibold ${group && !group.label.trim() ? "italic text-faint" : ""}`}>
-          {group && !group.label.trim() ? "Unlabelled group" : blockName(block)}
-        </span>
+        <span className={cn("min-w-0 truncate font-semibold", unlabelled && "italic text-graphite-soft")}>{name}</span>
         {/* "Answer every row" / "Rank every option" make the question required too (the renderer's rule). */}
-        {(block.required || block.completeRequired) && <span className="text-red">*</span>}
-        {group && isRepeatingGroup(group) && (
-          <span
-            data-repeat-badge
-            // Bordered: group boxes alternate shading, and a filled pill vanished on the grey ones.
-            className="flex-none rounded-full border border-line-2 bg-surface px-2 py-0.5 text-[11px] font-semibold text-ink-2"
-          >
-            {repeatBadgeText(group)}
-          </span>
-        )}
-        {!!block.enableWhen?.length && (
-          <span className="flex-none rounded-full bg-accent-weak px-2 py-0.5 text-[11px] font-semibold text-accent-2">
-            Conditional
-          </span>
-        )}
-        {level > MAX_INDENT_LEVELS && (
-          <span className="flex-none rounded-full bg-surface-3 px-2 py-0.5 text-[11px] font-semibold text-muted">
-            Level {level + 1}
-          </span>
-        )}
+        {(block.required || block.completeRequired) && <RequiredMark />}
+        <BlockChips block={block} level={item.level} />
         {group && item.collapsed && (
-          <span className="flex-none text-xs text-muted">
+          <span className="flex-none text-[0.75rem] text-graphite">
             {hiddenCount} {hiddenCount === 1 ? "block" : "blocks"} inside
           </span>
         )}
       </div>
       {!group && <BlockPreview block={block} />}
 
-      {/* Visible on hover, and whenever focus is inside the card, so these work from the keyboard. */}
-      <div className="absolute right-2 top-2 flex gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+      {/* Visible on hover, and whenever focus is in the card, so these work from the keyboard. */}
+      <div className="absolute right-2 top-2 z-10 flex gap-0.5 opacity-0 transition-opacity duration-200 ease-out-expo focus-within:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100">
         {group && menu && <MenuButton label={`More actions for group "${blockName(group).trim() || "Unlabelled group"}"`} items={menu} />}
         {!locked && (
           <>
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onMove(-1);
               }}
               disabled={!canMoveUp}
-              className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-surface-3 hover:text-ink disabled:opacity-30"
+              className={CARD_ICON}
               aria-label="Move up"
             >
-              <ArrowUp className="h-4 w-4" />
+              <ArrowUp aria-hidden="true" className="h-4 w-4" />
             </button>
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onMove(1);
               }}
               disabled={!canMoveDown}
-              className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-surface-3 hover:text-ink disabled:opacity-30"
+              className={CARD_ICON}
               aria-label="Move down"
             >
-              <ArrowDown className="h-4 w-4" />
+              <ArrowDown aria-hidden="true" className="h-4 w-4" />
             </button>
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete();
               }}
-              className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-fail-wash hover:text-red"
+              className={CARD_DELETE}
               aria-label={group ? "Delete group" : "Delete"}
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 aria-hidden="true" className="h-4 w-4" />
             </button>
           </>
         )}
@@ -713,12 +773,12 @@ function ContainerEnd({
     <div className="relative">
       {dropLine && <DropLine at="top" />}
       <button
+        type="button"
         onClick={(e) => onAdd(e.currentTarget)}
-        className={`flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] hover:bg-surface-2 hover:text-accent-2 ${
-          group.blocks.length ? "text-muted" : "text-amber"
-        }`}
+        // Graphite either way: an empty page or group is something to fill, not a warning.
+        className={buttonClasses({ variant: "ghost", size: "sm", className: "-ml-1 text-graphite ease-out-expo hover:text-brand-deep" })}
       >
-        <Plus className="h-3.5 w-3.5" />
+        <Plus aria-hidden="true" className="h-3.5 w-3.5" />
         {group.blocks.length ? `Add to "${name}"` : `"${name}" is empty — add a block to it`}
       </button>
     </div>
@@ -727,16 +787,13 @@ function ContainerEnd({
 
 /** What follows the pointer while dragging: the block's icon and label. */
 function DragGhost({ block }: { block: Block }) {
-  const Icon = ICONS[block.type];
   const inside = isGroup(block) ? walkBlocks(block.blocks).length : 0;
   return (
-    <div className="flex h-full items-start gap-2 rounded-xl border border-accent bg-surface px-3.5 py-2.5 shadow-pop">
-      <span className="grid h-[22px] w-[22px] flex-none place-items-center rounded-md bg-accent-weak text-accent-2">
-        <Icon className="h-3.5 w-3.5" />
-      </span>
+    <div className="flex h-full items-start gap-2 rounded-[0.625rem] border border-brand-deep bg-surface px-3.5 py-2.5 shadow-[0_18px_44px_-18px_rgb(2_20_17/0.28)]">
+      <BlockIcon type={block.type} />
       <span className="min-w-0 truncate font-semibold">{blockName(block).trim() || "Unlabelled group"}</span>
       {isGroup(block) && (
-        <span className="flex-none pt-0.5 text-xs text-muted">
+        <span className="flex-none pt-0.5 text-[0.75rem] text-graphite">
           {inside} {inside === 1 ? "block" : "blocks"} inside
         </span>
       )}
@@ -1620,12 +1677,18 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   /** Show a notice; a refusal unless `tone` says otherwise. A new id remounts it, so it is announced even if the words repeat. */
   const notify = ({ tone = "warn", ...rest }: { text: string; blocks?: Block[]; tone?: NoticeTone }) =>
     setNotice({ ...rest, tone, id: ++noticeCount.current });
+  // What a screen reader hears after an edit with no other voice: a move, a delete, an insert.
+  // Each message is a new node, so the same words twice are said twice.
+  const [said, setSaid] = useState({ n: 0, text: "" });
+  const say = (text: string) => setSaid((s) => ({ n: s.n + 1, text }));
   // The standing note on a screen that can't be saved, until dismissed.
   const [readOnlyNoteDismissed, setReadOnlyNoteDismissed] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuQuery, setMenuQuery] = useState("");
   const [menuAnchor, setMenuAnchor] = useState({ left: 0, top: 0 });
+  // What had focus when the insert menu opened: where focus goes back if it's closed without a pick.
+  const menuOpener = useRef<HTMLElement | null>(null);
   // Where the insert menu puts the next block; null = decided by the selection.
   const [insertTarget, setInsertTarget] = useState<MoveTarget | null>(null);
   // Groups folded on the canvas. Editor-only state: never saved.
@@ -1768,6 +1831,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     setSchema((s) => (s ? fn(s) : s));
 
   const openMenu = (anchor?: HTMLElement | null, target: MoveTarget | null = null) => {
+    menuOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setInsertTarget(target);
     const r = (anchor ?? insertRowRef.current)?.getBoundingClientRect();
     if (r) {
@@ -1829,10 +1893,18 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     if (isAnswerable(b)) newQuestions.current.add(b.id);
     patch((s) => ({ ...s, blocks: insertBlockIntoTree(s.blocks, target.parentId, target.index, b) }));
     if (target.parentId) expand(target.parentId);
-    setSelectedId(b.id);
+    // The new block's settings take focus: its label is the next thing to write.
+    selectBlock(b.id, true);
+    say(`Added ${catalogLabel(item)}.`);
     setMenuOpen(false);
     setMenuQuery("");
     setInsertTarget(null);
+  };
+  /** Closed without a pick: focus goes back where it was. */
+  const closeMenu = () => {
+    setMenuOpen(false);
+    setMenuQuery("");
+    menuOpener.current?.focus();
   };
   /** Why "Insert as page" isn't available in this form, or null when it is. */
   function insertAsPageRefusal(): string | null {
@@ -1878,6 +1950,27 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     const label = source ? conditionAnswerOptions(source)?.find((o) => o.code === c.answer)?.label : undefined;
     const answer = c.operator === "exists" ? "" : ` ${label ?? c.answer}`;
     return `${source ? `"${blockName(source)}"` : "a missing question"} ${OPERATOR_TEXT[c.operator]}${answer}`;
+  }
+
+  /**
+   * Select a block. From the keyboard (the card's Enter or Space), focus moves
+   * on to its first field in the settings pane, as the author asked to edit it;
+   * the pane's "Back to the canvas" returns it.
+   */
+  function selectBlock(bid: string, toPane: boolean) {
+    setSelectedId(bid);
+    if (toPane) requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById("block-label")?.focus()));
+  }
+
+  /** From the pane back to the selected block's place on the canvas: its card, or a page's title. */
+  function backToCanvas() {
+    if (!selectedId) return;
+    const escaped = selectedId.replace(/["\\]/g, "\\$&");
+    const target =
+      document.querySelector<HTMLElement>(`[data-block-id="${escaped}"] [data-select-block]`) ??
+      document.querySelector<HTMLElement>(`[data-page-box="${escaped}"] input`);
+    target?.focus();
+    target?.scrollIntoView({ block: "nearest" });
   }
 
   /** Select a block and bring it into view (used by the "jump to" links), opening any folded groups around it. */
@@ -2229,6 +2322,35 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     return true;
   }
 
+  /**
+   * Where focus goes when the block that had it is removed (its card's Delete,
+   * or a dialog that card opened): the next block on the canvas, else the one
+   * before, else the "+" that inserts one. Only if focus was in that card or
+   * the dialog, so a deletion never moves focus away from somewhere else.
+   */
+  function keepFocusAfterRemoving(bid: string) {
+    if (!schema) return;
+    const active = document.activeElement;
+    const inCard = !!active?.closest(`[data-block-id="${bid.replace(/["\\]/g, "\\$&")}"], [role="dialog"], [role="alertdialog"]`);
+    if (!inCard) return;
+    const rows = flattenVisible(schema.blocks, collapsed, null);
+    const gone = new Set(walkBlocks(findBlock(schema.blocks, bid) ? [findBlock(schema.blocks, bid)!.block] : []).map((x) => x.block.id));
+    const at = rows.findIndex((r) => r.id === bid);
+    const after = rows.slice(at + 1).find((r) => !gone.has(r.id));
+    const before = rows.slice(0, Math.max(at, 0)).reverse().find((r) => !gone.has(r.id));
+    const to = (after ?? before)?.id;
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        const escaped = to?.replace(/["\\]/g, "\\$&");
+        const target = to
+          ? (document.querySelector<HTMLElement>(`[data-block-id="${escaped}"] [data-select-block]`) ??
+            document.querySelector<HTMLElement>(`[data-page-box="${escaped}"] input`))
+          : null;
+        (target ?? insertRowRef.current?.querySelector<HTMLElement>("button"))?.focus();
+      }),
+    );
+  }
+
   const removeBlock = (bid: string) => {
     if (!schema) return;
     const current = findBlock(schema.blocks, bid)?.block;
@@ -2252,8 +2374,10 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     }
     if (refuseForScores(scoreDeletionBlockers(schema.blocks, bid))) return;
     newQuestions.current.delete(bid);
+    keepFocusAfterRemoving(bid);
     patch((s) => ({ ...s, blocks: removeBlockFromTree(s.blocks, bid) }));
     setSelectedId((cur) => (cur === bid ? null : cur));
+    say(`Deleted "${blockName(current)}".`);
   };
 
   /** Delete a group but keep its contents where it was. Its own conditions go with it. */
@@ -2266,8 +2390,11 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     // goes through the same guard as any move.
     if (refuseStructureEdit(structureBreaks(schema.blocks, next), "remove that group")) return;
     // A repeating group's questions may now be within reach of a scored group (contract §17.8).
+    const group = findBlock(schema.blocks, gid)?.block;
+    keepFocusAfterRemoving(gid);
     patch((s) => ({ ...s, blocks: withNames(unwrapGroup(s.blocks, gid)) }));
     setSelectedId((cur) => (cur === gid ? null : cur));
+    say(`Deleted the group "${group ? blockName(group) : ""}". Its contents are where it was.`);
   }
 
   /** Delete a group and everything in it — refused while anything outside depends on something inside. */
@@ -2285,8 +2412,10 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
       return;
     }
     if (refuseForScores(scoreDeletionBlockers(schema.blocks, gid))) return;
+    keepFocusAfterRemoving(gid);
     patch((s) => ({ ...s, blocks: removeBlockFromTree(s.blocks, gid) }));
     setSelectedId(null);
+    say(`Deleted "${group ? blockName(group) : "the group"}" and its contents.`);
   }
 
   /**
@@ -2326,7 +2455,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
    * inside a repeating group the dependent isn't in — into, out of or between
    * repeats (contract §12.8).
    */
-  function tryMove(bid: string, target: MoveTarget) {
+  function tryMove(bid: string, target: MoveTarget, how = "") {
     if (!schema) return;
     if (refuseRootChange(bid, target)) return;
     const moving = findBlock(schema.blocks, bid)?.block;
@@ -2345,6 +2474,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     const moved = new Set(walkBlocks([moving]).map((e) => e.block.id));
     const { blocks: resolved, renamed } = resolveNameClashes(schema.blocks, next, moved);
     patch((s) => ({ ...s, blocks: withNames(resolved) }));
+    say(`Moved "${blockName(moving)}"${how}.`);
     if (renamed.length) {
       notify({
         tone: "info",
@@ -2430,6 +2560,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     const page = newPage(allBlockIds(schema.blocks));
     patch((s) => ({ ...s, blocks: insertPageAfter(s.blocks, after, page) }));
     setSelectedId(page.id);
+    say("Added a page.");
   }
 
   /** Wrap everything into Page 1 and add an empty Page 2 after it. */
@@ -2440,24 +2571,37 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     const second = newPage(allBlockIds(wrapped));
     patch((s) => ({ ...s, blocks: insertPageAfter(wrapped, wrapped[0].id, second) }));
     setSelectedId(second.id);
+    say("Split into pages: your questions are on Page 1, and Page 2 is empty.");
   }
 
   function movePageBy(pageId: string, direction: -1 | 1) {
-    if (schema) applyPageEdit(movePage(schema.blocks, pageId, direction));
+    if (!schema) return;
+    const page = findBlock(schema.blocks, pageId)?.block;
+    if (applyPageEdit(movePage(schema.blocks, pageId, direction)) && page) say(`Moved "${blockName(page)}" ${direction === -1 ? "up" : "down"}.`);
   }
 
   function deletePageKeeping(pageId: string) {
     if (!schema) return;
     setDeletingPageId(null);
-    if (applyPageEdit(deletePageKeepingContents(schema.blocks, pageId))) {
+    const page = findBlock(schema.blocks, pageId)?.block;
+    const edit = deletePageKeepingContents(schema.blocks, pageId);
+    if (edit.ok) keepFocusAfterRemoving(pageId);
+    if (applyPageEdit(edit)) {
       setSelectedId((cur) => (cur === pageId ? null : cur));
+      say(`Deleted the page "${page ? blockName(page) : ""}". Its contents moved to the next page along.`);
     }
   }
 
   function deletePageAll(pageId: string) {
     if (!schema) return;
     setDeletingPageId(null);
-    if (applyPageEdit(deletePageWithContents(schema.blocks, pageId))) setSelectedId(null);
+    const page = findBlock(schema.blocks, pageId)?.block;
+    const edit = deletePageWithContents(schema.blocks, pageId);
+    if (edit.ok) keepFocusAfterRemoving(pageId);
+    if (applyPageEdit(edit)) {
+      setSelectedId(null);
+      say(`Deleted the page "${page ? blockName(page) : ""}" and its contents.`);
+    }
   }
 
   /** "Remove pages": only offered with one page left; its contents become the form. */
@@ -2469,6 +2613,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     const switchDrafts = !draftModeAvailable(mode, blocks);
     patch((s) => ({ ...s, blocks, ...(switchDrafts ? { drafts: undefined } : {}) }));
     setSelectedId(null);
+    say("Removed pages: the form is one page again.");
     if (switchDrafts) {
       notify({
         tone: "info",
@@ -2606,11 +2751,11 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
           canMoveUp={!!step.up}
           canMoveDown={!!step.down}
           dropLine={!item.isContainer && dropBefore === item.id ? "top" : undefined}
-          onSelect={() => setSelectedId(item.id)}
+          onSelect={(toPane) => selectBlock(item.id, toPane)}
           onDelete={() => removeBlock(item.id)}
           onMove={(direction) => {
             const target = direction === -1 ? step.up : step.down;
-            if (target) tryMove(item.id, target);
+            if (target) tryMove(item.id, target, direction === -1 ? " up" : " down");
           }}
           onToggle={() => toggle(item.id)}
           menu={
@@ -2707,7 +2852,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   const paneSection = "mb-4 border-t border-rule pt-3";
 
   return (
-    <div className="flex h-screen flex-col bg-bg">
+    <div className="flex h-screen flex-col bg-paper">
       {/* Top bar */}
       <header className="flex h-14 flex-none items-center gap-3 border-b border-rule bg-surface px-4">
         <LeaveLink
@@ -2847,6 +2992,10 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         />
       )}
 
+      <div role="status" aria-live="polite" className="sr-only" data-editor-announcement>
+        <span key={said.n}>{said.text}</span>
+      </div>
+
       {((readOnlyNote && !readOnlyNoteDismissed) || notice) && (
         <div className="flex flex-none flex-col gap-2 border-b border-rule bg-paper px-4 py-2.5">
           {readOnlyNote && !readOnlyNoteDismissed && (
@@ -2883,12 +3032,12 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         style={{ gridTemplateColumns: `minmax(0,1fr) 0px ${pane.width}px` }}
       >
         {/* Canvas */}
-        <div className="overflow-auto bg-bg px-6 py-8">
+        <div className="overflow-auto bg-paper px-6 py-8">
           <div className="mx-auto max-w-[680px]">
-            <div className="rounded-2xl border border-line bg-surface p-8 shadow-soft">
+            <div className="surface p-8">
               {groupTemplate ? (
                 // A group template has no title or description of its own: it is its group.
-                <p className="text-sm text-muted">
+                <p className="body-sm text-graphite">
                   This group template is the group below. Everything in it goes inside the group.
                 </p>
               ) : (
@@ -2898,7 +3047,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                     onChange={(e) => patch((s) => ({ ...s, title: e.target.value }))}
                     onFocus={() => setSelectedId(null)}
                     aria-label={templateMode ? "Form title (in forms made from this template)" : "Form title"}
-                    className="w-full text-[26px] font-bold tracking-tight outline-none"
+                    className="-mx-2 w-[calc(100%+1rem)] rounded-lg border border-transparent bg-transparent px-2 font-display text-[1.625rem] font-bold tracking-[-0.02em] text-ink outline-none transition-colors duration-200 ease-out-expo hover:bg-paper-sunk focus:border-brand-deep focus:bg-surface focus:ring-[3px] focus:ring-brand/20"
                     spellCheck={false}
                   />
                   <input
@@ -2909,7 +3058,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                     onFocus={() => setSelectedId(null)}
                     placeholder="Add a description…"
                     aria-label="Form description"
-                    className="mt-1.5 w-full text-[14.5px] text-muted outline-none"
+                    className="-mx-2 mt-1 w-[calc(100%+1rem)] rounded-lg border border-transparent bg-transparent px-2 py-0.5 text-[0.9375rem] text-graphite outline-none transition-colors duration-200 ease-out-expo placeholder:text-graphite-soft hover:bg-paper-sunk focus:border-brand-deep focus:bg-surface focus:ring-[3px] focus:ring-brand/20"
                     spellCheck={false}
                   />
                 </>
@@ -2926,6 +3075,13 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                   onDragOver={onDragOver}
                   onDragEnd={onDragEnd}
                   onDragCancel={() => setDrag(null)}
+                  // The handles are for the pointer; this is what a screen reader hears if it reaches one.
+                  accessibility={{
+                    screenReaderInstructions: {
+                      draggable:
+                        "To move a block from the keyboard, select it and use Move up, Move down or Move to… in its settings, or the Move up and Move down buttons on its card.",
+                    },
+                  }}
                 >
                   <SortableContext items={rows.map((r) => r.id)} strategy={noDisplacement}>
                     <div className="relative flex flex-col gap-2.5">
@@ -2942,48 +3098,58 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
               {/* Notion-style slash inserter */}
               <div ref={insertRowRef} className="mt-3 flex items-center gap-2 rounded-lg px-1 py-1">
                 <button
+                  type="button"
                   onClick={() => openMenu()}
-                  className="grid h-7 w-7 flex-none place-items-center rounded-md border border-line-2 text-muted transition-colors hover:bg-surface-3 hover:text-ink"
+                  className={buttonClasses({ size: "icon", className: "h-7 w-7 flex-none p-0 text-graphite ease-out-expo hover:text-ink" })}
                   title="Insert a block"
+                  aria-label="Insert a block"
+                  aria-haspopup="listbox"
+                  aria-expanded={menuOpen}
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus aria-hidden="true" className="h-4 w-4" />
                 </button>
-                <input
-                  value=""
-                  onChange={() => {}}
-                  onKeyDown={(e) => {
-                    if (e.key === "/") {
-                      e.preventDefault();
-                      openMenu();
-                    }
-                  }}
-                  placeholder={
-                    autoTargetGroup
-                      ? `Type / to add a block to "${
-                          blockName(autoTargetGroup).trim() || (isPage(autoTargetGroup) ? "this page" : "this group")
-                        }", or click +`
-                      : "Type / to insert a block, or click +"
-                  }
-                  className="flex-1 bg-transparent text-sm outline-none placeholder:text-faint"
-                  spellCheck={false}
-                />
+                {(() => {
+                  const hint = autoTargetGroup
+                    ? `Type / to add a block to "${
+                        blockName(autoTargetGroup).trim() || (isPage(autoTargetGroup) ? "this page" : "this group")
+                      }", or click +`
+                    : "Type / to insert a block, or click +";
+                  return (
+                    <input
+                      value=""
+                      onChange={() => {}}
+                      onKeyDown={(e) => {
+                        if (e.key === "/") {
+                          e.preventDefault();
+                          openMenu();
+                        }
+                      }}
+                      placeholder={hint}
+                      // Its only key is "/"; the name says so, as the placeholder does.
+                      aria-label={hint}
+                      className="flex-1 bg-transparent text-[0.875rem] text-ink outline-none placeholder:text-graphite-soft"
+                      spellCheck={false}
+                    />
+                  );
+                })()}
               </div>
 
               {!groupTemplate && (
                 <button
+                  type="button"
                   onClick={addPage}
-                  className="mt-2 flex items-center gap-1.5 rounded-lg px-1 py-1 text-sm font-medium text-muted hover:text-accent-2"
+                  className={buttonClasses({ variant: "ghost", size: "sm", className: "mt-2 text-graphite ease-out-expo hover:text-brand-deep" })}
                 >
-                  <FileText className="h-4 w-4" />
+                  <FileText aria-hidden="true" className="h-3.5 w-3.5" />
                   {addPageAfter ? `Add page after "${addPageAfter.title.trim() || "Untitled page"}"` : "Add page"}
                 </button>
               )}
 
               {schema.blocks.length === 0 && (
-                <div className="mt-4 flex flex-col items-center gap-2 rounded-xl border border-dashed border-line-2 py-10 text-center">
-                  <span className="text-sm font-medium text-ink">Add your first block</span>
-                  <span className="text-sm text-muted">
-                    Type <kbd className="rounded border border-line-2 bg-surface-2 px-1.5 font-mono text-xs">/</kbd>{" "}
+                <div className="mt-4 flex flex-col items-center gap-1.5 rounded-[0.875rem] border border-dashed border-rule-strong px-6 py-10 text-center">
+                  <span className="font-display text-[1.0625rem] font-semibold tracking-[-0.015em] text-ink">Add your first block</span>
+                  <span className="body-sm max-w-[52ch] text-graphite">
+                    Type <kbd className="rounded border border-rule-strong bg-paper-sunk px-1.5 font-mono text-[0.75rem] text-ink">/</kbd>{" "}
                     above or click + to choose from {CATALOG.reduce((n, g) => n + g.items.filter((it) => !it.template).length, 0)} block types.
                   </span>
                 </div>
@@ -2994,23 +3160,8 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
 
         {menuOpen && (
           <>
-            <div
-              className="fixed inset-0 z-30"
-              onClick={() => {
-                setMenuOpen(false);
-                setMenuQuery("");
-              }}
-            />
-            <BlockMenu
-              query={menuQuery}
-              onQuery={setMenuQuery}
-              onPick={insertFromCatalog}
-              onClose={() => {
-                setMenuOpen(false);
-                setMenuQuery("");
-              }}
-              pos={menuAnchor}
-            />
+            <div className="fixed inset-0 z-30" onClick={closeMenu} />
+            <BlockMenu query={menuQuery} onQuery={setMenuQuery} onPick={insertFromCatalog} onClose={closeMenu} pos={menuAnchor} />
           </>
         )}
 
@@ -3024,6 +3175,17 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         >
           {selected ? (
             <div key={selected.id}>
+              {/* Shown on focus: the way back to this block on the canvas, after a keyboard selection. */}
+              <button
+                type="button"
+                onClick={backToCanvas}
+                className={cn(
+                  "sr-only focus:not-sr-only",
+                  buttonClasses({ variant: "ghost", size: "sm", className: "focus:-ml-2.5 focus:mb-2" }),
+                )}
+              >
+                <ChevronLeft aria-hidden="true" className="h-3.5 w-3.5" /> Back to the canvas
+              </button>
               <h4 id={SETTINGS_PANE_HEADING_ID} className="eyebrow mb-3 text-graphite-soft">
                 {inspectorHeading(selected)}
               </h4>

@@ -80,7 +80,8 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     const cards = P.locator("[data-block-id]");
     const labelInput = P.locator("#block-label");
     const urlInput = P.locator("#block-url");
-    const pick = (name) => P.getByRole("button", { name, exact: true }).click();
+    // A block in the insert menu (a listbox of options).
+    const pick = (name) => P.getByRole("option", { name, exact: true }).click();
     const add = async (name) => { await P.getByTitle("Insert a block").click(); await pick(name); };
     const rename = (label) => labelInput.fill(label);
     const inline = () => P.locator("aside").getByRole("alert");

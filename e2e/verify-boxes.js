@@ -111,7 +111,7 @@ const DEEP = { title: "Deep nesting", blocks: [leaf("top", "Top question"), ...d
     // ---------- 3. empty group ----------
     await deselect();
     await page.getByTitle("Insert a block").click();
-    await page.getByRole("button", { name: "Group", exact: true }).click();
+    await page.getByRole("option", { name: "Group", exact: true }).click();
     await page.locator("#block-label").fill("Travel");
     await deselect();
     const travel = page.locator("[data-group-box]").last();

@@ -52,7 +52,8 @@ async function waitFor(url) {
       // The label is the truncating span; badges share its weight but not this class.
       return `${"  ".repeat(Number(e.getAttribute("data-depth")))}${e.querySelector("span.truncate").textContent}`;
     }))).join(" | ");
-    const pick = async (name) => page.getByRole("button", { name, exact: true }).click();
+    // A block in the insert menu (a listbox of options).
+    const pick = async (name) => page.getByRole("option", { name, exact: true }).click();
     const addViaInserter = async (name) => { await page.getByTitle("Insert a block").click(); await pick(name); };
     const addToGroup = async (groupLabel, name) => {
       await page.getByRole("button", { name: new RegExp(`^(Add to "${groupLabel}"|"${groupLabel}" is empty)`) }).click();

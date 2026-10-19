@@ -112,7 +112,8 @@ const file = (name, text) => ({ name, mimeType: name.endsWith(".csv") ? "text/cs
     const cardOf = (label) => cards.filter({ has: P.locator("span.truncate", { hasText: new RegExp(`^${label.replace(/[?()[\]]/g, "\\$&")}$`) }) }).first();
     const idOf = (label) => cardOf(label).getAttribute("data-block-id");
     const select = async (label) => { await cardOf(label).locator("span.truncate").first().click(); await P.locator("#block-label").waitFor(); };
-    const add = async (name) => { await P.getByTitle("Insert a block").click(); await P.getByRole("button", { name, exact: true }).click(); };
+    // A block in the insert menu (a listbox of options).
+    const add = async (name) => { await P.getByTitle("Insert a block").click(); await P.getByRole("option", { name, exact: true }).click(); };
     const rename = (label) => P.locator("#block-label").fill(label);
     const deselect = () => P.locator('input[placeholder="Add a description…"]').click();
     const label = (list, i) => P.locator(`#${list}-${i}-label`);
@@ -219,7 +220,7 @@ const file = (name, text) => ({ name, mimeType: name.endsWith(".csv") ? "text/cs
     check("turning it on shows Required as on and locks it, saying why",
       (await requiredSwitch.getAttribute("aria-checked")) === "true" && (await requiredSwitch.isDisabled())
       && (await aside.getByText("Respondents must rank every option. This also makes the question required.").isVisible()));
-    check("the canvas marks it required", (await cardOf("Priorities").locator("span.text-red", { hasText: "*" }).count()) === 1);
+    check("the canvas marks it required", (await cardOf("Priorities").locator("[data-required-mark]").count()) === 1);
     await deselect(); await add("Matrix"); await rename("Sleep");
     check("Matrix is in the insert menu, with Rows and Columns", (await aside.getByText("Rows", { exact: true }).count()) === 1 && (await aside.getByText("Columns", { exact: true }).count()) === 1);
     await setLabels("options", "Weekdays", "Weekends");

@@ -145,7 +145,7 @@ const NOTE = "Changing a code after the form is in use will not match answers al
     check('insert menu: "grid" + Enter inserts a Grid', (await P.locator("#block-label").inputValue()) === "Grid question");
     await P.getByTitle("Insert a block").click();
     await P.getByPlaceholder("Search blocks…").fill("grid");
-    const menuItems = await P.locator("div.shadow-pop button span.flex-1").allTextContents();
+    const menuItems = await P.locator('[data-block-menu] [role="option"] [data-label]').allTextContents();
     check('insert menu: "grid" lists Grid first, then Matrix (its keywords untouched)', JSON.stringify(menuItems) === '["Grid","Matrix"]', JSON.stringify(menuItems));
     await P.keyboard.press("Escape");
 
@@ -248,8 +248,15 @@ const NOTE = "Changing a code after the form is in use will not match answers al
     await expectColumns("moving column 4 up");
     await P.locator("#grid-col-0-move-up").evaluate((b) => b.click()); // disabled: nothing happens
     await expectColumns("pressing a disabled Move up");
-    check("the canvas headers follow the column order", JSON.stringify(await preview.locator('th[scope="col"]').allTextContents())
-      === JSON.stringify(model.map((c) => (c.required ? `${c.label} *` : c.label))), JSON.stringify(await preview.locator('th[scope="col"]').allTextContents()));
+    // What is seen: the required mark's screen-reader word ("required") is left out.
+    const headers = () => preview.locator('th[scope="col"]').evaluateAll((ths) => ths.map((th) => {
+      const copy = th.cloneNode(true);
+      copy.querySelectorAll(".sr-only").forEach((s) => s.remove());
+      return copy.textContent;
+    }));
+    check("the canvas headers follow the column order", JSON.stringify(await headers())
+      === JSON.stringify(model.map((c) => (c.required ? `${c.label} *` : c.label))), JSON.stringify(await headers()));
+    check("…a required column's mark is read as \"required\"", (await preview.locator('th[scope="col"] [data-required-mark] .sr-only').allTextContents()).every((t) => t === "required"));
 
     // ---------- adding and removing ----------
     await aside.getByRole("button", { name: "Add column" }).click();

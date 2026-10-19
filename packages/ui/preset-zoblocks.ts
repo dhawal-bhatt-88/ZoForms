@@ -1,5 +1,5 @@
 import type { Config } from "tailwindcss";
-import { frameComponents } from "./frame-components";
+import { frameEyebrow } from "./frame-components";
 
 /**
  * The web app's design tokens: the ZoBlocks palette.
@@ -21,37 +21,22 @@ import { frameComponents } from "./frame-components";
  *     written from now on.
  */
 const zb = (name: string) => `rgb(var(--zb-${name}) / <alpha-value>)`;
-/** For the component plugin, which doesn't fill in `<alpha-value>`. */
-const solid = (name: string, alpha?: number) =>
-  alpha === undefined ? `rgb(var(--zb-${name}))` : `rgb(var(--zb-${name}) / ${alpha})`;
 
-const zoblocksPlugin = frameComponents(() => ({
-  primary: solid("cta"),
-  // The label on the primary action is the page colour, as in ZoBlocks' Button.
-  // White would be 1.5:1 on dark mode's light teal.
-  onPrimary: solid("paper"),
-  // Darken rather than dim: ZoBlocks measured the dimmed teal at 4.37:1.
-  primaryHover: { backgroundColor: solid("cta-hover") },
-  accent: solid("brand-deep"),
-  accentHover: solid("cta-hover"),
-  darkHover: solid("cta-hover"),
-  ink: solid("ink"),
-  line: solid("rule"),
-  surface: solid("surface"),
-  bg: solid("paper"),
-  placeholder: solid("graphite-soft"),
-  focusBorder: solid("brand-deep"),
-  focusShadow: `0 0 0 3px ${solid("brand", 0.2)}`,
-  // The ZoBlocks eyebrow: a mono uppercase label, not a pill. No colour of its
-  // own; the call site picks one.
-  eyebrow: {
-    fontFamily: "var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace",
-    fontSize: "0.6875rem",
-    letterSpacing: "0.16em",
-    textTransform: "uppercase",
-    fontWeight: "500",
-  },
-}));
+/*
+ * Of the shared component classes, only `.eyebrow`: the web app's buttons and
+ * fields are its kit's (`apps/web/src/components/ui`), so `.btn*` and `.input`
+ * aren't generated here (restyle 3). The admin preset keeps them.
+ *
+ * The ZoBlocks eyebrow: a mono uppercase label, not a pill. No colour of its
+ * own; the call site picks one.
+ */
+const zoblocksPlugin = frameEyebrow({
+  fontFamily: "var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace",
+  fontSize: "0.6875rem",
+  letterSpacing: "0.16em",
+  textTransform: "uppercase",
+  fontWeight: "500",
+});
 
 const sans = [
   "var(--font-instrument-sans)",
@@ -82,6 +67,8 @@ const zoblocksPreset: Partial<Config> = {
         // ZoBlocks' names.
         paper: zb("paper"),
         "paper-sunk": zb("paper-sunk"),
+        // The builder's own: the editor's alternate group-box fill (globals.css).
+        nest: zb("nest"),
         rule: zb("rule"),
         "rule-strong": zb("rule-strong"),
         shimmer: zb("shimmer"),
