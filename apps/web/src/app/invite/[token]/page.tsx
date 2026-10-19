@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { Button, Input } from "@formbuilder/ui";
 import { acceptInvite, getInvite, type InviteInfo } from "@/lib/api";
-import { Logo } from "@/components/marketing/logo";
+import { Logo } from "@/components/logo";
 
 export default function AcceptInvitePage() {
   const params = useParams();

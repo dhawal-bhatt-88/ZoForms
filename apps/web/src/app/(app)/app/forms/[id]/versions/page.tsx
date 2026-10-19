@@ -89,7 +89,7 @@ export default function VersionsPage() {
           </div>
           {versions.length === 0 ? (
             <p className="rounded-xl border border-dashed border-line-2 bg-surface-2 px-4 py-6 text-center text-sm text-muted">
-              No versions yet. Every time you save, Frame keeps a restorable version here.
+              No versions yet. Every time you save, Zowork Forms keeps a restorable version here.
             </p>
           ) : (
             <div className="divide-y divide-line">

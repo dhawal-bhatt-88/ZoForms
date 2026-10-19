@@ -6,7 +6,7 @@ import { Loader2 } from "lucide-react";
 import { Button, Input } from "@formbuilder/ui";
 import { GOOGLE_CLIENT_ID, googleLogin, login, signup } from "@/lib/api";
 import { GoogleButton } from "@/components/google-button";
-import { Logo } from "@/components/marketing/logo";
+import { Logo } from "@/components/logo";
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const isSignup = mode === "signup";
@@ -58,8 +58,8 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           </h1>
           <p className="mt-1 text-sm text-muted">
             {isSignup
-              ? "Start building forms in seconds — no card required."
-              : "Log in to your Frame workspace."}
+              ? "Build forms with logic and scoring, then download them for your app."
+              : "Log in to your Zowork Forms workspace."}
           </p>
 
           {GOOGLE_CLIENT_ID && (
@@ -147,7 +147,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             </>
           ) : (
             <>
-              New to Frame?{" "}
+              New to Zowork Forms?{" "}
               <Link href="/signup" className="font-semibold text-accent-2 hover:underline">
                 Create an account
               </Link>

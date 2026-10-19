@@ -10,8 +10,8 @@ const hanken = Hanken_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: { default: "Frame Admin", template: "%s · Frame Admin" },
-  description: "Platform administration console for Frame.",
+  title: { default: "Zowork Forms Admin", template: "%s · Zowork Forms Admin" },
+  description: "Platform administration console for Zowork Forms.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

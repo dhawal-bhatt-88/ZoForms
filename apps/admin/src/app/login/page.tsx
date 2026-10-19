@@ -33,7 +33,7 @@ export default function AdminLogin() {
             <ShieldCheck className="h-5 w-5" />
           </span>
           <div>
-            <div className="text-[15px] font-semibold tracking-tight">Frame Admin</div>
+            <div className="text-[15px] font-semibold tracking-tight">Zowork Forms Admin</div>
             <div className="text-xs text-muted">Platform administration</div>
           </div>
         </div>

@@ -12,8 +12,6 @@
 **/.env.local
 **/.env.*.local
 
-# Large local-only artifacts
-blueprint.html
-frame-prototype.html
+# Docs (not needed in images)
 *.md
 !README.md

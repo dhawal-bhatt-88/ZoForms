@@ -2,7 +2,7 @@
 
 Plain Node scripts that drive the real builder: the API over HTTP, the editor in a real browser (Playwright), and the Postgres database directly (Prisma) to check what was stored. Each prints one `PASS`/`FAIL` line per check and `N/M passed`, and exits non-zero if anything failed.
 
-These are separate from `apps/web/e2e` (the Playwright marketing-page spec).
+These are separate from `apps/web/e2e` (the Playwright sign-in smoke spec).
 
 ## Prerequisites
 

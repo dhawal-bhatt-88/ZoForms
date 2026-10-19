@@ -57,9 +57,9 @@ export default function AppShell({
       <aside className="sticky top-0 hidden h-screen w-[236px] flex-none flex-col border-r border-line bg-surface md:flex">
         <div className="flex items-center gap-2.5 px-5 pb-4 pt-5">
           <span className="grid h-8 w-8 place-items-center rounded-[9px] bg-primary text-[15px] font-bold text-white shadow-sm">
-            F
+            Z
           </span>
-          <span className="text-[15px] font-semibold tracking-tight">Frame</span>
+          <span className="text-[15px] font-semibold tracking-tight">Zowork Forms</span>
         </div>
 
         {/* Workspace */}

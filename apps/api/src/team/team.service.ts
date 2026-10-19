@@ -123,9 +123,9 @@ export class TeamService {
     const acceptUrl = this.acceptUrl(token);
     void this.mail.send({
       to: email,
-      subject: `You're invited to ${org?.name ?? "a team"} on Frame`,
+      subject: `You're invited to ${org?.name ?? "a team"} on Zowork Forms`,
       html: this.mail.layout(
-        `Join ${org?.name ?? "the team"} on Frame`,
+        `Join ${org?.name ?? "the team"} on Zowork Forms`,
         `You've been invited as <strong>${role[0] + role.slice(1).toLowerCase()}</strong>. Accept to get started.`,
         { label: "Accept invite", url: acceptUrl },
       ),

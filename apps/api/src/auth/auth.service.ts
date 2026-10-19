@@ -127,10 +127,10 @@ export class AuthService {
     const url = `${env.PUBLIC_TENANT_URL.replace(/\/$/, "")}/verify-email/${token}`;
     void this.mail.send({
       to: record.user.email,
-      subject: "Verify your email · Frame",
+      subject: "Verify your email · Zowork Forms",
       html: this.mail.layout(
         "Confirm your email",
-        "Please confirm your email address to secure your Frame account.",
+        "Please confirm your email address to secure your Zowork Forms account.",
         { label: "Verify email", url },
       ),
     });
@@ -235,7 +235,7 @@ export class AuthService {
     const url = `${env.PUBLIC_TENANT_URL.replace(/\/$/, "")}/reset-password/${token}`;
     void this.mail.send({
       to: email,
-      subject: "Reset your Frame password",
+      subject: "Reset your Zowork Forms password",
       html: this.mail.layout(
         "Reset your password",
         "Choose a new password with the button below. This link expires in 1 hour. If you didn't request this, you can safely ignore this email.",

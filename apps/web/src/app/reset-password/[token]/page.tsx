@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { Button, Input } from "@formbuilder/ui";
 import { resetPassword } from "@/lib/api";
-import { Logo } from "@/components/marketing/logo";
+import { Logo } from "@/components/logo";
 
 export default function ResetPasswordPage() {
   const params = useParams();

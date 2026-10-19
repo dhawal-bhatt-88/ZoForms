@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export function LogoMark({ className = "h-7 w-7" }: { className?: string }) {
+function LogoMark({ className = "h-7 w-7" }: { className?: string }) {
   return (
     <svg viewBox="0 0 28 28" fill="none" className={className} aria-hidden>
       <rect width="28" height="28" rx="8" fill="url(#frameGrad)" />
@@ -26,7 +26,7 @@ export function Logo({ href = "/" }: { href?: string }) {
       <span className="inline-block transition-transform duration-300 group-hover:-rotate-6">
         <LogoMark />
       </span>
-      <span className="text-[17px] font-semibold tracking-tight text-ink">Frame</span>
+      <span className="text-[17px] font-semibold tracking-tight text-ink">Zowork Forms</span>
     </Link>
   );
 }

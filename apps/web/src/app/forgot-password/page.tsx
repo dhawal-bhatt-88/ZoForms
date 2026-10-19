@@ -5,7 +5,7 @@ import Link from "next/link";
 import { CheckCircle2, Loader2 } from "lucide-react";
 import { Button, Input } from "@formbuilder/ui";
 import { forgotPassword } from "@/lib/api";
-import { Logo } from "@/components/marketing/logo";
+import { Logo } from "@/components/logo";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");

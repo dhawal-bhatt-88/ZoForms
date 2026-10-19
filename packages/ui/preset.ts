@@ -2,7 +2,7 @@ import type { Config } from "tailwindcss";
 import plugin from "tailwindcss/plugin";
 
 /**
- * Frame component classes (`.btn`, `.input`, `.eyebrow`, `.card-mkt`, …).
+ * Shared component classes (`.btn`, `.input`, `.eyebrow`, …).
  *
  * Shipped as a Tailwind plugin rather than a raw CSS file so the classes are
  * generated inside each app's own Tailwind pass — tokens resolve correctly and
@@ -103,22 +103,16 @@ const framePlugin = plugin(({ addComponents, theme }) => {
       fontWeight: "600",
       color: colors.accent["2"],
     },
-    ".card-mkt": {
-      borderRadius: "1rem",
-      border: `1px solid ${colors.line.DEFAULT}`,
-      backgroundColor: colors.surface.DEFAULT,
-      boxShadow: theme("boxShadow.soft") as string,
-    },
   });
 });
 
 /**
- * Frame design tokens — the single source of truth for the whole product.
+ * Design tokens — the single source of truth for the whole product.
  *
- * Ported from the prototype (`frame-prototype.html`). Every app consumes these
- * via `presets: [framePreset]` in its `tailwind.config.ts`, so colors, radii,
- * shadows, the type family, and the shared component classes live in exactly
- * one place instead of being copy-pasted per app.
+ * Every app consumes these via `presets: [framePreset]` in its
+ * `tailwind.config.ts`, so colors, radii, shadows, the type family, and the
+ * shared component classes live in exactly one place instead of being
+ * copy-pasted per app.
  */
 const framePreset: Partial<Config> = {
   theme: {
@@ -145,7 +139,7 @@ const framePreset: Partial<Config> = {
       },
       fontFamily: {
         // `--font-hanken` is set by each app's root layout (next/font). The
-        // fallback stack matches the prototype so unstyled flashes stay on-brand.
+        // fallback stack keeps unstyled flashes close to Hanken.
         sans: [
           "var(--font-hanken)",
           "-apple-system",

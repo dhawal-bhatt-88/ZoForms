@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { verifyEmail } from "@/lib/api";
-import { Logo } from "@/components/marketing/logo";
+import { Logo } from "@/components/logo";
 
 export default function VerifyEmailPage() {
   const params = useParams();

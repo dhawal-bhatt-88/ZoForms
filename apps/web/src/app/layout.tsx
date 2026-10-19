@@ -10,19 +10,12 @@ const hanken = Hanken_Grotesk({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://frame.so"),
   title: {
-    default: "Frame — Forms that feel like writing",
-    template: "%s · Frame",
+    default: "Zowork Forms",
+    template: "%s · Zowork Forms",
   },
   description:
-    "Frame is the simplest way to build beautiful forms. Type a question, add logic, publish, and collect answers. Free forever, unlimited forms.",
-  openGraph: {
-    title: "Frame — Forms that feel like writing",
-    description:
-      "Type a question, add logic, publish, and collect answers. Free forever, unlimited forms.",
-    type: "website",
-  },
+    "Build clinical forms with logic and scoring, then download them for your app.",
 };
 
 export default function RootLayout({

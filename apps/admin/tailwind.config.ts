@@ -1,7 +1,7 @@
 import type { Config } from "tailwindcss";
 import framePreset from "@formbuilder/ui/preset";
 
-// Design tokens live in @formbuilder/ui (preset.ts), ported from the prototype.
+// Design tokens live in @formbuilder/ui (preset.ts).
 export default {
   presets: [framePreset],
   content: {
