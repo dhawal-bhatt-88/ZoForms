@@ -1,5 +1,8 @@
-// Prisma schema — the six core tables for the walking skeleton.
-// Grow this from tally-teardown.html §11 (Database Design) as features land.
+// Prisma schema for the Zowork Forms builder: users and sign-in tokens;
+// organisations, members, invites and workspaces; forms with their append-only
+// versions; templates; and the admin audit log. Form and template content is
+// JSONB in the shape @formbuilder/form-schema defines. Change the schema with a
+// new migration (`pnpm db:migrate`); never edit an applied one.
 
 generator client {
   provider = "prisma-client-js"
