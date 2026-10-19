@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Copied from github.com/zoworkhq/zoblocks at 9aaefe0, apps/app/src/app/icon.svg, as are
+       favicon.ico and apple-icon.png beside it: Zowork Forms uses the ZoBlocks mark. -->
+  <!--
+    The site mark — two blocks and the tenon that joins them — as the tab icon.
+
+    Picked up by Next's `icon` file convention (app/icon.svg), so no <link> tag
+    is written by hand.
+
+    Three deliberate differences from `ZoBlocksMark` in chrome.tsx, all forced
+    by the size this renders at:
+
+      1. It carries its own dark ground rather than sitting transparent. A tab
+         icon has no control over what is behind it, and ink-on-transparent
+         vanishes against a dark browser chrome — which is where a large share
+         of readers will see it.
+      2. Colours are literal. `currentColor` and `var(--color-brand)` have
+         nothing to resolve against in a standalone file.
+      3. Strokes are proportionally heavier and the mark fills the square. At
+         16px a 2px stroke on a 28-wide viewBox lands under one device pixel and
+         greys out into a smudge.
+  -->
+  <rect width="32" height="32" rx="7" fill="#08110f" />
+  <!-- The tenon is the brand colour and is drawn first, so the blocks sit on it. -->
+  <rect x="13" y="13" width="6" height="6" rx="1.5" fill="#10b995" />
+  <rect x="4.5" y="9.5" width="10" height="13" rx="2.5" fill="none" stroke="#f7f9f8" stroke-width="2.75" />
+  <rect x="17.5" y="9.5" width="10" height="13" rx="2.5" fill="none" stroke="#f7f9f8" stroke-width="2.75" />
+</svg>

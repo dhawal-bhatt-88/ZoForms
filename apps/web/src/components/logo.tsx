@@ -1,32 +1,35 @@
 import Link from "next/link";
 
-function LogoMark({ className = "h-7 w-7" }: { className?: string }) {
+/*
+ * The wordmark: the ZoBlocks mark, "Zowork" in the display face, and "Forms"
+ * as the small mono label, the way the ZoBlocks console reads "ZoBlocks APP".
+ *
+ * Ported from github.com/zoworkhq/zoblocks at 9aaefe0: the mark is
+ * `ZoBlocksMark` in apps/app/src/components/Rail.tsx, verbatim, and the lockup
+ * is the one in that file and apps/app/src/app/(auth)/layout.tsx. The tab icons
+ * (app/icon.svg, favicon.ico, apple-icon.png) are that app's files, copied.
+ *
+ * Reusing the ZoBlocks mark is the family signal. If Zowork Forms gets a mark
+ * of its own, only this file and the tab icons change.
+ */
+
+export function ZoBlocksMark({ className = "h-4 w-7" }: { className?: string }) {
+  // Two blocks and the tenon that joins them.
   return (
-    <svg viewBox="0 0 28 28" fill="none" className={className} aria-hidden>
-      <rect width="28" height="28" rx="8" fill="url(#frameGrad)" />
-      <path
-        d="M9 10.5A1.5 1.5 0 0 1 10.5 9H19M9 14h7M9 17.5h10"
-        stroke="white"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      <defs>
-        <linearGradient id="frameGrad" x1="0" y1="0" x2="28" y2="28" gradientUnits="userSpaceOnUse">
-          <stop stopColor="#7C6BFF" />
-          <stop offset="1" stopColor="#5546E6" />
-        </linearGradient>
-      </defs>
+    <svg viewBox="0 0 28 16" className={className} aria-hidden="true">
+      <rect x="11.5" y="5.5" width="5" height="5" rx="1.25" fill="rgb(var(--zb-brand))" />
+      <rect x="2.5" y="3" width="9.5" height="10" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
+      <rect x="16" y="3" width="9.5" height="10" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
     </svg>
   );
 }
 
 export function Logo({ href = "/" }: { href?: string }) {
   return (
-    <Link href={href} className="group flex items-center gap-2">
-      <span className="inline-block transition-transform duration-300 group-hover:-rotate-6">
-        <LogoMark />
-      </span>
-      <span className="text-[17px] font-semibold tracking-tight text-ink">Zowork Forms</span>
+    <Link href={href} aria-label="Zowork Forms home" className="group inline-flex items-center gap-2.5 text-ink">
+      <ZoBlocksMark className="h-4 w-7 transition-transform duration-500 ease-out-expo group-hover:rotate-180" />
+      <span className="font-display text-[0.9375rem] font-semibold tracking-[-0.02em]">Zowork</span>
+      <span className="eyebrow text-graphite-soft">Forms</span>
     </Link>
   );
 }
