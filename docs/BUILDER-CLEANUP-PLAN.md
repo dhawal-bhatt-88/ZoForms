@@ -24,7 +24,8 @@ The builder isn't deployed anywhere (confirmed 16 Oct 2026), so these two holes 
 | 4. AI | Done 16 Oct 2026 | `69b2379`, `bb4e5d4` |
 | 5. Custom domains | Done 16 Oct 2026 | `ab802d4`, `cf6c30f` |
 | 6. Block types and form design | Done 19 Oct 2026 | `a028089`, `bb5e336`, `1641af1`, `237b389` |
-| 7. Static pages and homepage | Next | |
+| 7. Static pages and homepage | Done 19 Oct 2026 | `1ceb8fc`, `a17054b`, `6dbf79c` |
+| 8. Tidy-up and docs | Next | |
 
 ## Before any deployment
 
@@ -149,6 +150,11 @@ No deleted code provides tenant isolation. Tenants come from the signed-in user,
   - Rebuild `packages/form-schema/dist` after changing the package.
   - Run the full builder e2e with the external-app variables, and restore the external app's form files afterwards.
 - **Commits:** commit at each checkpoint once tests pass. Don't push.
+
+## Follow-ups after the clean-up
+
+Not clean-up work, so not in any brief:
+- **ESLint:** `next lint` was deprecated and then removed in Next.js 16, and the repo has no ESLint config. Brief 8 removes the broken `lint` scripts. Setting up ESLint (flat config, run directly, across web, admin, API and packages) and fixing what it reports is a separate task.
 
 ## Unblocked afterwards
 
