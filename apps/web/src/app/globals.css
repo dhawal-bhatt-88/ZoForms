@@ -30,10 +30,11 @@
 :root {
   --zb-paper: 247 249 248; /* #f7f9f8 */
   --zb-paper-sunk: 238 243 241; /* #eef3f1 */
-  /* The editor's nested group boxes alternate between this and surface. The
-     builder's own, not ZoBlocks': in light it is paper-sunk (1.12:1 against
-     surface); in dark, paper-sunk is 1.02:1 against surface, so it has its own
-     value there. */
+  /* BUILDER-ONLY, not a ZoBlocks token (it has no counterpart in ZoBlocks'
+     globals.css; docs/ZOBLOCKS-UPSTREAM-NOTES.md, "Local additions"). The
+     editor's nested group boxes alternate between this and surface, so that
+     adjacent levels differ in fill as well as by indentation. In light it is
+     paper-sunk: 1.121:1 against surface, measured in the browser. */
   --zb-nest: 238 243 241; /* #eef3f1 */
   --zb-surface: 255 255 255; /* #ffffff; ZoBlocks' .surface is paper here */
   --zb-rule: 221 229 226; /* #dde5e2 */
@@ -78,8 +79,11 @@
 .dark {
   --zb-paper: 8 11 16; /* #080b10 */
   --zb-paper-sunk: 13 18 25; /* #0d1219 */
-  /* 1.12:1 against surface, as nesting is in light. No ZoBlocks token sits
-     there: panel (1.06) is the instrument's, shimmer (1.18) the skeleton's. */
+  /* BUILDER-ONLY, not a ZoBlocks token (see :root). Its own value in dark
+     because paper-sunk is 1.02:1 against surface here, so nested levels were
+     the same colour. #17202a is 1.125:1 against surface, measured in the
+     browser, matching light's 1.121:1. No ZoBlocks token sits there: panel
+     (1.06:1) is the instrument's, shimmer (1.18:1) the skeleton's. */
   --zb-nest: 23 32 42; /* #17202a */
   --zb-surface: 14 20 27; /* #0e141b, .dark .surface */
   --zb-rule: 29 39 51; /* #1d2733 */

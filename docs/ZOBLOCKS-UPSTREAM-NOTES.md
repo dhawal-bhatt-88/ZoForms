@@ -2,7 +2,7 @@
 
 Defects found in the ZoBlocks console (`github.com/zoworkhq/zoblocks`, `apps/app`) while porting its components into Zowork Forms. All line numbers are at commit `9aaefe0`. Nothing here has been filed upstream.
 
-Each port in this repo names its ZoBlocks source in a header comment. Notes 1–6 are fixed in the ports. Contrast ratios are WCAG 2.2 relative-luminance ratios, measured from the hex values in `apps/app/src/app/globals.css`.
+Each port in this repo names its ZoBlocks source in a header comment. Notes 1–6 are fixed in the ports. Local additions, after the notes, are not defects: they are tokens the builder needs that ZoBlocks doesn't have. Contrast ratios are WCAG 2.2 relative-luminance ratios, measured from the hex values in `apps/app/src/app/globals.css`.
 
 ## 1. Callout's info tone draws no accent edge
 
@@ -39,3 +39,14 @@ Each port in this repo names its ZoBlocks source in a header comment. Notes 1–
 - **File:** `apps/app/src/components/ThemeToggle.tsx`, lines 55 and 68.
 - **What's wrong:** the selected segment is marked by a `paper` fill on the `paper-sunk` track (line 68 on line 55's track), plus a change of icon colour from `graphite-soft` to `ink`. In dark mode the fill is 1.05:1 against the track (`#080b10` on `#0d1219`) and the icon colour change is 2.81:1 (`#edf2f7` against `#8592a1`); neither reaches the 3:1 WCAG 1.4.11 asks of a state indicator, so which theme is chosen is hard to see. In light mode the fill is 1.06:1, but the icon colour change is 3.50:1, so the state is perceivable there. `aria-checked` gives the state to assistive technology in both themes.
 - **Fix used here:** the selected segment gets a 1px `border-brand-deep`: 4.96:1 against the `paper-sunk` track in light mode and 12.46:1 in dark, so the state clears 3:1 in both themes. Every segment carries a border, transparent until selected, so choosing one moves nothing. It lives in one class helper, `segmentClasses` (`apps/web/src/components/ui/segment.ts`), not a component, because the builder's segmented controls have different semantics: the ThemeToggle and a heading's level are radio groups, the Templates screen's are tabs. All three use it. Before this, the builder's Templates tabs marked the selected tab with `accent-wash` and `brand-deep` text, which was still under 3:1 (1.23:1 against the track in dark mode, 1.01:1 in light). Upstream, the same border would apply to every segmented control built this way.
+
+## Local additions
+
+Not defects, and nothing to file upstream: tokens the builder defines for itself. Each is marked builder-only where it is defined.
+
+### `--zb-nest`: the editor's nested group boxes
+
+- **Where:** `apps/web/src/app/globals.css` (`:root` and `.dark`), exposed as the colour `nest` in `packages/ui/preset-zoblocks.ts`. Used only by the editor's `GroupBox` (`apps/web/src/components/form-editor/canvas-preview.tsx`), which alternates nested groups between `nest` and `surface`.
+- **Why:** nested group boxes need adjacent levels to differ in fill as well as by indentation. The builder used `paper-sunk` against `surface`, which is 1.12:1 in light but 1.02:1 in dark, so in dark mode nested levels were the same colour. No ZoBlocks token sits near 1.12:1 from dark `surface` with a meaning that fits: `panel` (1.06:1) belongs to the instrument panel, and `shimmer` (1.18:1) to the skeleton's sweep.
+- **Values:** `#eef3f1` in light (the same as `paper-sunk`, so light mode is unchanged) and `#17202a` in dark.
+- **Measured** in the browser against `surface`, restyle 3: 1.121:1 in light and 1.125:1 in dark.

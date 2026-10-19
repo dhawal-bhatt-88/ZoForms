@@ -156,6 +156,8 @@ No deleted code provides tenant isolation. Tenants come from the signed-in user,
 Not clean-up work, so not in any brief:
 - **ESLint:** `next lint` was deprecated and then removed in Next.js 16, and the repo has no ESLint config. Brief 8 removes the broken `lint` scripts. Setting up ESLint (flat config, run directly, across web, admin, API and packages) and fixing what it reports is a separate task.
 - **e2e:** the API's file watcher can restart mid-suite and race the test seed. Run the API without watch mode for e2e.
+- **Editor, read-only screens:** viewers and system templates can still change fields that can't be saved. Make the editor truly read-only for them. (Restyle 3 gave the form editor the system-template treatment: no Save or Cancel, never dirty, an info note.)
+- **Editor at 768px:** the top bar overflows by 74px and Save is off-screen. Brief 4. (Measured in restyle 3 CP1: the canvas is 488px wide and a block three groups deep is 280px.)
 
 ## Unblocked afterwards
 

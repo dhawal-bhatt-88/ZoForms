@@ -67,7 +67,8 @@ const zoblocksPreset: Partial<Config> = {
         // ZoBlocks' names.
         paper: zb("paper"),
         "paper-sunk": zb("paper-sunk"),
-        // The builder's own: the editor's alternate group-box fill (globals.css).
+        // Builder-only, not a ZoBlocks token: the editor's alternate
+        // group-box fill (globals.css; docs/ZOBLOCKS-UPSTREAM-NOTES.md).
         nest: zb("nest"),
         rule: zb("rule"),
         "rule-strong": zb("rule-strong"),
