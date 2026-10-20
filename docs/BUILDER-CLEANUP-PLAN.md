@@ -27,6 +27,23 @@ The builder isn't deployed anywhere (confirmed 16 Oct 2026), so these two holes 
 | 7. Static pages and homepage | Done 19 Oct 2026 | `1ceb8fc`, `a17054b`, `6dbf79c` |
 | 8. Tidy-up and docs | Done 19 Oct 2026 | `e0b410e`, `15caffb`, `f30b2fb`, `3f08724`, `de0b36e` |
 
+## Restyle: the ZoBlocks family
+
+Done 20 Oct 2026. Four briefs, run after the clean-up, moved the web app onto ZoBlocks' look: tokens, type, light and dark, the shell, the component kit and the editor, then checked the result against the ZoBlocks console. The admin app wasn't part of it.
+
+| Brief | Status | Commits |
+|---|---|---|
+| 1. Foundation: tokens, type, light/dark, shell, auth frame | Done 19 Oct 2026 | `8986ff8`, `b486d36`, `f93db71` |
+| 2. Component kit and the list screens | Done 19 Oct 2026 | `d13d10d`, `c1ddf86`, `19cefe5`, `47742f1` |
+| 3. The editor | Done 19 Oct 2026 | `6d51e10`, `6e7c602`, `f6a712f`, `ffe5161` |
+| 4. Verification: side-by-side, contrast gate, accessibility, the editor at 768px | Done 20 Oct 2026 | `bc75d44`, `e53f6bb`, `d5a1d58`, and the docs commit after it |
+
+What it leaves behind, so the look can't slip unnoticed:
+- **The contrast gate** (`apps/web/scripts/contrast.mjs`): every colour pair the web app composes, in both themes, measured from `globals.css`. It runs before `next build` and in CI, and its readings are committed as `apps/web/contrast.json`.
+- **`e2e/verify-a11y.js`**: axe (WCAG 2.2 A and AA) on every screen and state in both themes, the page structure, forced colours and 320px reflow.
+- **An axe check of the sign-in page** in the web Playwright spec, so CI covers one page.
+- **`docs/ZOBLOCKS-UPSTREAM-NOTES.md`**: eight defects found in the ZoBlocks console, ready to send, and the builder's own tokens.
+
 ## Before any deployment
 
 Hardening items found during the clean-up. None of them belong to a removal brief, but all must be done before the builder is deployed anywhere:
@@ -49,6 +66,8 @@ Hardening items found during the clean-up. None of them belong to a removal brie
 | Product name (brief 7) | **Zowork Forms**, replacing "Frame" in every user-visible place: page titles, sidebar, logo, auth pages, admin and emails. Internal names (`frame_token`, code types) stay. |
 | `Organization.slug` (brief 5) | Keep. It's a random label set at signup that operators search and see in the admin console. No tenant URL or route uses it. |
 | form-schema's self-used exports (B1) | Leave them. Some may be shared vocabulary with the renderer. |
+| Content width (restyle 4) | Keep 1,200px for the list screens, not the console's 900px: My forms and Templates are card grids, and at 900px three cards are 289px wide. |
+| Card and panel surface (restyle 4) | Keep white in light, not the console's `paper`: the editor relies on the step between its canvas card and the page, and `--zb-nest` was tuned against white. |
 
 ## The briefs
 
@@ -157,7 +176,9 @@ Not clean-up work, so not in any brief:
 - **ESLint:** `next lint` was deprecated and then removed in Next.js 16, and the repo has no ESLint config. Brief 8 removes the broken `lint` scripts. Setting up ESLint (flat config, run directly, across web, admin, API and packages) and fixing what it reports is a separate task.
 - **e2e:** the API's file watcher can restart mid-suite and race the test seed. Run the API without watch mode for e2e.
 - **Editor, read-only screens:** viewers and system templates can still change fields that can't be saved. Make the editor truly read-only for them. (Restyle 3 gave the form editor the system-template treatment: no Save or Cancel, never dirty, an info note.)
-- **Editor at 768px:** the top bar overflows by 74px and Save is off-screen. Brief 4. (Measured in restyle 3 CP1: the canvas is 488px wide and a block three groups deep is 280px.)
+- **Editor, the form title:** the form title can be edited in two places (top bar and canvas). Keep one. (Restyle 4 gave the two fields distinct names, "Form title in the top bar" and "Form title on the canvas", so a screen reader can tell them apart until then.)
+- **Editor below 768px:** out of scope for the restyle. The top bar fits from 768px (restyle 4); below that, and the canvas and settings pane side by side, haven't been designed.
+- **Admin app:** not part of the restyle, and not covered by the contrast gate or the accessibility suite, which check the web app only.
 
 ## Unblocked afterwards
 

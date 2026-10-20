@@ -2,7 +2,7 @@
 
 Defects found in the ZoBlocks console (`github.com/zoworkhq/zoblocks`, `apps/app`) while porting its components into Zowork Forms. All line numbers are at commit `9aaefe0`. Nothing here has been filed upstream.
 
-Each port in this repo names its ZoBlocks source in a header comment. Notes 1–6 are fixed in the ports; note 7 is open (restyle 4). Local additions, after the notes, are not defects: they are tokens the builder needs that ZoBlocks doesn't have. Contrast ratios are WCAG 2.2 relative-luminance ratios, measured from the hex values in `apps/app/src/app/globals.css`.
+Each port in this repo names its ZoBlocks source in a header comment. Notes 1–7 are fixed in the ports. Note 8 needs no fix here, because the ports' shared classes are layered, but it changes what the console renders. Local additions, after the notes, are not defects: they are tokens the builder needs that ZoBlocks doesn't have. Contrast ratios are WCAG 2.2 relative-luminance ratios, measured from the hex values in `apps/app/src/app/globals.css`.
 
 ## 1. Callout's info tone draws no accent edge
 
@@ -45,7 +45,17 @@ Each port in this repo names its ZoBlocks source in a header comment. Notes 1–
 - **Files:** `apps/app/src/components/ui/control.ts`, line 31 (`border-rule-strong`), with the colour at `apps/app/src/app/globals.css` lines 89 (light, `#c3d0cc`) and 148 (dark, `#2c3744`).
 - **What's wrong:** a text field, select or textarea is drawn by its border alone, and the border is `rule-strong`: 1.50:1 against `paper` in light mode, and 1.53:1 against the `.surface` colour in dark mode (1.63:1 against dark `paper`). WCAG 1.4.11 asks 3:1 for the visual information needed to identify a control, so an empty field is hard to find, especially in dark mode. The same colour draws the Checkbox's ring (note 4) and the colour fields' swatches and inputs (`ColorField.tsx`, `ColorPicker.tsx`).
 - **Why nothing caught it:** ZoBlocks' contrast gate (`packages/tokens/src/validate/`, run by `pnpm gen --strict` in `verify.yml`) checks the component library's tokens, not the console's own palette. The library already has the right answer: `--zb-field-border` is `border-strong`, which the gate holds to 3:1 (4.76:1 in light, 3.26:1 in dark, `packages/tokens/src/contrast.json`). The console's `--site-*` colours in `globals.css` are checked only by the axe sweep (`e2e/app-a11y.spec.ts`), and axe measures text contrast, not the 3:1 for controls. So any console colour that draws a control, rather than text, is checked by nothing.
-- **Fix used here:** to come in restyle 4, CP2. The builder's contrast gate (`apps/web/scripts/contrast.mjs`) reads the ported palette and holds every control boundary to 3:1, which is how this was found. Upstream, two changes would close it: a field-border colour in the console's palette that clears 3:1 on `paper` and `.surface` in both themes, used by `control.ts` and the colour fields; and the library gate's pair list run over `apps/app/src/app/globals.css` too, so the console's colours are held to the bar the library's are.
+- **Fix used here:** a field-border colour of its own, `--zb-field-border` (see "Local additions"), used by `controlClasses` (`apps/web/src/components/ui/control.ts`) and by the editor's drawings of fields, radios and checkboxes. `rule-strong` is unchanged and still draws a card's hover, group and page boxes and dashed empty boxes, where nothing is a control. The builder's contrast gate (`apps/web/scripts/contrast.mjs`) reads the ported palette and holds every control boundary to 3:1, which is how this was found. Upstream, two changes would close it: a field-border colour in the console's palette that clears 3:1 on `paper` and `.surface` in both themes, used by `control.ts` and the colour fields; and the library gate's pair list run over `apps/app/src/app/globals.css` too, so the console's colours are held to the bar the library's are.
+
+## 8. Unlayered `.eyebrow` and `.surface` silently override utilities
+
+- **Files:** `apps/app/src/app/globals.css`, `.eyebrow` (line 240) and `.surface` (line 284), both outside any `@layer`; the call sites below.
+- **What's wrong:** Tailwind 4 puts every utility in `@layer utilities`, and unlayered CSS beats layered CSS whatever the specificity. So a utility on an element that also has `.eyebrow` or `.surface` loses to it whenever the two set the same property, and the class it was written for has no effect:
+  - **Eyebrow sizes:** 18 eyebrows ask for a smaller size (16 `text-[0.5625rem]`, 9px, and 2 `text-[0.625rem]`, 10px) and all render at `.eyebrow`'s 0.6875rem (11px). They are in `Rail.tsx`, `AccountMenu.tsx`, `Failure.tsx`, `ui/ColorPicker.tsx`, `ui/Toolbar.tsx`, `(auth)/layout.tsx`, `(auth)/SocialSignIn.tsx`, `pending/page.tsx` and eight `(app)` screens (account, market and market item, not-found, playground, theme screens, token editor, transfer).
+  - **The account menu's shadow:** `AccountMenu.tsx` line 117 gives the open menu `shadow-[0_18px_44px_-18px_rgb(2_20_17/0.28)]`, but `.surface`'s `box-shadow: 0 1px 2px -1px` wins, so the menu floats over the page with almost no shadow.
+- **Measured** in the running console at `9aaefe0` (restyle 4): the rail's eyebrows compute to 11px, and the open account menu's shadow to `rgba(2, 20, 17, 0.04) 0px 1px 2px -1px`.
+- **Here:** the ports put the shared classes in `@layer components` (`apps/web/src/app/globals.css` and `packages/ui/frame-components.ts`), so a utility beside them wins, as it does in Tailwind 3. To render as the console does, the ports left the eyebrow size utilities out. The account menu keeps its shadow, so the builder's menu shows the shadow the console's source asks for.
+- **Upstream:** put `.eyebrow`, `.surface` and the other shared classes in `@layer components`, then decide for each call site whether its utility should apply (the 9px eyebrows are under the 11px floor the eyebrow was set at, so most likely the utilities should go).
 
 ## Local additions
 
@@ -57,3 +67,10 @@ Not defects, and nothing to file upstream: tokens the builder defines for itself
 - **Why:** nested group boxes need adjacent levels to differ in fill as well as by indentation. The builder used `paper-sunk` against `surface`, which is 1.12:1 in light but 1.02:1 in dark, so in dark mode nested levels were the same colour. No ZoBlocks token sits near 1.12:1 from dark `surface` with a meaning that fits: `panel` (1.06:1) belongs to the instrument panel, and `shimmer` (1.18:1) to the skeleton's sweep.
 - **Values:** `#eef3f1` in light (the same as `paper-sunk`, so light mode is unchanged) and `#17202a` in dark.
 - **Measured** in the browser against `surface`, restyle 3: 1.121:1 in light and 1.125:1 in dark.
+
+### `--zb-field-border`: a field's border
+
+- **Where:** `apps/web/src/app/globals.css` (`:root` and `.dark`), exposed as the colour `field-border` in `packages/ui/preset-zoblocks.ts`. Used by `controlClasses` (every Input, Select and Textarea) and the editor's drawings of fields, radios and checkboxes (`apps/web/src/components/form-editor/canvas-preview.tsx`).
+- **Why:** the console draws fields with `rule-strong`, under 3:1 (note 7). The name follows the ZoBlocks library's own `--zb-field-border`, which its gate holds to 3:1; the console's palette has no such colour.
+- **Values:** `#798984` in light and `#636f7e` in dark, on the `rule-strong`–`graphite-soft` line, so a field reads as the same grey-green, only firmer.
+- **Measured** by the contrast gate (`apps/web/contrast.json`): 3.67:1 on `surface`, 3.47:1 on `paper` and 3.27:1 on `nest` and `paper-sunk` in light; 3.62:1, 3.85:1, 3.22:1 and 3.67:1 in dark.
