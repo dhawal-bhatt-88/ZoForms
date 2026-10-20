@@ -62,7 +62,7 @@ export function ScoresPanel({
 
   return (
     <div className="mb-4 border-t border-rule pt-3">
-      <h4 className="eyebrow mb-1.5 text-graphite-soft">Scores</h4>
+      <h3 className="eyebrow mb-1.5 text-graphite-soft">Scores</h3>
       {!scores.length && (
         <p className="mb-2 text-[0.75rem] text-graphite">
           Calculate a score from this group&apos;s answers, such as a questionnaire total.

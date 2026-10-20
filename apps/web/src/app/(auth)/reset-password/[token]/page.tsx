@@ -49,7 +49,7 @@ export default function ResetPasswordPage() {
               {err}
             </Callout>
           )}
-          <Button type="submit" variant="primary" pending={busy} className="w-full py-2.5">
+          <Button type="submit" variant="primary" pending={busy} className="w-full">
             Reset password &amp; sign in
           </Button>
         </form>

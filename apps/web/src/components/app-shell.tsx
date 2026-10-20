@@ -60,7 +60,8 @@ export default function AppShell({
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="sticky top-0 z-30 flex min-h-[3.25rem] items-center justify-end gap-3 border-b border-rule bg-paper/85 px-5 py-2.5 backdrop-blur-md sm:px-8 lg:px-10">
+        {/* A <header>, so the bar is the page's banner landmark (ZoBlocks' is a div). */}
+        <header className="sticky top-0 z-30 flex min-h-[3.25rem] items-center justify-end gap-3 border-b border-rule bg-paper/85 px-5 py-2.5 backdrop-blur-md sm:px-8 lg:px-10">
           <ThemeToggle />
           {user ? (
             <AccountMenu
@@ -75,7 +76,7 @@ export default function AppShell({
           ) : (
             <span aria-hidden="true" className="h-[2.375rem] w-[2.375rem] rounded-full border border-rule bg-paper-sunk" />
           )}
-        </div>
+        </header>
 
         {user && !user.emailVerified && !dismissed && (
           <div className="border-b border-warn/25 bg-warn-wash">

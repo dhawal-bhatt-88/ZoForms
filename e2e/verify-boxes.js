@@ -71,7 +71,7 @@ const DEEP = { title: "Deep nesting", blocks: [leaf("top", "Top question"), ...d
     const box = (id) => page.locator(`[data-group-box="${id}"]`);
     const deselect = () => page.locator('input[placeholder="Add a description…"]').click();
     const open = async (id) => { await page.goto(`${WEB}/app/forms/${id}/edit`); await page.getByText("All changes saved").waitFor(); };
-    const canvas = page.locator("div.overflow-auto").first();
+    const canvas = page.locator("main.overflow-auto").first();
 
     // ---------- 1. three levels of boxes ----------
     await open(mainId);
@@ -167,7 +167,7 @@ const DEEP = { title: "Deep nesting", blocks: [leaf("top", "Top question"), ...d
       await page.setViewportSize({ width, height: 900 });
       await open(deepId);
       const m = await page.evaluate(() => {
-        const c = document.querySelector("div.overflow-auto");
+        const c = document.querySelector("main.overflow-auto");
         const q = document.querySelector('[data-block-id="deep_q"]').getBoundingClientRect();
         const top = document.querySelector('[data-block-id="top"]').getBoundingClientRect();
         const l6 = document.querySelector('[data-block-id="d7"]').getBoundingClientRect();
@@ -186,7 +186,7 @@ const DEEP = { title: "Deep nesting", blocks: [leaf("top", "Top question"), ...d
       if (width === 900) {
         await open(mainId);
         const m2 = await page.evaluate(() => {
-          const c = document.querySelector("div.overflow-auto");
+          const c = document.querySelector("main.overflow-auto");
           return { hscroll: c.scrollWidth > c.clientWidth, food: Math.round(document.querySelector('[data-block-id="food"]').getBoundingClientRect().width) };
         });
         check("900px: the three-level form fits", !m2.hscroll && m2.food > 300, JSON.stringify(m2));

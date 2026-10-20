@@ -45,7 +45,7 @@ export default function ForgotPasswordPage() {
                 {devLink}
               </a>
             )}
-            <Link href="/login" className={buttonClasses({ className: "mt-6 w-full py-2.5" })}>
+            <Link href="/login" className={buttonClasses({ className: "mt-6 w-full" })}>
               Back to login
             </Link>
           </div>
@@ -68,7 +68,7 @@ export default function ForgotPasswordPage() {
                   />
                 )}
               </Field>
-              <Button type="submit" variant="primary" pending={busy} className="w-full py-2.5">
+              <Button type="submit" variant="primary" pending={busy} className="w-full">
                 Send reset link
               </Button>
             </form>

@@ -91,7 +91,8 @@ export default function VersionsPage() {
   ];
 
   return (
-    <main className="mx-auto max-w-4xl px-5 py-8 sm:px-8">
+    // The header sits outside <main>, so it is the page's banner landmark.
+    <div className="mx-auto max-w-4xl px-5 py-8 sm:px-8">
       <header className="mb-8 flex flex-wrap items-start gap-x-4 gap-y-3 border-b border-rule pb-6">
         <Link
           href="/app"
@@ -109,54 +110,56 @@ export default function VersionsPage() {
         </Link>
       </header>
 
-      {status === "loading" && <TableSkeleton rows={3} columns={4} label="Loading saved versions" />}
-      {status === "error" && (
-        <Callout tone="fail" title="Couldn't load version history">
-          The API didn&apos;t answer. Reload to try again.
-        </Callout>
-      )}
+      <main>
+        {status === "loading" && <TableSkeleton rows={3} columns={4} label="Loading saved versions" />}
+        {status === "error" && (
+          <Callout tone="fail" title="Couldn't load version history">
+            The API didn&apos;t answer. Reload to try again.
+          </Callout>
+        )}
 
-      {status === "ok" && (
-        <section aria-labelledby="versions-heading">
-          <h2 id="versions-heading" className="mb-1 font-display text-[0.9375rem] font-semibold tracking-[-0.008em]">
-            Saved versions
-          </h2>
-          <p className="body-sm mb-4 text-graphite">Every save keeps a version. Restoring one saves its content as a new version.</p>
-          <DataTable
-            caption={`Versions of ${title || "this form"}`}
-            columns={columns}
-            rows={versions}
-            rowKey={(v) => v.id}
-            empty={
-              <EmptyState
-                title="No versions yet"
-                body="Every time you save, Zowork Forms keeps a restorable version here."
-                actions={
-                  <Link href={`/app/forms/${fid}/edit`} className={buttonClasses({ variant: "primary" })}>
-                    Open the editor
-                  </Link>
-                }
-              />
-            }
+        {status === "ok" && (
+          <section aria-labelledby="versions-heading">
+            <h2 id="versions-heading" className="mb-1 font-display text-[0.9375rem] font-semibold tracking-[-0.008em]">
+              Saved versions
+            </h2>
+            <p className="body-sm mb-4 text-graphite">Every save keeps a version. Restoring one saves its content as a new version.</p>
+            <DataTable
+              caption={`Versions of ${title || "this form"}`}
+              columns={columns}
+              rows={versions}
+              rowKey={(v) => v.id}
+              empty={
+                <EmptyState
+                  title="No versions yet"
+                  body="Every time you save, Zowork Forms keeps a restorable version here."
+                  actions={
+                    <Link href={`/app/forms/${fid}/edit`} className={buttonClasses({ variant: "primary", size: "sm" })}>
+                      Open the editor
+                    </Link>
+                  }
+                />
+              }
+            />
+          </section>
+        )}
+
+        {restoring && current && (
+          <ConfirmDialog
+            variant="primary"
+            title={`Restore v${restoring.version}?`}
+            consequence={`Saves v${restoring.version}'s content as a new version, v${current.version + 1}, and opens it in the editor. Every version in between is kept.`}
+            confirmLabel="Restore"
+            onConfirm={async () => {
+              const r = await restoreVersion(fid, restoring.id);
+              toast.show({ tone: "pass", title: `Restored v${restoring.version} as v${r.version}.` });
+              // The editor loads the latest version on mount, which is now the restored one.
+              router.push(`/app/forms/${fid}/edit`);
+            }}
+            onClose={() => setRestoring(null)}
           />
-        </section>
-      )}
-
-      {restoring && current && (
-        <ConfirmDialog
-          variant="primary"
-          title={`Restore v${restoring.version}?`}
-          consequence={`Saves v${restoring.version}'s content as a new version, v${current.version + 1}, and opens it in the editor. Every version in between is kept.`}
-          confirmLabel="Restore"
-          onConfirm={async () => {
-            const r = await restoreVersion(fid, restoring.id);
-            toast.show({ tone: "pass", title: `Restored v${restoring.version} as v${r.version}.` });
-            // The editor loads the latest version on mount, which is now the restored one.
-            router.push(`/app/forms/${fid}/edit`);
-          }}
-          onClose={() => setRestoring(null)}
-        />
-      )}
-    </main>
+        )}
+      </main>
+    </div>
   );
 }

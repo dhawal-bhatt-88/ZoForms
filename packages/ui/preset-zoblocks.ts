@@ -72,6 +72,9 @@ const zoblocksPreset: Partial<Config> = {
         nest: zb("nest"),
         rule: zb("rule"),
         "rule-strong": zb("rule-strong"),
+        // A field's border: 3:1 against every ground a field sits on
+        // (globals.css; the ZoBlocks library's --zb-field-border).
+        "field-border": zb("field-border"),
         shimmer: zb("shimmer"),
         graphite: zb("graphite"),
         "graphite-soft": zb("graphite-soft"),
@@ -97,9 +100,6 @@ const zoblocksPreset: Partial<Config> = {
         "fail-wash": zb("critical-wash"),
         warn: zb("warn"),
         "warn-wash": zb("warn-wash"),
-      },
-      borderRadius: {
-        xl: "16px",
       },
       boxShadow: {
         soft: "0 1px 2px rgba(20,22,28,.06), 0 1px 1px rgba(20,22,28,.04)",

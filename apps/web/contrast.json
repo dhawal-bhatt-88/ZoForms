@@ -397,25 +397,47 @@
   },
   {
     "theme": "light",
-    "fg": "rule-strong",
+    "fg": "field-border",
     "bg": "surface",
     "kind": "ui",
-    "ratio": 1.589,
+    "ratio": 3.668,
     "floor": 3,
-    "pass": false,
-    "colours": "#c3d0cc on #ffffff",
-    "use": "a field's border (controlClasses), and the canvas's stand-ins for fields, radios and checkboxes"
+    "pass": true,
+    "colours": "#798984 on #ffffff",
+    "use": "a field's border (controlClasses), and the canvas's drawings of fields, radios and checkboxes"
   },
   {
     "theme": "light",
-    "fg": "rule-strong",
+    "fg": "field-border",
     "bg": "paper",
     "kind": "ui",
-    "ratio": 1.503,
+    "ratio": 3.469,
     "floor": 3,
-    "pass": false,
-    "colours": "#c3d0cc on #f7f9f8",
-    "use": "a field's border (controlClasses), and the canvas's stand-ins for fields, radios and checkboxes"
+    "pass": true,
+    "colours": "#798984 on #f7f9f8",
+    "use": "a field's border (controlClasses), and the canvas's drawings of fields, radios and checkboxes"
+  },
+  {
+    "theme": "light",
+    "fg": "field-border",
+    "bg": "nest",
+    "kind": "ui",
+    "ratio": 3.271,
+    "floor": 3,
+    "pass": true,
+    "colours": "#798984 on #eef3f1",
+    "use": "a field's border (controlClasses), and the canvas's drawings of fields, radios and checkboxes"
+  },
+  {
+    "theme": "light",
+    "fg": "field-border",
+    "bg": "paper-sunk",
+    "kind": "ui",
+    "ratio": 3.271,
+    "floor": 3,
+    "pass": true,
+    "colours": "#798984 on #eef3f1",
+    "use": "a field's border (controlClasses), and the canvas's drawings of fields, radios and checkboxes"
   },
   {
     "theme": "light",
@@ -936,25 +958,47 @@
   },
   {
     "theme": "dark",
-    "fg": "rule-strong",
+    "fg": "field-border",
     "bg": "surface",
     "kind": "ui",
-    "ratio": 1.531,
+    "ratio": 3.619,
     "floor": 3,
-    "pass": false,
-    "colours": "#2c3744 on #0e141b",
-    "use": "a field's border (controlClasses), and the canvas's stand-ins for fields, radios and checkboxes"
+    "pass": true,
+    "colours": "#636f7e on #0e141b",
+    "use": "a field's border (controlClasses), and the canvas's drawings of fields, radios and checkboxes"
   },
   {
     "theme": "dark",
-    "fg": "rule-strong",
+    "fg": "field-border",
     "bg": "paper",
     "kind": "ui",
-    "ratio": 1.63,
+    "ratio": 3.853,
     "floor": 3,
-    "pass": false,
-    "colours": "#2c3744 on #080b10",
-    "use": "a field's border (controlClasses), and the canvas's stand-ins for fields, radios and checkboxes"
+    "pass": true,
+    "colours": "#636f7e on #080b10",
+    "use": "a field's border (controlClasses), and the canvas's drawings of fields, radios and checkboxes"
+  },
+  {
+    "theme": "dark",
+    "fg": "field-border",
+    "bg": "nest",
+    "kind": "ui",
+    "ratio": 3.216,
+    "floor": 3,
+    "pass": true,
+    "colours": "#636f7e on #17202a",
+    "use": "a field's border (controlClasses), and the canvas's drawings of fields, radios and checkboxes"
+  },
+  {
+    "theme": "dark",
+    "fg": "field-border",
+    "bg": "paper-sunk",
+    "kind": "ui",
+    "ratio": 3.673,
+    "floor": 3,
+    "pass": true,
+    "colours": "#636f7e on #0d1219",
+    "use": "a field's border (controlClasses), and the canvas's drawings of fields, radios and checkboxes"
   },
   {
     "theme": "dark",

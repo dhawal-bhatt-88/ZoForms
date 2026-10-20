@@ -36,7 +36,7 @@ export default function VerifyEmailPage() {
             <CheckCircle2 aria-hidden="true" className="mx-auto h-10 w-10 text-pass" />
             <h1 className="mt-4 display-sm">Email verified</h1>
             <p className="body-sm mt-2 text-graphite">Your email address is confirmed.</p>
-            <Link href="/app" className={buttonClasses({ variant: "primary", className: "mt-6 w-full py-2.5" })}>
+            <Link href="/app" className={buttonClasses({ variant: "primary", className: "mt-6 w-full" })}>
               Go to your dashboard
             </Link>
           </>
@@ -48,7 +48,7 @@ export default function VerifyEmailPage() {
               Couldn&apos;t verify
             </h1>
             <p className="body-sm mt-2 text-graphite">{message}</p>
-            <Link href="/app" className={buttonClasses({ className: "mt-6 w-full py-2.5" })}>
+            <Link href="/app" className={buttonClasses({ className: "mt-6 w-full" })}>
               Back to dashboard
             </Link>
           </>

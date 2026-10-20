@@ -45,7 +45,7 @@ export default function AcceptInvitePage() {
           <div className="text-center">
             <h1 className="display-sm">Invite unavailable</h1>
             <p className="body-sm mt-2 text-graphite">{loadError}</p>
-            <Link href="/login" className={buttonClasses({ className: "mt-6 w-full py-2.5" })}>
+            <Link href="/login" className={buttonClasses({ className: "mt-6 w-full" })}>
               Go to login
             </Link>
           </div>
@@ -93,7 +93,7 @@ export default function AcceptInvitePage() {
                 </Callout>
               )}
 
-              <Button type="submit" variant="primary" pending={busy} pendingLabel="Joining…" className="w-full py-2.5">
+              <Button type="submit" variant="primary" pending={busy} pendingLabel="Joining…" className="w-full">
                 {`Accept & join ${info.orgName}`}
               </Button>
             </form>

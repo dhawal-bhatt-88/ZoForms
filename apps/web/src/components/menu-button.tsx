@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { MoreHorizontal, type LucideIcon } from "lucide-react";
+import { Check, MoreHorizontal, type LucideIcon } from "lucide-react";
 
 export type MenuItem =
   | {
@@ -14,6 +14,11 @@ export type MenuItem =
       href?: string;
       /** Destructive: the fail colour, and the word carries it. */
       danger?: boolean;
+      /**
+       * One of a set of choices (a `menuitemradio`): `true` for the chosen one,
+       * which shows a tick. Choosing it keeps the menu's focus behaviour.
+       */
+      checked?: boolean;
     }
   | "separator";
 
@@ -47,7 +52,7 @@ export function MenuButton({
   const menu = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (open) menu.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    if (open) menu.current?.querySelector<HTMLElement>('[role="menuitem"], [role="menuitemradio"]')?.focus();
   }, [open]);
 
   function closeMenu() {
@@ -56,7 +61,7 @@ export function MenuButton({
   }
 
   function onMenuKey(e: React.KeyboardEvent) {
-    const all = Array.from(menu.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
+    const all = Array.from(menu.current?.querySelectorAll<HTMLElement>('[role="menuitem"], [role="menuitemradio"]') ?? []);
     const at = all.indexOf(document.activeElement as HTMLElement);
     const go = (i: number) => all[(i + all.length) % all.length]?.focus();
     if (e.key === "Escape") {
@@ -123,11 +128,12 @@ export function MenuButton({
           >
             {items.map((item, i) => {
               if (item === "separator") return <div key={`sep-${i}`} role="separator" className="-mx-1.5 my-1.5 h-px bg-rule" />;
-              const { label: itemLabel, icon: ItemIcon, onSelect, href, danger } = item;
+              const { label: itemLabel, icon: ItemIcon, onSelect, href, danger, checked } = item;
               const content = (
                 <>
                   {ItemIcon && <ItemIcon aria-hidden="true" strokeWidth={2} className="h-3.5 w-3.5 shrink-0" />}
-                  {itemLabel}
+                  <span className="flex-1">{itemLabel}</span>
+                  {checked && <Check aria-hidden="true" strokeWidth={2.5} className="h-3.5 w-3.5 shrink-0 text-brand-deep" />}
                 </>
               );
               return href ? (
@@ -138,7 +144,8 @@ export function MenuButton({
                 <button
                   key={itemLabel}
                   type="button"
-                  role="menuitem"
+                  role={checked === undefined ? "menuitem" : "menuitemradio"}
+                  aria-checked={checked}
                   tabIndex={-1}
                   onClick={() => {
                     closeMenu();

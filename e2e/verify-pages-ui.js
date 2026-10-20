@@ -125,7 +125,7 @@ const SINGLE = {
 
     // ---------- 2. conditions on pages ----------
     await selectPage("p2");
-    check('inspector: a Page, with a Title and no help text or required', (await P.locator("aside h4").first().textContent()) === "Page"
+    check('inspector: a Page, with a Title and no help text or required', (await P.locator("aside h2").first().textContent()) === "Page"
       && (await P.locator("aside").getByText("Help text").count()) === 0 && (await P.locator('aside [role="switch"]').count()) === 0);
     check('"Show this page only when…"', await P.getByText("Show this page only when…").isVisible());
     const picker = P.getByRole("combobox", { name: "Question" }).first();
@@ -292,7 +292,7 @@ const SINGLE = {
     check("converting wraps everything into Page 1 and adds an empty Page 2",
       c1 === "[Untitled page] |   Your name |   Contact |     Email address |   Comments | [Untitled page]", c1);
     const secondId = await P.locator("[data-page-box]").nth(1).getAttribute("data-page-box");
-    check("Page 2 is selected and says it's empty", (await P.locator("aside h4").first().textContent()) === "Page"
+    check("Page 2 is selected and says it's empty", (await P.locator("aside h2").first().textContent()) === "Page"
       && await pageBox(secondId).getByRole("button", { name: '"this page" is empty — add a block to it' }).count() === 0
       && await pageBox(secondId).getByText(/is empty — add a block to it/).isVisible());
     await card(secondId).locator('input[aria-label="Page 2 title"]').fill("Follow-up");

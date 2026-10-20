@@ -22,7 +22,7 @@ export function EmptyState({
   return (
     <div className={cn("surface px-6 py-12 text-center", className)}>
       <p className="font-display text-[1.0625rem] font-semibold tracking-[-0.015em]">{title}</p>
-      {body && <p className="body-sm mx-auto mt-2 max-w-[52ch] text-graphite">{body}</p>}
+      {body && <p className="body-sm mx-auto mt-2 max-w-[46ch] text-graphite">{body}</p>}
       {actions && <div className="mt-5 flex flex-wrap justify-center gap-2">{actions}</div>}
     </div>
   );

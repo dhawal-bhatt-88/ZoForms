@@ -104,7 +104,7 @@ async function waitFor(url) {
     // ---------- 3. conditions on a group, and the breadcrumb picker ----------
     await select(ID.med);
     // Its only switch is Repeats (contract §12.8); there is no Required one.
-    check("inspector calls it a Group, with no help text or required", (await page.locator("aside h4").first().textContent()) === "Group"
+    check("inspector calls it a Group, with no help text or required", (await page.locator("aside h2").first().textContent()) === "Group"
       && (await page.locator("aside").getByText("Help text").count()) === 0
       && (await page.locator("aside").getByText("Required", { exact: true }).count()) === 0
       && (await page.locator('aside [role="switch"]').count()) === 1

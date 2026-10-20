@@ -20,12 +20,15 @@ import { segmentClasses, segmentTrackClasses } from "@/components/ui";
  * keyboard too: one tab stop, the arrow keys move the choice.
  */
 
-const CHOICES: readonly { value: Theme; label: string; Icon: typeof Sun }[] = [
+/** The choices, shared with the editor's ⋯ menu, which offers the same ones below 1024px. */
+export const THEME_CHOICES: readonly { value: Theme; label: string; Icon: typeof Sun }[] = [
   { value: "light", label: "Light", Icon: Sun },
   { value: "dark", label: "Dark", Icon: Moon },
 ];
+const CHOICES = THEME_CHOICES;
 
-export function ThemeToggle() {
+/** The chosen theme, and a way to choose: stored, and applied at once. */
+export function useThemeChoice(): [Theme, (value: Theme) => void] {
   // Starts light on server and client and is corrected in an effect: reading
   // storage during render would make the two disagree and fail hydration.
   const [choice, setChoice] = useState<Theme>("light");
@@ -35,12 +38,17 @@ export function ThemeToggle() {
     if (resolved === "light" || resolved === "dark") setChoice(resolved);
   }, []);
 
-  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
   const select = (value: Theme) => {
     setChoice(value);
     writeTheme(value);
     applyTheme(value);
   };
+  return [choice, select];
+}
+
+export function ThemeToggle({ className }: { className?: string } = {}) {
+  const [choice, select] = useThemeChoice();
+  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
 
   function onKey(e: React.KeyboardEvent, i: number) {
     const step = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
@@ -52,7 +60,7 @@ export function ThemeToggle() {
   }
 
   return (
-    <div role="radiogroup" aria-label="Colour theme" className={segmentTrackClasses()}>
+    <div role="radiogroup" aria-label="Colour theme" className={segmentTrackClasses(className)}>
       {CHOICES.map(({ value, label, Icon }, i) => (
         <button
           key={value}

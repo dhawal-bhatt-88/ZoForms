@@ -64,6 +64,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
+      {/* z-[60], not ZoBlocks' z-50: the console has no modal dialogs, but the
+          builder's Dialog overlay is z-50, and a toast raised from a dialog
+          (a save, a duplicate) must sit above its scrim to be read. */}
       <div
         aria-live="polite"
         data-toasts

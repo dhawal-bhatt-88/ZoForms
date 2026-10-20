@@ -28,7 +28,7 @@ export function controlClasses({
 } = {}): string {
   return cn(
     "w-full rounded-lg border bg-surface text-ink",
-    "border-rule-strong placeholder:text-graphite-soft",
+    "border-field-border placeholder:text-graphite-soft",
     "transition-[border-color,box-shadow] duration-200",
     "focus:border-brand-deep focus:outline-none focus:ring-[3px] focus:ring-brand/20",
     // Unavailable reads as unavailable, not as low-contrast text: opacity would

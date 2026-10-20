@@ -169,7 +169,7 @@ import { ScoresPanel } from "@/components/scores-panel";
 import { Switch } from "@/components/switch";
 import { MenuButton, type MenuItem } from "@/components/menu-button";
 import { Dialog } from "@/components/dialog";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { THEME_CHOICES, ThemeToggle, useThemeChoice } from "@/components/theme-toggle";
 import {
   Button,
   buttonClasses,
@@ -370,11 +370,14 @@ function BlockMenu({
           spellCheck={false}
         />
       </div>
-      <div className="min-h-0 overflow-y-auto p-1.5">
-        {groups.length === 0 && (
-          <p className="px-3 py-4 text-center text-[0.8125rem] text-graphite">No blocks match “{query}”.</p>
-        )}
-        <div role="listbox" id={listId} aria-label="Blocks">
+      {groups.length === 0 && (
+        <p className="px-3 py-4 text-center text-[0.8125rem] text-graphite">No blocks match “{query}”.</p>
+      )}
+      {/* The listbox is the scroller: it is the combobox's popup, which keyboard
+          users move through with the arrow keys from the search field. A
+          wrapper scrolling instead is a region the keyboard can't reach (axe's
+          scrollable-region-focusable). */}
+      <div role="listbox" id={listId} aria-label="Blocks" className="min-h-0 overflow-y-auto p-1.5">
           {groups.map((g) => (
             <div key={g.group} role="group" aria-labelledby={`${baseId}-${g.group}`} className="mb-1 last:mb-0">
               <div id={`${baseId}-${g.group}`} className="eyebrow px-2 pb-1 pt-2 text-graphite-soft">
@@ -412,7 +415,6 @@ function BlockMenu({
               })}
             </div>
           ))}
-        </div>
       </div>
       {/* Said once the author has typed: "3 blocks", or that nothing matches. */}
       <p aria-live="polite" className="sr-only">
@@ -665,7 +667,8 @@ function CanvasCard({
           // A click from the keyboard has no pointer, so detail is 0.
           onSelect(e.detail === 0);
         }}
-        className="pointer-events-none absolute inset-0 rounded-[0.625rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-deep focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+        // Forced colours removes the ring's box-shadow, so an outline takes over there.
+        className="pointer-events-none absolute inset-0 rounded-[0.625rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-deep focus-visible:ring-offset-2 focus-visible:ring-offset-surface forced-colors:focus-visible:outline forced-colors:focus-visible:outline-2 forced-colors:focus-visible:outline-offset-2 forced-colors:focus-visible:outline-[Highlight]"
       />
       {dropLine && <DropLine at={dropLine} />}
       <div className={cn("flex items-center gap-2 pr-[88px]", !group && "mb-2.5")}>
@@ -1183,7 +1186,7 @@ function PositionPanel({
   if (pageAt >= 0) {
     return (
       <div className="mt-3 border-t border-rule pt-3">
-        <h4 className="eyebrow mb-2 text-graphite-soft">Position</h4>
+        <h3 className="eyebrow mb-2 text-graphite-soft">Position</h3>
         {steps(
           pageAt > 0 ? () => onMovePage(-1) : null,
           pageAt < blocks.length - 1 ? () => onMovePage(1) : null,
@@ -1196,7 +1199,7 @@ function PositionPanel({
 
   return (
     <div className="mt-3 border-t border-rule pt-3">
-      <h4 className="eyebrow mb-2 text-graphite-soft">Position</h4>
+      <h3 className="eyebrow mb-2 text-graphite-soft">Position</h3>
       {steps(up ? () => onMove(up) : null, down ? () => onMove(down) : null, stepReason(rawUp, "top"), stepReason(rawDown, "bottom"))}
       <div className="mt-2 flex flex-col items-start gap-1.5">
         <Select
@@ -1480,7 +1483,7 @@ function ConditionsPanel({
   if (isPage(block) && blocks[0]?.id === block.id && !conditions.length) {
     return (
       <div className="border-t border-rule pt-3">
-        <h4 className="eyebrow mb-1.5 text-graphite-soft">Logic</h4>
+        <h3 className="eyebrow mb-1.5 text-graphite-soft">Logic</h3>
         <p className="text-[0.75rem] text-graphite">The first page can&apos;t have conditions — it is always shown.</p>
       </div>
     );
@@ -1488,7 +1491,7 @@ function ConditionsPanel({
 
   return (
     <div className="border-t border-rule pt-3">
-      <h4 className="eyebrow mb-1.5 text-graphite-soft">Logic</h4>
+      <h3 className="eyebrow mb-1.5 text-graphite-soft">Logic</h3>
       <p className="mb-2 text-[0.8125rem] font-medium text-ink">Show this {noun} only when…</p>
 
       <div className="flex flex-col gap-2">
@@ -1669,6 +1672,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [theme, chooseTheme] = useThemeChoice();
   // A message under the header; `blocks` are questions to offer "jump to" links for. Its tone is
   // its meaning: `warn` an edit that was refused (nothing is broken, it just didn't happen), `fail`
   // a save or download that failed, `info` a neutral note (e.g. a setting switched for the author).
@@ -2870,13 +2874,21 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
             <StatusChip className="flex-none">{groupTemplate ? "Group" : "Form"}</StatusChip>
           </h1>
         ) : (
+          <>
+          {/* The page's one h1, for a screen reader's heading list; the title
+              itself is the field beside it. */}
+          <h1 className="sr-only">Edit form: {schema.title.trim() || "Untitled form"}</h1>
           <input
             value={schema.title}
             onChange={(e) => patch((s) => ({ ...s, title: e.target.value }))}
-            aria-label="Form title"
-            className="min-w-0 max-w-[280px] flex-none rounded-md border border-transparent px-2 py-1 font-display text-[0.9375rem] font-semibold tracking-[-0.008em] outline-none transition-colors duration-200 hover:bg-paper-sunk focus:border-brand-deep focus:bg-surface focus:ring-[3px] focus:ring-brand/20"
+            // The canvas has a field for the same title; the names say which is which.
+            aria-label="Form title in the top bar"
+            // The one thing in the bar that shrinks, and the first to: below
+            // 1024px the bar is tight, and Save must stay on screen.
+            className="min-w-[7rem] max-w-[280px] shrink rounded-md border border-transparent px-2 py-1 font-display text-[0.9375rem] font-semibold tracking-[-0.008em] outline-none transition-colors duration-200 hover:bg-paper-sunk focus:border-brand-deep focus:bg-surface focus:ring-[3px] focus:ring-brand/20"
             spellCheck={false}
           />
+          </>
         )}
         {readOnly ? (
           <StatusChip tone="locked" className="flex-none">
@@ -2886,27 +2898,56 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
           <SaveStatus state={saving ? "saving" : dirty ? "dirty" : "saved"} announcement={saveAnnouncement.text} />
         )}
 
-        <div className="ml-auto flex items-center gap-2">
-          <ThemeToggle />
+        <div className="ml-auto flex flex-none items-center gap-2">
+          {/* From 1024px: everything in the bar. Below it, Download, the theme
+              and the form's actions move into one ⋯ menu, so Save, Cancel and
+              the save state stay on screen (restyle 4). */}
+          <ThemeToggle className="hidden lg:inline-flex" />
           {!templateMode && (
             <>
-              <Button size="sm" onClick={onDownload} pending={downloading} pendingLabel="Download" title="Download the latest saved version">
+              <Button size="sm" onClick={onDownload} pending={downloading} pendingLabel="Download" title="Download the latest saved version" className="hidden lg:inline-flex">
                 <Download aria-hidden="true" className="h-3.5 w-3.5" />
                 Download
               </Button>
               {canEdit && (
-                <MenuButton
-                  label="More form actions"
-                  className={buttonClasses({ size: "sm", className: "px-2" })}
-                  items={[{ label: "Save form as template…", icon: LayoutTemplate, onSelect: () => setSavingAsTemplate({ kind: "form" }) }]}
-                />
+                <div className="hidden lg:block">
+                  <MenuButton
+                    label="More form actions"
+                    className={buttonClasses({ size: "sm", className: "px-2" })}
+                    items={[{ label: "Save form as template…", icon: LayoutTemplate, onSelect: () => setSavingAsTemplate({ kind: "form" }) }]}
+                  />
+                </div>
               )}
             </>
           )}
+          <div className="lg:hidden">
+            <MenuButton
+              label={templateMode ? "More actions" : "More form actions"}
+              className={buttonClasses({ size: "sm", className: "px-2" })}
+              items={[
+                ...(templateMode
+                  ? []
+                  : [
+                      { label: downloading ? "Downloading…" : "Download", icon: Download, onSelect: onDownload },
+                      ...(canEdit ? [{ label: "Save form as template…", icon: LayoutTemplate, onSelect: () => setSavingAsTemplate({ kind: "form" }) }] : []),
+                      "separator" as const,
+                    ]),
+                // The same choices as the ThemeToggle it replaces here.
+                ...THEME_CHOICES.map(({ value, label, Icon }) => ({
+                  label: `${label} theme`,
+                  icon: Icon,
+                  checked: theme === value,
+                  onSelect: () => chooseTheme(value),
+                })),
+              ]}
+            />
+          </div>
           {!readOnly && (
             <>
               {(!dirty || saving) && (
-                <span id={saveReasonId} className="text-[0.6875rem] text-graphite">
+                // Visually hidden below 1024px, where the save state beside the
+                // title says the same; still Cancel's and Save's description.
+                <span id={saveReasonId} className="sr-only text-[0.6875rem] text-graphite lg:not-sr-only">
                   {saving ? "Saving your changes…" : "No changes to save"}
                 </span>
               )}
@@ -3031,8 +3072,8 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         // The handle sits in a zero-width column between the canvas and the settings pane.
         style={{ gridTemplateColumns: `minmax(0,1fr) 0px ${pane.width}px` }}
       >
-        {/* Canvas */}
-        <div className="overflow-auto bg-paper px-6 py-8">
+        {/* Canvas: the page's main landmark. */}
+        <main className="overflow-auto bg-paper px-6 py-8">
           <div className="mx-auto max-w-[680px]">
             <div className="surface p-8">
               {groupTemplate ? (
@@ -3046,7 +3087,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                     value={schema.title}
                     onChange={(e) => patch((s) => ({ ...s, title: e.target.value }))}
                     onFocus={() => setSelectedId(null)}
-                    aria-label={templateMode ? "Form title (in forms made from this template)" : "Form title"}
+                    aria-label={templateMode ? "Form title (in forms made from this template)" : "Form title on the canvas"}
                     className="-mx-2 w-[calc(100%+1rem)] rounded-lg border border-transparent bg-transparent px-2 font-display text-[1.625rem] font-bold tracking-[-0.02em] text-ink outline-none transition-colors duration-200 ease-out-expo hover:bg-paper-sunk focus:border-brand-deep focus:bg-surface focus:ring-[3px] focus:ring-brand/20"
                     spellCheck={false}
                   />
@@ -3156,7 +3197,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
               )}
             </div>
           </div>
-        </div>
+        </main>
 
         {menuOpen && (
           <>
@@ -3186,9 +3227,9 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
               >
                 <ChevronLeft aria-hidden="true" className="h-3.5 w-3.5" /> Back to the canvas
               </button>
-              <h4 id={SETTINGS_PANE_HEADING_ID} className="eyebrow mb-3 text-graphite-soft">
+              <h2 id={SETTINGS_PANE_HEADING_ID} className="eyebrow mb-3 text-graphite-soft">
                 {inspectorHeading(selected)}
-              </h4>
+              </h2>
               <Field
                 id="block-label"
                 label={isPage(selected) ? "Title" : "Label"}
@@ -3621,21 +3662,21 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
             </div>
           ) : groupTemplate ? (
             <div>
-              <h4 id={SETTINGS_PANE_HEADING_ID} className="eyebrow mb-3 text-graphite-soft">
+              <h2 id={SETTINGS_PANE_HEADING_ID} className="eyebrow mb-3 text-graphite-soft">
                 Group template
-              </h4>
+              </h2>
               <p className="body-sm text-graphite">
                 A group template has no form settings: forms it&apos;s inserted into keep their own. Select a block to edit it.
               </p>
             </div>
           ) : (
             <div>
-              <h4 id={SETTINGS_PANE_HEADING_ID} className="eyebrow mb-3 text-graphite-soft">
+              <h2 id={SETTINGS_PANE_HEADING_ID} className="eyebrow mb-3 text-graphite-soft">
                 Form settings
-              </h4>
+              </h2>
               {paged && (
                 <>
-                  <h4 className="mb-2 text-[0.8125rem] font-medium text-ink">Navigation</h4>
+                  <h3 className="mb-2 text-[0.8125rem] font-medium text-ink">Navigation</h3>
                   <label className="flex items-start gap-2.5">
                     <Checkbox
                       checked={schema.navigation?.showProgress ?? NAVIGATION_DEFAULTS.showProgress}

@@ -86,7 +86,7 @@ export const ICONS: Record<AnyBlockType, typeof Type> = {
 };
 
 export function BlockPreview({ block }: { block: Block }) {
-  const box = "rounded-lg border border-rule bg-surface px-3 py-2.5 text-sm text-graphite-soft";
+  const box = "rounded-lg border border-field-border bg-surface px-3 py-2.5 text-sm text-graphite-soft";
 
   // ---- layout / static ----
   // These show what the renderer shows: a heading's label at its level; a title's
@@ -188,7 +188,7 @@ export function BlockPreview({ block }: { block: Block }) {
         {arr.map((n) => (
           <span
             key={n}
-            className="grid h-8 w-8 place-items-center rounded-lg border border-rule-strong text-sm text-graphite"
+            className="grid h-8 w-8 place-items-center rounded-lg border border-field-border text-sm text-graphite"
           >
             {n}
           </span>
@@ -215,7 +215,7 @@ export function BlockPreview({ block }: { block: Block }) {
             <div className="flex-[1.2] p-1.5 text-graphite">{r.label}</div>
             {cols.map((_, ci) => (
               <div key={ci} className="flex-1 p-1.5 text-center">
-                <span className="inline-block h-3.5 w-3.5 rounded-full border border-rule-strong" />
+                <span className="inline-block h-3.5 w-3.5 rounded-full border border-field-border" />
               </div>
             ))}
           </div>
@@ -250,7 +250,7 @@ export function BlockPreview({ block }: { block: Block }) {
       <div className="flex flex-col gap-2">
         {opts.map((o, i) => (
           <div key={i} className="flex items-center gap-2.5 text-sm text-ink">
-            <span className={`h-4 w-4 border border-rule-strong ${square ? "rounded" : "rounded-full"}`} />
+            <span className={`h-4 w-4 border border-field-border ${square ? "rounded" : "rounded-full"}`} />
             {o.label}
           </div>
         ))}
@@ -277,7 +277,7 @@ function GridCellPreview({ column }: { column: GridColumn }) {
       <span className="flex flex-col gap-1">
         {(column.options ?? []).map((o, i) => (
           <span key={i} className="flex items-center gap-1.5 whitespace-nowrap text-graphite">
-            <span className="inline-block h-3 w-3 flex-none rounded-full border border-rule-strong" />
+            <span className="inline-block h-3 w-3 flex-none rounded-full border border-field-border" />
             {o.label}
           </span>
         ))}
@@ -285,12 +285,12 @@ function GridCellPreview({ column }: { column: GridColumn }) {
     );
   if (column.type === "dropdown")
     return (
-      <span className="flex min-w-[96px] items-center justify-between gap-2 rounded-md border border-rule-strong bg-surface px-2 py-1 text-graphite-soft">
+      <span className="flex min-w-[96px] items-center justify-between gap-2 rounded-md border border-field-border bg-surface px-2 py-1 text-graphite-soft">
         <span className="whitespace-nowrap">Choose…</span>
         <ChevronDown className="h-3.5 w-3.5 flex-none" />
       </span>
     );
-  return <span className="block h-[26px] min-w-[96px] rounded-md border border-rule-strong bg-surface" />;
+  return <span className="block h-[26px] min-w-[96px] rounded-md border border-field-border bg-surface" />;
 }
 
 /**

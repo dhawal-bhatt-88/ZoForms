@@ -21,7 +21,9 @@
  * Deliberately absent, as in ZoBlocks:
  *   - a callout's or toast's coloured edge on its own tint, and the info
  *     callout's `brand` edge: they reinforce a box its title already names;
- *   - `rule` around cards and panels: their content identifies them;
+ *   - `rule` around cards and panels, and `rule-strong` where it remains (a
+ *     card's hover, group and page boxes, dashed empty boxes, a divider): their
+ *     content identifies them, and no control is drawn with it any more;
  *   - the `brand/20` halo beside a focused field: the solid `brand-deep`
  *     border is the indicator;
  *   - disabled controls, which WCAG exempts.
@@ -50,7 +52,7 @@ export const PAIRS = [
   ...on("brand-deep", [...GROUNDS, "accent-wash"], "ui", "the focus outline and a focused field's border"),
   ...on("brand-deep", ["paper-sunk"], "ui", "the selected segment's border on its track"),
   ...on("brand-deep", ["surface", "nest", "paper"], "ui", "the selected block and page box"),
-  ...on("rule-strong", ["surface", "paper"], "ui", "a field's border (controlClasses), and the canvas's stand-ins for fields, radios and checkboxes"),
+  ...on("field-border", ["surface", "paper", "nest", "paper-sunk"], "ui", "a field's border (controlClasses), and the canvas's drawings of fields, radios and checkboxes"),
   ...on("critical", ["critical-wash"], "ui", "an invalid field's border"),
   ...on("graphite-soft", ["surface", "paper", "nest"], "ui", "Checkbox's unchecked ring, Switch's off outline"),
   ...on("graphite-soft", ["paper"], "ui", "Switch's off thumb on its track"),

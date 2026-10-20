@@ -109,21 +109,23 @@ export default function Dashboard() {
     }
   }
 
-  const newForm = canEdit && (
-    <Button variant="primary" onClick={() => setNewFormOpen(true)}>
-      <Plus aria-hidden="true" className="h-4 w-4" />
-      New form
-    </Button>
-  );
+  // The page header's is medium; an empty state's action is small, as in ZoBlocks.
+  const newForm = (size: "md" | "sm") =>
+    canEdit && (
+      <Button variant="primary" size={size} onClick={() => setNewFormOpen(true)}>
+        <Plus aria-hidden="true" className={size === "md" ? "h-4 w-4" : "h-3.5 w-3.5"} />
+        New form
+      </Button>
+    );
 
   return (
-    <AppShell title="My forms" actions={newForm}>
+    <AppShell title="My forms" actions={newForm("md")}>
       <div role="search" className="mb-6 flex flex-wrap items-center gap-2.5">
         <div className="relative min-w-[200px] flex-1">
           <label htmlFor={searchId} className="sr-only">
             Search forms
           </label>
-          <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-graphite-soft" />
+          <Search aria-hidden="true" strokeWidth={2} className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-graphite-soft" />
           <Input
             ref={searchRef}
             id={searchId}
@@ -131,13 +133,15 @@ export default function Dashboard() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search forms…"
-            className="pl-9"
+            // Small, as ZoBlocks' list search is (TableTools).
+            controlSize="sm"
+            className="pl-8"
           />
         </div>
         <label htmlFor={sortId} className="sr-only">
           Sort forms
         </label>
-        <Select id={sortId} value={sort} onChange={(e) => setSort(e.target.value as Sort)} wrapperClassName="w-auto">
+        <Select id={sortId} size="sm" value={sort} onChange={(e) => setSort(e.target.value as Sort)} wrapperClassName="w-auto">
           <option value="recent">Recently edited</option>
           <option value="name">Name (A–Z)</option>
         </Select>
@@ -171,7 +175,7 @@ export default function Dashboard() {
               ? "Start from scratch or from a template. Every save keeps a version you can go back to."
               : "Forms your organisation makes will appear here."
           }
-          actions={newForm}
+          actions={newForm("sm")}
         />
       )}
 
@@ -179,7 +183,11 @@ export default function Dashboard() {
         <EmptyState
           title={`No forms match "${query.trim()}"`}
           body="Try another word, or clear the search to see every form."
-          actions={<Button onClick={() => setQuery("")}>Clear search</Button>}
+          actions={
+            <Button size="sm" onClick={() => setQuery("")}>
+              Clear search
+            </Button>
+          }
         />
       )}
 
@@ -258,7 +266,9 @@ function FormCard({
     <li className="surface group relative flex flex-col p-5 transition-[transform,box-shadow,border-color] duration-300 ease-out-expo hover:-translate-y-0.5 hover:border-rule-strong hover:shadow-[0_12px_32px_-16px_rgb(2_20_17/0.25)] motion-reduce:hover:translate-y-0">
       <Link
         href={href}
-        className="absolute inset-0 z-0 rounded-[0.875rem] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-deep focus-visible:ring-offset-2 focus-visible:ring-offset-paper"
+        // An outline, not a ring: forced colours removes box-shadows, and the ring
+        // was the card's only focus indicator there.
+        className="absolute inset-0 z-0 rounded-[0.875rem] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-deep"
         aria-label={`${open} ${f.title}`}
       />
 
@@ -266,9 +276,9 @@ function FormCard({
         <FileText className="h-[18px] w-[18px]" strokeWidth={2} />
       </span>
 
-      <h3 className="line-clamp-2 font-display text-[0.9375rem] font-semibold leading-snug tracking-[-0.008em]">
+      <h2 className="line-clamp-2 font-display text-[0.9375rem] font-semibold leading-snug tracking-[-0.008em]">
         {f.title}
-      </h3>
+      </h2>
       <p className="body-sm mt-1.5 text-graphite">Edited {relTime(f.updatedAt || f.createdAt)}</p>
 
       <div className="relative z-10 mt-4 flex items-center justify-end border-t border-rule pt-3">

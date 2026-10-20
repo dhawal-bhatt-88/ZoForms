@@ -28,7 +28,9 @@ export function Logo({ href = "/" }: { href?: string }) {
   return (
     <Link href={href} aria-label="Zowork Forms home" className="group inline-flex items-center gap-2.5 text-ink">
       <ZoBlocksMark className="h-4 w-7 transition-transform duration-500 ease-out-expo group-hover:rotate-180" />
-      <span className="font-display text-[0.9375rem] font-semibold tracking-[-0.02em]">Zowork</span>
+      {/* The space is part of the visible text, "Zowork Forms", which the
+          name has to contain (WCAG 2.5.3); the gap is drawn by `gap-2.5`. */}
+      <span className="font-display text-[0.9375rem] font-semibold tracking-[-0.02em]">Zowork</span>{" "}
       <span className="eyebrow text-graphite-soft">Forms</span>
     </Link>
   );

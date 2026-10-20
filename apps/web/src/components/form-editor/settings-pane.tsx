@@ -175,7 +175,8 @@ export function SettingsPaneHandle({ pane }: { pane: SettingsPane }) {
       <div
         {...pane.separator}
         title="Drag to resize. Double-click to reset."
-        className="group absolute inset-y-0 -left-1 w-2 cursor-col-resize touch-none select-none outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        // Forced colours removes the ring's box-shadow, so an outline takes over there.
+        className="group absolute inset-y-0 -left-1 w-2 cursor-col-resize touch-none select-none outline-none focus-visible:ring-2 focus-visible:ring-accent forced-colors:focus-visible:outline forced-colors:focus-visible:outline-2 forced-colors:focus-visible:-outline-offset-2 forced-colors:focus-visible:outline-[Highlight]"
       >
         <span
           aria-hidden

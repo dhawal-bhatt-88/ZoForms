@@ -39,6 +39,11 @@
   --zb-surface: 255 255 255; /* #ffffff; ZoBlocks' .surface is paper here */
   --zb-rule: 221 229 226; /* #dde5e2 */
   --zb-rule-strong: 195 208 204; /* #c3d0cc */
+  /* A field's border. Not in the console's palette, whose fields use
+     rule-strong at 1.50:1 (docs/ZOBLOCKS-UPSTREAM-NOTES.md, note 7); named
+     after the ZoBlocks library's --zb-field-border. 3.67:1 on surface, 3.47:1
+     on paper, 3.27:1 on nest and paper-sunk (apps/web/contrast.json). */
+  --zb-field-border: 121 137 132; /* #798984 */
   --zb-shimmer: 253 254 254; /* #fdfefe */
 
   --zb-ink: 8 17 15; /* #08110f */
@@ -88,6 +93,8 @@
   --zb-surface: 14 20 27; /* #0e141b, .dark .surface */
   --zb-rule: 29 39 51; /* #1d2733 */
   --zb-rule-strong: 44 55 68; /* #2c3744 */
+  /* 3.62:1 on surface, 3.85:1 on paper, 3.22:1 on nest. */
+  --zb-field-border: 99 111 126; /* #636f7e */
   --zb-shimmer: 26 36 50; /* #1a2432 */
 
   --zb-ink: 237 242 247; /* #edf2f7 */

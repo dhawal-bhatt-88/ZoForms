@@ -236,7 +236,7 @@ const seed = () => ({
 
     // ---------- the toggle: groups only ----------
     await card("p1").locator("span", { hasText: /^Page \d+$/ }).click();
-    check("a page has no Repeats switch", (await P.locator("aside h4").first().textContent()) === "Page" && (await toggle.count()) === 0);
+    check("a page has no Repeats switch", (await P.locator("aside h2").first().textContent()) === "Page" && (await toggle.count()) === 0);
     await select("household");
     check("a group has a Repeats switch, off, with no repeat fields", (await toggle.count()) === 1 && (await toggle.getAttribute("aria-checked")) === "false" && (await field("label").count()) === 0);
 

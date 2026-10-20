@@ -364,7 +364,7 @@ const structure = [];
       await P.keyboard.press("Escape");
 
       // Discard unsaved changes.
-      // Two fields are named "Form title" (the top bar's and the canvas's): the top bar's.
+      // The top bar's title field ("Form title in the top bar"; the canvas has "…on the canvas").
       await P.getByRole("banner").getByLabel("Form title").fill("Clinic visit, edited");
       await P.getByRole("button", { name: "Cancel", exact: true }).click();
       await P.getByRole("alertdialog", { name: "Discard unsaved changes?" }).waitFor();
@@ -442,7 +442,11 @@ const structure = [];
         fcCheck(`My forms (${theme}): the selected segment is distinguishable`, await differs(P, seg, `segment-${theme}`, async () => {}, async () => { await P.getByRole("radiogroup", { name: "Colour theme" }).getByRole("radio", { name: other }).click(); }));
         await P.getByRole("radiogroup", { name: "Colour theme" }).getByRole("radio", { name: mine }).click();
         const cardLink = P.getByRole("link", { name: "Edit Clinic visit" });
-        fcCheck(`My forms (${theme}): a card's focus ring`, await differs(P, cardLink, `card-focus-${theme}`, () => P.locator("h1").click(), async () => { await P.getByLabel("Sort forms").focus(); await P.keyboard.press("Tab"); }), "the card's link, reached by Tab from Sort, drew nothing new");
+        fcCheck(`My forms (${theme}): a card's focus ring`, await differs(P, cardLink, `card-focus-${theme}`, () => P.locator("h1").click(), async () => {
+          // By keyboard, so :focus-visible applies; the card list is newest first, so Tab until it's this card.
+          await P.getByLabel("Sort forms").focus();
+          for (let i = 0; i < 20 && !(await cardLink.evaluate((el) => el === document.activeElement)); i++) await P.keyboard.press("Tab");
+        }), "the card's link, reached by Tab, drew nothing new");
         await P.getByRole("button", { name: 'More actions for "Clinic visit"' }).click();
         await P.getByRole("menuitem", { name: "Delete…" }).click();
         const dialog = P.getByRole("alertdialog");

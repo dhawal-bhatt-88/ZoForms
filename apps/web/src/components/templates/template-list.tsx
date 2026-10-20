@@ -20,7 +20,7 @@ export function TemplateSearch({ value, onChange, label }: { value: string; onCh
       <label htmlFor={id} className="sr-only">
         {label}
       </label>
-      <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-graphite-soft" />
+      <Search aria-hidden="true" strokeWidth={2} className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-graphite-soft" />
       <Input
         id={id}
         data-autofocus
@@ -28,7 +28,8 @@ export function TemplateSearch({ value, onChange, label }: { value: string; onCh
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={label}
-        className="pl-9"
+        controlSize="sm"
+        className="pl-8"
       />
     </div>
   );

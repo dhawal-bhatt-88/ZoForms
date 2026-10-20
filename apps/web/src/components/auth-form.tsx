@@ -116,7 +116,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             </Callout>
           )}
 
-          <Button type="submit" variant="primary" pending={busy} pendingLabel="Please wait…" className="w-full py-2.5">
+          <Button type="submit" variant="primary" pending={busy} pendingLabel="Please wait…" className="w-full">
             {isSignup ? "Create account" : "Log in"}
           </Button>
         </form>

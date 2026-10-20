@@ -16,6 +16,10 @@ import { cn } from "@formbuilder/ui";
  * Adapted: the unchecked ring is `graphite-soft` (5.47:1 on surface in light,
  * 5.84:1 in dark), not ZoBlocks' `rule-strong`, which is about 1.6:1 — under
  * the 3:1 WCAG 1.4.11 asks of a control's boundary.
+ *
+ * Forced colours: the fill becomes the canvas and the SVG tick keeps its own
+ * colour (white in light), so a checked box looked unchecked. The tick takes
+ * `CanvasText` there, and shows on whatever canvas the reader has chosen.
  */
 export function Checkbox({
   className,
@@ -45,7 +49,7 @@ export function Checkbox({
       <svg
         aria-hidden="true"
         viewBox="0 0 16 16"
-        className="pointer-events-none absolute left-[3px] top-[3px] h-[1.125rem] w-[1.125rem] text-accent-on opacity-0 transition-opacity duration-150 peer-checked:opacity-100"
+        className="pointer-events-none absolute left-[3px] top-[3px] h-[1.125rem] w-[1.125rem] text-accent-on opacity-0 transition-opacity duration-150 peer-checked:opacity-100 forced-colors:text-[CanvasText]"
       >
         <path d="M4.2 8.3 6.9 11 11.8 5.6" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" />
       </svg>

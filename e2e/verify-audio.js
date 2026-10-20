@@ -92,7 +92,7 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     const helpField = () => P.locator("aside").getByText("Help text", { exact: true });
     const requiredToggle = () => P.locator("aside").getByRole("switch");
     // The inspector's heading (textContent: the CSS upper-cases it), and how often a phrase appears in it.
-    const inspectorHeading = () => P.locator("aside h4").first().textContent();
+    const inspectorHeading = () => P.locator("aside h2").first().textContent();
     const timesShown = async (phrase) => (await P.locator("aside").innerText()).toLowerCase().split(phrase.toLowerCase()).length - 1;
     const redMessages = () => P.locator("aside [data-field-error]").count();
     const logicSays = (noun) => P.locator("aside").getByText(`Show this ${noun} only when…`, { exact: true }).isVisible();
