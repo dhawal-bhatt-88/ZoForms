@@ -67,7 +67,7 @@ export function OptionListEditor({
    */
   sharedNoteId?: string;
   /**
-   * Show a Score field on each option (contract §17.9): for the options of a
+   * Show a Score column (contract §17.9): for the options of a
    * choice, dropdown, checkbox or multiselect, or a matrix's columns, while the
    * question is within reach of a scored group. Scores stay when it isn't.
    */
@@ -112,9 +112,11 @@ export function OptionListEditor({
         </p>
       )}
       {options.length > 0 && (
+        // The rows' widths, so each heading sits over its column; pr: the remove button and its gap.
         <div className="eyebrow mb-1 flex gap-1.5 pr-[38px] text-graphite-soft" aria-hidden>
           <span className="w-24 flex-none">Code</span>
-          <span className="flex-1">Label</span>
+          <span className="min-w-0 flex-1">Label</span>
+          {showScores && <span className={cn(SCORE_WIDTH, "flex-none")}>Score</span>}
         </div>
       )}
       <div className="flex flex-col gap-2">
@@ -192,8 +194,11 @@ export function CodeChangeNote({ id, className = "mt-2" }: { id: string; classNa
 const field = (invalid: boolean, className: string) =>
   controlClasses({ size: "sm", invalid, className: cn("min-w-0", className, "leading-5") });
 
+/** The Score column's width, shared by its heading and every row's field. */
+const SCORE_WIDTH = "w-14";
+
 /**
- * One option: code, label, remove. Re-renders only when its own values or
+ * One option: code, label, score when shown, remove. Re-renders only when its own values or
  * messages change. Also a grid column's code and label (the columns editor),
  * so both behave the same way.
  */
@@ -239,16 +244,14 @@ export const OptionRow = memo(function OptionRow({
   return (
     <div>
       {/*
-        Code first, then label, as in import files (contract §13.8). The DOM order is
-        the visual and the tab order: code, label, score, remove. The code field is a
-        fixed-width slot (flex-none), so a code generated on leaving the label changes
-        neither the layout nor focus. The label grows to fill the row from a minimum
-        of 8rem; with a score (contract §17.9), the fixed-width score shares the
-        label's line while both fit and wraps below the label when they don't. That
-        depends only on the room there is, so no breakpoint. The row's other controls
-        stay on the first line.
+        Code first, then label, as in import files (contract §13.8), then the score
+        when shown (contract §17.9). The DOM order is the visual and the tab order:
+        code, label, score, remove. Code and score are fixed-width slots (flex-none),
+        so a code generated on leaving the label changes neither the layout nor focus;
+        the label takes the rest of the row and is the only field that narrows with
+        the pane.
       */}
-      <div className="flex items-start gap-1.5">
+      <div className="flex items-center gap-1.5">
         <input
           id={`${base}-code`}
           aria-label={`${Noun} ${i + 1} code${of}`}
@@ -268,57 +271,47 @@ export const OptionRow = memo(function OptionRow({
           // Mono: a code is an identifier, compared down the column.
           className={field(!!codeError, "w-24 flex-none font-mono text-[0.75rem]")}
         />
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-1">
+        <input
+          id={`${base}-label`}
+          aria-label={`${Noun} ${i + 1} label${of}`}
+          value={label}
+          onChange={(e) => h.onLabel(i, e.target.value)}
+          onFocus={() => {
+            labelAtFocus.current = label;
+          }}
+          onBlur={() => {
+            if (labelAtFocus.current !== null && label !== labelAtFocus.current) h.onLabelLeave(i);
+            labelAtFocus.current = null;
+          }}
+          aria-invalid={!!labelError}
+          aria-describedby={labelError ? `${base}-label-error` : undefined}
+          // min-w-0 (in `field`) lets it narrow with the pane and stay inside the row.
+          className={field(!!labelError, "flex-1")}
+        />
+        {showScore && (
           <input
-            id={`${base}-label`}
-            aria-label={`${Noun} ${i + 1} label${of}`}
-            value={label}
-            onChange={(e) => h.onLabel(i, e.target.value)}
-            onFocus={() => {
-              labelAtFocus.current = label;
+            id={`${base}-score`}
+            type="number"
+            step="any"
+            inputMode="decimal"
+            // Named as the code and label are: which option, then the column.
+            aria-label={`${Noun} ${i + 1} score${of}`}
+            // A stored value that isn't a number (sent through the API) shows empty; its message says why.
+            value={typeof score === "number" ? score : ""}
+            onChange={(e) => {
+              const n = e.target.valueAsNumber;
+              h.onScore?.(i, e.target.value === "" || !Number.isFinite(n) ? undefined : n);
             }}
-            onBlur={() => {
-              if (labelAtFocus.current !== null && label !== labelAtFocus.current) h.onLabelLeave(i);
-              labelAtFocus.current = null;
-            }}
-            aria-invalid={!!labelError}
-            aria-describedby={labelError ? `${base}-label-error` : undefined}
-            // Grows from 8rem; narrower only when the pane is (min-w-0 keeps it inside the row).
-            className={field(!!labelError, "w-auto flex-[1_1_8rem]")}
+            aria-invalid={!!scoreError}
+            aria-describedby={scoreError ? `${base}-score-error` : undefined}
+            // About 5 characters ("-12.5") at text-xs, as the code field.
+            className={field(!!scoreError, cn(SCORE_WIDTH, "flex-none px-2 text-[0.75rem] tabular-nums"))}
           />
-          {showScore && (
-            <div data-score className="flex flex-none items-center gap-1.5">
-              <label htmlFor={`${base}-score`} className="text-[0.75rem] font-medium text-graphite">
-                Score
-              </label>
-              <input
-                id={`${base}-score`}
-                type="number"
-                step="any"
-                inputMode="decimal"
-                // Starts with the visible "Score" (WCAG 2.5.3) and says which option, as every row has one.
-                aria-label={`Score for ${noun} ${i + 1}${of}`}
-                // A stored value that isn't a number (sent through the API) shows empty; its message says why.
-                value={typeof score === "number" ? score : ""}
-                onChange={(e) => {
-                  const n = e.target.valueAsNumber;
-                  h.onScore?.(i, e.target.value === "" || !Number.isFinite(n) ? undefined : n);
-                }}
-                aria-invalid={!!scoreError}
-                aria-describedby={scoreError ? `${base}-score-error` : undefined}
-                // About 6 characters wide. text-xs, as the code field: at text-sm in
-                // Instrument Sans, "Score" and the field outgrow the label at the
-                // narrowest pane. leading-5 keeps the fields one height.
-                className={field(!!scoreError, "w-[calc(6ch+1.25rem)] flex-none px-2 text-[0.75rem] tabular-nums")}
-              />
-            </div>
-          )}
-        </div>
+        )}
         <Button
           variant="ghost"
           size="icon"
           onClick={() => h.onRemove(i)}
-          // Centred on the fields' line, wherever the score is.
           className="h-8 w-8 flex-none text-graphite hover:text-ink"
           aria-label={`Remove ${noun} ${i + 1}${of}`}
         >

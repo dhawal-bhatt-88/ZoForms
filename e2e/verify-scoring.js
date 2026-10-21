@@ -128,7 +128,7 @@ const moodTemplate = {
     for (let k = 1; k <= 5; k += 1) {
       await selectByLabel(`Item ${k}`);
       check(`Item ${k}: Name field shows item_${k}`, (await aside.getByRole("textbox", { name: "Name" }).inputValue()) === `item_${k}`);
-      for (let o = 1; o <= 3; o += 1) await aside.getByRole("spinbutton", { name: `Score for option ${o}` }).fill(String(o - 1));
+      for (let o = 1; o <= 3; o += 1) await aside.getByRole("spinbutton", { name: `Option ${o} score` }).fill(String(o - 1));
     }
     await selectByLabel("PHQ-5");
     check("no missing option scores are listed", (await aside.getByText(/has no score/).count()) === 0);
@@ -200,7 +200,7 @@ const moodTemplate = {
 
     // ================= a missing option score blocks the save =================
     await selectByLabel("Item 3");
-    await aside.getByRole("spinbutton", { name: "Score for option 2" }).fill("");
+    await aside.getByRole("spinbutton", { name: "Option 2 score" }).fill("");
     await selectByLabel("PHQ-5");
     check("the Scores panel shows the missing option score live",
       (await aside.getByText(`"Item 3": Option 2 ("Option 2") has no score, but the score "Total" of "PHQ-5" uses this question. Give every option a score.`).count()) === 1);
@@ -212,7 +212,7 @@ const moodTemplate = {
     check("…and nothing saved", (await prisma.formVersion.count({ where: { formId } })) === versions);
     await dismiss();
     await selectByLabel("Item 3");
-    await aside.getByRole("spinbutton", { name: "Score for option 2" }).fill("1");
+    await aside.getByRole("spinbutton", { name: "Option 2 score" }).fill("1");
     await save();
     check("with the score restored, it saves", (await prisma.formVersion.count({ where: { formId } })) === versions + 1);
 
