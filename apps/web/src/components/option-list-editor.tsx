@@ -197,6 +197,10 @@ const field = (invalid: boolean, className: string) =>
 /** The Score column's width, shared by its heading and every row's field. */
 const SCORE_WIDTH = "w-14";
 
+/** A number field without its stepper arrows: Firefox (`textfield`), and Chromium and WebKit (the spin buttons). */
+const SCORE_NO_STEPPER =
+  "[appearance:textfield] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none";
+
 /**
  * One option: code, label, score when shown, remove. Re-renders only when its own values or
  * messages change. Also a grid column's code and label (the columns editor),
@@ -304,8 +308,10 @@ export const OptionRow = memo(function OptionRow({
             }}
             aria-invalid={!!scoreError}
             aria-describedby={scoreError ? `${base}-score-error` : undefined}
-            // About 5 characters ("-12.5") at text-xs, as the code field.
-            className={field(!!scoreError, cn(SCORE_WIDTH, "flex-none px-2 text-[0.75rem] tabular-nums"))}
+            // About 5 characters ("-12.5") at text-xs, as the code field. No stepper
+            // arrows: browsers keep room for them even when hidden, which the column
+            // hasn't got. The arrow keys still step the value.
+            className={field(!!scoreError, cn(SCORE_WIDTH, SCORE_NO_STEPPER, "flex-none px-2 text-[0.75rem] tabular-nums"))}
           />
         )}
         <Button

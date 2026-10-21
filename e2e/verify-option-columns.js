@@ -176,6 +176,11 @@ const WIDTHS = [["End", "widest"], [400, "about 400px"], ["Home", "narrowest"]];
         for (let i = 0; i < 3; i++) orders.push(await tabOrder(prefix, i));
         check(`${at}: tab order code → label → score → remove in every row`, orders.every((o, i) => JSON.stringify(o.slice(0, 3)) === JSON.stringify([`${prefix}-${i}-code`, `${prefix}-${i}-label`, `${prefix}-${i}-score`]) && o[3] === `Remove ${Noun.toLowerCase()} ${i + 1}`), JSON.stringify(orders));
         labelWidths.push(m.rows[0].label.w);
+        // A typical score typed in fits its field: nothing kept for stepper arrows.
+        const typed = P.locator(`#${prefix}-0-score`);
+        await typed.fill("-12.5");
+        const fit = await typed.evaluate((el) => ({ value: el.value, scroll: el.scrollWidth, client: el.clientWidth }));
+        check(`${at}: "-12.5" typed into a score field isn't clipped`, fit.value === "-12.5" && fit.scroll <= fit.client, JSON.stringify(fit));
         if (id === "radio" || id === "mx") {
           const fieldset = P.locator(`#${prefix}-0-code`).locator("xpath=ancestor::fieldset[1]");
           await fieldset.scrollIntoViewIfNeeded();
@@ -183,6 +188,20 @@ const WIDTHS = [["End", "widest"], [400, "about 400px"], ["Home", "narrowest"]];
         }
       }
       check(`${what}: only the label narrows with the pane`, labelWidths[0] > labelWidths[1] && labelWidths[1] > labelWidths[2] && labelWidths[2] > 0, JSON.stringify(labelWidths));
+
+      // No stepper arrows, but the arrow keys still step the value, and the editor keeps it.
+      const stepped = P.locator(`#${prefix}-1-score`);
+      await stepped.fill("-12.5");
+      await stepped.press("ArrowUp");
+      const up = await stepped.inputValue();
+      await stepped.press("ArrowDown");
+      await stepped.press("ArrowDown");
+      const down = await stepped.inputValue();
+      check(`${what}: ArrowUp and ArrowDown step the score by 1 (-12.5 → ${up} → ${down})`, up === "-11.5" && down === "-13.5");
+      await select("plain");
+      await select(id);
+      check(`${what}: a stepped score is kept by the editor`, (await stepped.inputValue()) === "-13.5", await stepped.inputValue());
+      check(`${what}: the score field has no stepper (appearance: textfield)`, (await stepped.evaluate((el) => getComputedStyle(el).appearance)) === "textfield");
     }
 
     // Long values are kept whole in their fields at the narrowest width.
