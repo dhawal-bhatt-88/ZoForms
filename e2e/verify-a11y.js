@@ -186,9 +186,13 @@ const structure = [];
       if (theme === "light") check(`structure, ${screen}: ${state}`, !problems.length, problems.join("; "));
     };
 
-    // ================= Auth =================
+    // ================= Public and auth =================
     for (const theme of THEMES) {
       const { ctx, P } = await open({ theme });
+      // The public home page: no session, and navigation of its own.
+      await P.goto(WEB + "/");
+      await P.locator("h1").first().waitFor({ timeout: 60000 });
+      await audit(P, "Public", "home", theme, { nav: true });
       const auth = [
         ["sign-in", "/login"],
         ["sign-up", "/signup"],
@@ -501,7 +505,7 @@ const structure = [];
     // Nothing scrolls sideways (WCAG 1.4.10) except inside a table's own scroller.
     const RF = path.join(DIR, "reflow");
     const reflowScreens = [
-      ["sign-in", null, "/login"], ["sign-up", null, "/signup"], ["forgot password", null, "/forgot-password"],
+      ["home", null, "/"], ["sign-in", null, "/login"], ["sign-up", null, "/signup"], ["forgot password", null, "/forgot-password"],
       ["reset password", null, "/reset-password/not-a-real-token"], ["invite", null, `/invite/${pendingInvite}`], ["verify email", null, "/verify-email/not-a-real-token"],
       ["My forms", A, "/app"], ["Templates", A, "/app/templates"], ["Team", A, "/app/team"], ["Versions", A, `/app/forms/${form.id}/versions`],
     ];

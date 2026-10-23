@@ -1,0 +1,89 @@
+{
+  "title": "PHQ-2",
+  "formId": "0ea2d0a2-5298-4a5e-a1a3-08035ca5e758",
+  "formVersionId": "257ed0ec-2d23-462c-9fca-481f5088501e",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "phq2",
+      "type": "group",
+      "label": "Over the last 2 weeks, how often have you been bothered by any of the following problems?",
+      "scores": [
+        {
+          "id": "total",
+          "label": "Total score",
+          "formula": {
+            "op": "+",
+            "args": [
+              {
+                "ref": "interest"
+              },
+              {
+                "ref": "mood"
+              }
+            ]
+          },
+          "unanswered": "no-score"
+        }
+      ],
+      "blocks": [
+        {
+          "id": "interest",
+          "type": "choice",
+          "label": "Little interest or pleasure in doing things",
+          "required": true,
+          "options": [
+            {
+              "code": "not_at_all",
+              "label": "Not at all",
+              "score": 0
+            },
+            {
+              "code": "several_days",
+              "label": "Several days",
+              "score": 1
+            },
+            {
+              "code": "more_than_half",
+              "label": "More than half the days",
+              "score": 2
+            },
+            {
+              "code": "nearly_every_day",
+              "label": "Nearly every day",
+              "score": 3
+            }
+          ]
+        },
+        {
+          "id": "mood",
+          "type": "choice",
+          "label": "Feeling down, depressed, or hopeless",
+          "required": true,
+          "options": [
+            {
+              "code": "not_at_all",
+              "label": "Not at all",
+              "score": 0
+            },
+            {
+              "code": "several_days",
+              "label": "Several days",
+              "score": 1
+            },
+            {
+              "code": "more_than_half",
+              "label": "More than half the days",
+              "score": 2
+            },
+            {
+              "code": "nearly_every_day",
+              "label": "Nearly every day",
+              "score": 3
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

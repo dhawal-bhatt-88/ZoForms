@@ -30,7 +30,7 @@ That's all. The builder hosts no form pages and stores no uploads, so there's no
    └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-> **Build-time values:** `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_TENANT_URL`, `NEXT_PUBLIC_WEB_URL` and `NEXT_PUBLIC_GOOGLE_CLIENT_ID` are **built into the web and admin images**, not read at runtime. That's why they're GitHub repo variables (below). If the host's address changes, run Deploy again so the images are rebuilt. Allocate an Elastic IP so the address stays the same.
+> **Build-time values:** `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_WEB_URL` (also built in as `NEXT_PUBLIC_TENANT_URL`) and `NEXT_PUBLIC_GOOGLE_CLIENT_ID` are **built into the web and admin images**, not read at runtime. That's why they're GitHub repo variables (below). If the host's address changes, run Deploy again so the images are rebuilt. Allocate an Elastic IP so the address stays the same.
 
 ## 1. One-time AWS setup
 
@@ -84,8 +84,7 @@ Every deploy copies `docker-compose.prod.yml` to `~/zowork-forms/`; you don't pl
 | Name | Example |
 | --- | --- |
 | `NEXT_PUBLIC_API_URL` | `http://<ELASTIC_IP>:4000` |
-| `NEXT_PUBLIC_TENANT_URL` | `http://<ELASTIC_IP>:3000` (the admin console's impersonation link) |
-| `NEXT_PUBLIC_WEB_URL` | `http://<ELASTIC_IP>:3000` (the base of the home page's Open Graph links) |
+| `NEXT_PUBLIC_WEB_URL` | `http://<ELASTIC_IP>:3000`: the builder's address. The web image uses it for the home page's Open Graph links; the workflow also passes it to the admin image as `NEXT_PUBLIC_TENANT_URL`, the impersonation link, so the two can't drift. |
 | `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | optional; the same value as `GOOGLE_CLIENT_ID` |
 
 **Secrets** (used by the deploy step):

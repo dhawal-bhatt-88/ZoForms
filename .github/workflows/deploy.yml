@@ -8,7 +8,7 @@ name: Deploy
 # (see DEPLOY.md). Don't add a push trigger before then.
 #
 # Required repo settings (see DEPLOY.md):
-#   Variables : NEXT_PUBLIC_API_URL, NEXT_PUBLIC_TENANT_URL, NEXT_PUBLIC_WEB_URL, NEXT_PUBLIC_GOOGLE_CLIENT_ID (optional)
+#   Variables : NEXT_PUBLIC_API_URL, NEXT_PUBLIC_WEB_URL, NEXT_PUBLIC_GOOGLE_CLIENT_ID (optional)
 #   Secrets   : EC2_HOST, EC2_USER, EC2_SSH_KEY
 
 on:
@@ -54,10 +54,13 @@ jobs:
             ${{ env.IMAGE_BASE }}-${{ matrix.app }}:${{ github.sha }}
           # NEXT_PUBLIC_* are only consumed by the web/admin images; the api
           # image ignores them (a harmless "unused build arg" warning).
+          # NEXT_PUBLIC_TENANT_URL (the admin console's impersonation link) is
+          # the builder's address too, so it comes from NEXT_PUBLIC_WEB_URL:
+          # one variable, and the two can't drift.
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
-            NEXT_PUBLIC_TENANT_URL=${{ vars.NEXT_PUBLIC_TENANT_URL }}
             NEXT_PUBLIC_WEB_URL=${{ vars.NEXT_PUBLIC_WEB_URL }}
+            NEXT_PUBLIC_TENANT_URL=${{ vars.NEXT_PUBLIC_WEB_URL }}
             NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ vars.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

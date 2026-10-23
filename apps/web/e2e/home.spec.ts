@@ -32,11 +32,71 @@ test.describe("home page", () => {
     expect(res.headers()["content-type"]).toBe("image/png");
   });
 
+  test("the sections, in order", async ({ page }) => {
+    await page.goto("/");
+
+    expect(await page.locator("main h2").allInnerTexts()).toEqual([
+      "How it works",
+      "Built for clinical forms",
+      "Your data stays with you",
+      "Accessible forms",
+      "Questions",
+      "Build your first form",
+    ]);
+    // The final call to action repeats the hero's two buttons.
+    const cta = page.getByRole("region", { name: "Build your first form" });
+    await expect(cta.getByRole("link", { name: "Get started" })).toHaveAttribute("href", "/signup");
+    await expect(cta.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
+  });
+
+  test("the hero's example: an excerpt, the whole file and the form rendered", async ({ page }) => {
+    await page.goto("/");
+    const figure = page.getByRole("figure");
+
+    await expect(figure.getByText('"label": "Little interest or pleasure in doing things"')).toBeVisible();
+    await expect(figure.getByRole("img", { name: /Little interest or pleasure in doing things/ })).toBeVisible();
+
+    const href = await figure.getByRole("link", { name: "Download the whole file" }).getAttribute("href");
+    const file = await (await page.request.get(href!)).json();
+    expect(file.title).toBe("PHQ-2");
+    expect(file.blocks[0].blocks.map((b: { label: string }) => b.label)).toEqual([
+      "Little interest or pleasure in doing things",
+      "Feeling down, depressed, or hopeless",
+    ]);
+  });
+
+  test("a question in the FAQ opens to its answer", async ({ page }) => {
+    await page.goto("/");
+    const answer = page.getByText("Wherever your app sends them. Zowork Forms never sees them.");
+
+    await expect(answer).toBeHidden();
+    await page.getByText("Where are the answers stored?").click();
+    await expect(answer).toBeVisible();
+  });
+
+  test("the footer links what exists and marks the rest as soon", async ({ page }) => {
+    await page.goto("/");
+    const footer = page.getByRole("navigation", { name: "Footer" });
+
+    await expect(footer.getByRole("link", { name: "Docs" })).toHaveAttribute("href", "/docs");
+    await expect(footer.getByRole("link", { name: "ZoBlocks" })).toHaveAttribute("href", "https://zoblocks.design");
+    for (const name of ["Release notes", "Privacy", "Terms"]) {
+      await expect(footer.getByRole("link", { name })).toHaveCount(0);
+      await expect(footer.getByText(`${name} (soon)`)).toBeVisible();
+    }
+    // Plain text until its address is settled, and not "soon": it exists.
+    await expect(footer.getByRole("link", { name: "Zowork" })).toHaveCount(0);
+    await expect(footer.getByText("Zowork", { exact: true })).toBeVisible();
+    await expect(page.getByRole("contentinfo")).toContainText("© 2026 Zowork");
+  });
+
   test("Get started opens sign-up", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Get started" }).click();
 
-    await expect(page).toHaveURL(/\/signup$/);
+    // The dev server may be compiling /signup for the first time, under load
+    // from the other workers: longer than the default 5s.
+    await expect(page).toHaveURL(/\/signup$/, { timeout: 20_000 });
     await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
   });
 
@@ -107,6 +167,10 @@ test.describe("home page accessibility", () => {
         await page.goto("/");
         await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
         await expect(page.locator("html")).toHaveClass(theme === "dark" ? /\bdark\b/ : /^(?!.*\bdark\b)/);
+        // One screenshot of the rendered form, in this theme.
+        const rendered = page.getByRole("img", { name: /Little interest or pleasure/ });
+        await expect(rendered).toHaveCount(1);
+        await expect(rendered).toHaveAttribute("src", new RegExp(`phq-2-rendered-${theme}`));
         if (width === 375) await page.getByRole("button", { name: "Menu" }).click();
         await page.evaluate(() =>
           Promise.all(

@@ -157,6 +157,15 @@ html {
 
 /* Type scale — L232–272. `.eyebrow` is in the preset's component plugin. */
 @layer components {
+  /* The home page's headline. */
+  .display-lg {
+    font-family: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
+    font-size: clamp(2rem, 4.4vw, 3.5rem);
+    line-height: 1;
+    letter-spacing: -0.035em;
+    font-weight: 600;
+    text-wrap: balance;
+  }
   .display-sm {
     font-family: var(--font-instrument-sans), ui-sans-serif, system-ui, sans-serif;
     font-size: clamp(1.375rem, 2.2vw, 1.875rem);
