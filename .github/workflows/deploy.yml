@@ -8,7 +8,7 @@ name: Deploy
 # (see DEPLOY.md). Don't add a push trigger before then.
 #
 # Required repo settings (see DEPLOY.md):
-#   Variables : NEXT_PUBLIC_API_URL, NEXT_PUBLIC_TENANT_URL, NEXT_PUBLIC_GOOGLE_CLIENT_ID (optional)
+#   Variables : NEXT_PUBLIC_API_URL, NEXT_PUBLIC_TENANT_URL, NEXT_PUBLIC_WEB_URL, NEXT_PUBLIC_GOOGLE_CLIENT_ID (optional)
 #   Secrets   : EC2_HOST, EC2_USER, EC2_SSH_KEY
 
 on:
@@ -57,6 +57,7 @@ jobs:
           build-args: |
             NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
             NEXT_PUBLIC_TENANT_URL=${{ vars.NEXT_PUBLIC_TENANT_URL }}
+            NEXT_PUBLIC_WEB_URL=${{ vars.NEXT_PUBLIC_WEB_URL }}
             NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ vars.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

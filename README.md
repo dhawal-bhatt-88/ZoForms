@@ -130,6 +130,7 @@ Or use `pnpm db:studio`. Then sign in at http://localhost:3002 with the same ema
 | --- | --- |
 | `NEXT_PUBLIC_API_URL` | The API's origin (default `http://localhost:4000`) |
 | `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | The same client id as the API's `GOOGLE_CLIENT_ID`; without it, the Google button is hidden |
+| `NEXT_PUBLIC_WEB_URL` | The web app's own public origin, the base of the public pages' Open Graph and canonical URLs (default `http://localhost:3000`) |
 
 **`apps/admin/.env.local`** ([example](apps/admin/.env.local.example))
 

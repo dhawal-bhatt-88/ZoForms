@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Instrument_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
+import { HOME_REDIRECT_SCRIPT } from "@/lib/home-redirect";
 
 /*
  * Fonts and the pre-paint theme script ported from github.com/zoworkhq/zoblocks
@@ -26,6 +27,9 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  // Where Open Graph and canonical URLs point. The production address isn't
+  // settled, so it's a build-time variable; the home page is built static.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_WEB_URL || "http://localhost:3000"),
   title: {
     default: "Zowork Forms",
     template: "%s · Zowork Forms",
@@ -52,6 +56,8 @@ export default function RootLayout({
         {/* Inline and synchronous, before first paint, so a reader who chose
             dark never sees a flash of light. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+        {/* Same timing: a signed-in visitor on `/` never sees the home page. */}
+        <script dangerouslySetInnerHTML={{ __html: HOME_REDIRECT_SCRIPT }} />
       </head>
       <body>{children}</body>
     </html>

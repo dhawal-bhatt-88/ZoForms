@@ -7,7 +7,8 @@ type User = { id: string; email: string; name: string | null };
 
 /* ---------- token ---------- */
 
-const TOKEN_KEY = "frame_token";
+/** Also read before paint by HOME_REDIRECT_SCRIPT (lib/home-redirect.ts). */
+export const TOKEN_KEY = "frame_token";
 export function getToken() {
   return typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
 }

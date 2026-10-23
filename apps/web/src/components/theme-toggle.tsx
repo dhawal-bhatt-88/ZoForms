@@ -46,7 +46,8 @@ export function useThemeChoice(): [Theme, (value: Theme) => void] {
   return [choice, select];
 }
 
-export function ThemeToggle({ className }: { className?: string } = {}) {
+/** `label`: the public pages are in US English, the app in British. */
+export function ThemeToggle({ className, label = "Colour theme" }: { className?: string; label?: string } = {}) {
   const [choice, select] = useThemeChoice();
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
 
@@ -60,7 +61,7 @@ export function ThemeToggle({ className }: { className?: string } = {}) {
   }
 
   return (
-    <div role="radiogroup" aria-label="Colour theme" className={segmentTrackClasses(className)}>
+    <div role="radiogroup" aria-label={label} className={segmentTrackClasses(className)}>
       {CHOICES.map(({ value, label, Icon }, i) => (
         <button
           key={value}
