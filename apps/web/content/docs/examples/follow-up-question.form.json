@@ -1,0 +1,38 @@
+{
+  "title": "Follow-up question",
+  "formId": "57fb262b-a7c3-44e4-a1ac-14376de22829",
+  "formVersionId": "7f5cc430-b1eb-4366-893c-dbb14bf903d2",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "sees_therapist",
+      "type": "choice",
+      "label": "Does the client currently see a therapist?",
+      "required": true,
+      "options": [
+        {
+          "code": "yes",
+          "label": "Yes"
+        },
+        {
+          "code": "no",
+          "label": "No"
+        }
+      ]
+    },
+    {
+      "id": "therapist_name",
+      "type": "short",
+      "label": "Therapist's name",
+      "required": true,
+      "enableWhen": [
+        {
+          "id": "c_9kzhcss2",
+          "question": "sees_therapist",
+          "operator": "=",
+          "answer": "yes"
+        }
+      ]
+    }
+  ]
+}

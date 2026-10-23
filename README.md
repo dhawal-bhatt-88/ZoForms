@@ -49,6 +49,7 @@ The builder offers only block types the renderer knows. [`e2e/verify-renderer-ty
 formbuilder/
 ├─ apps/
 │  ├─ web/            # The builder (Next.js)                     → :3000
+│  │  └─ content/docs/   # The public docs at /docs: MDX pages, nav.ts, example form files
 │  ├─ admin/          # Operators' admin console (Next.js)       → :3002
 │  └─ api/            # REST API (NestJS + Prisma)                → :4000
 │     └─ prisma/
@@ -60,8 +61,11 @@ formbuilder/
 ├─ e2e/               # Builder end-to-end suites (plain Node + Playwright)
 ├─ deploy/            # Production compose file and env example (see DEPLOY.md)
 ├─ docs/              # Contracts, the clean-up audit and plan, briefs
+├─ vendor/            # zoworkhq-forms-<version>.tgz: @zoworkhq/forms for the docs' live examples
 └─ docker-compose.yml # Local Postgres 16
 ```
+
+**The renderer in the docs.** `@zoworkhq/forms` isn't on a registry, so `apps/web` installs the tarball in `vendor/` (every Dockerfile copies that folder before `pnpm install`). To upgrade it, put the new `npm pack` output in `vendor/`, delete the old one, point `apps/web/package.json` at it with forward slashes, and run `pnpm install`. The docs' live examples render real downloads: with the API running, `node apps/web/scripts/docs-example-forms.mjs` builds each example form through the API and rewrites its `.form.json`.
 
 ## Local setup
 

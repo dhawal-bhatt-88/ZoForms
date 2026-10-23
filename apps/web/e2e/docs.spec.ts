@@ -1,0 +1,241 @@
+import AxeBuilder from "@axe-core/playwright";
+import { expect, test, type Page } from "@playwright/test";
+
+/**
+ * The public docs at /docs (docs/briefs/BUILDER-BRIEF-DOCS.md). They need no
+ * API and no session.
+ *
+ * The live example renders @zoworkhq/forms inside an open shadow root, so the
+ * tests that matter most here check the form still works as a form there:
+ * labels and descriptions resolve, the error summary takes focus and its links
+ * move it, axe reaches inside, and the stand-in endpoint exists only while an
+ * example is on the page.
+ */
+
+const EXAMPLE = "/docs/examples/follow-up-question";
+
+/** The deepest focused element, through shadow roots: a short description of it. */
+async function focused(page: Page) {
+  return page.evaluate(() => {
+    let el: Element | null = document.activeElement;
+    let inShadow = false;
+    while (el?.shadowRoot?.activeElement) {
+      el = el.shadowRoot.activeElement;
+      inShadow = true;
+    }
+    return { tag: el?.tagName.toLowerCase(), id: el?.id, className: el?.className, inShadow };
+  });
+}
+
+const shimmed = (page: Page) => page.evaluate(() => "__zoworkDocsExampleFetch" in window.fetch);
+
+test.describe("docs", () => {
+  test("/docs is public and shows the two ways in, with its navigation", async ({ page }) => {
+    await page.goto("/docs");
+
+    await expect(page).toHaveTitle("Zowork Forms documentation · Zowork Forms");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Zowork Forms documentation");
+    await expect(page.getByRole("link", { name: /I build forms/ })).toHaveAttribute("href", "/docs/build/question-types/dropdown");
+    await expect(page.getByRole("link", { name: /I integrate forms/ })).toHaveAttribute("href", "/docs/integrate/reference/form-renderer");
+
+    const nav = page.getByRole("navigation", { name: "Docs" });
+    await expect(nav.getByRole("link", { name: "Docs home" })).toHaveAttribute("aria-current", "page");
+    const header = page.getByRole("banner");
+    await expect(header.getByText("@zoworkhq/forms 0.26.0")).toBeVisible();
+    await expect(header.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
+    await expect(header.getByRole("link", { name: "Release notes" })).toHaveCount(0);
+  });
+
+  test("a page has the shared header, On this page, and previous and next", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/docs/build/question-types/dropdown");
+
+    await expect(page.getByRole("navigation", { name: "Docs" }).getByRole("link", { name: "Dropdown" })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toHaveText(/Docs\s*\/\s*Build forms\s*\/\s*Question types/);
+    await expect(page.getByRole("link", { name: "View as Markdown" })).toHaveAttribute("href", "/docs/build/question-types/dropdown.md");
+    await expect(page.getByText("Applies to: Zowork Forms builder · @zoworkhq/forms 0.26.0 or later.")).toBeVisible();
+
+    const toc = page.getByRole("navigation", { name: "On this page" });
+    await expect(toc).toBeVisible();
+    await expect(toc.getByRole("link", { name: "When to use" })).toHaveAttribute("href", "#when-to-use");
+    await expect(page.locator("h2#when-to-use")).toHaveText("When to use");
+
+    const ends = page.getByRole("navigation", { name: "Previous and next" });
+    await expect(ends.getByRole("link", { name: /Previous\s*Docs home/ })).toHaveAttribute("href", "/docs");
+    await expect(ends.getByRole("link", { name: /Next\s*Show a question only when it applies/ })).toBeVisible();
+
+    await page.setViewportSize({ width: 1100, height: 900 });
+    await expect(toc).toBeHidden();
+  });
+
+  test("below 760px the side navigation is a menu", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 800 });
+    await page.goto("/docs");
+    const menu = page.getByRole("button", { name: "Docs menu" });
+    const link = page.getByRole("navigation", { name: "Docs" }).getByRole("link", { name: "FormRenderer" });
+
+    await expect(menu).toHaveAttribute("aria-expanded", "false");
+    await expect(link).toBeHidden();
+    await menu.click();
+    await expect(link).toBeVisible();
+    await link.click();
+    await expect(page).toHaveURL(/form-renderer$/);
+    await expect(page.getByRole("button", { name: "Docs menu" })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  test("the skip link is the first stop and lands on the page", async ({ page }) => {
+    await page.goto("/docs");
+    await page.keyboard.press("Tab");
+    const skip = page.getByRole("link", { name: "Skip to main content" });
+    await expect(skip).toBeFocused();
+    await skip.press("Enter");
+    await expect(page.locator("main#main")).toBeFocused();
+  });
+
+  test("Was this page helpful? offers reasons on No", async ({ page }) => {
+    await page.goto("/docs");
+    await page.getByRole("button", { name: "No", exact: true }).click();
+    const reasons = page.getByRole("group", { name: "Tell us more" });
+    for (const r of ["Clear instructions", "Example helped", "Missing information", "Didn't match the product"]) {
+      await expect(reasons.getByRole("button", { name: r })).toHaveAttribute("aria-pressed", "false");
+    }
+    await reasons.getByRole("button", { name: "Missing information" }).click();
+    await expect(reasons.getByRole("button", { name: "Missing information" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  test("search finds a page by a word in it", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/docs");
+    await page.getByRole("searchbox", { name: "Search the docs" }).fill("renderer");
+    const results = page.getByRole("list", { name: "Search results" });
+    await expect(results.getByRole("link", { name: /FormRenderer/ })).toBeVisible();
+    await page.keyboard.press("ArrowDown");
+    await expect(results.getByRole("link").first()).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(results).toHaveCount(0);
+  });
+
+  test("each page has a Markdown version, and llms.txt lists them", async ({ request }) => {
+    const md = await request.get("/docs/examples/follow-up-question.md");
+    expect(md.headers()["content-type"]).toBe("text/markdown; charset=utf-8");
+    const text = await md.text();
+    expect(text.startsWith("# Follow-up question\n")).toBe(true);
+    expect(text).toContain('"label": "Does the client currently see a therapist?"');
+
+    expect((await request.get("/docs.md")).status()).toBe(200);
+    expect((await request.get("/docs/nope.md")).status()).toBe(404);
+
+    const llms = await (await request.get("/docs/llms.txt")).text();
+    for (const page of ["/docs.md", "/docs/build/question-types/dropdown.md", "/docs/integrate/reference/form-renderer.md"]) {
+      expect(llms).toContain(`${page}): `);
+    }
+  });
+
+  test.describe("the live example", () => {
+    test("renders the real form in a shadow root, with labels and descriptions that resolve there", async ({ page }) => {
+      await page.goto(EXAMPLE);
+      const host = page.locator("[data-docs-example=follow-up-question]");
+      await expect(host.locator(".zf-form")).toBeVisible();
+
+      await page.getByRole("radio", { name: "Yes" }).check();
+      const name = page.getByRole("textbox", { name: "Therapist's name" });
+      await expect(name).toBeVisible();
+
+      const refs = await host.evaluate((el) => {
+        const root = el.shadowRoot!;
+        const missing: string[] = [];
+        for (const node of root.querySelectorAll("[aria-describedby],[aria-labelledby],label[for]")) {
+          const ids = [node.getAttribute("aria-describedby"), node.getAttribute("aria-labelledby"), node.getAttribute("for")]
+            .flatMap((v) => (v ? v.split(/\s+/) : []));
+          for (const id of ids) if (!root.getElementById(id)) missing.push(`${node.tagName}→${id}`);
+        }
+        return { checked: root.querySelectorAll("[aria-describedby],[aria-labelledby],label[for]").length, missing, inDocument: !!document.querySelector(".zf-form") };
+      });
+      expect(refs.inDocument).toBe(false);
+      expect(refs.checked).toBeGreaterThan(0);
+      expect(refs.missing).toEqual([]);
+    });
+
+    test("the error summary takes focus, and its link moves focus to the question", async ({ page }) => {
+      await page.goto(EXAMPLE);
+      await page.getByRole("radio", { name: "Yes" }).check();
+      await page.getByRole("button", { name: "Submit" }).click();
+
+      const summary = page.locator(".zf-error-summary");
+      await expect(summary).toBeVisible();
+      await expect(summary.getByRole("heading")).toHaveText("There is a problem");
+      expect(await focused(page)).toMatchObject({ tag: "div", className: "zf-error-summary", inShadow: true });
+
+      await summary.getByRole("link", { name: '"Therapist\'s name" is required.' }).click();
+      expect(await focused(page)).toMatchObject({ tag: "input", id: "therapist_name", inShadow: true });
+      await expect(page.getByRole("textbox", { name: "Therapist's name" })).toHaveAccessibleDescription(/is required/);
+    });
+
+    test("Payload and Server output come from the real submit; a hidden answer is left out", async ({ page }) => {
+      await page.goto(EXAMPLE);
+      await page.getByRole("radio", { name: "Yes" }).check();
+      await page.getByRole("textbox", { name: "Therapist's name" }).fill("Dr. Rivera");
+      await page.getByRole("radio", { name: "No" }).check();
+      await page.getByRole("button", { name: "Submit" }).click();
+      await expect(page.getByText("Form submitted successfully.")).toBeVisible();
+
+      await page.getByRole("tab", { name: "Payload" }).click();
+      const payload = JSON.parse((await page.getByRole("region", { name: "Request body" }).textContent()) ?? "");
+      expect(payload.answers).toEqual({ sees_therapist: { state: "answered", value: "no" } });
+      expect(payload.formId).toBe("57fb262b-a7c3-44e4-a1ac-14376de22829");
+
+      await page.getByRole("tab", { name: "Server output" }).click();
+      const server = JSON.parse((await page.getByRole("region", { name: "prepareSubmission(schema, body)" }).textContent()) ?? "");
+      expect(server.ok).toBe(true);
+      expect(server.answers).toEqual({ sees_therapist: { state: "answered", value: { code: "no", label: "No" } } });
+      await expect(page.getByText("Computed in your browser by prepareSubmission")).toBeVisible();
+    });
+
+    test("the tabs work from the keyboard", async ({ page }) => {
+      await page.goto(EXAMPLE);
+      const preview = page.getByRole("tab", { name: "Preview" });
+      await preview.focus();
+      await page.keyboard.press("ArrowRight");
+      await expect(page.getByRole("tab", { name: "Schema" })).toBeFocused();
+      await expect(page.getByRole("tab", { name: "Schema" })).toHaveAttribute("aria-selected", "true");
+      await page.keyboard.press("End");
+      await expect(page.getByRole("tab", { name: "Server output" })).toBeFocused();
+      await page.keyboard.press("Home");
+      await expect(preview).toBeFocused();
+      await page.keyboard.press("ArrowLeft");
+      await expect(page.getByRole("tab", { name: "Server output" })).toHaveAttribute("aria-selected", "true");
+    });
+
+    test("axe scans inside the shadow root and finds nothing, light and dark", async ({ page, context }) => {
+      for (const theme of ["light", "dark"]) {
+        await context.addCookies([{ name: "zoblocks-theme", value: theme, url: "http://localhost:3100" }]);
+        await page.goto(EXAMPLE);
+        await page.getByRole("radio", { name: "Yes" }).check();
+        await page.getByRole("button", { name: "Submit" }).click();
+        await expect(page.locator(".zf-error-summary")).toBeVisible();
+
+        const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
+        expect(results.violations.map((v) => `${theme}: ${v.id} ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
+        // A target inside a shadow root is a list of selectors, host first.
+        const inShadow = results.passes.flatMap((r) => r.nodes).filter((n) => Array.isArray(n.target[0]));
+        expect(inShadow.some((n) => JSON.stringify(n.target).includes(".zf-"))).toBe(true);
+      }
+    });
+
+    test("the stand-in endpoint exists only while an example is on the page", async ({ page }) => {
+      await page.goto("/docs");
+      expect(await shimmed(page)).toBe(false);
+
+      await page.goto(EXAMPLE);
+      await expect(page.locator(".zf-form")).toBeVisible();
+      expect(await shimmed(page)).toBe(true);
+      // Anything else still goes to the network.
+      expect(await page.evaluate(async () => (await fetch("/docs/llms.txt")).status)).toBe(200);
+
+      await page.getByRole("navigation", { name: "Docs" }).getByRole("link", { name: "Docs home" }).click();
+      await expect(page).toHaveURL(/\/docs$/);
+      expect(await shimmed(page)).toBe(false);
+      expect(await page.evaluate(() => Function.prototype.toString.call(window.fetch).includes("[native code]"))).toBe(true);
+    });
+  });
+});

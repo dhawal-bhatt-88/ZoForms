@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { buttonClasses } from "@/components/ui";
+import { StatusChip, buttonClasses } from "@/components/ui";
 
 /**
  * The header of the public pages: the home page and the docs.
@@ -15,6 +15,10 @@ import { buttonClasses } from "@/components/ui";
  * (a disclosure, like the app rail's) shows them as a panel under the row.
  * Every control exists once, so the tab order is the order on screen at both
  * widths and there's no second theme toggle to fall out of step.
+ *
+ * The docs' variant (docs brief, "Common layout") spans the full width, names
+ * the docs after the logo, and holds search, the package version and Release
+ * notes in place of Docs and Get started.
  */
 
 const LINKS = [
@@ -22,7 +26,15 @@ const LINKS = [
   { label: "Sign in", href: "/login" },
 ];
 
-export function PublicHeader() {
+const linkClasses =
+  "block rounded-lg px-2.5 py-2 text-[0.8125rem] text-graphite transition-colors duration-200 hover:bg-paper-sunk hover:text-ink sm:py-1.5";
+
+export function PublicHeader({
+  docs,
+}: {
+  /** The docs' variant: the package version and the search box, which the docs layout passes in so the home page never loads it. */
+  docs?: { version: string; search: React.ReactNode };
+} = {}) {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
 
@@ -36,8 +48,18 @@ export function PublicHeader() {
         }
       }}
     >
-      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-3 px-4 py-3 sm:px-6">
+      <div className={`${docs ? "" : "mx-auto max-w-6xl "}flex flex-wrap items-center gap-x-3 px-4 py-3 sm:px-6`}>
         <Logo />
+        {docs && (
+          <>
+            <span aria-hidden="true" className="text-rule-strong">
+              /
+            </span>
+            <Link href="/docs" className="text-[0.8125rem] font-medium text-ink">
+              Docs
+            </Link>
+          </>
+        )}
 
         <button
           ref={trigger}
@@ -61,23 +83,38 @@ export function PublicHeader() {
           onClick={(e) => (e.target as HTMLElement).closest("a") && setOpen(false)}
           className={`${open ? "flex" : "hidden"} mt-3 basis-full flex-col gap-3 border-t border-rule pb-1 pt-3 sm:ml-auto sm:mt-0 sm:flex sm:basis-auto sm:flex-row sm:items-center sm:border-0 sm:p-0`}
         >
+          {docs?.search}
           <nav aria-label="Main">
             <ul className="flex flex-col gap-1 sm:flex-row sm:items-center">
-              {LINKS.map((link) => (
-                <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    className="block rounded-lg px-2.5 py-2 text-[0.8125rem] text-graphite transition-colors duration-200 hover:bg-paper-sunk hover:text-ink sm:py-1.5"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-              <li className="mt-1 sm:ml-1 sm:mt-0">
-                <Link href="/signup" className={buttonClasses({ variant: "primary", className: "w-full sm:w-auto" })}>
-                  Get started
-                </Link>
-              </li>
+              {docs ? (
+                <>
+                  <li className="px-2.5 py-2 font-mono text-[0.75rem] text-graphite sm:py-1.5">@zoworkhq/forms {docs.version}</li>
+                  {/* No page yet (docs brief, decision 9): plain text, marked "soon", as in the footer. */}
+                  <li className="flex items-center gap-1.5 px-2.5 py-2 text-[0.8125rem] text-graphite sm:py-1.5">
+                    Release notes <StatusChip>soon</StatusChip>
+                  </li>
+                  <li>
+                    <Link href="/login" className={linkClasses}>
+                      Sign in
+                    </Link>
+                  </li>
+                </>
+              ) : (
+                <>
+                  {LINKS.map((link) => (
+                    <li key={link.href}>
+                      <Link href={link.href} className={linkClasses}>
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                  <li className="mt-1 sm:ml-1 sm:mt-0">
+                    <Link href="/signup" className={buttonClasses({ variant: "primary", className: "w-full sm:w-auto" })}>
+                      Get started
+                    </Link>
+                  </li>
+                </>
+              )}
             </ul>
           </nav>
           <ThemeToggle label="Color theme" className="self-start sm:self-auto" />

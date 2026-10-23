@@ -15,6 +15,8 @@ COPY apps/admin/package.json ./apps/admin/package.json
 COPY apps/api/package.json ./apps/api/package.json
 COPY packages/form-schema/package.json ./packages/form-schema/package.json
 COPY packages/ui/package.json ./packages/ui/package.json
+# @zoworkhq/forms isn't on a registry: the web app installs this committed tarball.
+COPY vendor ./vendor
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # ---- build ----

@@ -21,6 +21,16 @@ const nextConfig = {
   output: "standalone",
   outputFileTracingRoot: join(__dirname, "../../"),
   transpilePackages: ["@formbuilder/form-schema", "@formbuilder/ui"],
+  // The Markdown version of each docs page (app/docs-md). Before the file
+  // routes, so `/docs/x.md` never reaches the docs page route as a slug.
+  async rewrites() {
+    return {
+      beforeFiles: [
+        { source: "/docs.md", destination: "/docs-md" },
+        { source: "/docs/:path(.+)\\.md", destination: "/docs-md/:path" },
+      ],
+    };
+  },
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },
