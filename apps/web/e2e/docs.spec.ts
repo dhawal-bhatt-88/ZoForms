@@ -250,13 +250,13 @@ test.describe("docs", () => {
       for (const theme of ["light", "dark"]) {
         await context.addCookies([{ name: "zoblocks-theme", value: theme, url: "http://localhost:3100" }]);
         await page.goto("/docs/build/question-types/dropdown");
-        const select = page.getByRole("combobox", { name: "Your relationship to the client" });
+        const select = page.getByRole("combobox", { name: "How was the client referred?" });
         await expect(select).toHaveAccessibleDescription("Choose the closest match.");
         const clean = await new AxeBuilder({ page }).withTags(WCAG).analyze();
         expect(clean.violations.map((v) => `${theme}: ${v.id}`)).toEqual([]);
 
         await page.getByRole("button", { name: "Submit" }).click();
-        await expect(page.locator(".zf-error-summary")).toContainText('"Your relationship to the client" is required.');
+        await expect(page.locator(".zf-error-summary")).toContainText('"How was the client referred?" is required.');
         await expect(select).toHaveAttribute("aria-invalid", "true");
         const invalid = await new AxeBuilder({ page }).withTags(WCAG).analyze();
         expect(invalid.violations.map((v) => `${theme} with the error: ${v.id}`)).toEqual([]);

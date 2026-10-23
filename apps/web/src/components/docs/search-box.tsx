@@ -4,6 +4,7 @@ import { useId, useRef, useState } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { cn } from "@formbuilder/ui";
+import { controlClasses } from "@/components/ui";
 import { docsHref } from "@/lib/docs/nav";
 import { search, type SearchEntry } from "@/lib/docs/search";
 
@@ -88,7 +89,7 @@ export function SearchBox({ className }: { className?: string }) {
           setQuery(e.target.value);
           setOpen(true);
         }}
-        className="w-full rounded-lg border border-rule-strong bg-surface py-1.5 pl-8 pr-2.5 text-[0.8125rem] text-ink placeholder:text-graphite-soft sm:w-64"
+        className={controlClasses({ size: "sm", className: "pl-8 sm:w-64" })}
       />
       <p id={`${id}-status`} role="status" className="sr-only">
         {showing ? (index ? `${results.length} ${results.length === 1 ? "result" : "results"}` : "Loading") : ""}

@@ -64,7 +64,7 @@ The form checks the answer when the respondent selects Submit (or Next, on a for
 
 | Situation | Message |
 |---|---|
-| Required, and no option chosen | "Your relationship to the client" is required. (the question's own label, in quotation marks) |
+| Required, and no option chosen | "How was the client referred?" is required. (the question's own label, in quotation marks) |
 | The answer isn't the code of one of the options. The form can't send this; only a request sent straight to your endpoint can. | Select a valid option. |
 | The answer isn't in the `{ state, value }` shape | Invalid answer. |
 | One of your validators returns a message | Your message |
@@ -93,7 +93,7 @@ What the rendered form exposes to assistive technology:
 **Payload.** The browser sends the chosen option's code:
 
 ```json
-{ "relationship": { "state": "answered", "value": "guardian" } }
+{ "referral_source": { "state": "answered", "value": "primary_care_provider" } }
 ```
 
 With nothing chosen, it sends `{ "state": "empty" }`. A dropdown that is hidden by its conditions isn't in the payload at all.
@@ -101,22 +101,22 @@ With nothing chosen, it sends `{ "state": "empty" }`. A dropdown that is hidden 
 **`prepareSubmission`.** On your server the answer comes back with its label, looked up from the schema you pass, never from the request:
 
 ```json
-{ "relationship": { "state": "answered", "value": { "code": "guardian", "label": "Guardian" } } }
+{ "referral_source": { "state": "answered", "value": { "code": "primary_care_provider", "label": "Primary care provider" } } }
 ```
 
 **Conditions.** As the source of a condition, a dropdown offers is answered, is and is not. The condition stores the option's code.
 
 **Scoring.** Inside a group with a score, give each option a Score. In the group's formula, the dropdown counts as the chosen option's score. Every option needs one.
 
-**Validators.** A validator receives the code as `value`:
+**Validators.** A validator receives the code as `value`. This one asks who referred the client when the answer is Other:
 
 ```js
 export const validators = [
   {
-    field: 'relationship',
-    // relationship_detail: a Short answer question in the same form.
+    field: 'referral_source',
+    // referral_other: a Short answer question in the same form, for the referral when it's Other.
     validate: ({ value, answers }) =>
-      value === 'other' && !answers.relationship_detail ? 'Say how you know the client.' : null,
+      value === 'other' && !answers.referral_other ? 'Say who referred the client.' : null,
   },
 ];
 ```
@@ -125,7 +125,7 @@ export const validators = [
 
 **Your server rejects the answer with "Select a valid option."** The body carried something other than a code exactly as stored: a label, a code in a different case, or a `{ code, label }` object. The form sends codes; check anything between it and your server.
 
-**A condition on the dropdown never passes while it is unanswered.** Every operator except is answered needs an answer to compare against, so is not Guardian is false until something is chosen.
+**A condition on the dropdown never passes while it is unanswered.** Every operator except is answered needs an answer to compare against, so is not Self is false until something is chosen.
 
 **Stored answers stopped matching after an edit.** A code was changed after the form was in use. Answers already stored keep the old code.
 

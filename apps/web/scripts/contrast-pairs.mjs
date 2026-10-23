@@ -47,6 +47,8 @@ export const PAIRS = [
   ...on("graphite", ["critical-wash", "warn-wash", "pass-wash"], "text", "callout and toast body text"),
   ...on("warn", ["warn-wash"], "text", "warn chip, callout and the verify-email banner"),
   ...on("pass", ["pass-wash"], "text", "pass chip, callout and toast"),
+  ...on("ink", ["pass-wash", "warn-wash"], "text", "the docs' Tip and Warning: bold text in the body"),
+  ...on("brand-deep", ["pass-wash", "warn-wash"], "text", "the docs' Tip and Warning: a link in the body"),
 
   // Interface components and states — SC 1.4.11.
   ...on("brand-deep", [...GROUNDS, "accent-wash"], "ui", "the focus outline and a focused field's border"),

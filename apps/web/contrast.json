@@ -342,6 +342,50 @@
   },
   {
     "theme": "light",
+    "fg": "ink",
+    "bg": "pass-wash",
+    "kind": "text",
+    "ratio": 17.015,
+    "floor": 4.5,
+    "pass": true,
+    "colours": "#08110f on #e6f5ef",
+    "use": "the docs' Tip and Warning: bold text in the body"
+  },
+  {
+    "theme": "light",
+    "fg": "ink",
+    "bg": "warn-wash",
+    "kind": "text",
+    "ratio": 17.41,
+    "floor": 4.5,
+    "pass": true,
+    "colours": "#08110f on #fdf3e3",
+    "use": "the docs' Tip and Warning: bold text in the body"
+  },
+  {
+    "theme": "light",
+    "fg": "brand-deep",
+    "bg": "pass-wash",
+    "kind": "text",
+    "ratio": 4.946,
+    "floor": 4.5,
+    "pass": true,
+    "colours": "#067662 on #e6f5ef",
+    "use": "the docs' Tip and Warning: a link in the body"
+  },
+  {
+    "theme": "light",
+    "fg": "brand-deep",
+    "bg": "warn-wash",
+    "kind": "text",
+    "ratio": 5.061,
+    "floor": 4.5,
+    "pass": true,
+    "colours": "#067662 on #fdf3e3",
+    "use": "the docs' Tip and Warning: a link in the body"
+  },
+  {
+    "theme": "light",
     "fg": "brand-deep",
     "bg": "paper",
     "kind": "ui",
@@ -900,6 +944,50 @@
     "pass": true,
     "colours": "#4ade80 on #0f2a1c",
     "use": "pass chip, callout and toast"
+  },
+  {
+    "theme": "dark",
+    "fg": "ink",
+    "bg": "pass-wash",
+    "kind": "text",
+    "ratio": 13.627,
+    "floor": 4.5,
+    "pass": true,
+    "colours": "#edf2f7 on #0f2a1c",
+    "use": "the docs' Tip and Warning: bold text in the body"
+  },
+  {
+    "theme": "dark",
+    "fg": "ink",
+    "bg": "warn-wash",
+    "kind": "text",
+    "ratio": 14.205,
+    "floor": 4.5,
+    "pass": true,
+    "colours": "#edf2f7 on #2a2010",
+    "use": "the docs' Tip and Warning: bold text in the body"
+  },
+  {
+    "theme": "dark",
+    "fg": "brand-deep",
+    "bg": "pass-wash",
+    "kind": "text",
+    "ratio": 10.181,
+    "floor": 4.5,
+    "pass": true,
+    "colours": "#6ce7cb on #0f2a1c",
+    "use": "the docs' Tip and Warning: a link in the body"
+  },
+  {
+    "theme": "dark",
+    "fg": "brand-deep",
+    "bg": "warn-wash",
+    "kind": "text",
+    "ratio": 10.613,
+    "floor": 4.5,
+    "pass": true,
+    "colours": "#6ce7cb on #2a2010",
+    "use": "the docs' Tip and Warning: a link in the body"
   },
   {
     "theme": "dark",

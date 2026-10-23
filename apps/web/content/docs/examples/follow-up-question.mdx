@@ -34,10 +34,4 @@ The form has two questions. The second has one condition, quoted here from the f
 - The browser keeps the hidden answer while the form is open, which is why it comes back on Yes. It leaves it out of the payload.
 - Your server runs `prepareSubmission` with the same schema. It checks the answers again, drops any answer to a hidden question, and returns each coded answer with its label.
 
-To build it yourself, follow [Show a question only when it applies](/docs/build/show-questions-conditionally): add a Multiple choice question with Yes and No, a Short answer after it, and on the Short answer add the condition *Does the client currently see a therapist?* is *Yes*.
-
-## Related examples
-
-[TODO: no other examples yet. The gallery grows as more are added.]
-
-- [Dropdown](/docs/build/question-types/dropdown) has its own live example, with a density switch.
+To build it yourself, follow [Show a question only when it applies](/docs/build/show-questions-conditionally): add a Multiple choice question with Yes and No, a Short answer after it, and on the Short answer add the condition "Does the client currently see a therapist?" is Yes.

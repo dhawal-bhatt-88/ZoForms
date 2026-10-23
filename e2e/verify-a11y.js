@@ -69,6 +69,15 @@ const GROUP_TEMPLATE = { id: "tg", type: "group", label: "Smoking history", bloc
   { id: "t2", type: "number", label: "Cigarettes a day", enableWhen: [{ question: "t1", operator: "=", answer: "yes" }] },
 ] };
 
+// The docs home and the four pages (docs/briefs/BUILDER-BRIEF-DOCS.md).
+const DOCS_PAGES = [
+  ["docs home", "/docs"],
+  ["Dropdown", "/docs/build/question-types/dropdown"],
+  ["Show a question only when it applies", "/docs/build/show-questions-conditionally"],
+  ["FormRenderer", "/docs/integrate/reference/form-renderer"],
+  ["Follow-up question", "/docs/examples/follow-up-question"],
+];
+
 // Every violation, for the report.
 const violations = [];
 const structure = [];
@@ -213,6 +222,49 @@ const structure = [];
       const refused = await P.getByRole("alert").first().waitFor({ timeout: 15000 }).then(() => true, () => false);
       if (theme === "light") check("sign-in: a wrong password is announced (role=alert)", refused);
       await audit(P, "Auth", "sign-in: a wrong password", theme);
+      await ctx.close();
+    }
+
+    // ================= Docs =================
+    // Public like the home page, with a side navigation. The live examples
+    // render inside a shadow root, which axe scans too.
+    for (const theme of THEMES) {
+      const { ctx, P } = await open({ theme });
+      const go = async (url) => {
+        await P.goto(WEB + url);
+        await P.locator("h1").first().waitFor({ timeout: 60000 });
+      };
+      for (const [name, url] of DOCS_PAGES) {
+        await go(url);
+        // A live example renders after hydration; wait for its form.
+        if (await P.locator("[data-docs-example]").count()) await P.locator(".zf-form").first().waitFor({ timeout: 30000 });
+        await audit(P, "Docs", name, theme, { nav: true });
+      }
+
+      await go("/docs/build/question-types/dropdown");
+      await P.getByRole("button", { name: "Submit" }).click();
+      await P.locator(".zf-error-summary").waitFor();
+      await audit(P, "Docs", "Dropdown: the example's error shown", theme, { nav: true });
+
+      await go("/docs/examples/follow-up-question");
+      await P.getByRole("radio", { name: "Yes" }).check();
+      await P.getByRole("button", { name: "Submit" }).click();
+      await P.locator(".zf-error-summary").waitFor();
+      await audit(P, "Docs", "Follow-up question: the follow-up's error shown", theme, { nav: true });
+      await P.getByRole("textbox", { name: "Therapist's name" }).fill("Dr. Rivera");
+      await P.getByRole("button", { name: "Submit" }).click();
+      await P.getByText("Form submitted successfully.").waitFor();
+      await P.getByRole("tab", { name: "Server output" }).click();
+      await audit(P, "Docs", "Follow-up question: submitted, Server output tab", theme, { nav: true });
+
+      await go("/docs");
+      await P.getByRole("searchbox", { name: "Search the docs" }).fill("condition");
+      await P.getByRole("list", { name: "Search results" }).waitFor({ timeout: 30000 });
+      await audit(P, "Docs", "search results open", theme, { nav: true });
+      await P.keyboard.press("Escape");
+      await P.getByRole("button", { name: "No", exact: true }).click();
+      await P.getByRole("group", { name: "Tell us more" }).getByRole("button", { name: "Missing information" }).click();
+      await audit(P, "Docs", "feedback: No, with a reason chosen", theme, { nav: true });
       await ctx.close();
     }
 
@@ -508,14 +560,17 @@ const structure = [];
       ["home", null, "/"], ["sign-in", null, "/login"], ["sign-up", null, "/signup"], ["forgot password", null, "/forgot-password"],
       ["reset password", null, "/reset-password/not-a-real-token"], ["invite", null, `/invite/${pendingInvite}`], ["verify email", null, "/verify-email/not-a-real-token"],
       ["My forms", A, "/app"], ["Templates", A, "/app/templates"], ["Team", A, "/app/team"], ["Versions", A, `/app/forms/${form.id}/versions`],
+      ...DOCS_PAGES.map(([name, url]) => [`docs: ${name}`, null, url]),
+      ["docs: Docs menu open", null, "/docs", (P) => P.getByRole("button", { name: "Docs menu" }).click()],
     ];
     {
       const { ctx, P } = await open({ token: null, theme: "light", viewport: { width: 320, height: 640 } });
-      for (const [name, token, url] of reflowScreens) {
+      for (const [name, token, url, then] of reflowScreens) {
         if (token) await ctx.addInitScript((t) => localStorage.setItem("frame_token", t), token);
         await P.goto(WEB + url);
         await P.locator("h1").first().waitFor({ timeout: 60000 });
         await P.waitForTimeout(800);
+        if (then) await then(P);
         await settle(P);
         const r = await P.evaluate(() => {
           const vw = document.documentElement.clientWidth;

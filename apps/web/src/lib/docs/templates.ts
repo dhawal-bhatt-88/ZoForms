@@ -2,7 +2,8 @@
  * The four page templates (docs/briefs/BUILDER-BRIEF-DOCS.md, "Page
  * templates"), and the docs home. Each lists the `h2` sections its pages have,
  * in order; a unit test holds every page to its template. A section ending in
- * " …" matches any heading that starts with the rest ("More about …").
+ * " …" matches any heading that starts with the rest ("More about …"), and one
+ * ending in "?" may be left out.
  *
  * `example` is the live example block's tabs for that template, when it has one.
  */
@@ -51,18 +52,26 @@ export const TEMPLATES: Record<TemplateName, Template> = {
   },
   example: {
     label: "Example",
-    sections: ["Try this", "How it works", "Related examples"],
+    // Related examples only once there is another example to relate to.
+    sections: ["Try this", "How it works", "Related examples?"],
     example: { tabs: ["preview", "schema", "react", "payload", "server"], density: false },
   },
 };
 
 export const TEMPLATE_NAMES = Object.keys(TEMPLATES) as TemplateName[];
 
-/** Whether a page's `h2`s are exactly its template's sections, in order. */
+/**
+ * Whether a page's `h2`s are exactly its template's sections, in order. A
+ * section ending in "?" may be left out.
+ */
 export function sectionsMatch(template: TemplateName, headings: readonly string[]): boolean {
-  const wanted = TEMPLATES[template].sections;
-  return (
-    headings.length === wanted.length &&
-    wanted.every((w, i) => (w.endsWith(" …") ? headings[i].startsWith(w.slice(0, -1)) : headings[i] === w))
-  );
+  const is = (w: string, h: string | undefined) => h !== undefined && (w.endsWith(" …") ? h.startsWith(w.slice(0, -1)) : h === w);
+  let i = 0;
+  for (const section of TEMPLATES[template].sections) {
+    const optional = section.endsWith("?");
+    const wanted = optional ? section.slice(0, -1) : section;
+    if (is(wanted, headings[i])) i++;
+    else if (!optional) return false;
+  }
+  return i === headings.length;
 }
