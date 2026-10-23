@@ -2,9 +2,10 @@ import { unified } from "unified";
 import remarkStringify from "remark-stringify";
 import remarkGfm from "remark-gfm";
 import type { DocsPage } from "./content";
-import { exampleReactCode } from "./example-code";
+import { exampleReactCode, formExcerpt } from "./example-code";
 import { attributesOf, type MdNode } from "./mdast";
 import { docsHref, sectionPages } from "./nav";
+import type { Reference } from "./reference";
 import { TEMPLATES } from "./templates";
 
 /*
@@ -22,7 +23,14 @@ export type MarkdownContext = {
   version: string;
   /** An example's form file, by name. */
   exampleForm: (name: string) => Record<string, unknown>;
+  /** An API reference page's generated table, when it has one. */
+  reference?: Reference | null;
 };
+
+function referenceOf(ctx: MarkdownContext): Reference {
+  if (!ctx.reference) throw new Error(`${ctx.page.file}: no reference table beside it`);
+  return ctx.reference;
+}
 
 const p = (...children: MdNode[]): MdNode => ({ type: "paragraph", children });
 const text = (value: string): MdNode => ({ type: "text", value });
@@ -60,6 +68,8 @@ export const MARKDOWN_COMPONENTS: Record<string, Convert> = {
     ];
   },
 
+  FormExcerpt: (_, { form, block, field }, __, ctx) => [code("json", formExcerpt(ctx.exampleForm(form), block, field))],
+
   UseCases: (_, __, children) => children,
   UseCase: (_, { title }, children) => lead([strong(`${title}.`)], children),
 
@@ -74,15 +84,37 @@ export const MARKDOWN_COMPONENTS: Record<string, Convert> = {
     ),
   ],
 
-  Prop: (_, { name, type, default: fallback, required }, children) => [
-    { type: "heading", depth: 3, children: [{ type: "inlineCode", value: name }] },
-    list(false, [
-      item(p(strong("Type:"), text(" "), { type: "inlineCode", value: type })),
-      item(p(strong("Default:"), text(" "), fallback ? { type: "inlineCode", value: fallback } : text("none"))),
-      item(p(strong("Required:"), text(required === undefined ? " no" : " yes"))),
-    ]),
-    ...children,
+  PropsAtAGlance: (_, __, ___, ctx) => [
+    {
+      type: "table",
+      align: [],
+      children: [
+        { type: "tableRow", children: ["Name", "Type", "Default", "Required"].map((h) => ({ type: "tableCell", children: [text(h)] })) },
+        ...referenceOf(ctx).props.map((prop) => ({
+          type: "tableRow",
+          children: [
+            [{ type: "inlineCode", value: prop.name }],
+            [{ type: "inlineCode", value: prop.type }],
+            [prop.default ? { type: "inlineCode", value: prop.default } : text("None")],
+            [text(prop.required ? "Yes" : "No")],
+          ].map((cell) => ({ type: "tableCell", children: cell })),
+        })),
+      ],
+    } as MdNode,
   ],
+  Prop: (_, { name }, children, ctx) => {
+    const prop = referenceOf(ctx).props.find((x) => x.name === name);
+    if (!prop) throw new Error(`${ctx.page.file}: <Prop name="${name}"> isn't in the reference`);
+    return [
+      { type: "heading", depth: 3, children: [{ type: "inlineCode", value: name }] },
+      list(false, [
+        item(p(strong("Type:"), text(" "), { type: "inlineCode", value: prop.type })),
+        item(p(strong("Default:"), text(" "), prop.default ? { type: "inlineCode", value: prop.default } : text("none"))),
+        item(p(strong("Required:"), text(prop.required ? " yes" : " no"))),
+      ]),
+      ...children,
+    ];
+  },
   Rules: (_, __, children) => [{ type: "blockquote", children: lead([strong("Rules:")], children) }],
 
   TryThis: (_, __, children) => children,

@@ -12,6 +12,8 @@ Thumbs.db
 node_modules/
 dist/
 build/
+# …except the docs' "Build forms" section, which is content, not output.
+!apps/web/content/docs/build/
 .next/
 .turbo/
 coverage/

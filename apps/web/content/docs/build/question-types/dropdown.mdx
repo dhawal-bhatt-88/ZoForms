@@ -1,0 +1,132 @@
+---
+title: Dropdown
+summary: One answer from a list of options, shown as a select menu.
+template: question-type
+badges: [Coded options]
+appliesTo: [builder, package]
+updated: 2026-10-24
+prev: /docs
+next: /docs/build/show-questions-conditionally
+---
+
+<LiveExample form="dropdown" />
+
+## When to use
+
+Use a dropdown when the respondent picks exactly one answer, from a list long enough that showing every option on the page would crowd it. The options stay out of sight until the respondent opens the menu.
+
+Use something else when:
+
+- **There are only a few options.** Use Multiple choice, which shows every option at once, so the respondent can compare them without opening anything.
+- **More than one answer can apply.** Use Checkboxes or Multi-select.
+- **The question asks for a country.** Use Respondent's country, which comes with the renderer's own list of countries.
+
+## Add it in the builder
+
+You need a form open in the editor.
+
+1. Below the last block, select **+** (Insert a block), or type `/` in the line beside it.
+2. Under **Questions**, choose **Dropdown**. Typing `select` in the search box finds it too. The dropdown is added and its settings open.
+<Gif alt="Inserting a Dropdown from the block menu" />
+3. In **Label**, write the question.
+4. Under **Options**, replace Option 1, Option 2 and Option 3 with your own labels. When you leave a label you have changed, the builder fills in its code. Use **Add option** for more, or **Import from file** for a long list.
+<Gif alt="Typing option labels and seeing their codes appear" />
+5. Turn on **Required** if the question must be answered.
+6. Select **Save**.
+
+<Note>
+Within one list, no two codes may be the same, ignoring case, and no two labels either. A code is 1 to 64 letters, digits, `.`, `-` or `_`, starting with a letter or digit, so clinical codes such as `F32.1` fit.
+</Note>
+
+<Note>
+Changing a code after the form is in use will not match answers already stored under the old code. Conditions in the form that use it are updated for you.
+</Note>
+
+<Note>
+Import from file takes a `.csv` or `.txt` file, read in your browser and never uploaded. A `.txt` file has one label per line. A `.csv` file has a label, or a code then a label, on each row. You see every row in a preview first, and Apply stays off while any row has a problem.
+</Note>
+
+## Settings
+
+| Builder setting | Schema property | Default |
+|---|---|---|
+| Label | `label` | "Dropdown" |
+| Help text | `description` | none; left out of the file when empty |
+| Options: Code and Label | `options[].code`, `options[].label` | Option 1, Option 2 and Option 3, with codes filled in from the labels you type |
+| Options: Score (only inside a group with a score) | `options[].score` | none |
+| Required | `required` | `false` |
+| Name (only inside a group with a score) | not in the downloaded file | made from the label |
+| Show this question only when… | `enableWhen`, and `enableLogic` with two or more conditions | none |
+
+## Validation and error messages
+
+The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. `prepareSubmission` gives the same messages on your server.
+
+| Situation | Message |
+|---|---|
+| Required, and no option chosen | "Your relationship to the client" is required. (the question's own label, in quotation marks) |
+| The answer isn't the code of one of the options. The form can't send this; only a request sent straight to your endpoint can. | Select a valid option. |
+| The answer isn't in the `{ state, value }` shape | Invalid answer. |
+| One of your validators returns a message | Your message |
+| One of your validators throws, or returns something other than a message or `null` | This answer couldn't be checked. |
+
+Choosing "— Select —" again clears the answer.
+
+## Accessibility
+
+What the rendered form exposes to assistive technology:
+
+- The question is a native `<select>`, named by its label.
+- The first entry, "— Select —", means no answer.
+- Help text, then any error, are linked to the select as its description (`aria-describedby`).
+- A required dropdown has the native `required` attribute. The red asterisk is hidden from assistive technology, so it is never read out as part of the name.
+- After a failed check, the select has `aria-invalid="true"`.
+
+| Check | Status |
+|---|---|
+| Automated: axe, WCAG 2.2 A and AA | No violations on the live example above, in light and dark, with and without its error shown. Checked by the docs' own tests. |
+| Contrast | Covered by axe's contrast rule in the same tests: the renderer's default colours, light and dark. |
+| Screen reader | [TODO: not tested with a screen reader yet.] |
+
+## For developers
+
+**Payload.** The browser sends the chosen option's code:
+
+```json
+{ "relationship": { "state": "answered", "value": "guardian" } }
+```
+
+With nothing chosen, it sends `{ "state": "empty" }`. A dropdown that is hidden by its conditions isn't in the payload at all.
+
+**`prepareSubmission`.** On your server the answer comes back with its label, looked up from the schema you pass, never from the request:
+
+```json
+{ "relationship": { "state": "answered", "value": { "code": "guardian", "label": "Guardian" } } }
+```
+
+**Conditions.** As the source of a condition, a dropdown offers is answered, is and is not. The condition stores the option's code.
+
+**Scoring.** Inside a group with a score, give each option a Score. In the group's formula, the dropdown counts as the chosen option's score. Every option needs one.
+
+**Validators.** A validator receives the code as `value`:
+
+```js
+export const validators = [
+  {
+    field: 'relationship',
+    // relationship_detail: a Short answer question in the same form.
+    validate: ({ value, answers }) =>
+      value === 'other' && !answers.relationship_detail ? 'Say how you know the client.' : null,
+  },
+];
+```
+
+## Troubleshooting
+
+**Your server rejects the answer with "Select a valid option."** The body carried something other than a code exactly as stored: a label, a code in a different case, or a `{ code, label }` object. The form sends codes; check anything between it and your server.
+
+**A condition on the dropdown never passes while it is unanswered.** Every operator except is answered needs an answer to compare against, so is not Guardian is false until something is chosen.
+
+**Stored answers stopped matching after an edit.** A code was changed after the form was in use. Answers already stored keep the old code.
+
+**Apply stays off when importing options.** A row has a missing label, an invalid code, or a code or label that is already in the file or in the list. Fix the file and choose it again.

@@ -3,6 +3,7 @@ import { ArrowRight, Film } from "lucide-react";
 import { cn } from "@formbuilder/ui";
 import { Callout, StatusChip } from "@/components/ui";
 import { docsHref, sectionPages } from "@/lib/docs/nav";
+import type { ReferenceProp } from "@/lib/docs/reference";
 
 /*
  * The components a page's MDX may use beyond Markdown and the callouts, by
@@ -59,15 +60,53 @@ export function Series({ slug }: { slug: string }) {
 
 /* ---------- API reference (C) ---------- */
 
-/** One prop: name, type, default and whether it is required, then its description and example. */
-export function Prop({
-  name,
-  type,
-  default: fallback,
-  required,
-  children,
-}: Children & { name: string; type: string; default?: string; required?: string }) {
-  const isRequired = required !== undefined;
+/**
+ * Every prop in one table: name, type, default, required. From the page's
+ * generated reference (`<page>.props.json`), never typed into the page.
+ */
+export function PropsAtAGlance({ props }: { props: readonly ReferenceProp[] }) {
+  return (
+    <div className="surface scroll-x relative my-5 overflow-x-auto">
+      <table className="w-full border-collapse text-[0.8125rem]">
+        <thead>
+          <tr>
+            {["Name", "Type", "Default", "Required"].map((h) => (
+              <th
+                key={h}
+                scope="col"
+                className="whitespace-nowrap border-b border-rule bg-paper-sunk px-4 py-2.5 text-left font-mono text-[0.625rem] font-medium uppercase tracking-[0.11em] text-graphite-soft"
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {props.map((p) => (
+            <tr key={p.name} className="border-b border-rule last:border-b-0">
+              <td className="px-4 py-2.5 align-top">
+                <a href={`#prop-${p.name}`} className="link font-mono text-[0.75rem]">
+                  {p.name}
+                </a>
+              </td>
+              <td className="px-4 py-2.5 align-top">
+                <code className="font-mono text-[0.75rem] text-ink">{p.type}</code>
+              </td>
+              <td className="px-4 py-2.5 align-top">
+                {p.default ? <code className="font-mono text-[0.75rem] text-ink">{p.default}</code> : <span className="text-graphite">None</span>}
+              </td>
+              <td className="px-4 py-2.5 align-top text-ink">{p.required ? "Yes" : "No"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** One prop: its name, type, default and whether it is required (all from the reference), then the page's description. */
+export function Prop({ name, prop, children }: Children & { name: string; prop: ReferenceProp }) {
+  const { type, default: fallback, required: isRequired } = prop;
   return (
     <section aria-labelledby={`prop-${name}`} className="mt-8 border-t border-rule pt-6">
       <div className="flex flex-wrap items-center gap-2">

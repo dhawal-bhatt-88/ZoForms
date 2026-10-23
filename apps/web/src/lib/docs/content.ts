@@ -3,6 +3,7 @@ import path from "node:path";
 import { parseFrontmatter, type DocsFrontmatter } from "./frontmatter";
 import { headingsOf, parseMdx, type Heading, type MdNode } from "./mdast";
 import { livePages } from "./nav";
+import type { Reference } from "./reference";
 
 /*
  * Reading the docs' content files (apps/web/content/docs) on the server. Every
@@ -22,6 +23,16 @@ export type DocsPage = {
   tree: MdNode;
   headings: Heading[];
 };
+
+/** A JSON file, naming the file if it doesn't parse. */
+export function readJson(full: string): unknown {
+  const text = fs.readFileSync(full, "utf8");
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    throw new Error(`${full}: ${(error as Error).message} (${text.length} characters read)`);
+  }
+}
 
 const fileOf = (slug: string) => (slug ? `${slug}.mdx` : "index.mdx");
 
@@ -58,6 +69,16 @@ export function getLivePages(): DocsPage[] {
 }
 
 /**
+ * An API reference page's table: `<page>.props.json` beside it, generated
+ * from the package (lib/docs/reference.ts) and checked by reference.test.ts.
+ * Null for a page without one.
+ */
+export function readReference(pageSlug: string): Reference | null {
+  const full = path.join(CONTENT_DIR, `${pageSlug}.props.json`);
+  return fs.existsSync(full) ? (readJson(full) as Reference) : null;
+}
+
+/**
  * An example's form file: `<name>.form.json` beside the page that shows it. A
  * real download from the builder (scripts/docs-example-forms.mjs), never
  * written by hand.
@@ -67,5 +88,5 @@ export function readExampleForm(pageSlug: string, name: string): { schema: Recor
   const file = path.posix.join(dir === "." ? "" : dir, `${name}.form.json`);
   const full = path.join(CONTENT_DIR, file);
   if (!fs.existsSync(full)) throw new Error(`${fileOf(pageSlug)}: no example form at content/docs/${file}`);
-  return { schema: JSON.parse(fs.readFileSync(full, "utf8")), file };
+  return { schema: readJson(full) as Record<string, unknown>, file };
 }

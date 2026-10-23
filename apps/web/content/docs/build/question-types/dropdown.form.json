@@ -1,0 +1,45 @@
+{
+  "title": "Dropdown example",
+  "formId": "0ea774ce-40e0-4e64-8d0a-e7018c28ac53",
+  "formVersionId": "89514cab-3ff0-41a8-8b5a-b6f594544138",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "relationship",
+      "type": "dropdown",
+      "label": "Your relationship to the client",
+      "description": "Choose the closest match.",
+      "required": true,
+      "options": [
+        {
+          "code": "parent",
+          "label": "Parent"
+        },
+        {
+          "code": "guardian",
+          "label": "Guardian"
+        },
+        {
+          "code": "spouse_or_partner",
+          "label": "Spouse or partner"
+        },
+        {
+          "code": "sibling",
+          "label": "Sibling"
+        },
+        {
+          "code": "other_relative",
+          "label": "Other relative"
+        },
+        {
+          "code": "caseworker",
+          "label": "Caseworker"
+        },
+        {
+          "code": "other",
+          "label": "Other"
+        }
+      ]
+    }
+  ]
+}

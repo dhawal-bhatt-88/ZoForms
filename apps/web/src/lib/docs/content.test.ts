@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { assertSchemaIntegrity, type FormSchema } from "@zoworkhq/forms/core";
 import { getLivePages, pageFiles, readExampleForm } from "./content";
-import { MARKDOWN_COMPONENTS, pageMarkdown } from "./markdown";
+import { MARKDOWN_COMPONENTS } from "./markdown";
+import { markdownFor } from "./page-markdown";
 import { attributesOf, lintMdx, walk } from "./mdast";
 import { DOCS_NAV, docsHref, isGroup, livePages } from "./nav";
 import { TEMPLATES, sectionsMatch } from "./templates";
@@ -61,12 +62,7 @@ describe("the docs content", () => {
   });
 
   it.each(pages.map((p) => [p.file, p] as const))("%s has a Markdown version with no components left in it", (_, page) => {
-    const md = pageMarkdown({
-      page,
-      origin: "https://forms.example",
-      version: "9.9.9",
-      exampleForm: (name) => readExampleForm(page.slug, name).schema,
-    });
+    const md = markdownFor(page, "https://forms.example");
     expect(md.startsWith(`# ${page.frontmatter.title}\n`)).toBe(true);
     for (const name of components) expect(md).not.toMatch(new RegExp(`<${name}[\\s/>]`));
   });

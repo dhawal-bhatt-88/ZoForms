@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { readJson } from "./content";
 
 /*
  * The installed @zoworkhq/forms (vendor/zoworkhq-forms-<version>.tgz), read on
@@ -11,7 +12,7 @@ const PACKAGE_DIR = path.join(process.cwd(), "node_modules", "@zoworkhq", "forms
 
 /** The installed version, e.g. "0.26.0": the top bar and every "Applies to". */
 export function rendererVersion(): string {
-  return JSON.parse(fs.readFileSync(path.join(PACKAGE_DIR, "package.json"), "utf8")).version;
+  return (readJson(path.join(PACKAGE_DIR, "package.json")) as { version: string }).version;
 }
 
 /** The package's default stylesheet, for the live examples' shadow roots. */

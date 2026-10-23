@@ -3,18 +3,26 @@ import { evaluate } from "@mdx-js/mdx";
 import * as runtime from "react/jsx-runtime";
 import remarkGfm from "remark-gfm";
 import type { FormSchema } from "@zoworkhq/forms/core";
-import { readExampleForm, type DocsPage } from "@/lib/docs/content";
-import { exampleReactCode } from "@/lib/docs/example-code";
-import { MARKDOWN_COMPONENTS, pageMarkdown } from "@/lib/docs/markdown";
+import { readExampleForm, readReference, type DocsPage } from "@/lib/docs/content";
+import type { Reference } from "@/lib/docs/reference";
+import { exampleReactCode, formExcerpt } from "@/lib/docs/example-code";
+import type { MARKDOWN_COMPONENTS } from "@/lib/docs/markdown";
 import { remarkHeadingIds } from "@/lib/docs/mdast";
+import { markdownFor } from "@/lib/docs/page-markdown";
 import { rendererStyles, rendererVersion } from "@/lib/docs/renderer";
-import { siteOrigin } from "@/lib/docs/site";
 import { TEMPLATES } from "@/lib/docs/templates";
 import { Note, Tip, Warning } from "./callouts";
-import { MdxPre } from "./code-block";
+import { CodeBlock, MdxPre } from "./code-block";
 import { LiveExample } from "./live-example";
 import { OnThisPage, PageEnd, PageHeader } from "./page-frame";
-import { Architecture, Door, Doors, Gif, Prop, Rules, Series, TryThis, UseCase, UseCases } from "./template-parts";
+import { Architecture, Door, Doors, Gif, Prop, PropsAtAGlance, Rules, Series, TryThis, UseCase, UseCases } from "./template-parts";
+
+/** The page's generated reference table (`<page>.props.json`); a page using Prop must have one. */
+function referenceOf(page: DocsPage): Reference {
+  const reference = readReference(page.slug);
+  if (!reference) throw new Error(`${page.file}: no ${page.slug}.props.json beside it`);
+  return reference;
+}
 
 /*
  * One docs page: its MDX compiled on the server (at build time, since every
@@ -70,7 +78,19 @@ function components(page: DocsPage) {
     UseCase,
     Gif,
     Series: () => <Series slug={page.slug} />,
-    Prop,
+    FormExcerpt: ({ form, block, field }: { form: string; block: string; field: string }) => (
+      <CodeBlock code={formExcerpt(readExampleForm(page.slug, form).schema, block, field)} lang="json" title={`${form}.json, block "${block}"`} />
+    ),
+    PropsAtAGlance: () => <PropsAtAGlance props={referenceOf(page).props} />,
+    Prop: ({ name, children }: { name: string; children?: React.ReactNode }) => {
+      const prop = referenceOf(page).props.find((p) => p.name === name);
+      if (!prop) throw new Error(`${page.file}: <Prop name="${name}"> isn't in the package's FormRendererProps`);
+      return (
+        <Prop name={name} prop={prop}>
+          {children}
+        </Prop>
+      );
+    },
     Rules,
     TryThis,
     Doors,
@@ -96,12 +116,7 @@ function components(page: DocsPage) {
 
 export async function DocsArticle({ page }: { page: DocsPage }) {
   const version = rendererVersion();
-  const markdown = pageMarkdown({
-    page,
-    origin: siteOrigin(),
-    version,
-    exampleForm: (name) => readExampleForm(page.slug, name).schema,
-  });
+  const markdown = markdownFor(page);
   const { default: Content } = await evaluate(page.body, {
     ...runtime,
     development: false,

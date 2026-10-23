@@ -1,0 +1,115 @@
+---
+title: Show a question only when it applies
+summary: Show a question, group or page only when earlier answers meet its conditions.
+template: how-to
+badges: [Conditional logic]
+appliesTo: [builder, package]
+updated: 2026-10-24
+prev: /docs/build/question-types/dropdown
+next: /docs/integrate/reference/form-renderer
+---
+
+## When you'd use this
+
+<UseCases>
+<UseCase title="A follow-up on Yes">
+Ask for the therapist's name only when the answer to "Does the client currently see a therapist?" is Yes.
+</UseCase>
+<UseCase title="A section for some respondents">
+Show a group of questions about medication only when "Do you take any medication?" is answered Yes.
+</UseCase>
+<UseCase title="A threshold">
+Show a safety question only when a 0 to 10 Linear scale for distress is at least 7.
+</UseCase>
+</UseCases>
+
+See the first one working in the [follow-up question example](/docs/examples/follow-up-question).
+
+## Before you start
+
+- The question the condition reads, its **source**, must come **before** the question, group or page you are making conditional, in reading order. Add or move it there first.
+- The source must be a question whose answer can be compared. These can be sources: Short answer, Multiple choice, Checkboxes, Dropdown, Multi-select, Number, Email, Phone number, Link, Date, Time, Linear scale, Rating, Ranking and Respondent's country.
+- These can't: Long answer, Matrix, Grid, Hidden field, groups, pages, and the blocks that collect no answer (Heading, Text, Divider, Title, Label, Image, Video and Audio).
+
+## Steps
+
+1. Select the question, group or page to show only sometimes. Its settings open.
+2. Under **Logic**, in **Show this question only when…**, select **Add condition**. The new condition reads the nearest question before it, with is answered.
+<Gif alt="Adding a first condition in the Logic section" />
+3. In the condition's first box, choose the source. The list has only the questions you can use, numbered as on the canvas and grouped under the groups they are in.
+4. In the second box, choose how to compare. What it offers depends on the source:
+
+| Source | Operators |
+|---|---|
+| Multiple choice, Dropdown, Respondent's country, Short answer, Email, Phone number, Link, Date, Time | is answered, is, is not |
+| Number, Linear scale, Rating | is answered, is, is not, is greater than, is less than, is at least, is at most |
+| Checkboxes, Multi-select, Ranking | is answered, includes |
+
+5. Unless you chose is answered, give the answer to compare with. For a source with options you choose an option by its label, and the builder stores its code. For Number, Linear scale and Rating you type a number. For the others you type the text.
+6. For a second condition, select **Add condition** again. A **Logic** field appears, filled in with `1 AND 2`.
+7. Say how the conditions combine, using their numbers, AND, OR and brackets:
+   - All of them: `1 AND 2 AND 3`
+   - Any of them: `1 OR 2 OR 3`
+   - Your own mix: `1 OR (2 AND 3)`
+<Gif alt="Typing custom logic in the Logic field" />
+8. Select **Save**.
+
+<Note>
+There is no NOT. To show a question when an answer is not Yes, use the is not operator in the condition itself.
+</Note>
+
+<Note>
+Conditions can't be reordered. If you delete one, every higher number in the Logic field goes down by one, so `1 OR 3` becomes `1 OR 2`.
+</Note>
+
+<Note>
+The first page of a form can't have conditions: it is always shown.
+</Note>
+
+## What happens behind the scenes
+
+- **An item shows only when its own conditions pass and every group or page around it is showing.**
+- **A hidden source fails only its own condition.** With `1 OR 2`, a hidden source for condition 1 still lets condition 2 show the question.
+- **Every operator except is answered needs an answer.** Until the source is answered, is not Guardian, is greater than 5 and the rest are all false.
+- **Answers to hidden questions are kept while the form is being filled in.** If the respondent changes their mind and the question shows again, their answer is still there.
+- **They are never submitted and never checked.** A hidden required question doesn't stop the form being submitted, and the browser leaves its answer out of the payload.
+- **Your server drops them too.** `prepareSubmission` returns answers to visible questions only. An answer to a hidden question in the body is removed, never a reason to reject it.
+- **The downloaded file carries the logic as a tree**, so the renderer never reads your text. A single condition, or all AND, is just `enableWhen`. All OR adds `enableBehavior: "any"`. A mix adds `enableLogic`, the tree.
+
+## Rules the builder enforces
+
+The builder refuses any change that would leave a condition pointing at something it can't use, and says which blocks are in the way, each with a link:
+
+| What you try | What the builder says |
+|---|---|
+| Delete a question that conditions use | Can't delete "Smoker" — these questions have conditions that depend on it: |
+| Delete a group and its questions, when a question outside it has a condition on one inside | Can't delete "Medication" and its questions — these questions outside it have conditions that depend on something inside it: |
+| Delete a page and its contents, in the same case | Can't delete "History" and its contents — these questions outside it have conditions that depend on something inside it: |
+| Move or insert something so a question would come before its source: dragging, Move to, moving a page up or down, or deleting a page and keeping its contents | Can't move "Smoker" there — these questions would end up before a question their conditions depend on: (the start names what you tried, for example Can't move "History" up, or Can't insert "Vitals" there) |
+| Move a page with conditions so it becomes the first page | Can't move "History" up: "History" would become the first page, and the first page can't have conditions — it is always shown. Remove the conditions on "History" first. |
+| Move something so a condition would read a question inside a repeating group the dependent isn't in | Can't move "Dose" there — these blocks would have conditions on a question inside a repeating group they aren't in: |
+| Turn on Repeats for a group, when a question outside it has a condition on one inside | Can't make "Medication" repeat — these blocks outside it have conditions that use a question inside it: |
+| Change the type of a question that conditions use | Can't change the type of "Smoker" — these questions have conditions that depend on it: |
+| Remove an option that a condition uses | Can't remove "Former smoker" — these blocks have conditions that use it: |
+| Replace a list from a file that leaves out a code a condition uses | Can't replace the options — these blocks have conditions that use a code that isn't in the file: |
+| Delete a condition whose number is in the Logic field | Condition 2 is used in the logic. Remove it from the logic first. |
+
+The names in quotation marks are examples; the builder uses yours.
+
+<Tip>
+Changing an option's code isn't refused: every condition that uses the old code moves to the new one, and the builder says how many, for example "2 conditions updated to use "former"."
+</Tip>
+
+## Troubleshooting
+
+**Add condition isn't there.** No question before this one can be a source. The panel says "Only questions before this question can be used. Add or move a question before it first."
+
+**A question you expected isn't in the source list.** It comes after this one, it is a type that can't be a source, or it is inside a repeating group this block isn't in. In the last case the panel says "Some questions aren't listed because they're inside a repeating group this block isn't in."
+
+**The Logic field shows a message.** It is checked after you stop typing, and only the first problem is shown. For example "Add brackets to show whether AND or OR comes first." for `1 AND 2 OR 3`, or "Condition 3 isn't used." after you add a third condition. The form can't be saved until it's fixed.
+
+**The question never shows.** Check that the source is answered, and showing, when you test it. Check also every group or page around the question: each must be showing too.
+
+## More about building forms
+
+<Series />

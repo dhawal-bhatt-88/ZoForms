@@ -1,0 +1,83 @@
+{
+  "package": "@zoworkhq/forms 0.26.0",
+  "source": "dist/react/index.d.ts (interface FormRendererProps) and dist/react/index.js (defaults)",
+  "props": [
+    {
+      "name": "schema",
+      "type": "FormSchema",
+      "required": true,
+      "default": null,
+      "doc": null
+    },
+    {
+      "name": "endpoint",
+      "type": "string",
+      "required": true,
+      "default": null,
+      "doc": null
+    },
+    {
+      "name": "credentials",
+      "type": "'omit' | 'same-origin' | 'include'",
+      "required": false,
+      "default": "'same-origin'",
+      "doc": null
+    },
+    {
+      "name": "getAuthHeaders",
+      "type": "() => Promise<Record<string, string>> | Record<string, string>",
+      "required": false,
+      "default": null,
+      "doc": null
+    },
+    {
+      "name": "onSuccess",
+      "type": "(response: Response) => void",
+      "required": false,
+      "default": null,
+      "doc": null
+    },
+    {
+      "name": "onError",
+      "type": "(error: unknown) => void",
+      "required": false,
+      "default": null,
+      "doc": "Submitting failed. Only ever about the submit; draft problems go to onDraftProblem."
+    },
+    {
+      "name": "timeoutMs",
+      "type": "number",
+      "required": false,
+      "default": "30000",
+      "doc": null
+    },
+    {
+      "name": "drafts",
+      "type": "DraftsOptions",
+      "required": false,
+      "default": null,
+      "doc": "What drafts need from the host (drafts contract section 3): a scope, and a key (device mode) or three functions (server mode). Used only when the schema asks for device or server drafts."
+    },
+    {
+      "name": "onDraftProblem",
+      "type": "(problem: DraftProblem) => void",
+      "required": false,
+      "default": null,
+      "doc": "A drafts problem: a fallback to session, or a draft that could not be read, loaded or saved."
+    },
+    {
+      "name": "assetBase",
+      "type": "string",
+      "required": false,
+      "default": null,
+      "doc": "Where the host serves its own files, for image blocks whose source is a root-relative path (contract section 9). A host served under a sub-path passes it — e.g. Vite's `import.meta.env.BASE_URL` — so \"/images/a.png\" loads from \"/app/images/a.png\". Unset, such paths load from the page's origin. `https://` sources ignore it."
+    },
+    {
+      "name": "validators",
+      "type": "readonly FieldValidator[]",
+      "required": false,
+      "default": null,
+      "doc": "The host's own checks (contract section 16), run with the built-in ones: on Next, Submit and Return to review, and live on flagged questions. Pass the same array to prepareSubmission on the server, or they can be bypassed. Checked at mount and whenever a different array is passed."
+    }
+  ]
+}

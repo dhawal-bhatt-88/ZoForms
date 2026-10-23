@@ -4,7 +4,7 @@ summary: A choice whose Yes answer shows a required follow-up question.
 template: example
 badges: [Conditional logic]
 appliesTo: [builder, package]
-updated: 2026-10-23
+updated: 2026-10-24
 prev: /docs/integrate/reference/form-renderer
 next: null
 ---
@@ -13,12 +13,31 @@ next: null
 
 ## Try this
 
-[TODO: CP2. A checklist of things to try in the example.]
+<TryThis>
+
+- Select **Submit** without answering. The error summary takes focus and lists one problem: the choice is required.
+- Choose **Yes**. Therapist's name appears under the question.
+- Select **Submit** again. Therapist's name is required now that it shows. Select its link in the error summary to go to the field.
+- Type a name, then change the answer to **No**. Therapist's name disappears. Choose **Yes** again and the name you typed is still there.
+- Choose **No** and select **Submit**. On **Payload**, `therapist_name` is missing: the browser never sends an answer to a hidden question. On **Server output**, `prepareSubmission` returns only `sees_therapist`, with its label.
+
+</TryThis>
 
 ## How it works
 
-[TODO: CP2.]
+The form has two questions. The second has one condition, quoted here from the form file:
+
+<FormExcerpt form="follow-up-question" block="therapist_name" field="enableWhen" />
+
+- `question` is the source's block id, and `answer` is the code of its Yes option. The builder generated both the code and the condition's `id`.
+- Therapist's name is `required: true`, but a required question is checked only while it shows. With No chosen it is hidden, so the form can be submitted without it.
+- The browser keeps the hidden answer while the form is open, which is why it comes back on Yes. It leaves it out of the payload.
+- Your server runs `prepareSubmission` with the same schema. It checks the answers again, drops any answer to a hidden question, and returns each coded answer with its label.
+
+To build it yourself, follow [Show a question only when it applies](/docs/build/show-questions-conditionally): add a Multiple choice question with Yes and No, a Short answer after it, and on the Short answer add the condition *Does the client currently see a therapist?* is *Yes*.
 
 ## Related examples
 
-[TODO: CP2.]
+[TODO: no other examples yet. The gallery grows as more are added.]
+
+- [Dropdown](/docs/build/question-types/dropdown) has its own live example, with a density switch.
