@@ -1,0 +1,14 @@
+{
+  "title": "Phone number example",
+  "formId": "5059c220-8a5c-4181-833a-9f75fc6fe818",
+  "formVersionId": "c12efc11-e270-4c79-9b2b-7ac0cf953b7b",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "phone",
+      "type": "phone",
+      "label": "Best phone number to reach you",
+      "required": true
+    }
+  ]
+}

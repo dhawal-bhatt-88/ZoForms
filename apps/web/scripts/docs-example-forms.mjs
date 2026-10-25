@@ -4,6 +4,7 @@
 // that uses it, and then deletes the account and its forms.
 //
 //   API on :4000 (or E2E_API_URL), then: node apps/web/scripts/docs-example-forms.mjs
+//   or, for some of them: node apps/web/scripts/docs-example-forms.mjs build/question-types/date.form.json …
 //
 // Only the author's input is written here: labels, options, required and
 // conditions. Option codes, condition ids, identity and the file's shape come
@@ -78,7 +79,29 @@ const FORMS = [
       },
     ],
   },
+  // The simple inputs (docs/briefs/BUILDER-BRIEF-DOCS-QUESTIONS.md, CP1): one question each.
+  ...[
+    ["short-answer", "Short answer example", { id: "preferred_name", type: "short", label: "Preferred name", description: "The name you'd like staff to use." }],
+    ["long-answer", "Long answer example", { id: "reason_for_visit", type: "long", label: "What brings you in today?", description: "In your own words. Share as much or as little as you like." }],
+    ["number", "Number example", { id: "therapy_visits", type: "number", label: "How many times have you seen a therapist or counselor in the past 12 months?", description: "Enter 0 if none." }],
+    ["email", "Email example", { id: "email", type: "email", label: "Email address", description: "We'll send appointment reminders here." }],
+    ["phone-number", "Phone number example", { id: "phone", type: "phone", label: "Best phone number to reach you" }],
+    ["link", "Link example", { id: "referring_website", type: "link", label: "Referring practice's website", description: "Include https://." }],
+    ["date", "Date example", { id: "date_of_birth", type: "date", label: "Date of birth" }],
+    ["time", "Time example", { id: "preferred_time", type: "time", label: "Preferred appointment time", description: "We'll try to book the nearest available slot." }],
+  ].map(([name, title, block]) => ({
+    file: `build/question-types/${name}.form.json`,
+    title,
+    blocks: [{ ...block, required: true }],
+  })),
 ];
+
+// Only the files named on the command line, if any, so building a new example
+// leaves the others' files (and their form ids) as they are.
+const wanted = process.argv.slice(2);
+const unknown = wanted.filter((f) => !FORMS.some((form) => form.file === f));
+if (unknown.length) throw new Error(`no example form for: ${unknown.join(", ")}`);
+const building = wanted.length ? FORMS.filter((form) => wanted.includes(form.file)) : FORMS;
 
 async function call(method, url, token, body) {
   const res = await fetch(API + url, {
@@ -97,7 +120,7 @@ try {
   const { token } = JSON.parse(
     await call("POST", "/v1/auth/signup", null, { email, password: "Docs-examples-123!", name: "Docs examples" }),
   );
-  for (const form of FORMS) {
+  for (const form of building) {
     const { id } = JSON.parse(await call("POST", "/v1/forms", token, { title: form.title }));
     await call("PUT", `/v1/forms/${id}/schema`, token, { title: form.title, blocks: form.blocks });
     const artifact = await call("GET", `/v1/forms/${id}/artifact`, token);

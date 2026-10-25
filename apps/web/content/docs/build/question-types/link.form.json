@@ -1,0 +1,15 @@
+{
+  "title": "Link example",
+  "formId": "7c74f54a-09db-4867-bd2c-4247322685e2",
+  "formVersionId": "e1c35591-82bd-42e4-b24e-b1b7f8743c41",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "referring_website",
+      "type": "link",
+      "label": "Referring practice's website",
+      "description": "Include https://.",
+      "required": true
+    }
+  ]
+}

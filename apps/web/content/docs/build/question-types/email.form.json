@@ -1,0 +1,15 @@
+{
+  "title": "Email example",
+  "formId": "d0a3c6a3-69af-4492-9e6f-648c452f2995",
+  "formVersionId": "714237f8-545a-41de-917c-1baac5db9d04",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "email",
+      "type": "email",
+      "label": "Email address",
+      "description": "We'll send appointment reminders here.",
+      "required": true
+    }
+  ]
+}

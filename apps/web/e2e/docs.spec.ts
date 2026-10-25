@@ -69,7 +69,7 @@ test.describe("docs", () => {
 
     const ends = page.getByRole("navigation", { name: "Previous and next" });
     await expect(ends.getByRole("link", { name: /Previous\s*Docs home/ })).toHaveAttribute("href", "/docs");
-    await expect(ends.getByRole("link", { name: /Next\s*Show a question only when it applies/ })).toBeVisible();
+    await expect(ends.getByRole("link", { name: /Next\s*Short answer/ })).toHaveAttribute("href", "/docs/build/question-types/short-answer");
 
     await page.setViewportSize({ width: 1100, height: 900 });
     await expect(toc).toBeHidden();

@@ -1,0 +1,78 @@
+---
+title: Email
+summary: An email address, checked for the right form.
+template: question-type
+badges: [Free text]
+appliesTo: [builder, package]
+updated: 2026-10-25
+prev: /docs/build/question-types/number
+next: /docs/build/question-types/phone-number
+---
+
+<LiveExample form="email" />
+
+## When to use
+
+Use an email question when you need an address to write to: for appointment reminders, a portal invitation or a copy of a letter. The form checks that the answer looks like an email address before it can be sent.
+
+Use something else when:
+
+- **You need a phone number or a web address.** Use Phone number or Link.
+- **Any text will do.** Use Short answer, which doesn't check the answer's form.
+
+## Add it in the builder
+
+You need a form open in the editor.
+
+1. Below the last block, select **+** (Insert a block), or type `/` in the line beside it.
+2. Under **Questions**, choose **Email**. The question is added and its settings open.
+<Gif alt="Inserting an Email question from the block menu" />
+3. In **Label**, write the question, or keep "Email address".
+4. Add **Help text** to say what the address will be used for.
+5. Turn on **Required** if the question must be answered.
+6. Select **Save**.
+
+## Settings
+
+| Builder setting | Schema property | Default |
+|---|---|---|
+| Label | `label` | "Email address" |
+| Help text | `description` | none; left out of the file when empty |
+| Required | `required` | `false` |
+| Name (only inside a group with a score) | not in the downloaded file | made from the label |
+| Show this question only when… | `enableWhen`, and `enableLogic` with two or more conditions | none |
+
+**As a condition.** Other questions can be shown depending on an email answer, with is answered, is or is not. Is answered is the useful one, for example to ask how often to send reminders only once an address is given.
+
+## Validation and error messages
+
+The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. Once a message shows, it updates as the respondent types, and it goes when the answer is fixed.
+
+| Situation | Message |
+|---|---|
+| Required, and nothing typed | "Email address" is required. (the question's own label, in quotation marks) |
+| Required, and only spaces typed | The same message: an answer of only spaces counts as no answer. |
+| The answer isn't in the form name@example.org | Enter a valid email address. |
+
+The check looks only at the address's form: some text, an @, and a domain with a dot in it, with no spaces. It ignores spaces before or after the address. The form can't tell whether the address exists.
+
+## Accessibility
+
+What the rendered form exposes to assistive technology:
+
+- The question is a native email input (`type="email"`), named by its label.
+- Help text, then any error, are linked to the input as its description (`aria-describedby`).
+- A required question has the native `required` attribute. The red asterisk is hidden from assistive technology, so it is never read out as part of the name.
+- After a failed check, the input has `aria-invalid="true"`.
+
+| Check | Status |
+|---|---|
+| Automated: axe, WCAG 2.2 A and AA | No violations on the live example above, in light and dark, with and without its error shown. Checked by the docs' own tests. |
+| Contrast | Covered by axe's contrast rule in the same tests: the renderer's default colours, light and dark. |
+| Screen reader | [TODO: not tested with a screen reader yet.] |
+
+## Troubleshooting
+
+**"Enter a valid email address." for an address that looks right.** The check wants a dot in the part after the @, and no spaces anywhere in the address. An address such as name@localhost is refused.
+
+**A reminder was sent to a mistyped address.** The form checks the form of an address, not that it exists or belongs to the respondent.

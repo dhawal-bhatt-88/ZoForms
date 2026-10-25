@@ -1,0 +1,15 @@
+{
+  "title": "Long answer example",
+  "formId": "bd1022f8-9200-4772-a937-6732bf2b6e5c",
+  "formVersionId": "1197f1dc-a8aa-45ab-a8be-24d6b0996956",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "reason_for_visit",
+      "type": "long",
+      "label": "What brings you in today?",
+      "description": "In your own words. Share as much or as little as you like.",
+      "required": true
+    }
+  ]
+}

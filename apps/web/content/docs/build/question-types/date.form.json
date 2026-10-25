@@ -1,0 +1,14 @@
+{
+  "title": "Date example",
+  "formId": "82038af9-5097-443c-aa81-21d374a83c5d",
+  "formVersionId": "50e44ab6-8e77-483c-ae01-59b78f263685",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "date_of_birth",
+      "type": "date",
+      "label": "Date of birth",
+      "required": true
+    }
+  ]
+}

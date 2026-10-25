@@ -29,7 +29,9 @@ export const TEMPLATES: Record<TemplateName, Template> = {
       "Settings",
       "Validation and error messages",
       "Accessibility",
-      "For developers",
+      // Left out of the form-author pages until the developer docs write it
+      // (docs/briefs/BUILDER-BRIEF-DOCS-QUESTIONS.md).
+      "For developers?",
       "Troubleshooting",
     ],
     example: { tabs: ["preview", "schema", "payload", "server"], density: true },

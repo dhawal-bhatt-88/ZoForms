@@ -1,0 +1,79 @@
+---
+title: Date
+summary: A calendar date, picked or typed in the browser's own date field.
+template: question-type
+badges: []
+appliesTo: [builder, package]
+updated: 2026-10-25
+prev: /docs/build/question-types/link
+next: /docs/build/question-types/time
+---
+
+<LiveExample form="date" />
+
+## When to use
+
+Use a date when the answer is a day on the calendar: a date of birth, the date of a last visit, a preferred start date. The respondent uses the browser's own date field, so every answer is stored the same way, whatever order the respondent writes dates in.
+
+Use something else when:
+
+- **You need a time of day.** Use Time, or a Date and a Time question side by side.
+- **The answer is vague,** such as "about two years ago". Use Short answer.
+- **You want to show other questions when a date is before or after a day you choose.** A condition can't compare dates that way; see "As a condition" below.
+
+## Add it in the builder
+
+You need a form open in the editor.
+
+1. Below the last block, select **+** (Insert a block), or type `/` in the line beside it.
+2. Under **Questions**, choose **Date**. The question is added and its settings open.
+<Gif alt="Inserting a Date question from the block menu" />
+3. In **Label**, write the question.
+4. Add **Help text** if the respondent needs to know which date you mean.
+5. Turn on **Required** if the question must be answered.
+6. Select **Save**.
+
+## Settings
+
+| Builder setting | Schema property | Default |
+|---|---|---|
+| Label | `label` | "Date" |
+| Help text | `description` | none; left out of the file when empty |
+| Required | `required` | `false` |
+| Name (only inside a group with a score) | not in the downloaded file | made from the label |
+| Show this question only when… | `enableWhen`, and `enableLogic` with two or more conditions | none |
+
+The builder has no setting for an earliest or latest date.
+
+**As a condition.** Other questions can be shown depending on a date, with is answered, is or is not. For is and is not, type the date as year, month and day, such as `2026-10-25`, which is how the answer is stored. There is no before or after: to show a question to respondents under 18, ask their age with a Number question and use is less than 18.
+
+## Validation and error messages
+
+The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. Once a message shows, it updates as the respondent changes the answer, and it goes when the answer is fixed.
+
+| Situation | Message |
+|---|---|
+| Required, and no date given | "Date of birth" is required. (the question's own label, in quotation marks) |
+
+On the review page of a form with pages, the date is written out in full, in the respondent's browser language, such as 25 October 2026.
+
+## Accessibility
+
+What the rendered form exposes to assistive technology:
+
+- The question is a native date input (`type="date"`), named by its label. How it looks and is read out, including its calendar, comes from the respondent's browser.
+- Help text, then any error, are linked to the input as its description (`aria-describedby`).
+- A required question has the native `required` attribute. The red asterisk is hidden from assistive technology, so it is never read out as part of the name.
+- After a failed check, the input has `aria-invalid="true"`.
+
+| Check | Status |
+|---|---|
+| Automated: axe, WCAG 2.2 A and AA | No violations on the live example above, in light and dark, with and without its error shown. Checked by the docs' own tests. |
+| Contrast | Covered by axe's contrast rule in the same tests: the renderer's default colours, light and dark. |
+| Screen reader | [TODO: not tested with a screen reader yet.] |
+
+## Troubleshooting
+
+**A condition with is never matches.** The date to compare against must be written as year-month-day, such as `2026-10-25`. A date written another way, such as 25/10/2026, never matches.
+
+**The review page shows the date differently from the date field.** The review page writes the date out in the respondent's browser language. The answer stored is the same either way: year, month and day.

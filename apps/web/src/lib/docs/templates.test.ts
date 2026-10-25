@@ -15,6 +15,13 @@ describe("sectionsMatch", () => {
     expect(sectionsMatch("example", ["Related examples", "Try this", "How it works"])).toBe(false);
   });
 
+  it("lets a question-type page leave out For developers", () => {
+    const before = ["When to use", "Add it in the builder", "Settings", "Validation and error messages", "Accessibility"];
+    expect(sectionsMatch("question-type", [...before, "For developers", "Troubleshooting"])).toBe(true);
+    expect(sectionsMatch("question-type", [...before, "Troubleshooting"])).toBe(true);
+    expect(sectionsMatch("question-type", [...before, "Troubleshooting", "For developers"])).toBe(false);
+  });
+
   it("matches a section ending in … by its start", () => {
     const howTo = ["When you'd use this", "Before you start", "Steps", "What happens behind the scenes", "Rules the builder enforces", "Troubleshooting"];
     expect(sectionsMatch("how-to", [...howTo, "More about building forms"])).toBe(true);

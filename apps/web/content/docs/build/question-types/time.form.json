@@ -1,0 +1,15 @@
+{
+  "title": "Time example",
+  "formId": "4e6649cc-ac3e-47ef-a646-26bf9884ffc5",
+  "formVersionId": "9396b58a-27f1-42b4-9f50-d1c82b86bea2",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "preferred_time",
+      "type": "time",
+      "label": "Preferred appointment time",
+      "description": "We'll try to book the nearest available slot.",
+      "required": true
+    }
+  ]
+}

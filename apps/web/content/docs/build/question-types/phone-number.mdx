@@ -1,0 +1,78 @@
+---
+title: Phone number
+summary: A phone number, checked for the characters a phone number uses.
+template: question-type
+badges: [Free text]
+appliesTo: [builder, package]
+updated: 2026-10-25
+prev: /docs/build/question-types/email
+next: /docs/build/question-types/link
+---
+
+<LiveExample form="phone-number" />
+
+## When to use
+
+Use a phone number question when you need a number to call or text. The answer is kept exactly as typed, so a leading zero, a `+` and the spacing the respondent chose all stay.
+
+Use something else when:
+
+- **You need an email address or a web address.** Use Email or Link.
+- **You need a count or an amount.** Use Number.
+
+## Add it in the builder
+
+You need a form open in the editor.
+
+1. Below the last block, select **+** (Insert a block), or type `/` in the line beside it.
+2. Under **Questions**, choose **Phone number**. Typing `mobile` in the search box finds it too. The question is added and its settings open.
+<Gif alt="Inserting a Phone number question from the block menu" />
+3. In **Label**, write the question.
+4. Add **Help text** if you need a particular number, such as a mobile for text reminders.
+5. Turn on **Required** if the question must be answered.
+6. Select **Save**.
+
+## Settings
+
+| Builder setting | Schema property | Default |
+|---|---|---|
+| Label | `label` | "Phone number" |
+| Help text | `description` | none; left out of the file when empty |
+| Required | `required` | `false` |
+| Name (only inside a group with a score) | not in the downloaded file | made from the label |
+| Show this question only when… | `enableWhen`, and `enableLogic` with two or more conditions | none |
+
+**As a condition.** Other questions can be shown depending on a phone number, with is answered, is or is not. Is answered is the useful one, for example to ask whether you may leave a voicemail only once a number is given.
+
+## Validation and error messages
+
+The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. Once a message shows, it updates as the respondent types, and it goes when the answer is fixed.
+
+| Situation | Message |
+|---|---|
+| Required, and nothing typed | "Best phone number to reach you" is required. (the question's own label, in quotation marks) |
+| Required, and only spaces typed | The same message: an answer of only spaces counts as no answer. |
+| Fewer than 7 characters, or a character a phone number doesn't use | Enter a valid phone number. |
+
+A phone number may use digits, spaces, `+`, brackets, `-` and `.`, and needs at least 7 of them. The check ignores spaces before or after the number. It doesn't check a country's numbering or whether the number exists.
+
+## Accessibility
+
+What the rendered form exposes to assistive technology:
+
+- The question is a native telephone input (`type="tel"`), named by its label.
+- Help text, then any error, are linked to the input as its description (`aria-describedby`).
+- A required question has the native `required` attribute. The red asterisk is hidden from assistive technology, so it is never read out as part of the name.
+- After a failed check, the input has `aria-invalid="true"`.
+
+| Check | Status |
+|---|---|
+| Automated: axe, WCAG 2.2 A and AA | No violations on the live example above, in light and dark, with and without its error shown. Checked by the docs' own tests. |
+| Contrast | Covered by axe's contrast rule in the same tests: the renderer's default colours, light and dark. |
+| Screen reader | [TODO: not tested with a screen reader yet.] |
+
+## Troubleshooting
+
+**"Enter a valid phone number." for a number with an extension.** Letters aren't allowed, so "555 0100 ext 12" is refused. Add a Short answer question for the extension.
+
+**A condition with is or is not never matches.** They compare the number exactly as typed, spaces and brackets included, so "(555) 0100" isn't the same as "555 0100". Use is answered instead.

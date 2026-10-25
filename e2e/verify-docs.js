@@ -18,10 +18,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PAGES = [
   ["docs-home", "/docs"],
   ["dropdown", "/docs/build/question-types/dropdown"],
+  ...["short-answer", "long-answer", "number", "email", "phone-number", "link", "date", "time"].map((n) => [n, `/docs/build/question-types/${n}`]),
   ["show-questions-conditionally", "/docs/build/show-questions-conditionally"],
   ["form-renderer", "/docs/integrate/reference/form-renderer"],
   ["follow-up-question", "/docs/examples/follow-up-question"],
 ];
+const urlOf = (name) => PAGES.find(([n]) => n === name)[1];
 const WIDTHS = [375, 1440];
 const THEMES = ["light", "dark"];
 
@@ -82,8 +84,8 @@ const THEMES = ["light", "dark"];
       }
 
       for (const [name, url, tabs] of [
-        ["dropdown", PAGES[1][1], ["Preview", "Schema", "Payload", "Server output"]],
-        ["follow-up-question", PAGES[4][1], ["Preview", "Schema", "React code", "Payload", "Server output"]],
+        ["dropdown", urlOf("dropdown"), ["Preview", "Schema", "Payload", "Server output"]],
+        ["follow-up-question", urlOf("follow-up-question"), ["Preview", "Schema", "React code", "Payload", "Server output"]],
       ]) {
         await load(P, url);
         const tablist = P.getByRole("tablist");
@@ -111,13 +113,57 @@ const THEMES = ["light", "dark"];
       }
 
       // The density switch is a radio group: one Tab stop, the arrow keys move the choice.
-      await load(P, PAGES[1][1]);
+      await load(P, urlOf("dropdown"));
       const density = P.getByRole("radiogroup", { name: "Density" });
       await density.getByRole("radio", { name: "Standard" }).focus();
       await P.keyboard.press("ArrowRight");
       const chosen = await density.getByRole("radio", { checked: true }).textContent();
       const attr = await P.locator("[data-docs-example=dropdown]").locator("[data-zf-density]").getAttribute("data-zf-density");
       check("dropdown: ArrowRight in Density chooses Dense", chosen === "Dense" && attr === "dense", `${chosen}, data-zf-density=${attr}`);
+      await ctx.close();
+    }
+
+    // ---------- what the question-type pages say about their examples ----------
+    // Each page's messages and stored formats, against the real renderer.
+    {
+      const { ctx, P } = await open("light", 1440);
+      const errorsOf = async () => (await P.locator(".zf-error-message").allTextContents()).map((t) => t.trim());
+      const submit = () => P.getByRole("button", { name: "Submit" }).click();
+      const answerWith = async (name, label, enter) => {
+        await load(P, urlOf(name));
+        const box = P.getByLabel(label, { exact: true });
+        await enter(box);
+        await submit();
+        await P.waitForTimeout(300);
+        return box;
+      };
+      const says = async (name, label, typed, want) => {
+        await answerWith(name, label, (box) => box.fill(typed));
+        const errors = await errorsOf();
+        check(`${name}: "${typed}" gets ${want}`, errors.includes(want), errors.join(" | "));
+      };
+      await says("short-answer", "Preferred name", "   ", '"Preferred name" is required.');
+      await says("email", "Email address", "name@localhost", "Enter a valid email address.");
+      await says("phone-number", "Best phone number to reach you", "555 0100 ext 12", "Enter a valid phone number.");
+      await says("link", "Referring practice's website", "example.org", "Enter a valid URL, including https://.");
+
+      // Once shown, a message follows the answer and goes when it is fixed.
+      await P.getByLabel("Referring practice's website", { exact: true }).fill("mailto:intake@example.org");
+      await P.waitForTimeout(300);
+      check("link: the message goes once the answer is fixed, and mailto: passes", (await errorsOf()).length === 0, (await errorsOf()).join(" | "));
+
+      const label = "How many times have you seen a therapist or counselor in the past 12 months?";
+      await answerWith("number", label, (box) => box.pressSequentially("e"));
+      const numberErrors = await errorsOf();
+      check("number: what isn't a number counts as no answer", numberErrors.includes(`"${label}" is required.`), numberErrors.join(" | "));
+
+      for (const [name, field, typed] of [["date", "Date of birth", "2026-10-25"], ["time", "Preferred appointment time", "14:30"]]) {
+        await answerWith(name, field, (box) => box.fill(typed));
+        await P.getByText("Form submitted successfully.").waitFor();
+        await P.getByRole("tab", { name: "Payload" }).click();
+        const payload = await P.getByRole("tabpanel").textContent();
+        check(`${name}: stored as ${typed}`, payload.includes(`"${typed}"`), payload.slice(0, 200));
+      }
       await ctx.close();
     }
 

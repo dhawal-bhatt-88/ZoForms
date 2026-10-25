@@ -1,0 +1,78 @@
+---
+title: Long answer
+summary: Free text that may run to several sentences, in a larger box.
+template: question-type
+badges: [Free text]
+appliesTo: [builder, package]
+updated: 2026-10-25
+prev: /docs/build/question-types/short-answer
+next: /docs/build/question-types/number
+---
+
+<LiveExample form="long-answer" />
+
+## When to use
+
+Use a long answer when the respondent explains something in their own words and may need several sentences: the reason for a visit, a history, anything else they want the team to know. The box is five lines tall.
+
+Use something else when:
+
+- **The answer is a few words.** Use Short answer.
+- **You want to show or skip other questions depending on the answer.** A long answer can't be used in a condition. Ask a Multiple choice or Short answer question for that.
+- **There is a known set of answers.** Use Multiple choice, Checkboxes or Dropdown, so the answers can be counted.
+
+## Add it in the builder
+
+You need a form open in the editor.
+
+1. Below the last block, select **+** (Insert a block), or type `/` in the line beside it.
+2. Under **Questions**, choose **Long answer**. The question is added and its settings open.
+<Gif alt="Inserting a Long answer from the block menu" />
+3. In **Label**, write the question.
+4. Add **Help text** if it helps the respondent know how much to write.
+5. Turn on **Required** if the question must be answered.
+6. Select **Save**.
+
+## Settings
+
+| Builder setting | Schema property | Default |
+|---|---|---|
+| Label | `label` | "Long answer" |
+| Help text | `description` | none; left out of the file when empty |
+| Required | `required` | `false` |
+| Name (only inside a group with a score) | not in the downloaded file | made from the label |
+| Show this question only when… | `enableWhen`, and `enableLogic` with two or more conditions | none |
+
+**As a condition.** A long answer can't be the source of a condition, so it isn't offered in another question's **Show this question only when…** list. It can have conditions of its own.
+
+## Validation and error messages
+
+The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. Once a message shows, it updates as the respondent types, and it goes when the answer is fixed.
+
+| Situation | Message |
+|---|---|
+| Required, and nothing typed | "What brings you in today?" is required. (the question's own label, in quotation marks) |
+| Required, and only spaces or blank lines typed | The same message: an answer of only spaces counts as no answer. |
+
+An answer can be up to 20,000 characters long. The box stops accepting more. Line breaks the respondent types are kept, and the review page shows them.
+
+## Accessibility
+
+What the rendered form exposes to assistive technology:
+
+- The question is a native `<textarea>`, named by its label.
+- Help text, then any error, are linked to the box as its description (`aria-describedby`).
+- A required question has the native `required` attribute. The red asterisk is hidden from assistive technology, so it is never read out as part of the name.
+- After a failed check, the box has `aria-invalid="true"`.
+
+| Check | Status |
+|---|---|
+| Automated: axe, WCAG 2.2 A and AA | No violations on the live example above, in light and dark, with and without its error shown. Checked by the docs' own tests. |
+| Contrast | Covered by axe's contrast rule in the same tests: the renderer's default colours, light and dark. |
+| Screen reader | [TODO: not tested with a screen reader yet.] |
+
+## Troubleshooting
+
+**The long answer isn't in the list when you add a condition.** A long answer can't be the source of a condition. Ask a separate Multiple choice or Short answer question and base the condition on that.
+
+**The respondent can't type any more.** The answer has reached 20,000 characters, the most a long answer takes.

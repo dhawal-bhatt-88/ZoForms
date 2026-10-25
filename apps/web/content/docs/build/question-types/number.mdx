@@ -1,0 +1,78 @@
+---
+title: Number
+summary: A number the respondent types, such as a count or an amount.
+template: question-type
+badges: []
+appliesTo: [builder, package]
+updated: 2026-10-25
+prev: /docs/build/question-types/long-answer
+next: /docs/build/question-types/email
+---
+
+<LiveExample form="number" />
+
+## When to use
+
+Use a number when the answer is a quantity the respondent types: a count of visits, an age, a number of hours. The answer is stored as a number, so other questions can depend on it being more or less than a value you choose.
+
+Use something else when:
+
+- **The answer is a rating on a fixed range,** such as 1 to 5. Use Linear scale or Rating, which show every point to choose from.
+- **The "number" is really an identifier,** such as a phone number, a ZIP code or a record number. Use Phone number or Short answer: a number question would drop a leading zero.
+- **The answer is a date or a time.** Use Date or Time.
+
+## Add it in the builder
+
+You need a form open in the editor.
+
+1. Below the last block, select **+** (Insert a block), or type `/` in the line beside it.
+2. Under **Questions**, choose **Number**. The question is added and its settings open.
+<Gif alt="Inserting a Number question from the block menu" />
+3. In **Label**, write the question.
+4. Add **Help text** to say what to enter when the answer is none, or which unit to use.
+5. Turn on **Required** if the question must be answered.
+6. Select **Save**.
+
+## Settings
+
+| Builder setting | Schema property | Default |
+|---|---|---|
+| Label | `label` | "Number" |
+| Help text | `description` | none; left out of the file when empty |
+| Required | `required` | `false` |
+| Name (only inside a group with a score) | not in the downloaded file | made from the label |
+| Show this question only when… | `enableWhen`, and `enableLogic` with two or more conditions | none |
+
+Any number is accepted, including 0, decimals and negative numbers. The builder has no setting for a smallest or largest number; say in the help text what you expect.
+
+**As a condition.** Other questions can be shown depending on a number, with is answered, is, is not, is greater than, is less than, is at least or is at most. You type the number to compare against. For example, show "Parent or guardian's name" only when an age question is less than 18.
+
+## Validation and error messages
+
+The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. Once a message shows, it updates as the respondent types, and it goes when the answer is fixed.
+
+| Situation | Message |
+|---|---|
+| Required, and nothing typed | "How many times have you seen a therapist or counselor in the past 12 months?" is required. (the question's own label, in quotation marks) |
+| Required, and what's in the box isn't a number | The same message: anything that isn't a number counts as no answer. |
+
+## Accessibility
+
+What the rendered form exposes to assistive technology:
+
+- The question is a native number input (`type="number"`), named by its label.
+- Help text, then any error, are linked to the input as its description (`aria-describedby`).
+- A required question has the native `required` attribute. The red asterisk is hidden from assistive technology, so it is never read out as part of the name.
+- After a failed check, the input has `aria-invalid="true"`.
+
+| Check | Status |
+|---|---|
+| Automated: axe, WCAG 2.2 A and AA | No violations on the live example above, in light and dark, with and without its error shown. Checked by the docs' own tests. |
+| Contrast | Covered by axe's contrast rule in the same tests: the renderer's default colours, light and dark. |
+| Screen reader | [TODO: not tested with a screen reader yet.] |
+
+## Troubleshooting
+
+**The respondent typed something, but the form says the question is required.** What's in the box isn't a number, so it counts as no answer.
+
+**A condition such as is less than 18 doesn't pass while the number is blank.** Every comparison except is answered needs an answer to compare against, so the dependent question stays hidden until a number is typed.

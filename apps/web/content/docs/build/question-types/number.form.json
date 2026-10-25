@@ -1,0 +1,15 @@
+{
+  "title": "Number example",
+  "formId": "55dc66db-6172-4355-beff-a9a8ec74c04a",
+  "formVersionId": "db72cf3c-148d-4065-9bb7-fec69e849f72",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "therapy_visits",
+      "type": "number",
+      "label": "How many times have you seen a therapist or counselor in the past 12 months?",
+      "description": "Enter 0 if none.",
+      "required": true
+    }
+  ]
+}

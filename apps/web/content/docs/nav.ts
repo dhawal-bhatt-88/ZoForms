@@ -35,7 +35,17 @@ export const DOCS_NAV: DocsNavSection[] = [
     items: [
       {
         title: "Question types",
-        pages: [{ title: "Dropdown", slug: "build/question-types/dropdown", status: "live" }],
+        pages: [
+          { title: "Dropdown", slug: "build/question-types/dropdown", status: "live" },
+          { title: "Short answer", slug: "build/question-types/short-answer", status: "live" },
+          { title: "Long answer", slug: "build/question-types/long-answer", status: "live" },
+          { title: "Number", slug: "build/question-types/number", status: "live" },
+          { title: "Email", slug: "build/question-types/email", status: "live" },
+          { title: "Phone number", slug: "build/question-types/phone-number", status: "live" },
+          { title: "Link", slug: "build/question-types/link", status: "live" },
+          { title: "Date", slug: "build/question-types/date", status: "live" },
+          { title: "Time", slug: "build/question-types/time", status: "live" },
+        ],
       },
       { title: "Show a question only when it applies", slug: "build/show-questions-conditionally", status: "live" },
     ],
