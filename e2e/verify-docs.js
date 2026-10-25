@@ -18,7 +18,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PAGES = [
   ["docs-home", "/docs"],
   ["dropdown", "/docs/build/question-types/dropdown"],
-  ...["short-answer", "long-answer", "multiple-choice", "checkboxes", "number", "email", "phone-number", "link", "date", "time", "linear-scale", "rating", "ranking", "respondents-country"].map((n) => [n, `/docs/build/question-types/${n}`]),
+  ...["short-answer", "long-answer", "multiple-choice", "checkboxes", "number", "email", "phone-number", "link", "date", "time", "linear-scale", "grid", "matrix", "rating", "ranking", "respondents-country"].map((n) => [n, `/docs/build/question-types/${n}`]),
   ["show-questions-conditionally", "/docs/build/show-questions-conditionally"],
   ["form-renderer", "/docs/integrate/reference/form-renderer"],
   ["follow-up-question", "/docs/examples/follow-up-question"],
@@ -219,6 +219,40 @@ const THEMES = ["light", "dark"];
       await item("Cost").click();
       const described = await item("Distance from home").evaluate((el) => el.getRootNode().getElementById(el.getAttribute("aria-describedby"))?.textContent);
       check("ranking: unranking moves the rest up", described === "Ranked 1 of 4", described);
+
+      // Matrix: a partial answer gets its message when Answer every row is on.
+      await load(P, urlOf("matrix"));
+      await P.getByRole("radiogroup", { name: "Booking" }).getByRole("radio", { name: "Satisfied", exact: true }).check();
+      await submit();
+      await P.waitForTimeout(300);
+      const matrixErrors = await errorsOf();
+      check("matrix: a partial answer gets its message", matrixErrors.includes('Answer every row of "How satisfied were you with each part of your visit?".'), matrixErrors.join(" | "));
+
+      // Grid: a required column's empty cells, each "Required.", and one summary entry for the column.
+      await load(P, urlOf("grid"));
+      const monday = P.getByRole("radiogroup", { name: "Monday, Available" });
+      await monday.getByRole("radio", { name: "Yes" }).click();
+      await monday.getByRole("radio", { name: "Yes" }).click();
+      const cleared = !(await monday.getByRole("radio", { name: "Yes" }).isChecked());
+      check("grid: selecting a Radio cell's option again clears it", cleared);
+      await P.getByRole("radiogroup", { name: "Tuesday, Available" }).getByRole("radio", { name: "No" }).click();
+      await submit();
+      await P.waitForTimeout(300);
+      const cellErrors = (await errorsOf()).filter((e) => e === "Required.").length;
+      const summary = (await P.locator(".zf-error-summary").textContent()) || "";
+      check("grid: Required. under each of the 4 empty cells", cellErrors === 4, `${cellErrors}`);
+      check("grid: one summary entry for the column", summary.includes('"Weekly availability": answer "Available" in every row (4 missing).'), summary);
+      const wideRow = await P.locator(".zf-grid-card").first().evaluate((el) => getComputedStyle(el).display);
+      check("grid: a table at 1440px", wideRow === "table-row", wideRow);
+      await ctx.close();
+    }
+    {
+      // Grid: each row a card when the grid has less than 34rem.
+      const { ctx, P } = await open("light", 375);
+      await load(P, urlOf("grid"));
+      const card = await P.locator(".zf-grid-card").first().evaluate((el) => getComputedStyle(el).display);
+      const label = await P.locator(".zf-grid-cell-label").first().evaluate((el) => getComputedStyle(el).display);
+      check("grid: each row a card at 375px, with its column labels", card === "block" && label === "block", `${card}, ${label}`);
       await ctx.close();
     }
 

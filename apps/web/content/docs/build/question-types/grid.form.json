@@ -1,0 +1,77 @@
+{
+  "title": "Grid example",
+  "formId": "2e1ed43d-d926-4389-a85c-59dfdca049ee",
+  "formVersionId": "5d65a312-c933-434e-803f-42ae83035b63",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "weekly_availability",
+      "type": "grid",
+      "label": "Weekly availability",
+      "rows": [
+        {
+          "code": "monday",
+          "label": "Monday"
+        },
+        {
+          "code": "tuesday",
+          "label": "Tuesday"
+        },
+        {
+          "code": "wednesday",
+          "label": "Wednesday"
+        },
+        {
+          "code": "thursday",
+          "label": "Thursday"
+        },
+        {
+          "code": "friday",
+          "label": "Friday"
+        }
+      ],
+      "columns": [
+        {
+          "code": "available",
+          "label": "Available",
+          "type": "radio",
+          "options": [
+            {
+              "code": "yes",
+              "label": "Yes"
+            },
+            {
+              "code": "no",
+              "label": "No"
+            }
+          ],
+          "required": true
+        },
+        {
+          "code": "session_format",
+          "label": "Session format",
+          "type": "dropdown",
+          "options": [
+            {
+              "code": "in_person",
+              "label": "In person"
+            },
+            {
+              "code": "video",
+              "label": "Video"
+            },
+            {
+              "code": "phone",
+              "label": "Phone"
+            }
+          ]
+        },
+        {
+          "code": "earliest_time",
+          "label": "Earliest time",
+          "type": "text"
+        }
+      ]
+    }
+  ]
+}

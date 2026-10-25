@@ -48,6 +48,8 @@ export const DOCS_NAV: DocsNavSection[] = [
           { title: "Date", slug: "build/question-types/date", status: "live" },
           { title: "Time", slug: "build/question-types/time", status: "live" },
           { title: "Linear scale", slug: "build/question-types/linear-scale", status: "live" },
+          { title: "Grid", slug: "build/question-types/grid", status: "live" },
+          { title: "Matrix", slug: "build/question-types/matrix", status: "live" },
           { title: "Rating", slug: "build/question-types/rating", status: "live" },
           { title: "Ranking", slug: "build/question-types/ranking", status: "live" },
           { title: "Respondent's country", slug: "build/question-types/respondents-country", status: "live" },

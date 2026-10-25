@@ -1,0 +1,51 @@
+{
+  "title": "Matrix example",
+  "formId": "b7eb8000-1cd3-46b3-8ab2-2aebf999638e",
+  "formVersionId": "d0636618-33d5-4ee2-b13e-f9f3d1331ed6",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "visit_satisfaction",
+      "type": "matrix",
+      "label": "How satisfied were you with each part of your visit?",
+      "required": false,
+      "completeRequired": true,
+      "options": [
+        {
+          "code": "booking",
+          "label": "Booking"
+        },
+        {
+          "code": "check-in",
+          "label": "Check-in"
+        },
+        {
+          "code": "waiting_time",
+          "label": "Waiting time"
+        },
+        {
+          "code": "session",
+          "label": "Session"
+        }
+      ],
+      "columns": [
+        {
+          "code": "very_dissatisfied",
+          "label": "Very dissatisfied"
+        },
+        {
+          "code": "dissatisfied",
+          "label": "Dissatisfied"
+        },
+        {
+          "code": "satisfied",
+          "label": "Satisfied"
+        },
+        {
+          "code": "very_satisfied",
+          "label": "Very satisfied"
+        }
+      ]
+    }
+  ]
+}

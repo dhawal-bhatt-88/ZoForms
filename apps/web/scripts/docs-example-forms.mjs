@@ -117,6 +117,39 @@ const FORMS = [
     title,
     blocks: [{ required: true, ...block }],
   })),
+  // The tables (CP4). A matrix with Answer every row on; a grid, whose columns are required one by one.
+  {
+    file: "build/question-types/matrix.form.json",
+    title: "Matrix example",
+    blocks: [
+      {
+        id: "visit_satisfaction",
+        type: "matrix",
+        label: "How satisfied were you with each part of your visit?",
+        required: false,
+        completeRequired: true,
+        options: options("Booking", "Check-in", "Waiting time", "Session"),
+        columns: options("Very dissatisfied", "Dissatisfied", "Satisfied", "Very satisfied"),
+      },
+    ],
+  },
+  {
+    file: "build/question-types/grid.form.json",
+    title: "Grid example",
+    blocks: [
+      {
+        id: "weekly_availability",
+        type: "grid",
+        label: "Weekly availability",
+        rows: options("Monday", "Tuesday", "Wednesday", "Thursday", "Friday"),
+        columns: [
+          { code: "", label: "Available", type: "radio", options: options("Yes", "No"), required: true },
+          { code: "", label: "Session format", type: "dropdown", options: options("In person", "Video", "Phone") },
+          { code: "", label: "Earliest time", type: "text" },
+        ],
+      },
+    ],
+  },
 ];
 
 // Only the files named on the command line, if any, so building a new example

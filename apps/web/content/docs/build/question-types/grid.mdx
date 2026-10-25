@@ -1,0 +1,124 @@
+---
+title: Grid
+summary: A table of fixed rows and typed columns, with an answer in every cell.
+template: question-type
+badges: [Coded options]
+appliesTo: [builder, package]
+updated: 2026-10-25
+prev: /docs/build/question-types/linear-scale
+next: /docs/build/question-types/matrix
+---
+
+<LiveExample form="grid" />
+
+## When to use
+
+Use a grid when you ask the same few things about each of a fixed set of rows, and the answers differ in kind: for each weekday, whether the respondent is available, which kind of session suits them, and the earliest time they can start. Each column has its own type, Radio, Dropdown or Short text, and every cell is its own answer.
+
+Use something else when:
+
+- **Every row has the same set of answers to choose from,** such as Never to Always. Use Matrix, which is simpler to fill in.
+- **The respondent decides how many rows there are,** such as one row per medication. Use a repeating group: a grid's rows are fixed.
+- **There is only one row.** Ask separate questions instead.
+
+### On a narrow screen
+
+When the grid has less than 34rem of width (544 pixels at the usual text size), as on most phones, each row shows as a card. The row's label is the card's heading, and each cell shows its column's label above it, with the red asterisk on required columns. Wider, the grid is a table. If the table is wider than the space it has, it scrolls sideways in its own box.
+
+Try it: narrow the browser window, or open this page on a phone, and the example above changes to cards.
+
+## Add it in the builder
+
+You need a form open in the editor.
+
+1. Below the last block, select **+** (Insert a block), or type `/` in the line beside it.
+2. Under **Questions**, choose **Grid**. Typing `table` or `columns` in the search box finds it too. The grid is added with three rows and one Short text column, and its settings open.
+<Gif alt="Inserting a Grid from the block menu" />
+3. In **Label**, write the question.
+4. Under **Rows**, replace Row 1, Row 2 and Row 3 with your own labels. Use **Add row** for more, or **Import from file** for a list you already have.
+5. Under **Columns**, for each column:
+   - write its **Label**;
+   - choose its type: **Radio**, **Dropdown** or **Short text**;
+   - for Radio and Dropdown, replace Option 1, Option 2 and Option 3 under its **Options** with your own;
+   - turn on **Required** if the column must be answered in every row.
+
+   Use **Add column** for another column, and the arrows to move a column up or down.
+<Gif alt="Setting a grid column's type, options and Required" />
+6. Select **Save**.
+
+<Note>
+When you leave a label you have changed, the builder fills in its code: for rows, columns and each column's options. Within each of those lists, no two codes may be the same, ignoring case, and no two labels either.
+</Note>
+
+<Note>
+Changing a Radio or Dropdown column to Short text removes its options, so the builder asks first, such as: Change "Session format" to short text? Its 3 options will be removed. Between Radio and Dropdown, the options are kept.
+</Note>
+
+## Settings
+
+| Builder setting | Schema property | Default |
+|---|---|---|
+| Label | `label` | "Grid question" |
+| Help text | `description` | none; left out of the file when empty |
+| Rows: Code and Label | `rows[].code`, `rows[].label` | Row 1, Row 2 and Row 3, with codes filled in from the labels you type |
+| Columns: Code and Label | `columns[].code`, `columns[].label` | one column, Column 1 |
+| Columns: type (Radio, Dropdown or Short text) | `columns[].type`: `radio`, `dropdown` or `text` | Short text |
+| Columns: Options (Radio and Dropdown only) | `columns[].options[]` | Option 1, Option 2 and Option 3, when a column becomes Radio or Dropdown |
+| Columns: Required | `columns[].required` | off; left out of the file when off |
+| Name (only inside a group with a score) | not in the downloaded file | made from the label |
+| Show this question only when… | `enableWhen`, and `enableLogic` with two or more conditions | none |
+
+Rows and each column's options can be imported from a file; columns can't. A grid can't be used in a score.
+
+### Required, column by column
+
+A grid has no Required switch of its own. Instead, each column has one:
+
+- **A required column must be answered in every row.** In the example, every weekday needs an answer under Available.
+- **A column that isn't required can be left empty in any row,** or in all of them.
+- **A grid with no required column is optional throughout:** it can be sent with every cell empty.
+
+There is no way to require an answer in some rows of a column but not others, or to require at least one row to be filled in.
+
+**As a condition.** A grid can't be the source of a condition, so it isn't offered in another question's **Show this question only when…** list. It can have conditions of its own.
+
+## Validation and error messages
+
+The form checks the grid when the respondent selects Submit (or Next, on a form with pages). Each message shows under its cell, and the "There is a problem" summary at the top of the form has one entry per required column with empty cells, linking to the first of them. Once a message shows, it updates as the respondent changes the answer, and it goes when the answer is fixed.
+
+| Situation | Message |
+|---|---|
+| A required column's cell is empty | Required. (under that cell, for every empty cell) |
+| In the summary, for each required column with empty cells | "Weekly availability": answer "Available" in every row (5 missing). (the grid's label, the column's label and how many cells are empty) |
+
+In a Radio cell, selecting the chosen option again clears it. In a Dropdown cell, choosing "— Select —" clears it. A Short text cell takes up to 20,000 characters.
+
+On the review page of a form with pages, each row with an answer is listed with its answered cells, such as "Session format: Video". When a column's label ends in a question mark, a colon or a full stop, no colon is added.
+
+## Accessibility
+
+What the rendered form exposes to assistive technology:
+
+- The grid is a table named by its label, with column headers and row headers. Its description (`aria-describedby`) is the help text.
+- The table sits in a scrolling box named by the grid's label, which can take keyboard focus, so a keyboard user can scroll a wide grid.
+- Every cell's control is named by its row and column, such as "Monday, Available". A Radio cell is a group of native radio buttons, a Dropdown cell a native `<select>` whose first entry, "— Select —", means no answer, and a Short text cell a native text input.
+- A required column's cells have `aria-required="true"`. The red asterisk is hidden from assistive technology, so it is never read out as part of a name.
+- A cell that fails a check has `aria-invalid="true"`, and its message is its description.
+- On a narrow screen the column labels shown in each card are hidden from assistive technology, because every cell is already named by its row and column.
+
+| Check | Status |
+|---|---|
+| Automated: axe, WCAG 2.2 A and AA | No violations on the live example above, in light and dark, with and without its errors shown. Checked by the docs' own tests. |
+| Contrast | Covered by axe's contrast rule in the same tests: the renderer's default colours, light and dark. |
+| Reflow | The example shows as cards at 375 pixels wide, and nothing scrolls sideways at 320 pixels. Checked by the docs' own tests. |
+| Screen reader | [TODO: not tested with a screen reader yet.] |
+
+## Troubleshooting
+
+**There is no Required switch for the grid.** Required is set column by column, under each column in **Columns**.
+
+**The grid isn't in the list when you add a condition.** A grid can't be the source of a condition. Ask a separate question if a later question depends on it.
+
+**A column's options disappeared.** The column was changed to Short text, which has no options. Change it back to Radio or Dropdown and add them again.
+
+**There is no Import from file for columns.** Columns are added one by one, with **Add column**. Rows, and each Radio or Dropdown column's options, can be imported.

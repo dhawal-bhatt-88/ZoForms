@@ -1,0 +1,99 @@
+---
+title: Matrix
+summary: Several rows answered on the same set of columns, one answer per row.
+template: question-type
+badges: [Coded options]
+appliesTo: [builder, package]
+updated: 2026-10-25
+prev: /docs/build/question-types/grid
+next: /docs/build/question-types/rating
+---
+
+<LiveExample form="matrix" />
+
+## When to use
+
+Use a matrix when you ask the same question about several things, and every one is answered from the same choices: how satisfied the respondent was with each part of a visit, how often each of several things happens. Each row is one thing, each column one choice, and the respondent picks one column in each row.
+
+Use something else when:
+
+- **The rows need different kinds of answer,** such as a choice in one column and a time in another. Use Grid, whose columns each have their own type.
+- **There is only one row.** Use Multiple choice.
+- **More than one choice can apply in a row.** Ask a Checkboxes question for each row instead: a matrix takes one answer per row.
+
+## Add it in the builder
+
+You need a form open in the editor.
+
+1. Below the last block, select **+** (Insert a block), or type `/` in the line beside it.
+2. Under **Questions**, choose **Matrix**. The matrix is added and its settings open.
+<Gif alt="Inserting a Matrix from the block menu" />
+3. In **Label**, write the question.
+4. Under **Rows**, replace Option 1, Option 2 and Option 3 with the things being asked about. Use **Add row** for more, or **Import from file**.
+5. Under **Columns**, replace Column 1, Column 2 and Column 3 with the choices. Use **Add column** for more, or **Import from file**.
+6. Choose how much must be answered:
+   - Turn on **Required** if at least one row must be answered.
+   - Turn on **Answer every row** if every row must be answered. This also makes the question required: **Required** shows as on, and can't be turned off while **Answer every row** is on.
+7. Select **Save**.
+
+<Note>
+When you leave a label you have changed, the builder fills in its code. The rows and the columns are separate lists: within each, no two codes may be the same, ignoring case, and no two labels either.
+</Note>
+
+<Note>
+Changing a code after the form is in use will not match answers already stored under the old code.
+</Note>
+
+## Settings
+
+| Builder setting | Schema property | Default |
+|---|---|---|
+| Label | `label` | "Matrix question" |
+| Help text | `description` | none; left out of the file when empty |
+| Rows: Code and Label | `options[].code`, `options[].label` | Option 1, Option 2 and Option 3, with codes filled in from the labels you type |
+| Columns: Code and Label | `columns[].code`, `columns[].label` | Column 1, Column 2 and Column 3, with codes filled in from the labels you type |
+| Columns: Score (only inside a group with a score) | `columns[].score` | none |
+| Required | `required` | `false` |
+| Answer every row | `completeRequired` | off; left out of the file when off |
+| Name (only inside a group with a score) | not in the downloaded file | made from the label |
+| Show this question only when… | `enableWhen`, and `enableLogic` with two or more conditions | none |
+
+The rows are stored as the matrix's `options`, and the columns as its `columns`.
+
+**As a condition.** A matrix can't be the source of a condition, so it isn't offered in another question's **Show this question only when…** list. It can have conditions of its own.
+
+## Validation and error messages
+
+The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. Once a message shows, it updates as the respondent changes the answer, and it goes when the answer is fixed.
+
+| Situation | Message |
+|---|---|
+| Required (or Answer every row on), and no row answered | "How satisfied were you with each part of your visit?" is required. (the question's own label, in quotation marks) |
+| Answer every row on, and some rows not answered | Answer every row of "How satisfied were you with each part of your visit?". |
+
+Once a row is answered, the respondent can change its answer but not clear it: only **Clear form**, which clears every answer in the form, does that. On the review page of a form with pages, each answered row is listed with its answer, such as "Booking: Satisfied".
+
+The matrix keeps its table layout at every width. When the table is wider than the space it has, as with many columns on a phone, it scrolls sideways in its own box.
+
+## Accessibility
+
+What the rendered form exposes to assistive technology:
+
+- The question is a group (`<fieldset>`) named by its label (`<legend>`), holding a table with a header row of column labels.
+- Each row is a radio group named by its row label. Each radio button is named by its column label, and the arrow keys move between the radio buttons in a row.
+- The group's description (`aria-describedby`) is "Required", on a required question, then the help text, then any error. The red asterisk is hidden from assistive technology, so it is never read out as part of the name.
+- After a failed check, the group has `aria-invalid="true"`.
+
+| Check | Status |
+|---|---|
+| Automated: axe, WCAG 2.2 A and AA | No violations on the live example above, in light and dark, with and without its error shown. Checked by the docs' own tests. |
+| Contrast | Covered by axe's contrast rule in the same tests: the renderer's default colours, light and dark. |
+| Screen reader | [TODO: not tested with a screen reader yet.] |
+
+## Troubleshooting
+
+**Required can't be turned off.** Answer every row is on, and it makes the question required. Turn Answer every row off first.
+
+**The matrix isn't in the list when you add a condition.** A matrix can't be the source of a condition. Ask a separate question if a later question depends on it.
+
+**On a phone, respondents have to scroll the matrix sideways.** The table is wider than the screen. Use fewer or shorter column labels, or a Grid, which shows each row as a card on a narrow screen.
