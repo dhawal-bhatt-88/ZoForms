@@ -104,6 +104,19 @@ const FORMS = [
     title,
     blocks: [{ ...block, required: true }],
   })),
+  // The scales and ranking (CP3). Ranking has Rank every option on, which makes it required.
+  ...[
+    ["linear-scale", "Linear scale example", { id: "booking_ease", type: "scale", label: "How easy was it to book this appointment?", description: "1 = very hard, 5 = very easy", min: 1, max: 5 }],
+    ["rating", "Rating example", { id: "checkin_rating", type: "rating", label: "How would you rate your check-in experience today?" }],
+    ["ranking", "Ranking example", {
+      id: "therapist_priorities", type: "ranking", label: "Rank what matters most when choosing a therapist", required: false, completeRequired: true,
+      options: options("Appointment availability", "Distance from home", "Cost", "Therapist's specialty"),
+    }],
+  ].map(([name, title, block]) => ({
+    file: `build/question-types/${name}.form.json`,
+    title,
+    blocks: [{ required: true, ...block }],
+  })),
 ];
 
 // Only the files named on the command line, if any, so building a new example

@@ -1,0 +1,91 @@
+---
+title: Linear scale
+summary: One point on a numbered range, such as 1 to 5, with every point shown.
+template: question-type
+badges: []
+appliesTo: [builder, package]
+updated: 2026-10-25
+prev: /docs/build/question-types/time
+next: /docs/build/question-types/rating
+---
+
+<LiveExample form="linear-scale" />
+
+## When to use
+
+Use a linear scale when the respondent places their answer on a numbered range: how easy something was, how much they agree, how likely they are to do something. Every point is shown as its own option, and the answer is stored as a number.
+
+Use something else when:
+
+- **You want a star rating.** Use Rating, which is always 1 to 5 stars.
+- **The answer is a quantity the respondent counts,** such as a number of visits. Use Number.
+- **Each point needs its own words,** such as Never, Sometimes and Often. Use Multiple choice: a linear scale shows numbers only.
+
+## Add it in the builder
+
+You need a form open in the editor.
+
+1. Below the last block, select **+** (Insert a block), or type `/` in the line beside it.
+2. Under **Questions**, choose **Linear scale**. Typing `linear` or `nps` in the search box finds it too. The question is added and its settings open.
+<Gif alt="Inserting a Linear scale from the block menu" />
+3. In **Label**, write the question.
+4. Set **Min** and **Max**, the first and last points of the scale.
+5. In **Help text**, say what the ends of the scale mean, such as "1 = very hard, 5 = very easy". The scale itself shows only numbers.
+6. Turn on **Required** if the question must be answered.
+7. Select **Save**.
+
+<Warning>
+The builder doesn't check Min and Max when you save, so check them yourself:
+
+- **Max must be at least Min.** With Max below Min, the scale shows no points at all, and a required scale can never be answered.
+- **Use whole numbers.** Points go up in steps of 1 from Min, so a Min of 1.5 gives 1.5, 2.5, 3.5 and so on.
+- **A scale shows at most 20 points.** With Min 1 and Max 30, it shows 1 to 20, and 21 to 30 can't be chosen.
+</Warning>
+
+## Settings
+
+| Builder setting | Schema property | Default |
+|---|---|---|
+| Label | `label` | "Rate from 1 to 5" |
+| Help text | `description` | none; left out of the file when empty |
+| Min | `min` | 1 |
+| Max | `max` | 5 |
+| Required | `required` | `false` |
+| Name (only inside a group with a score) | not in the downloaded file | made from the label |
+| Show this question only when… | `enableWhen`, and `enableLogic` with two or more conditions | none |
+
+There is no setting for words at the ends of the scale; use the help text.
+
+**As a condition.** Other questions can be shown depending on the point chosen, with is answered, is, is not, is greater than, is less than, is at least or is at most. You type the number to compare against. For example, ask what made booking hard only when the answer is at most 2.
+
+## Validation and error messages
+
+The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. Once a message shows, it updates as the respondent changes the answer, and it goes when the answer is fixed.
+
+| Situation | Message |
+|---|---|
+| Required, and no point chosen | "How easy was it to book this appointment?" is required. (the question's own label, in quotation marks) |
+
+## Accessibility
+
+What the rendered form exposes to assistive technology:
+
+- The question is a group (`<fieldset>`) named by its label (`<legend>`). Each point is a native radio button, named by its number.
+- The group's description (`aria-describedby`) is "Required", on a required question, then the help text, then any error. Because each point is named only by its number, the help text is where screen reader users learn what the ends mean. The red asterisk is hidden from assistive technology, so it is never read out as part of the name.
+- After a failed check, the group has `aria-invalid="true"`.
+
+| Check | Status |
+|---|---|
+| Automated: axe, WCAG 2.2 A and AA | No violations on the live example above, in light and dark, with and without its error shown. Checked by the docs' own tests. |
+| Contrast | Covered by axe's contrast rule in the same tests: the renderer's default colours, light and dark. |
+| Screen reader | [TODO: not tested with a screen reader yet.] |
+
+## Troubleshooting
+
+**The scale shows no points.** Max is lower than Min. Set Max to at least Min.
+
+**The last points of the scale are missing.** The scale has more than 20 points, and only the first 20 are shown. Narrow the range.
+
+**The points aren't whole numbers.** Min isn't a whole number. Points go up in steps of 1 from Min.
+
+**A condition such as is at most 2 doesn't pass while the scale is unanswered.** Every comparison except is answered needs an answer to compare against, so the dependent question stays hidden until a point is chosen.

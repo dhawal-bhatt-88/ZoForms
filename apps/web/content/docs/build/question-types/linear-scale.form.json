@@ -1,0 +1,17 @@
+{
+  "title": "Linear scale example",
+  "formId": "6f631dc3-1399-486a-9741-83762b18acec",
+  "formVersionId": "3e9858c1-fe52-42f1-8cdb-f93a37563d25",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "booking_ease",
+      "type": "scale",
+      "label": "How easy was it to book this appointment?",
+      "description": "1 = very hard, 5 = very easy",
+      "required": true,
+      "min": 1,
+      "max": 5
+    }
+  ]
+}

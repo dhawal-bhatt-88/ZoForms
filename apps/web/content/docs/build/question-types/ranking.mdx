@@ -1,0 +1,91 @@
+---
+title: Ranking
+summary: The options put in order of importance, by selecting them one by one.
+template: question-type
+badges: [Coded options]
+appliesTo: [builder, package]
+updated: 2026-10-25
+prev: /docs/build/question-types/rating
+next: /docs/build/question-types/respondents-country
+---
+
+<LiveExample form="ranking" />
+
+## When to use
+
+Use a ranking when you want to know which options matter most to the respondent, in order: what they look for in a therapist, which appointment times suit them best. The respondent selects the options one by one, and each is ranked next: the first selected is 1, the next 2, and so on.
+
+Use something else when:
+
+- **The order doesn't matter.** Use Checkboxes.
+- **Each option needs its own rating.** Use Matrix, or a Linear scale for each.
+- **Only the top choice matters.** Use Multiple choice.
+
+## Add it in the builder
+
+You need a form open in the editor.
+
+1. Below the last block, select **+** (Insert a block), or type `/` in the line beside it.
+2. Under **Questions**, choose **Ranking**. Typing `order` or `rank` in the search box finds it too. The question is added and its settings open.
+<Gif alt="Inserting a Ranking from the block menu" />
+3. In **Label**, write the question.
+4. Under **Options**, replace Option 1, Option 2 and Option 3 with your own labels. When you leave a label you have changed, the builder fills in its code. Use **Add option** for more, or **Import from file** for a list you already have.
+5. Choose how much must be ranked:
+   - Turn on **Required** if at least one option must be ranked.
+   - Turn on **Rank every option** if every option must be ranked. This also makes the question required: **Required** shows as on, and can't be turned off while **Rank every option** is on.
+6. Select **Save**.
+
+<Note>
+Within one list, no two codes may be the same, ignoring case, and no two labels either. A code is 1 to 64 letters, digits, `.`, `-` or `_`, starting with a letter or digit.
+</Note>
+
+## Settings
+
+| Builder setting | Schema property | Default |
+|---|---|---|
+| Label | `label` | "Rank these in order" |
+| Help text | `description` | none; left out of the file when empty |
+| Options: Code and Label | `options[].code`, `options[].label` | Option 1, Option 2 and Option 3, with codes filled in from the labels you type |
+| Required | `required` | `false` |
+| Rank every option | `completeRequired` | off; left out of the file when off |
+| Name (only inside a group with a score) | not in the downloaded file | made from the label |
+| Show this question only when… | `enableWhen`, and `enableLogic` with two or more conditions | none |
+
+A ranking can't be used in a score, so its options have no Score.
+
+**As a condition.** Other questions can be shown depending on a ranking, with is answered or includes. Includes is true when the respondent ranked the option you pick, in any position. A condition can't ask which position an option was ranked in.
+
+## Validation and error messages
+
+The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. Once a message shows, it updates as the respondent changes the answer, and it goes when the answer is fixed.
+
+| Situation | Message |
+|---|---|
+| Required (or Rank every option on), and nothing ranked | "Rank what matters most when choosing a therapist" is required. (the question's own label, in quotation marks) |
+| Rank every option on, and some options not ranked | Rank every option in "Rank what matters most when choosing a therapist". |
+
+Selecting a ranked option again unranks it, and the options ranked after it move up one place. Unranking every option clears the answer. On the review page of a form with pages, the ranked options are listed in order, numbered.
+
+## Accessibility
+
+What the rendered form exposes to assistive technology:
+
+- The question is a group (`<fieldset>`) named by its label (`<legend>`). Each option is a button named by its option label, and pressed (`aria-pressed="true"`) once it is ranked.
+- Each option's description is its rank, such as "Ranked 2 of 4", or "Not ranked". The rank number shown on the button is hidden from assistive technology, so it isn't read out twice.
+- Every change is announced politely, such as "Cost ranked 2 of 4.", or "Cost unranked. Order: 1 Appointment availability, 2 Distance from home."
+- The group's description (`aria-describedby`) is "Required", on a required question, then the help text, then any error. The red asterisk is hidden from assistive technology, so it is never read out as part of the name.
+- After a failed check, the group has `aria-invalid="true"`.
+
+| Check | Status |
+|---|---|
+| Automated: axe, WCAG 2.2 A and AA | No violations on the live example above, in light and dark, with and without its error shown. Checked by the docs' own tests. |
+| Contrast | Covered by axe's contrast rule in the same tests: the renderer's default colours, light and dark. |
+| Screen reader | [TODO: not tested with a screen reader yet.] |
+
+## Troubleshooting
+
+**Required can't be turned off.** Rank every option is on, and it makes the question required. Turn Rank every option off first.
+
+**A respondent ranked an option in the wrong place.** Selecting it again unranks it, and the options after it move up. Selecting it once more ranks it last.
+
+**There is no way to show a question when an option is ranked first.** A condition can only ask whether an option was ranked at all. Ask a separate Multiple choice question if a later question depends on the top choice.

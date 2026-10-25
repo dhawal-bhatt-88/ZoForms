@@ -1,0 +1,33 @@
+{
+  "title": "Ranking example",
+  "formId": "d979de27-354b-4876-8695-42c0ad0a8c38",
+  "formVersionId": "4c693c7d-7cdf-4055-9a5e-08f69f12bd8e",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "therapist_priorities",
+      "type": "ranking",
+      "label": "Rank what matters most when choosing a therapist",
+      "required": false,
+      "completeRequired": true,
+      "options": [
+        {
+          "code": "appointment_availability",
+          "label": "Appointment availability"
+        },
+        {
+          "code": "distance_from_home",
+          "label": "Distance from home"
+        },
+        {
+          "code": "cost",
+          "label": "Cost"
+        },
+        {
+          "code": "therapists_specialty",
+          "label": "Therapist's specialty"
+        }
+      ]
+    }
+  ]
+}

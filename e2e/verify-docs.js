@@ -18,7 +18,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PAGES = [
   ["docs-home", "/docs"],
   ["dropdown", "/docs/build/question-types/dropdown"],
-  ...["short-answer", "long-answer", "multiple-choice", "checkboxes", "number", "email", "phone-number", "link", "date", "time", "respondents-country"].map((n) => [n, `/docs/build/question-types/${n}`]),
+  ...["short-answer", "long-answer", "multiple-choice", "checkboxes", "number", "email", "phone-number", "link", "date", "time", "linear-scale", "rating", "ranking", "respondents-country"].map((n) => [n, `/docs/build/question-types/${n}`]),
   ["show-questions-conditionally", "/docs/build/show-questions-conditionally"],
   ["form-renderer", "/docs/integrate/reference/form-renderer"],
   ["follow-up-question", "/docs/examples/follow-up-question"],
@@ -188,6 +188,37 @@ const THEMES = ["light", "dark"];
       const countries = await P.getByLabel("Country of residence", { exact: true }).locator("option").allTextContents();
       const listed = ["Select a country…", "United States", "United Kingdom", "Canada", "Australia", "India", "Germany", "France", "Netherlands", "Spain", "Italy", "Brazil", "Mexico", "Japan", "Singapore", "United Arab Emirates", "Other"];
       check("respondents-country: the list the page gives", JSON.stringify(countries) === JSON.stringify(listed), countries.join(", "));
+
+      // Linear scale: one radio per point, named by its number.
+      await load(P, urlOf("linear-scale"));
+      const points = await P.locator(".zf-form").getByRole("radio").evaluateAll((els) => els.map((e) => e.value));
+      check("linear-scale: points 1 to 5", JSON.stringify(points) === '["1","2","3","4","5"]', points.join(", "));
+
+      // Rating: selecting the same star again keeps the rating; "4 of 5" is stored as 4.
+      await load(P, urlOf("rating"));
+      await P.getByRole("button", { name: "4 stars" }).click();
+      await P.getByRole("button", { name: "4 stars" }).click();
+      const pressed = await P.getByRole("button", { name: "4 stars" }).getAttribute("aria-pressed");
+      await submit();
+      await P.getByText("Form submitted successfully.").waitFor();
+      await P.getByRole("tab", { name: "Payload" }).click();
+      const rated = (await P.getByRole("tabpanel").textContent()).replace(/\s+/g, "");
+      check("rating: the same star again keeps it, stored as 4", pressed === "true" && rated.includes('"checkin_rating":{"state":"answered","value":4}'), `${pressed} ${rated.slice(0, 200)}`);
+
+      // Ranking: ranked in the order selected; a partial ranking gets its message; unranking moves the rest up.
+      await load(P, urlOf("ranking"));
+      const item = (name) => P.getByRole("button", { name, exact: true });
+      await item("Cost").click();
+      await item("Distance from home").click();
+      const status = await P.locator(".zf-ranking-status").textContent();
+      check("ranking: the change is announced", status === "Distance from home ranked 2 of 4.", status);
+      await submit();
+      await P.waitForTimeout(300);
+      const rankErrors = await errorsOf();
+      check("ranking: a partial ranking gets its message", rankErrors.includes('Rank every option in "Rank what matters most when choosing a therapist".'), rankErrors.join(" | "));
+      await item("Cost").click();
+      const described = await item("Distance from home").evaluate((el) => el.getRootNode().getElementById(el.getAttribute("aria-describedby"))?.textContent);
+      check("ranking: unranking moves the rest up", described === "Ranked 1 of 4", described);
       await ctx.close();
     }
 

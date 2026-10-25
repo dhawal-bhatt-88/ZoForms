@@ -1,0 +1,78 @@
+---
+title: Rating
+summary: One to five stars.
+template: question-type
+badges: []
+appliesTo: [builder, package]
+updated: 2026-10-25
+prev: /docs/build/question-types/linear-scale
+next: /docs/build/question-types/ranking
+---
+
+<LiveExample form="rating" />
+
+## When to use
+
+Use a rating for a quick overall judgement that respondents know from reviews: how was the check-in, how was the session. It is always five stars, and the answer is stored as a number from 1 to 5.
+
+Use something else when:
+
+- **You need a different range,** such as 0 to 10. Use Linear scale, which lets you set the first and last points.
+- **The ends of the range need words,** such as very hard and very easy. Use Linear scale, with the words in the help text, or Multiple choice.
+- **You are rating several things on the same scale.** Use Matrix.
+
+## Add it in the builder
+
+You need a form open in the editor.
+
+1. Below the last block, select **+** (Insert a block), or type `/` in the line beside it.
+2. Under **Questions**, choose **Rating**. Typing `stars` in the search box finds it too. The question is added and its settings open.
+<Gif alt="Inserting a Rating from the block menu" />
+3. In **Label**, write the question.
+4. Turn on **Required** if the question must be answered.
+5. Select **Save**.
+
+## Settings
+
+| Builder setting | Schema property | Default |
+|---|---|---|
+| Label | `label` | "How would you rate this?" |
+| Help text | `description` | none; left out of the file when empty |
+| Required | `required` | `false` |
+| Name (only inside a group with a score) | not in the downloaded file | made from the label |
+| Show this question only when… | `enableWhen`, and `enableLogic` with two or more conditions | none |
+
+There are no other settings: a rating always has five stars.
+
+**As a condition.** Other questions can be shown depending on the rating, with is answered, is, is not, is greater than, is less than, is at least or is at most. You type the number of stars to compare against. For example, ask what could have gone better only when the rating is at most 3.
+
+## Validation and error messages
+
+The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. Once a message shows, it updates as the respondent changes the answer, and it goes when the answer is fixed.
+
+| Situation | Message |
+|---|---|
+| Required, and no star chosen | "How would you rate your check-in experience today?" is required. (the question's own label, in quotation marks) |
+
+Selecting a star fills it and every star before it. Selecting a different star changes the rating. Selecting the same star again keeps it: only **Clear form**, which clears every answer in the form, removes a rating. On the review page of a form with pages, the rating shows as "4 of 5".
+
+## Accessibility
+
+What the rendered form exposes to assistive technology:
+
+- The question is a group (`<fieldset>`) named by its label (`<legend>`). Each star is a button named by its number of stars, from "1 stars" to "5 stars". The chosen star's button is pressed (`aria-pressed="true"`).
+- The star symbols themselves are hidden from assistive technology.
+- The group's description (`aria-describedby`) is "Required", on a required question, then the help text, then any error. The red asterisk is hidden from assistive technology, so it is never read out as part of the name.
+- After a failed check, the group has `aria-invalid="true"`.
+
+| Check | Status |
+|---|---|
+| Automated: axe, WCAG 2.2 A and AA | No violations on the live example above, in light and dark, with and without its error shown. Checked by the docs' own tests. |
+| Contrast | Covered by axe's contrast rule in the same tests: the renderer's default colours, light and dark. |
+| Screen reader | [TODO: not tested with a screen reader yet.] |
+
+## Troubleshooting
+
+**A respondent can't take their rating back.** Selecting the chosen star again doesn't clear it. If a rating should be optional, leave Required off and say in the help text that the question can be skipped.
+
+**A condition such as is at most 3 doesn't pass while the rating is unanswered.** Every comparison except is answered needs an answer to compare against, so the dependent question stays hidden until a star is chosen.

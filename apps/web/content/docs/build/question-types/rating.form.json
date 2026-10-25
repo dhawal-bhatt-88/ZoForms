@@ -1,0 +1,14 @@
+{
+  "title": "Rating example",
+  "formId": "fb9ec7e8-f72a-4724-a638-6aa1b3244dc4",
+  "formVersionId": "8eecf342-de8f-4a6a-a51f-ca50ecb7b851",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "checkin_rating",
+      "type": "rating",
+      "label": "How would you rate your check-in experience today?",
+      "required": true
+    }
+  ]
+}

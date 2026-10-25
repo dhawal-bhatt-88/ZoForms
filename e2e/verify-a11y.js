@@ -82,6 +82,9 @@ const DOCS_ERROR_PAGES = [
   ["Link", "/docs/build/question-types/link"],
   ["Date", "/docs/build/question-types/date"],
   ["Time", "/docs/build/question-types/time"],
+  ["Linear scale", "/docs/build/question-types/linear-scale"],
+  ["Rating", "/docs/build/question-types/rating"],
+  ["Ranking", "/docs/build/question-types/ranking"],
   ["Respondent's country", "/docs/build/question-types/respondents-country"],
 ];
 
