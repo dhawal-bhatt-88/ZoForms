@@ -95,6 +95,11 @@ const DOCS_PAGES = [
   ["docs home", "/docs"],
   ["Dropdown", "/docs/build/question-types/dropdown"],
   ...DOCS_ERROR_PAGES,
+  // Display blocks only: no answerable question, so no error state to check.
+  ["Layout blocks", "/docs/build/layout-and-media/layout-blocks"],
+  ["Image", "/docs/build/layout-and-media/image"],
+  ["Video", "/docs/build/layout-and-media/video"],
+  ["Audio", "/docs/build/layout-and-media/audio"],
   ["Show a question only when it applies", "/docs/build/show-questions-conditionally"],
   ["FormRenderer", "/docs/integrate/reference/form-renderer"],
   ["Follow-up question", "/docs/examples/follow-up-question"],

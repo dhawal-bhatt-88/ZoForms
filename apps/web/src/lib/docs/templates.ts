@@ -47,6 +47,8 @@ export const TEMPLATES: Record<TemplateName, Template> = {
       "Troubleshooting",
       "More about …",
     ],
+    // Optional on a how-to page, which may show the blocks it explains (docs/briefs/BUILDER-BRIEF-DOCS-QUESTIONS.md).
+    example: { tabs: ["preview", "schema", "payload", "server"], density: true },
   },
   "api-reference": {
     label: "API reference",

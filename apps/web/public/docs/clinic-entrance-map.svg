@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" width="640" height="360" font-family="Arial, Helvetica, sans-serif">
+  <!-- The docs' Image example (content/docs/build/layout-and-media/image.mdx): a map of a clinic entrance. -->
+  <rect width="640" height="360" fill="#F4F4F2"/>
+  <!-- Main Street -->
+  <rect x="0" y="290" width="640" height="70" fill="#4A5157"/>
+  <line x1="0" y1="325" x2="640" y2="325" stroke="#F4F4F2" stroke-width="4" stroke-dasharray="24 18"/>
+  <text x="320" y="316" text-anchor="middle" font-size="18" font-weight="700" fill="#FFFFFF">Main Street</text>
+  <!-- The clinic -->
+  <rect x="60" y="40" width="330" height="220" fill="#FFFFFF" stroke="#14181B" stroke-width="4"/>
+  <text x="225" y="84" text-anchor="middle" font-size="24" font-weight="700" fill="#14181B">Clinic</text>
+  <!-- Reception, just inside the entrance -->
+  <rect x="160" y="150" width="130" height="70" fill="#E6F0ED" stroke="#0F5C4A" stroke-width="3"/>
+  <text x="225" y="191" text-anchor="middle" font-size="18" font-weight="700" fill="#0F5C4A">Reception</text>
+  <!-- The entrance: a gap in the front wall, facing Main Street -->
+  <rect x="195" y="254" width="60" height="12" fill="#F4F4F2"/>
+  <path d="M225 284 L225 236 M213 248 L225 236 L237 248" fill="none" stroke="#9E1B12" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="270" y="281" font-size="16" font-weight="700" fill="#14181B">Entrance</text>
+  <!-- The parking lot, beside the clinic -->
+  <rect x="420" y="40" width="180" height="220" fill="#FFFFFF" stroke="#6B7278" stroke-width="3" stroke-dasharray="10 6"/>
+  <g stroke="#6B7278" stroke-width="3">
+    <line x1="420" y1="110" x2="480" y2="110"/>
+    <line x1="420" y1="170" x2="480" y2="170"/>
+    <line x1="540" y1="110" x2="600" y2="110"/>
+    <line x1="540" y1="170" x2="600" y2="170"/>
+  </g>
+  <text x="510" y="146" text-anchor="middle" font-size="20" font-weight="700" fill="#14181B">Parking</text>
+</svg>

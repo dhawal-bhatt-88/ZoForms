@@ -1,0 +1,15 @@
+{
+  "title": "Video example",
+  "formId": "17110744-e913-48ed-b586-7f3a82050dfb",
+  "formVersionId": "c8fefb6f-ac89-41de-b12a-e6239bf18933",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "welcome_video",
+      "type": "video",
+      "label": "Welcome from the intake team",
+      "required": false,
+      "content": "/videos/welcome.mp4"
+    }
+  ]
+}

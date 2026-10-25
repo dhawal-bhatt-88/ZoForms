@@ -1,0 +1,38 @@
+{
+  "title": "Layout blocks example",
+  "formId": "84068ec8-6357-475b-9814-55cf26226a2e",
+  "formVersionId": "89269582-ceae-4db5-b29e-533a91d26c6f",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "about_heading",
+      "type": "heading",
+      "label": "About your visit",
+      "level": 2
+    },
+    {
+      "id": "intro_text",
+      "type": "text",
+      "label": "Text",
+      "required": false,
+      "content": "This form takes about 5 minutes. Only the intake team sees your answers."
+    },
+    {
+      "id": "divider",
+      "type": "divider",
+      "label": "Divider"
+    },
+    {
+      "id": "contact_title",
+      "type": "title",
+      "label": "Title",
+      "content": "Contact details"
+    },
+    {
+      "id": "required_note",
+      "type": "label",
+      "label": "Label",
+      "content": "Questions marked * are required."
+    }
+  ]
+}

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { sectionsMatch } from "./templates";
+import { sectionsMatch, TEMPLATES } from "./templates";
+
+describe("live examples", () => {
+  it("are allowed on how-to pages, with the question-type pages' tabs", () => {
+    expect(TEMPLATES["how-to"].example).toEqual(TEMPLATES["question-type"].example);
+  });
+});
 
 describe("sectionsMatch", () => {
   it("wants every section, in order", () => {

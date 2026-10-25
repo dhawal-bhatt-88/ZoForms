@@ -1,0 +1,78 @@
+---
+title: Audio
+summary: A sound file played on the form, with a transcript next to it.
+template: how-to
+badges: [Display blocks]
+appliesTo: [builder, package]
+updated: 2026-10-25
+prev: /docs/build/layout-and-media/video
+next: /docs/build/show-questions-conditionally
+---
+
+## When you'd use this
+
+Use audio when hearing something helps: spoken directions to the clinic, a short welcome, instructions read aloud. An audio block collects no answer, and it never plays until the respondent starts it.
+
+[TODO: add a live example once the docs have an audio file of their own.]
+
+## Before you start
+
+- **The audio must be a file that is already online:** an **.mp3**, **.m4a**, **.ogg** or **.wav** file, at an address starting with `https://`, or at a path on the server of the app your form is used in, starting with a single `/`, such as `/audio/welcome.mp3`. Links to streaming services or players aren't accepted.
+- **Write a transcript:** everything the recording says, as text. Respondents who can't hear the audio need it, and a recording without one doesn't meet WCAG 2.1 AA (1.2.1). You put it in a Text block next to the audio.
+- An audio block has no Required and no Help text, isn't numbered, and can't be the source of a condition. It can have conditions of its own, under **Logic**.
+
+## Steps
+
+1. Below the last block, select **+** (Insert a block), or type `/` in the line beside it.
+2. Under **Media**, choose **Audio**. Typing `sound` finds it too.
+3. In **Label**, say what the recording is. As the hint under it says, it is read aloud to screen-reader users as the player's name.
+4. In **URL**, paste the file's address or path. The hint under it reminds you to add a transcript.
+5. Insert a **Text** block right after the audio, and put the transcript in its **Content**.
+6. Select **Save**.
+<Gif alt="Adding an Audio block and its transcript" />
+
+In the downloaded file, the URL is the audio block's `content`, without spaces at either end:
+
+<FormExcerpt form="audio" block="directions_audio" field="content" />
+
+and the transcript is the Text block's `content`:
+
+<FormExcerpt form="audio" block="directions_transcript" field="content" />
+
+## What happens behind the scenes
+
+- **The file plays in the browser's own audio player,** as wide as the form.
+- **Audio never starts by itself,** never repeats, and is never muted to begin with.
+- **The Label is the player's name** for screen readers.
+- **An address that isn't recognised shows nothing,** and so does a file that fails to load: never an error for the respondent. The transcript in its Text block still shows.
+- **Nothing from an audio block is sent** with the answers.
+
+## Rules the builder enforces
+
+| What you try | What the builder says |
+|---|---|
+| Save an audio block with no URL, or one that isn't recognised | Audio "Directions": add the address of an .mp3, .m4a, .ogg or .wav file (https:// or a path on your app's server such as /audio/welcome.mp3). (under the URL field, the same text, starting with a capital) |
+
+The name in quotation marks is the audio block's path in the form: the page and groups it is in, then its label. The builder doesn't check that a transcript is there: that is yours to do.
+
+What is recognised, after spaces at either end are removed:
+
+| Recognised | Not recognised |
+|---|---|
+| `https://cdn.example.com/welcome.mp3` | `http://cdn.example.com/welcome.mp3`: must be `https://` |
+| `https://cdn.example.com/welcome.M4A?v=2` | `https://cdn.example.com/welcome.flac`: only .mp3, .m4a, .ogg and .wav |
+| `/audio/breathing.ogg` | `https://cdn.example.com/?file=welcome.mp3`: the file name must be the end of the path |
+| `/audio/breathing.wav#t=10` | `https://open.spotify.com/track/abc`: a streaming service |
+| | `//cdn.example.com/welcome.mp3`: two slashes at the start |
+
+## Troubleshooting
+
+**The audio doesn't show in your app, though the form saved.** Check the address opens in a browser, and for a path starting with `/`, check it on the app your form is used in. If it opens but still doesn't play, the app's developer may need to allow the file's location in the app's security settings (its Content Security Policy).
+
+**The builder refuses a link from a podcast or music service.** Only links to the sound file itself are accepted. Put the file on your app's server, or anywhere it has an `https://` address of its own.
+
+**Respondents who can't hear the recording miss what it says.** Add a Text block with the transcript next to it.
+
+## More about building forms
+
+<Series />

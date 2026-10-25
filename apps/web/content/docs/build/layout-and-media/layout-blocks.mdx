@@ -1,0 +1,108 @@
+---
+title: Layout blocks
+summary: Headings, text, dividers, titles and labels, which show content and ask nothing.
+template: how-to
+badges: [Display blocks]
+appliesTo: [builder, package]
+updated: 2026-10-25
+prev: /docs/build/question-types/respondents-country
+next: /docs/build/layout-and-media/image
+---
+
+<LiveExample form="layout-blocks" />
+
+## When you'd use this
+
+The builder's **Layout** blocks put words on the form without asking anything: they introduce a section, explain what comes next, or break a long form into parts. The example above has one of each.
+
+<UseCases>
+<UseCase title="Heading">
+A heading for a section, at level 1, 2 or 3, such as "About your visit".
+</UseCase>
+<UseCase title="Text">
+A paragraph of plain text, such as how long the form takes or who sees the answers. Line breaks you type are kept.
+</UseCase>
+<UseCase title="Divider">
+A horizontal rule between two parts of the form.
+</UseCase>
+<UseCase title="Title">
+A larger heading, always at level 2, such as "Contact details".
+</UseCase>
+<UseCase title="Label">
+A short line of text in a quieter colour, such as a note about which questions are required.
+</UseCase>
+</UseCases>
+
+To group questions under a heading that is part of the group, use a group instead: its label is its heading.
+
+## Before you start
+
+- You need a form open in the editor.
+- These blocks collect no answer. They have no **Required** and no **Help text**, aren't numbered, and can't be used as the source of a condition.
+- Each one can have conditions of its own, under **Logic**, so it shows only when they pass.
+
+## Steps
+
+### Add a heading
+
+1. Below the last block, select **+** (Insert a block), or type `/` in the line beside it.
+2. Under **Layout**, choose **Heading 1**, **Heading 2** or **Heading 3**.
+3. In **Label**, write the heading. The label is the heading respondents see.
+4. To change its level later, choose **H1**, **H2** or **H3** under **Level**.
+
+### Add text
+
+1. Insert a block, and under **Layout**, choose **Text**. Typing `paragraph` finds it too.
+2. In **Content**, replace "Add some descriptive text here." with your text. Respondents see the content, never the **Label**.
+
+### Add a divider
+
+1. Insert a block, and under **Layout**, choose **Divider**. Typing `line` or `separator` finds it too.
+2. Keep or change its **Label**. Respondents don't see it, but screen readers announce it as the divider's name.
+
+### Add a title
+
+1. Insert a block, and under **Layout**, choose **Title**.
+2. In **Content**, replace "Section title" with your title. Respondents see the content; if it is empty, they see the **Label** instead.
+
+### Add a label
+
+1. Insert a block, and under **Layout**, choose **Label**.
+2. In **Content**, replace "Label" with your text. Respondents see the content; if it is empty, they see the **Label** instead.
+
+Then select **Save**.
+
+<Note>
+For Heading, Divider, Title and Label, the settings are headed **Question**, and the Logic section reads **Show this question only when…**. They still collect no answer.
+</Note>
+
+## What happens behind the scenes
+
+- **Heading** is a heading element at its level: Heading 1 is `h1`, Heading 2 `h2`, Heading 3 `h3`.
+- **Title** is always an `h2`, drawn larger than a Heading 2.
+- **The form's own title isn't shown as a heading** by the renderer: the page the form sits in has its own. A group's label is a level 2 heading, or level 3 in a form with pages, under the page title, so a Heading 2 sits at the same level as a group.
+- **Text** is a paragraph. It is plain text, never HTML or Markdown, so `*` or `<b>` show as typed. A Text block with no content, or only spaces, shows nothing.
+- **Divider** is a horizontal rule (`<hr>`) named by its Label.
+- **Label** is a line of plain text, in the form's muted colour.
+- **Nothing from these blocks is sent** with the answers.
+- **A group or page that shows nothing is hidden.** If every block in a group or page is hidden by conditions, or shows nothing, such as an empty Text block, the group's heading isn't shown either, and in a form with pages the page is skipped.
+
+## Rules the builder enforces
+
+| What you try | What the builder says |
+|---|---|
+| Save a Text block with no content | Text block "About you › Text" is empty — add some text or delete it. (under the Content field: This text block is empty — add some text or delete it.) |
+
+The name in quotation marks is the block's path: the page and groups it is in, then its label.
+
+## Troubleshooting
+
+**Respondents don't see what you typed in Label.** For Text, Title and Label blocks, respondents see **Content**. A Text block's Label is never shown to them; a Title's or Label's is shown only when its Content is empty.
+
+**Text shows `*` or `<b>` instead of formatting.** Text is plain text. Use Heading, Title or Label blocks for emphasis.
+
+**A section heading disappeared.** Every block in the group is hidden by its conditions, or shows nothing, so the whole group is hidden.
+
+## More about building forms
+
+<Series />

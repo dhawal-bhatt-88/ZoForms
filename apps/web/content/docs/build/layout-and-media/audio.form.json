@@ -1,0 +1,22 @@
+{
+  "title": "Audio example",
+  "formId": "a5b04f87-6713-49a7-a32b-4c20fdea20cd",
+  "formVersionId": "3e6f5973-555d-43aa-82cd-e3546dfc483c",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "directions_audio",
+      "type": "audio",
+      "label": "Directions to the clinic",
+      "required": false,
+      "content": "/audio/directions.mp3"
+    },
+    {
+      "id": "directions_transcript",
+      "type": "text",
+      "label": "Text",
+      "required": false,
+      "content": "Transcript: The clinic is on Main Street, next to the parking lot. Come in through the front entrance; reception is just inside."
+    }
+  ]
+}

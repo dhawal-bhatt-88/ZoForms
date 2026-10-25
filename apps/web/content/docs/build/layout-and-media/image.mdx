@@ -1,0 +1,77 @@
+---
+title: Image
+summary: A picture on the form, from a web address or a file on your app's server, with alt text.
+template: how-to
+badges: [Display blocks]
+appliesTo: [builder, package]
+updated: 2026-10-25
+prev: /docs/build/layout-and-media/layout-blocks
+next: /docs/build/layout-and-media/video
+---
+
+<LiveExample form="image" />
+
+## When you'd use this
+
+Use an image when a picture helps the respondent: a map of how to find the clinic, as above, a photo of the entrance, or your organisation's logo. An image collects no answer.
+
+## Before you start
+
+- **The image must already be online.** The builder doesn't store image files: you give it the image's address. That is either:
+  - an address starting with `https://`, such as `https://example.org/map.png`; or
+  - a path on the server of the app your form is used in, starting with a single `/`, such as `/images/logo.png`.
+- **Write the alt text before you start:** a sentence that says what the image shows, for respondents who can't see it.
+- An image has no Required and no Help text, isn't numbered, and can't be the source of a condition. It can have conditions of its own, under **Logic**.
+
+## Steps
+
+1. Below the last block, select **+** (Insert a block), or type `/` in the line beside it.
+2. Under **Media**, choose **Image**. Typing `picture` or `photo` finds it too.
+3. In **Label**, write the alt text. As the hint under it says, it is read aloud to screen-reader users, so describe what the image shows. In the example, the label is "Map of the clinic: the entrance faces Main Street, the parking lot is beside the clinic, and reception is just inside the entrance."
+4. In **URL**, paste the image's address or path.
+5. To add a caption that everyone sees, put a Text block right after the image.
+6. Select **Save**.
+<Gif alt="Adding an Image with its alt text and URL" />
+
+The example's image is a file on this docs site, so its URL is a path:
+
+<FormExcerpt form="image" block="entrance_map" field="content" />
+
+## What happens behind the scenes
+
+- **The image is shown at its own size, never wider than the form.** On a narrow screen it shrinks to fit.
+- **The Label is the image's alt text,** what screen readers announce in its place. There is no separate caption setting.
+- **A path starting with `/` loads from the app the form is used in,** not from the builder. If that app runs under a sub-path, its developer can tell the form where, so the path still works.
+- **An address that isn't accepted, or an image that fails to load, shows nothing:** never a broken-image icon, and never an error for the respondent.
+- **The image loads only when it is about to come into view,** and the image's server isn't told which page it is on.
+- **Nothing from an image is sent** with the answers.
+
+## Rules the builder enforces
+
+| What you try | What the builder says |
+|---|---|
+| Save an image with no URL, or one that isn't accepted | Image "Map": add an image address starting with https:// or a path on your app's server such as /images/logo.png. (under the URL field: Add an image address starting with https:// or a path on your app's server such as /images/logo.png.) |
+
+The name in quotation marks is the image's path in the form: the page and groups it is in, then its label.
+
+What is accepted, after spaces at either end are removed:
+
+| Accepted | Not accepted |
+|---|---|
+| `https://example.com/a.png` | `http://example.com/a.png`: must be `https://` |
+| `HTTPS://example.com/a.png` | `images/a.png`: a path must start with `/` |
+| `/images/a.png` | `//cdn.example.com/a.png`: two slashes at the start |
+| | `https://user@cdn.example.com/a.png`: a name or password in the address |
+| | `data:image/png;base64,…`: images can't be pasted in as data |
+
+## Troubleshooting
+
+**The image doesn't show, though the form saved.** The address was accepted, but the file isn't there: check it opens in a browser. For a path starting with `/`, check it on the app your form is used in, not on the builder.
+
+**The builder refuses an `http://` address.** Only `https://` is accepted. Try the same address with `https://`, or put the image on your app's server and use its path.
+
+**Respondents need to read text that is in the image.** Put that text in the alt text, or in a Text block next to the image, so everyone can read it.
+
+## More about building forms
+
+<Series />

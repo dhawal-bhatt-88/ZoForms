@@ -1,0 +1,82 @@
+---
+title: Video
+summary: A YouTube or Vimeo video, or an .mp4 or .webm file, played on the form.
+template: how-to
+badges: [Display blocks]
+appliesTo: [builder, package]
+updated: 2026-10-25
+prev: /docs/build/layout-and-media/image
+next: /docs/build/layout-and-media/audio
+---
+
+## When you'd use this
+
+Use a video to show something that is easier to watch than to read: a welcome from the team, how to get to the clinic, what to expect at a first appointment. A video collects no answer, and it never plays until the respondent starts it.
+
+[TODO: add a live example once the docs have a video file of their own.]
+
+## Before you start
+
+- **The video must already be online,** in one of three places:
+  - on **YouTube**, as a video link;
+  - on **Vimeo**, as a video link, including unlisted videos;
+  - as an **.mp4** or **.webm** file, at an address starting with `https://`, or at a path on the server of the app your form is used in, starting with a single `/`, such as `/videos/intro.mp4`.
+- **Captions are yours to add.** On YouTube and Vimeo, add them there. A video file has no captions on the form, so if it has speech, put a transcript in a Text block next to it.
+- A video has no Required and no Help text, isn't numbered, and can't be the source of a condition. It can have conditions of its own, under **Logic**.
+
+## Steps
+
+1. Below the last block, select **+** (Insert a block), or type `/` in the line beside it.
+2. Under **Media**, choose **Video**. Typing `youtube`, `vimeo`, `mp4` or `webm` finds it too.
+3. In **Label**, say what the video is about. As the hint under it says, it is read aloud to screen-reader users as the player's name.
+4. In **URL**, paste the YouTube or Vimeo link, or the file's address or path.
+5. Select **Save**.
+<Gif alt="Adding a Video with its label and link" />
+
+In the downloaded file, the URL is the block's `content`, exactly as you pasted it, without spaces at either end. For a video file on your app's server:
+
+<FormExcerpt form="video" block="welcome_video" field="content" />
+
+## What happens behind the scenes
+
+- **YouTube and Vimeo videos play in that service's own player,** in a frame as wide as the form, 16:9. YouTube's player is loaded from `youtube-nocookie.com`.
+- **A start time on a YouTube link is kept,** from `t=` or `start=`, such as `?t=90` or `?t=1m30s`.
+- **A video file plays in the browser's own player,** at its own shape, never wider than the form.
+- **Videos never start by themselves.**
+- **At the end of a YouTube video, YouTube may suggest other videos** from the same channel. That can't be turned off.
+- **A link or address that isn't recognised shows nothing,** and so does a video file that fails to load: never an error for the respondent.
+- **Nothing from a video is sent** with the answers.
+
+## Rules the builder enforces
+
+| What you try | What the builder says |
+|---|---|
+| Save a video with no URL, or one that isn't recognised | Video "Welcome": paste a YouTube or Vimeo link, or the address of an .mp4 or .webm file (https:// or a path on your app's server such as /videos/intro.mp4). (under the URL field, the same text, starting with a capital) |
+
+The name in quotation marks is the video's path in the form: the page and groups it is in, then its label.
+
+What is recognised, after spaces at either end are removed:
+
+| Recognised | Not recognised |
+|---|---|
+| `https://www.youtube.com/watch?v=Ab3dEf6hIj9` | `http://www.youtube.com/watch?v=Ab3dEf6hIj9`: must be `https://` |
+| `https://youtu.be/Ab3dEf6hIj9?t=90` | `https://www.youtube.com/playlist?list=PL123`: a playlist, not a video |
+| `https://www.youtube.com/shorts/Ab3dEf6hIj9` | `https://www.youtube.com/shorts/Ab3dEf6hIj9/`: a slash at the end |
+| `https://vimeo.com/123456789` | `https://vimeo.com/channels/staffpicks`: a channel, not a video |
+| `https://vimeo.com/123456789/a1b2c3d4e5` (unlisted) | `https://cdn.example.com/intro.mov`: only .mp4 and .webm files |
+| `https://cdn.example.com/intro.mp4` | `//cdn.example.com/intro.mp4`: two slashes at the start |
+| `/videos/intro.WEBM` | `https://www.youtube.com/clip.mp4`: a YouTube address that isn't a video link |
+
+The video IDs in this table are made up; they show the form a link takes.
+
+## Troubleshooting
+
+**The video doesn't show in your app, though the form saved.** If it is on YouTube or Vimeo, the app's developer may need to allow those players in the app's security settings (its Content Security Policy). If it is a file, check the address opens in a browser, and for a path starting with `/`, check it on the app your form is used in.
+
+**The builder doesn't recognise a YouTube link.** Use the link to the video itself, not to a playlist, channel or search, and remove any slash at the end.
+
+**Respondents who can't hear the video miss what is said.** Add captions on YouTube or Vimeo. For a video file, put a transcript in a Text block next to it.
+
+## More about building forms
+
+<Series />

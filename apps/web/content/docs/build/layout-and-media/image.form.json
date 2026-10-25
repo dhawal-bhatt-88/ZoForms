@@ -1,0 +1,15 @@
+{
+  "title": "Image example",
+  "formId": "362933ef-2191-430e-8928-4826dc3af879",
+  "formVersionId": "fba4f8fc-1343-4d44-ad81-30d3106dfc18",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "entrance_map",
+      "type": "image",
+      "label": "Map of the clinic: the entrance faces Main Street, the parking lot is beside the clinic, and reception is just inside the entrance.",
+      "required": false,
+      "content": "/docs/clinic-entrance-map.svg"
+    }
+  ]
+}

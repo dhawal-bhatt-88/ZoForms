@@ -19,6 +19,7 @@ const PAGES = [
   ["docs-home", "/docs"],
   ["dropdown", "/docs/build/question-types/dropdown"],
   ...["short-answer", "long-answer", "multiple-choice", "checkboxes", "number", "email", "phone-number", "link", "date", "time", "linear-scale", "grid", "matrix", "rating", "ranking", "respondents-country"].map((n) => [n, `/docs/build/question-types/${n}`]),
+  ...["layout-blocks", "image", "video", "audio"].map((n) => [n, `/docs/build/layout-and-media/${n}`]),
   ["show-questions-conditionally", "/docs/build/show-questions-conditionally"],
   ["form-renderer", "/docs/integrate/reference/form-renderer"],
   ["follow-up-question", "/docs/examples/follow-up-question"],
@@ -86,6 +87,7 @@ const THEMES = ["light", "dark"];
       for (const [name, url, tabs] of [
         ["dropdown", urlOf("dropdown"), ["Preview", "Schema", "Payload", "Server output"]],
         ["follow-up-question", urlOf("follow-up-question"), ["Preview", "Schema", "React code", "Payload", "Server output"]],
+        ["layout-blocks", urlOf("layout-blocks"), ["Preview", "Schema", "Payload", "Server output"]],
       ]) {
         await load(P, url);
         const tablist = P.getByRole("tablist");
@@ -244,6 +246,36 @@ const THEMES = ["light", "dark"];
       check("grid: one summary entry for the column", summary.includes('"Weekly availability": answer "Available" in every row (4 missing).'), summary);
       const wideRow = await P.locator(".zf-grid-card").first().evaluate((el) => getComputedStyle(el).display);
       check("grid: a table at 1440px", wideRow === "table-row", wideRow);
+
+      // Layout blocks: what each renders as.
+      await load(P, urlOf("layout-blocks"));
+      const form = P.locator(".zf-form");
+      const rendered = await form.evaluate((el) => ({
+        h2: [...el.querySelectorAll("h2")].map((h) => h.textContent),
+        hr: el.querySelector("hr")?.getAttribute("aria-label"),
+        text: el.querySelector(".zf-text")?.textContent,
+        note: el.querySelector(".zf-block--label")?.textContent,
+      }));
+      check("layout-blocks: Heading 2 and Title are h2s, the Divider an hr named by its Label, Text and Label their Content",
+        JSON.stringify(rendered) === JSON.stringify({ h2: ["About your visit", "Contact details"], hr: "Divider", text: "This form takes about 5 minutes. Only the intake team sees your answers.", note: "Questions marked * are required." }),
+        JSON.stringify(rendered));
+
+      // Image: the docs' own file, loaded, with the Label as its alt text.
+      await load(P, urlOf("image"));
+      const img = P.locator(".zf-form img");
+      const image = await img.evaluate(async (el) => {
+        if (!el.complete) await new Promise((done) => { el.addEventListener("load", done); el.addEventListener("error", done); });
+        return { alt: el.alt, src: el.getAttribute("src"), loaded: el.naturalWidth > 0 };
+      });
+      check("image: the docs' own map, loaded, its alt text the Label", image.loaded && image.src === "/docs/clinic-entrance-map.svg" && image.alt === "Map of the clinic: the entrance faces Main Street, the parking lot is beside the clinic, and reception is just inside the entrance.", JSON.stringify(image));
+
+      // Video and Audio: schema only, no player.
+      for (const [name, src] of [["video", "/videos/welcome.mp4"], ["audio", "/audio/directions.mp3"]]) {
+        await load(P, urlOf(name));
+        const players = await P.locator("video, audio, iframe, [data-docs-example]").count();
+        const excerpt = await P.locator("pre").first().textContent();
+        check(`${name}: no player, and the schema's content`, players === 0 && excerpt.includes(`"content": "${src}"`), `${players} players; ${excerpt}`);
+      }
       await ctx.close();
     }
     {

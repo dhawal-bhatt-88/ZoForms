@@ -55,6 +55,15 @@ export const DOCS_NAV: DocsNavSection[] = [
           { title: "Respondent's country", slug: "build/question-types/respondents-country", status: "live" },
         ],
       },
+      {
+        title: "Layout and media",
+        pages: [
+          { title: "Layout blocks", slug: "build/layout-and-media/layout-blocks", status: "live" },
+          { title: "Image", slug: "build/layout-and-media/image", status: "live" },
+          { title: "Video", slug: "build/layout-and-media/video", status: "live" },
+          { title: "Audio", slug: "build/layout-and-media/audio", status: "live" },
+        ],
+      },
       { title: "Show a question only when it applies", slug: "build/show-questions-conditionally", status: "live" },
     ],
   },

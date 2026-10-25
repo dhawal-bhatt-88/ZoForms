@@ -150,6 +150,50 @@ const FORMS = [
       },
     ],
   },
+  // Layout and media (CP5). Display blocks have no Required and no help text; each label is the one
+  // the builder gives a new block, except where the label is what respondents see or hear.
+  {
+    file: "build/layout-and-media/layout-blocks.form.json",
+    title: "Layout blocks example",
+    blocks: [
+      { id: "about_heading", type: "heading", label: "About your visit", level: 2 },
+      { id: "intro_text", type: "text", label: "Text", content: "This form takes about 5 minutes. Only the intake team sees your answers." },
+      { id: "divider", type: "divider", label: "Divider" },
+      { id: "contact_title", type: "title", label: "Title", content: "Contact details" },
+      { id: "required_note", type: "label", label: "Label", content: "Questions marked * are required." },
+    ],
+  },
+  {
+    file: "build/layout-and-media/image.form.json",
+    title: "Image example",
+    blocks: [
+      {
+        id: "entrance_map",
+        type: "image",
+        label: "Map of the clinic: the entrance faces Main Street, the parking lot is beside the clinic, and reception is just inside the entrance.",
+        content: "/docs/clinic-entrance-map.svg",
+      },
+    ],
+  },
+  // Video and audio: shown as schema only, with no player, until the docs have their own files.
+  {
+    file: "build/layout-and-media/video.form.json",
+    title: "Video example",
+    blocks: [{ id: "welcome_video", type: "video", label: "Welcome from the intake team", content: "/videos/welcome.mp4" }],
+  },
+  {
+    file: "build/layout-and-media/audio.form.json",
+    title: "Audio example",
+    blocks: [
+      { id: "directions_audio", type: "audio", label: "Directions to the clinic", content: "/audio/directions.mp3" },
+      {
+        id: "directions_transcript",
+        type: "text",
+        label: "Text",
+        content: "Transcript: The clinic is on Main Street, next to the parking lot. Come in through the front entrance; reception is just inside.",
+      },
+    ],
+  },
 ];
 
 // Only the files named on the command line, if any, so building a new example
