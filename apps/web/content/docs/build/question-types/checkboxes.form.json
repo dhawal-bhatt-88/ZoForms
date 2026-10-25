@@ -1,0 +1,36 @@
+{
+  "title": "Checkboxes example",
+  "formId": "0563e755-95d9-4a11-8e29-37e6665e5dd8",
+  "formVersionId": "5ede6738-0e8a-4da9-9934-793d6515b393",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "available_days",
+      "type": "checkbox",
+      "label": "Which days can you usually attend?",
+      "required": true,
+      "options": [
+        {
+          "code": "monday",
+          "label": "Monday"
+        },
+        {
+          "code": "tuesday",
+          "label": "Tuesday"
+        },
+        {
+          "code": "wednesday",
+          "label": "Wednesday"
+        },
+        {
+          "code": "thursday",
+          "label": "Thursday"
+        },
+        {
+          "code": "friday",
+          "label": "Friday"
+        }
+      ]
+    }
+  ]
+}

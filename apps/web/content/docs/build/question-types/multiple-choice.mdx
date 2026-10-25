@@ -1,0 +1,89 @@
+---
+title: Multiple choice
+summary: One answer from a short list, with every option shown at once.
+template: question-type
+badges: [Coded options]
+appliesTo: [builder, package]
+updated: 2026-10-25
+prev: /docs/build/question-types/long-answer
+next: /docs/build/question-types/checkboxes
+---
+
+<LiveExample form="multiple-choice" />
+
+## When to use
+
+Use multiple choice when the respondent picks exactly one answer from a short list. Every option is on the page, so the respondent can compare them without opening anything.
+
+Use something else when:
+
+- **The list is long.** Use Dropdown, which keeps the options out of sight until the respondent opens it.
+- **More than one answer can apply.** Use Checkboxes.
+- **The answer is a point on a range,** such as 1 to 5. Use Linear scale.
+
+## Add it in the builder
+
+You need a form open in the editor.
+
+1. Below the last block, select **+** (Insert a block), or type `/` in the line beside it.
+2. Under **Questions**, choose **Multiple choice**. Typing `radio` in the search box finds it too. The question is added and its settings open.
+<Gif alt="Inserting a Multiple choice question from the block menu" />
+3. In **Label**, write the question.
+4. Under **Options**, replace Option 1, Option 2 and Option 3 with your own labels. When you leave a label you have changed, the builder fills in its code. Use **Add option** for more, or **Import from file** for a list you already have.
+<Gif alt="Typing option labels and seeing their codes appear" />
+5. Turn on **Required** if the question must be answered.
+6. Select **Save**.
+
+<Note>
+Within one list, no two codes may be the same, ignoring case, and no two labels either. A code is 1 to 64 letters, digits, `.`, `-` or `_`, starting with a letter or digit.
+</Note>
+
+<Note>
+Changing a code after the form is in use will not match answers already stored under the old code. Conditions in the form that use it are updated for you.
+</Note>
+
+## Settings
+
+| Builder setting | Schema property | Default |
+|---|---|---|
+| Label | `label` | "Multiple choice" |
+| Help text | `description` | none; left out of the file when empty |
+| Options: Code and Label | `options[].code`, `options[].label` | Option 1, Option 2 and Option 3, with codes filled in from the labels you type |
+| Options: Score (only inside a group with a score) | `options[].score` | none |
+| Required | `required` | `false` |
+| Name (only inside a group with a score) | not in the downloaded file | made from the label |
+| Show this question only when… | `enableWhen`, and `enableLogic` with two or more conditions | none |
+
+**As a condition.** Other questions can be shown depending on a multiple choice answer, with is answered, is or is not. You pick the option to compare against from the question's own options. For example, ask for a video link only when the answer is Video.
+
+## Validation and error messages
+
+The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. Once a message shows, it updates as the respondent changes the answer, and it goes when the answer is fixed.
+
+| Situation | Message |
+|---|---|
+| Required, and no option chosen | "How would you like to attend sessions?" is required. (the question's own label, in quotation marks) |
+
+Selecting the chosen option again clears the answer.
+
+## Accessibility
+
+What the rendered form exposes to assistive technology:
+
+- The question is a group (`<fieldset>`) named by its label (`<legend>`). Each option is a native radio button, named by its option label.
+- The group's description (`aria-describedby`) is "Required", on a required question, then the help text, then any error. The red asterisk is hidden from assistive technology, so it is never read out as part of the name.
+- After a failed check, the group has `aria-invalid="true"`.
+
+| Check | Status |
+|---|---|
+| Automated: axe, WCAG 2.2 A and AA | No violations on the live example above, in light and dark, with and without its error shown. Checked by the docs' own tests. |
+| Contrast | Covered by axe's contrast rule in the same tests: the renderer's default colours, light and dark. |
+| Screen reader | [TODO: not tested with a screen reader yet.] |
+
+## Troubleshooting
+
+**A condition on the question never passes while it is unanswered.** Every comparison except is answered needs an answer to compare against, so is not In person is false until something is chosen.
+
+**Stored answers stopped matching after an edit.** A code was changed after the form was in use. Answers already stored keep the old code.
+
+**Apply stays off when importing options.** A row has a missing label, an invalid code, or a code or label that is already in the file or in the list. Fix the file and choose it again.

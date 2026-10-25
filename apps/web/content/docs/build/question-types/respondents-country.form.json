@@ -1,0 +1,14 @@
+{
+  "title": "Respondent's country example",
+  "formId": "a97866a0-5a6f-4ab4-ab17-201e93bf3ee6",
+  "formVersionId": "f25c62d9-fbcc-4680-935e-234384a62256",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "country",
+      "type": "country",
+      "label": "Country of residence",
+      "required": true
+    }
+  ]
+}

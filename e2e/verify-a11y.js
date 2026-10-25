@@ -74,12 +74,15 @@ const GROUP_TEMPLATE = { id: "tg", type: "group", label: "Smoking history", bloc
 const DOCS_ERROR_PAGES = [
   ["Short answer", "/docs/build/question-types/short-answer"],
   ["Long answer", "/docs/build/question-types/long-answer"],
+  ["Multiple choice", "/docs/build/question-types/multiple-choice"],
+  ["Checkboxes", "/docs/build/question-types/checkboxes"],
   ["Number", "/docs/build/question-types/number"],
   ["Email", "/docs/build/question-types/email"],
   ["Phone number", "/docs/build/question-types/phone-number"],
   ["Link", "/docs/build/question-types/link"],
   ["Date", "/docs/build/question-types/date"],
   ["Time", "/docs/build/question-types/time"],
+  ["Respondent's country", "/docs/build/question-types/respondents-country"],
 ];
 
 // The docs home and every page (docs/briefs/BUILDER-BRIEF-DOCS.md and BUILDER-BRIEF-DOCS-QUESTIONS.md).

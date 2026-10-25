@@ -13,7 +13,7 @@ next: /docs/build/question-types/time
 
 ## When to use
 
-Use a date when the answer is a day on the calendar: a date of birth, the date of a last visit, a preferred start date. The respondent uses the browser's own date field, so every answer is stored the same way, whatever order the respondent writes dates in.
+Use a date when the answer is a day on the calendar: a date of birth, the date of a last visit, a preferred start date. The respondent picks the date in the browser's own date field, which shows dates the way their browser does. Every answer is stored the same way, as year, month and day, whatever the field shows.
 
 Use something else when:
 
@@ -45,7 +45,7 @@ You need a form open in the editor.
 
 The builder has no setting for an earliest or latest date.
 
-**As a condition.** Other questions can be shown depending on a date, with is answered, is or is not. For is and is not, type the date as year, month and day, such as `2026-10-25`, which is how the answer is stored. There is no before or after: to show a question to respondents under 18, ask their age with a Number question and use is less than 18.
+**As a condition.** Other questions can be shown depending on a date, with is answered, is or is not. For is and is not, you type the date to compare against in the condition's answer box in the builder. Type it as year, month and day, such as `2026-10-25`, which is how the answer is stored. Respondents never type this: they pick their date in the date field. There is no before or after: to show a question to respondents under 18, ask their age with a Number question and use is less than 18.
 
 ## Validation and error messages
 
@@ -74,6 +74,6 @@ What the rendered form exposes to assistive technology:
 
 ## Troubleshooting
 
-**A condition with is never matches.** The date to compare against must be written as year-month-day, such as `2026-10-25`. A date written another way, such as 25/10/2026, never matches.
+**A condition with is never matches.** The date you typed in the condition's answer box must be year-month-day, such as `2026-10-25`. A date written another way, such as 25/10/2026, never matches, whatever the respondent picks.
 
 **The review page shows the date differently from the date field.** The review page writes the date out in the respondent's browser language. The answer stored is the same either way: year, month and day.

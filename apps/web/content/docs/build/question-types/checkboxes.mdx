@@ -1,0 +1,95 @@
+---
+title: Checkboxes
+summary: Any number of answers from a short list, each with its own checkbox.
+template: question-type
+badges: [Coded options]
+appliesTo: [builder, package]
+updated: 2026-10-25
+prev: /docs/build/question-types/multiple-choice
+next: /docs/build/question-types/number
+---
+
+<LiveExample form="checkboxes" />
+
+## When to use
+
+Use checkboxes when more than one answer can apply, and the respondent ticks every one that does: the days they can attend, the services they have used, the languages they speak. Every option is on the page.
+
+Use something else when:
+
+- **Only one answer can apply.** Use Multiple choice, or Dropdown for a long list.
+- **The order of the answers matters.** Use Ranking.
+- **Each option needs its own answer,** such as how often for each of several things. Use Matrix.
+
+### Multi-select
+
+The insert menu also offers **Multi-select**. It currently looks and behaves the same as Checkboxes for respondents: the same checkboxes, the same messages and the same conditions. Its settings are the same too; only its starting label is different, "Select all that apply".
+
+## Add it in the builder
+
+You need a form open in the editor.
+
+1. Below the last block, select **+** (Insert a block), or type `/` in the line beside it.
+2. Under **Questions**, choose **Checkboxes**. The question is added and its settings open.
+<Gif alt="Inserting a Checkboxes question from the block menu" />
+3. In **Label**, write the question. Say in it, or in **Help text**, that the respondent can tick more than one.
+4. Under **Options**, replace Option 1, Option 2 and Option 3 with your own labels. When you leave a label you have changed, the builder fills in its code. Use **Add option** for more, or **Import from file** for a list you already have.
+<Gif alt="Typing option labels and seeing their codes appear" />
+5. Turn on **Required** if at least one option must be ticked.
+6. Select **Save**.
+
+<Note>
+Within one list, no two codes may be the same, ignoring case, and no two labels either. A code is 1 to 64 letters, digits, `.`, `-` or `_`, starting with a letter or digit.
+</Note>
+
+<Note>
+Changing a code after the form is in use will not match answers already stored under the old code. Conditions in the form that use it are updated for you.
+</Note>
+
+## Settings
+
+| Builder setting | Schema property | Default |
+|---|---|---|
+| Label | `label` | "Checkboxes" (Multi-select: "Select all that apply") |
+| Help text | `description` | none; left out of the file when empty |
+| Options: Code and Label | `options[].code`, `options[].label` | Option 1, Option 2 and Option 3, with codes filled in from the labels you type |
+| Options: Score (only inside a group with a score) | `options[].score` | none |
+| Required | `required` | `false` |
+| Name (only inside a group with a score) | not in the downloaded file | made from the label |
+| Show this question only when… | `enableWhen`, and `enableLogic` with two or more conditions | none |
+
+There is no setting for the fewest or most options a respondent may tick.
+
+**As a condition.** Other questions can be shown depending on checkboxes, with is answered or includes. Includes is true when the respondent ticked the option you pick, whatever else they ticked. For example, ask for a preferred time on Fridays only when the answer includes Friday.
+
+## Validation and error messages
+
+The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. Once a message shows, it updates as the respondent changes the answer, and it goes when the answer is fixed.
+
+| Situation | Message |
+|---|---|
+| Required, and nothing ticked | "Which days can you usually attend?" is required. (the question's own label, in quotation marks) |
+
+Unticking every option clears the answer. On the review page of a form with pages, the ticked options are listed in the order the respondent ticked them, separated by commas.
+
+## Accessibility
+
+What the rendered form exposes to assistive technology:
+
+- The question is a group (`<fieldset>`) named by its label (`<legend>`). Each option is a native checkbox, named by its option label.
+- The group's description (`aria-describedby`) is "Required", on a required question, then the help text, then any error. The red asterisk is hidden from assistive technology, so it is never read out as part of the name.
+- After a failed check, the group has `aria-invalid="true"`.
+
+| Check | Status |
+|---|---|
+| Automated: axe, WCAG 2.2 A and AA | No violations on the live example above, in light and dark, with and without its error shown. Checked by the docs' own tests. |
+| Contrast | Covered by axe's contrast rule in the same tests: the renderer's default colours, light and dark. |
+| Screen reader | [TODO: not tested with a screen reader yet.] |
+
+## Troubleshooting
+
+**There is no is or is not for checkboxes.** A condition on checkboxes asks whether one particular option was ticked, whatever else was: use includes.
+
+**Stored answers stopped matching after an edit.** A code was changed after the form was in use. Answers already stored keep the old code.
+
+**Apply stays off when importing options.** A row has a missing label, an invalid code, or a code or label that is already in the file or in the list. Fix the file and choose it again.

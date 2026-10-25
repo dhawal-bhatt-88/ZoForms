@@ -1,0 +1,81 @@
+---
+title: Respondent's country
+summary: One country, picked by the respondent from a fixed list of 15 countries and Other.
+template: question-type
+badges: []
+appliesTo: [builder, package]
+updated: 2026-10-25
+prev: /docs/build/question-types/time
+next: /docs/build/show-questions-conditionally
+---
+
+<LiveExample form="respondents-country" />
+
+## When to use
+
+Use Respondent's country when you ask which country the respondent lives in, and the countries you work with are on its list. The respondent picks one from a select menu. The list comes with the form and can't be edited:
+
+United States, United Kingdom, Canada, Australia, India, Germany, France, Netherlands, Spain, Italy, Brazil, Mexico, Japan, Singapore, United Arab Emirates, Other.
+
+Use something else when:
+
+- **You need a country that isn't on the list,** or every country. Use Dropdown, with your own list of countries; **Import from file** takes a whole list at once.
+- **You need a region, state or city.** Use Dropdown with your own list, or Short answer.
+
+## Add it in the builder
+
+You need a form open in the editor.
+
+1. Below the last block, select **+** (Insert a block), or type `/` in the line beside it.
+2. Under **Advanced**, choose **Respondent's country**. Typing `country` in the search box finds it too. The question is added and its settings open.
+<Gif alt="Inserting a Respondent's country question from the block menu" />
+3. In **Label**, write the question.
+4. Add **Help text** if the respondent needs to know which country you mean, such as where they live now.
+5. Turn on **Required** if the question must be answered.
+6. Select **Save**.
+
+## Settings
+
+| Builder setting | Schema property | Default |
+|---|---|---|
+| Label | `label` | "Country" |
+| Help text | `description` | none; left out of the file when empty |
+| Required | `required` | `false` |
+| Name (only inside a group with a score) | not in the downloaded file | made from the label |
+| Show this question only when… | `enableWhen`, and `enableLogic` with two or more conditions | none |
+
+The answer is stored as the country's name, exactly as it is in the list.
+
+**As a condition.** Other questions can be shown depending on the country, with is answered, is or is not. You pick the country to compare against from the same list. For example, ask for a ZIP code only when the country is United States.
+
+## Validation and error messages
+
+The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. Once a message shows, it updates as the respondent changes the answer, and it goes when the answer is fixed.
+
+| Situation | Message |
+|---|---|
+| Required, and no country chosen | "Country of residence" is required. (the question's own label, in quotation marks) |
+
+Choosing "Select a country…" again clears the answer.
+
+## Accessibility
+
+What the rendered form exposes to assistive technology:
+
+- The question is a native `<select>`, named by its label.
+- The first entry, "Select a country…", means no answer.
+- Help text, then any error, are linked to the select as its description (`aria-describedby`).
+- A required question has the native `required` attribute. The red asterisk is hidden from assistive technology, so it is never read out as part of the name.
+- After a failed check, the select has `aria-invalid="true"`.
+
+| Check | Status |
+|---|---|
+| Automated: axe, WCAG 2.2 A and AA | No violations on the live example above, in light and dark, with and without its error shown. Checked by the docs' own tests. |
+| Contrast | Covered by axe's contrast rule in the same tests: the renderer's default colours, light and dark. |
+| Screen reader | [TODO: not tested with a screen reader yet.] |
+
+## Troubleshooting
+
+**The canvas says "Auto-detected country".** Nothing is detected: respondents pick their country from the list themselves.
+
+**The respondent's country isn't on the list.** They can choose Other. If you need their actual country, use Dropdown with your own list instead.

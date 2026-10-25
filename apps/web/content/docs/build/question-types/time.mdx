@@ -6,14 +6,14 @@ badges: []
 appliesTo: [builder, package]
 updated: 2026-10-25
 prev: /docs/build/question-types/date
-next: /docs/build/show-questions-conditionally
+next: /docs/build/question-types/respondents-country
 ---
 
 <LiveExample form="time" />
 
 ## When to use
 
-Use a time when the answer is a time of day: a preferred appointment time, when medication is usually taken, the time of an incident. The respondent uses the browser's own time field, so every answer is stored the same way, on the 24-hour clock.
+Use a time when the answer is a time of day: a preferred appointment time, when medication is usually taken, the time of an incident. The respondent picks the time in the browser's own time field, which shows times the way their browser does. Every answer is stored the same way, on the 24-hour clock, whatever the field shows.
 
 Use something else when:
 
@@ -45,7 +45,7 @@ You need a form open in the editor.
 
 The builder has no setting for an earliest or latest time.
 
-**As a condition.** Other questions can be shown depending on a time, with is answered, is or is not. For is and is not, type the time on the 24-hour clock, with two digits each for hours and minutes, such as `14:30`, which is how the answer is stored. There is no before or after.
+**As a condition.** Other questions can be shown depending on a time, with is answered, is or is not. For is and is not, you type the time to compare against in the condition's answer box in the builder. Type it on the 24-hour clock, with two digits each for hours and minutes, such as `14:30`, which is how the answer is stored. Respondents never type this: they pick their time in the time field. There is no before or after.
 
 ## Validation and error messages
 
@@ -72,4 +72,4 @@ What the rendered form exposes to assistive technology:
 
 ## Troubleshooting
 
-**A condition with is never matches.** The time to compare against must be on the 24-hour clock with two digits each, such as `09:00` or `14:30`. "9:00" and "2:30 pm" never match.
+**A condition with is never matches.** The time you typed in the condition's answer box must be on the 24-hour clock with two digits each, such as `09:00` or `14:30`. "9:00" and "2:30 pm" never match, whatever the respondent picks.

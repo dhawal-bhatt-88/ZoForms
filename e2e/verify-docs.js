@@ -18,7 +18,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const PAGES = [
   ["docs-home", "/docs"],
   ["dropdown", "/docs/build/question-types/dropdown"],
-  ...["short-answer", "long-answer", "number", "email", "phone-number", "link", "date", "time"].map((n) => [n, `/docs/build/question-types/${n}`]),
+  ...["short-answer", "long-answer", "multiple-choice", "checkboxes", "number", "email", "phone-number", "link", "date", "time", "respondents-country"].map((n) => [n, `/docs/build/question-types/${n}`]),
   ["show-questions-conditionally", "/docs/build/show-questions-conditionally"],
   ["form-renderer", "/docs/integrate/reference/form-renderer"],
   ["follow-up-question", "/docs/examples/follow-up-question"],
@@ -148,9 +148,9 @@ const THEMES = ["light", "dark"];
       await says("link", "Referring practice's website", "example.org", "Enter a valid URL, including https://.");
 
       // Once shown, a message follows the answer and goes when it is fixed.
-      await P.getByLabel("Referring practice's website", { exact: true }).fill("mailto:intake@example.org");
+      await P.getByLabel("Referring practice's website", { exact: true }).fill("https://example.org");
       await P.waitForTimeout(300);
-      check("link: the message goes once the answer is fixed, and mailto: passes", (await errorsOf()).length === 0, (await errorsOf()).join(" | "));
+      check("link: the message goes once the answer is fixed", (await errorsOf()).length === 0, (await errorsOf()).join(" | "));
 
       const label = "How many times have you seen a therapist or counselor in the past 12 months?";
       await answerWith("number", label, (box) => box.pressSequentially("e"));
@@ -164,6 +164,30 @@ const THEMES = ["light", "dark"];
         const payload = await P.getByRole("tabpanel").textContent();
         check(`${name}: stored as ${typed}`, payload.includes(`"${typed}"`), payload.slice(0, 200));
       }
+
+      // Multiple choice: selecting the chosen option again clears the answer.
+      await load(P, urlOf("multiple-choice"));
+      await P.getByRole("radio", { name: "Video" }).click();
+      await P.getByRole("radio", { name: "Video" }).click();
+      await submit();
+      await P.waitForTimeout(300);
+      const choiceErrors = await errorsOf();
+      check("multiple-choice: selecting the chosen option again clears it", choiceErrors.includes('"How would you like to attend sessions?" is required.'), choiceErrors.join(" | "));
+
+      // Checkboxes: the answer keeps the order the options were ticked in.
+      await load(P, urlOf("checkboxes"));
+      for (const day of ["Thursday", "Monday"]) await P.getByRole("checkbox", { name: day }).check();
+      await submit();
+      await P.getByText("Form submitted successfully.").waitFor();
+      await P.getByRole("tab", { name: "Payload" }).click();
+      const ticked = (await P.getByRole("tabpanel").textContent()).replace(/\s+/g, "");
+      check("checkboxes: ticked in order Thursday, Monday", ticked.includes('["thursday","monday"]'), ticked.slice(0, 300));
+
+      // Respondent's country: the list the page gives, after "Select a country…".
+      await load(P, urlOf("respondents-country"));
+      const countries = await P.getByLabel("Country of residence", { exact: true }).locator("option").allTextContents();
+      const listed = ["Select a country…", "United States", "United Kingdom", "Canada", "Australia", "India", "Germany", "France", "Netherlands", "Spain", "Italy", "Brazil", "Mexico", "Japan", "Singapore", "United Arab Emirates", "Other"];
+      check("respondents-country: the list the page gives", JSON.stringify(countries) === JSON.stringify(listed), countries.join(", "));
       await ctx.close();
     }
 

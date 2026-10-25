@@ -77,4 +77,4 @@ What the rendered form exposes to assistive technology:
 
 **"Enter a valid URL, including https://." for an address that looks right.** The address has no scheme, as in example.org. The form doesn't add `https://` for the respondent, so ask for it in the help text.
 
-**An answer that isn't a website was accepted.** The check accepts any complete address, whatever its scheme, so `mailto:` and `tel:` addresses pass too.
+**An answer that isn't a web address was accepted.** The check asks only for a complete address, not for a web address, so an answer that starts with something other than `https://` or `http://` can get through. That includes `javascript:` addresses, which aren't safe to open. Treat every Link answer as text the respondent typed: before anyone opens one, or shows it as a link, check that it starts with `https://`. [TODO: the Link check is to be tightened so it accepts web addresses only.]

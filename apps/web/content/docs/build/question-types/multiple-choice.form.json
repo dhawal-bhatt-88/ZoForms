@@ -1,0 +1,28 @@
+{
+  "title": "Multiple choice example",
+  "formId": "d4d7c65c-6198-483d-ab5e-0b364c9cd35c",
+  "formVersionId": "88ec9fe4-9efe-43f4-bfcf-25436e18894a",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "attend_format",
+      "type": "choice",
+      "label": "How would you like to attend sessions?",
+      "required": true,
+      "options": [
+        {
+          "code": "in_person",
+          "label": "In person"
+        },
+        {
+          "code": "video",
+          "label": "Video"
+        },
+        {
+          "code": "phone",
+          "label": "Phone"
+        }
+      ]
+    }
+  ]
+}

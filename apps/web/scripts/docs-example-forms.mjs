@@ -94,6 +94,16 @@ const FORMS = [
     title,
     blocks: [{ ...block, required: true }],
   })),
+  // The choice types (CP2).
+  ...[
+    ["multiple-choice", "Multiple choice example", { id: "attend_format", type: "choice", label: "How would you like to attend sessions?", options: options("In person", "Video", "Phone") }],
+    ["checkboxes", "Checkboxes example", { id: "available_days", type: "checkbox", label: "Which days can you usually attend?", options: options("Monday", "Tuesday", "Wednesday", "Thursday", "Friday") }],
+    ["respondents-country", "Respondent's country example", { id: "country", type: "country", label: "Country of residence" }],
+  ].map(([name, title, block]) => ({
+    file: `build/question-types/${name}.form.json`,
+    title,
+    blocks: [{ ...block, required: true }],
+  })),
 ];
 
 // Only the files named on the command line, if any, so building a new example
