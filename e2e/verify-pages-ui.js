@@ -289,8 +289,8 @@ const SINGLE = {
     await P.screenshot({ path: `${OUT}/pages-4a-convert-confirm.png` });
     await confirmDialog.getByRole("button", { name: "Add pages" }).click();
     const c1 = await structure();
-    check("converting wraps everything into Page 1 and adds an empty Page 2",
-      c1 === "[Untitled page] |   Your name |   Contact |     Email address |   Comments | [Untitled page]", c1);
+    check('converting wraps everything into Page 1 and adds an empty Page 2, titled "Page 1" and "Page 2"',
+      c1 === "[Page 1] |   Your name |   Contact |     Email address |   Comments | [Page 2]", c1);
     const secondId = await P.locator("[data-page-box]").nth(1).getAttribute("data-page-box");
     check("Page 2 is selected and says it's empty", (await P.locator("aside h2").first().textContent()) === "Page"
       && await pageBox(secondId).getByRole("button", { name: '"this page" is empty — add a block to it' }).count() === 0
@@ -300,7 +300,7 @@ const SINGLE = {
     await P.screenshot({ path: `${OUT}/pages-4b-convert-result.png` });
     check('"Add page" now adds after the current page', await P.getByRole("button", { name: 'Add page after "Follow-up"' }).isVisible());
     await P.getByRole("button", { name: 'Add page after "Follow-up"' }).click();
-    check("…a third page, after Page 2", (await structure()).endsWith("[Follow-up] | [Untitled page]"));
+    check('…a third page, after Page 2, titled "Page 3"', (await structure()).endsWith("[Follow-up] | [Page 3]"), await structure());
     // Down to one page: the page menu offers Remove pages instead of delete.
     for (const n of [2, 1]) {
       const id = await P.locator("[data-page-box]").nth(n).getAttribute("data-page-box");

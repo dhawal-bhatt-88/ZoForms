@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import {
   blockName,
+  COUNTRY_OPTIONS,
   isGrid,
   isGroup,
   isPage,
@@ -145,12 +146,19 @@ export function BlockPreview({ block }: { block: Block }) {
       </div>
     );
   if (block.type === "hidden")
-    return <div className={box}>Hidden field — not shown to respondents</div>;
+    // No longer offered in the insert menu: the renderer does nothing with it yet.
+    return <div className={box}>Hidden field — not shown to respondents, and no value is collected or submitted yet.</div>;
   if (block.type === "country")
+    // What respondents see: a select of the renderer's countries, then Other.
     return (
-      <div className={`${box} flex items-center justify-between`}>
-        <span>Auto-detected country</span>
-        <Globe className="h-4 w-4" />
+      <div>
+        <div className={`${box} flex items-center justify-between`}>
+          <span>Select a country…</span>
+          <ChevronDown className="h-4 w-4" />
+        </div>
+        <p className="mt-1.5 text-[0.75rem] text-graphite">
+          {COUNTRY_OPTIONS.length - 1} countries, and Other
+        </p>
       </div>
     );
 

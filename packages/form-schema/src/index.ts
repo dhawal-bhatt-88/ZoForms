@@ -1272,7 +1272,8 @@ export function newBlock(
   // Presentational blocks have no `required` at all (contract §1); a grid has one per column (§14.1).
   if (!isPresentationalType(type) && type !== "grid") block.required = false;
   // Placeholders start with empty codes; each is generated from the label the author types (§13.3).
-  if (OPTION_TYPES.includes(type)) block.options = placeholderOptions("Option", 3);
+  // A matrix's options are its rows, so they are placeholdered as rows, as a grid's are.
+  if (OPTION_TYPES.includes(type)) block.options = placeholderOptions(type === "matrix" ? "Row" : "Option", 3);
   if (type === "matrix") block.columns = placeholderOptions("Column", 3);
   if (type === "grid") {
     block.rows = placeholderOptions("Row", 3);
@@ -1364,14 +1365,25 @@ export function newGroup(taken?: Iterable<string>, label = DEFAULT_GROUP_LABEL):
 /** What turning "Repeats" on writes (contract §12.1); the author can change both. */
 export const REPEAT_DEFAULTS = { repeatLabel: "item", minOccurs: 1 } as const;
 
-/** The title a new page gets (contract §2.5). */
-export const DEFAULT_PAGE_TITLE = "Untitled page";
+/**
+ * The title a new page gets (contract §2.5): "Page n", where n is the number of
+ * pages once it is added, raised to the next number no other page's title uses.
+ * Pass the form's root blocks as they are before the page is added.
+ */
+export function newPageTitle(blocks: readonly Block[]): string {
+  const pages = blocks.filter(isPage);
+  const used = new Set(pages.map((p) => p.title.trim().toLowerCase()));
+  let n = pages.length + 1;
+  while (used.has(`page ${n}`)) n += 1;
+  return `Page ${n}`;
+}
 
 /**
  * Create an empty page. It must be given at least one block before the form
- * can be saved. Pass every id in the form (`allBlockIds`) as `taken`.
+ * can be saved. Pass every id in the form (`allBlockIds`) as `taken`, and its
+ * title from `newPageTitle` unless it has one of its own.
  */
-export function newPage(taken?: Iterable<string>, title = DEFAULT_PAGE_TITLE): PageBlock {
+export function newPage(taken?: Iterable<string>, title = newPageTitle([])): PageBlock {
   // No `label` at runtime: see PageBlock.label.
   return { id: newBlockId(taken), type: "page", title, blocks: [] } as unknown as PageBlock;
 }
@@ -1686,11 +1698,11 @@ function rootPageIndex(blocks: readonly Block[], pageId: string): number {
 
 /**
  * "Make paged": wrap every root block of a form without pages into one page,
- * titled "Untitled page". Pass every id in the form as `taken` (defaults to them).
+ * titled "Page 1". Pass every id in the form as `taken` (defaults to them).
  */
 export function makePaged(blocks: readonly Block[], taken: Iterable<string> = allBlockIds(blocks)): Block[] {
   if (isPaged(blocks)) throw new Error("This form already has pages.");
-  return [{ ...newPage(taken), blocks: [...blocks] }];
+  return [{ ...newPage(taken, newPageTitle(blocks)), blocks: [...blocks] }];
 }
 
 /** Insert `page` directly after page `afterPageId`. */

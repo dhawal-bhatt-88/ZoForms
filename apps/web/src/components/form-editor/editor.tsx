@@ -39,7 +39,6 @@ import {
   canInsertAsPage,
   answerCode,
   applyImport,
-  BLOCK_META,
   blockName,
   canBeRequired,
   columnTypeChangeWarning,
@@ -91,6 +90,7 @@ import {
   newConditionId,
   newGroup,
   newPage,
+  newPageTitle,
   normalizeConditions,
   normalizeScores,
   pageContentsDestination,
@@ -131,7 +131,6 @@ import {
   walkBlocks,
   withColumnType,
   withOptionList,
-  type AnyBlockType,
   type Block,
   type Condition,
   type Score,
@@ -161,6 +160,7 @@ import {
   type MoveTarget,
 } from "@/lib/tree-dnd";
 import { inspectorHeading, logicNoun } from "@/lib/inspector";
+import { CATALOG_BLOCK_COUNT, catalogLabel, matchCatalog, type CatalogItem } from "@/lib/block-catalog";
 import { parseCount, repeatBadgeText, repeatPreviewText } from "@/lib/repeat-settings";
 import { OptionImportDialog } from "@/components/option-import-dialog";
 import { CodeChangeNote, OptionListEditor } from "@/components/option-list-editor";
@@ -212,81 +212,6 @@ import {
 /** A notice's meaning: an edit refused, a save or download failed, or a neutral note. */
 type NoticeTone = "warn" | "fail" | "info";
 
-type CatalogItem = {
-  // Pages are added with their own control, never from the block menu.
-  type: Exclude<AnyBlockType, "page">;
-  label?: string;
-  keywords?: string;
-  level?: number;
-  /** "From template…": opens the template picker instead of adding a block. */
-  template?: true;
-};
-
-/** The slash-menu block catalog, grouped by category. */
-const CATALOG: { group: string; items: CatalogItem[] }[] = [
-  {
-    group: "Structure",
-    items: [
-      { type: "group", label: "Group", keywords: "section fieldset container nest" },
-      { type: "group", label: "From template…", keywords: "template saved reuse library", template: true },
-    ],
-  },
-  {
-    group: "Questions",
-    items: [
-      { type: "short" },
-      { type: "long" },
-      { type: "choice", keywords: "multiple radio" },
-      { type: "checkbox" },
-      { type: "dropdown", keywords: "select" },
-      { type: "multiselect", keywords: "tags multiple" },
-      { type: "number" },
-      { type: "email" },
-      { type: "phone", keywords: "mobile" },
-      { type: "link", keywords: "url website" },
-      { type: "date" },
-      { type: "time" },
-      { type: "scale", keywords: "linear nps" },
-      // Before Matrix, whose keywords include "grid": "grid" + Enter picks the first match.
-      { type: "grid", keywords: "table cells columns" },
-      { type: "matrix", keywords: "grid table" },
-      { type: "rating", keywords: "stars" },
-      { type: "ranking", keywords: "order rank" },
-    ],
-  },
-  {
-    group: "Layout",
-    items: [
-      { type: "text", keywords: "paragraph" },
-      { type: "heading", label: "Heading 1", level: 1, keywords: "h1 title" },
-      { type: "heading", label: "Heading 2", level: 2, keywords: "h2" },
-      { type: "heading", label: "Heading 3", level: 3, keywords: "h3" },
-      { type: "divider", keywords: "separator line hr" },
-      { type: "title" },
-      { type: "label" },
-    ],
-  },
-  {
-    group: "Media",
-    items: [
-      { type: "image", keywords: "picture photo" },
-      { type: "video", keywords: "youtube vimeo mp4 webm" },
-      { type: "audio", keywords: "sound" },
-    ],
-  },
-  {
-    group: "Advanced",
-    items: [
-      { type: "hidden", keywords: "hidden field prefill" },
-      { type: "country", keywords: "geo location" },
-    ],
-  },
-];
-
-function catalogLabel(item: CatalogItem): string {
-  return item.label ?? (item.type === "group" ? "Group" : BLOCK_META[item.type].label);
-}
-
 /**
  * The insert menu: a ZoBlocks popover holding a search box and the catalog,
  * filtered as the author types. The ARIA combobox pattern: focus stays in the
@@ -310,14 +235,7 @@ function BlockMenu({
   const baseId = useId();
   const [active, setActive] = useState(0);
   const q = query.trim().toLowerCase();
-  const groups = CATALOG.map((g) => ({
-    group: g.group,
-    items: g.items.filter((it) => {
-      if (!q) return true;
-      const label = catalogLabel(it).toLowerCase();
-      return label.includes(q) || (it.keywords || "").includes(q) || it.type.includes(q);
-    }),
-  })).filter((g) => g.items.length > 0);
+  const groups = matchCatalog(q);
 
   const flat = groups.flatMap((g) => g.items);
   const optionId = (i: number) => `${baseId}-option-${i}`;
@@ -1931,7 +1849,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     let next: Block[];
     if (as === "page") {
       if (insertAsPageRefusal()) return;
-      const page = pageForTemplateGroup(group, allBlockIds(schema.blocks));
+      const page = pageForTemplateGroup(group, allBlockIds(schema.blocks), schema.blocks);
       const after = currentPageId();
       next = after ? insertPageAfter(schema.blocks, after, page) : [page];
     } else {
@@ -2561,7 +2479,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     }
     const after = currentPageId();
     if (!after) return;
-    const page = newPage(allBlockIds(schema.blocks));
+    const page = newPage(allBlockIds(schema.blocks), newPageTitle(schema.blocks));
     patch((s) => ({ ...s, blocks: insertPageAfter(s.blocks, after, page) }));
     setSelectedId(page.id);
     say("Added a page.");
@@ -2572,7 +2490,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     if (!schema) return;
     setConfirmPaging(false);
     const wrapped = makePaged(schema.blocks);
-    const second = newPage(allBlockIds(wrapped));
+    const second = newPage(allBlockIds(wrapped), newPageTitle(wrapped));
     patch((s) => ({ ...s, blocks: insertPageAfter(wrapped, wrapped[0].id, second) }));
     setSelectedId(second.id);
     say("Split into pages: your questions are on Page 1, and Page 2 is empty.");
@@ -3191,7 +3109,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                   <span className="font-display text-[1.0625rem] font-semibold tracking-[-0.015em] text-ink">Add your first block</span>
                   <span className="body-sm max-w-[52ch] text-graphite">
                     Type <kbd className="rounded border border-rule-strong bg-paper-sunk px-1.5 font-mono text-[0.75rem] text-ink">/</kbd>{" "}
-                    above or click + to choose from {CATALOG.reduce((n, g) => n + g.items.filter((it) => !it.template).length, 0)} block types.
+                    above or click + to choose from {CATALOG_BLOCK_COUNT} block types.
                   </span>
                 </div>
               )}
@@ -3508,9 +3426,9 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
               {/* Coded lists (contract §13): options, or a matrix's rows and columns. */}
               {OPTION_TYPES.includes(selected.type) &&
                 ([
-                  [{ list: "options" }, selected.type === "matrix" ? "Rows" : "Options", selected.type === "matrix" ? "row" : "option", "Option"],
+                  [{ list: "options" }, selected.type === "matrix" ? "Rows" : "Options", selected.type === "matrix" ? "row" : "option", selected.type === "matrix" ? "Row" : "Option"],
                   ...(selected.type === "matrix" ? [[{ list: "columns" }, "Columns", "column", "Column"]] : []),
-                ] as [OptionListRef, string, string, "Option" | "Column"][]).map(([ref, heading, noun, placeholder]) => (
+                ] as [OptionListRef, string, string, "Option" | "Row" | "Column"][]).map(([ref, heading, noun, placeholder]) => (
                   <OptionListEditor
                     key={ref.list}
                     idPrefix={ref.list}

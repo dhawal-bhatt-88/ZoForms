@@ -15,13 +15,13 @@ import { z } from "zod";
 import {
   describeBlockPath,
   draftsProblem,
-  DEFAULT_PAGE_TITLE,
   formProblems,
   isContainer,
   isGroup,
   isPaged,
   newBlockId,
   newPage,
+  newPageTitle,
   walkBlocks,
   withoutTemplateRefs,
   type Block,
@@ -253,11 +253,12 @@ export function groupFromTemplate(template: TemplateSource<GroupBlock>, taken: I
 /**
  * "Insert as page" for `group` (from `groupFromTemplate`): a new page, titled
  * with the group's label, holding the group. Pass every id in the form as
- * `taken`; the group's own are added.
+ * `taken`; the group's own are added. Without a label it gets a new page's
+ * title, for which pass the form's root `blocks`.
  */
-export function pageForTemplateGroup(group: GroupBlock, taken: Iterable<string>): PageBlock {
+export function pageForTemplateGroup(group: GroupBlock, taken: Iterable<string>, blocks: readonly Block[] = []): PageBlock {
   const ids = [...taken, ...walkBlocks([group]).map((entry) => entry.block.id)];
-  return { ...newPage(ids, group.label.trim() || DEFAULT_PAGE_TITLE), blocks: [group] };
+  return { ...newPage(ids, group.label.trim() || newPageTitle(blocks)), blocks: [group] };
 }
 
 /** Whether a group template can go in as a page: only in a form with pages, or an empty one. */

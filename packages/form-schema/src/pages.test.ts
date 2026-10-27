@@ -23,6 +23,7 @@ import {
   movePage,
   navigationWithoutDefaults,
   newPage,
+  newPageTitle,
   pageContentsDestination,
   questionNumbers,
   removePaging,
@@ -350,11 +351,11 @@ describe("navigation", () => {
 /* ---------- page edits ---------- */
 
 describe("make paged / add page / remove paging", () => {
-  it("makePaged wraps every root block into one Untitled page", () => {
+  it("makePaged wraps every root block into one page, Page 1", () => {
     const before = [leaf("a"), group("g", [leaf("b")])];
     const after = makePaged(before);
     expect(after).toHaveLength(1);
-    expect(after[0]).toMatchObject({ type: "page", title: "Untitled page", blocks: before });
+    expect(after[0]).toMatchObject({ type: "page", title: "Page 1", blocks: before });
     expect(allBlockIds(before)).not.toContain(after[0].id);
     expect(problemsOf(...after)).toEqual([]);
     expect(() => makePaged(after)).toThrow(/already has pages/);
@@ -362,9 +363,25 @@ describe("make paged / add page / remove paging", () => {
 
   it("insertPageAfter adds a page right after the given one", () => {
     const blocks = threePages();
-    const added = insertPageAfter(blocks, "p1", newPage(allBlockIds(blocks)));
-    expect(added.map((b) => (b.type === "page" ? b.title : b.id))).toEqual(["P1", "Untitled page", "P2", "P3"]);
+    const added = insertPageAfter(blocks, "p1", newPage(allBlockIds(blocks), newPageTitle(blocks)));
+    expect(added.map((b) => (b.type === "page" ? b.title : b.id))).toEqual(["P1", "Page 4", "P2", "P3"]);
     expect(() => insertPageAfter(blocks, "name", newPage())).toThrow();
+  });
+
+  it("a new page is Page n: n is the page count once added, raised past titles already used (contract §2.5)", () => {
+    const titled = (...titles: string[]) => titles.map((t, k) => page(`p${k}`, [leaf(`q${k}`)], { title: t }));
+    expect(newPageTitle([])).toBe("Page 1");
+    expect(newPageTitle([leaf("a")])).toBe("Page 1");
+    // "Split into pages": Page 1 wraps the form, then Page 2 is added after it.
+    const wrapped = makePaged([leaf("a")]);
+    expect(newPageTitle(wrapped)).toBe("Page 2");
+    expect(newPageTitle(titled("Intro", "Details"))).toBe("Page 3");
+    // Taken, whatever the case or spacing: the next free number up.
+    expect(newPageTitle(titled("Page 1", "Page 2"))).toBe("Page 3");
+    expect(newPageTitle(titled("Intro", " page 3 ", "Page 4"))).toBe("Page 5");
+    // A lower free number isn't reused: n never goes below the page count.
+    expect(newPageTitle(titled("Page 5", "Other"))).toBe("Page 3");
+    expect(newPage().title).toBe("Page 1");
   });
 
   it("removePaging unwraps the only page, and refuses with more than one", () => {

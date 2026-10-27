@@ -175,6 +175,8 @@ describe("groupFromTemplate", () => {
     paged = [...paged, p];
     expect(p.title).toBe("House");
     expect(p.blocks).toEqual([g]);
+    // Without a label, it gets a new page's title (contract §2.5).
+    expect(pageForTemplateGroup({ ...g, label: " " }, allBlockIds(paged), [page("first", [leaf("name")])]).title).toBe("Page 2");
     expect(new Set(allBlockIds(paged)).size).toBe(allBlockIds(paged).length);
     expect(formProblems(form(paged))).toEqual([]);
   });

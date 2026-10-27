@@ -115,9 +115,9 @@ describe("fillCodes", () => {
 /* ---------- placeholders and the editor's triggers (contract §13.3, §13.8) ---------- */
 
 describe("placeholders start with empty codes", () => {
-  it("a new block's options and a matrix's columns", () => {
+  it("a new block's options, and a matrix's rows and columns", () => {
     expect(newBlock("choice").options).toEqual(raw(["", "Option 1"], ["", "Option 2"], ["", "Option 3"]));
-    expect(newBlock("matrix").options).toEqual(raw(["", "Option 1"], ["", "Option 2"], ["", "Option 3"]));
+    expect(newBlock("matrix").options).toEqual(raw(["", "Row 1"], ["", "Row 2"], ["", "Row 3"]));
     expect(newBlock("matrix").columns).toEqual(raw(["", "Column 1"], ["", "Column 2"], ["", "Column 3"]));
   });
 
