@@ -1,6 +1,6 @@
 # Groups and Pages — Schema Contract
 
-Status: agreed 25 Sep 2026; amended 5 Oct 2026 for repeating groups (§12, with matching changes in §1–§8); amended 6 Oct 2026 for coded options and option import (§13); amended 7 Oct 2026 for the grid block (§14); amended 9 Oct 2026 for custom condition logic (§15); amended 13 Oct 2026 for host validators (§16); amended 14 Oct 2026 for grid layout by available width (§14.5); amended 14 Oct 2026 for the required marker and ranking announcements (§7); amended 15 Oct 2026 for scoring (§17, with matching changes in §1, §6 and §13.1); amended 15 Oct 2026 for the package rename (`@zoworkhq/forms`, public prefix `zf-`: §7, §8, §12.6, §14.5). Shared by the builder repo and the `@zoworkhq/forms` renderer repo.
+Status: agreed 25 Sep 2026; amended 5 Oct 2026 for repeating groups (§12, with matching changes in §1–§8); amended 6 Oct 2026 for coded options and option import (§13); amended 7 Oct 2026 for the grid block (§14); amended 9 Oct 2026 for custom condition logic (§15); amended 13 Oct 2026 for host validators (§16); amended 14 Oct 2026 for grid layout by available width (§14.5); amended 14 Oct 2026 for the required marker and ranking announcements (§7); amended 15 Oct 2026 for scoring (§17, with matching changes in §1, §6 and §13.1); amended 15 Oct 2026 for the package rename (`@zoworkhq/forms`, public prefix `zf-`: §7, §8, §12.6, §14.5); amended 27 Oct 2026 for new page titles (§2.5) and builder-only save rules for scale and number (§6). Shared by the builder repo and the `@zoworkhq/forms` renderer repo.
 Both implementations must follow this file exactly. Change it here first, then in both repos.
 
 ## 1. Shapes
@@ -40,7 +40,7 @@ navigation?: {
 2. `page` may appear only at the root — never inside a group or another page.
 3. If any root item is a page, **every** root item must be a page (no mixed root).
 4. Block ids are unique across the whole tree, including group and page ids.
-5. `label` (group) and `title` (page) are required and non-blank. The builder defaults them to "Untitled group" / "Untitled page".
+5. `label` (group) and `title` (page) are required and non-blank. The builder defaults a new group's label to "Untitled group". It titles a new page "Page n", where n is the number of pages once it is added, raised to the next number no other page's title uses; "Split into pages" gives "Page 1" and "Page 2".
 6. Empty group or page (`blocks: []`): **builder rejects at save**; **renderer renders nothing** for it (does not throw).
 7. **Effectively empty:** a group or page with no *displayable* descendant — every descendant is hidden by conditions, or is a `hidden`-type block, a `text` block with blank `content`, an `image` block without a valid source (see §9), a `video` block without a recognised source (see §10), or an `audio` block without a recognised source (see §11) — is treated as not visible. Its heading and rule are not rendered. In paged mode, such a page is skipped and not counted in progress. This is computed in `/core`, not in `/react`. It has no effect on the payload.
    - **Repeating groups:** decided on the group's template (its `blocks`), not on its instances. A repeating group whose template has a displayable descendant (ignoring that descendant's own conditions, which are evaluated per instance) is displayable even with zero instances, because its Add button must show.
@@ -90,6 +90,11 @@ The builder rejects these at save (400 naming the block). The renderer throws at
 - any §17.6 scoring rule broken.
 
 `repeatLabel`, `minOccurs` and `maxOccurs` on a group without `repeats: true` are ignored, not rejected.
+
+**Builder only.** The builder also rejects these at save (400 naming the block). The renderer does not throw for them and renders such a schema as it does today: a scale with `min` above `max` shows no points, and one with more than 20 points shows the first 20.
+
+- a `scale` whose `min` or `max` is not a whole number, whose `min` is greater than its `max`, or that has more than 20 points (`max − min + 1`); an absent `min` counts as 1 and an absent `max` as 5;
+- a `number` whose `min` is greater than its `max`.
 
 ## 7. Rendering (renderer only)
 
