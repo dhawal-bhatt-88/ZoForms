@@ -1,0 +1,116 @@
+---
+title: Pages, progress and review
+summary: Split a form into pages shown one at a time, with a progress caption or bar and a review page before submit.
+template: how-to
+badges: [Structure]
+appliesTo: [builder, package]
+updated: 2026-10-27
+prev: /docs/build/structure/repeating-groups
+next: /docs/build/show-questions-conditionally
+---
+
+<LiveExample form="pages" />
+
+## When you'd use this
+
+Use pages when a form is long enough that one screen of questions would be a lot to take in, or falls into clear steps. The respondent sees one page at a time, with **Next** and **Back**, and can check every answer on a review page before submitting. The example above has three pages, About you, Contact and Your visit, with a progress bar and a review page. Try an age under 18 on the first page.
+
+<UseCases>
+<UseCase title="Steps in order">
+An intake form in three steps: about the client, how to contact them, and the reason for the visit.
+</UseCase>
+<UseCase title="A page only some respondents see">
+A page for a parent or guardian, shown only when the client's age is under 18. Hidden pages are skipped and not counted in the progress.
+</UseCase>
+<UseCase title="A last check">
+A review page that lists every answer, page by page, with a button to change each page, before the respondent submits.
+</UseCase>
+</UseCases>
+
+## Before you start
+
+- You need a form open in the editor.
+- **Once a form has pages, everything in it is on a page.** Pages can't sit inside a group or another page, and there's nothing between pages.
+- **The first page is always shown,** so it can't have conditions. Every other page can.
+- Pages don't repeat; use a [repeating group](/docs/build/structure/repeating-groups) on a page instead.
+
+## Steps
+
+### Split the form into pages
+
+1. Below the canvas, select **Add page**.
+2. If the form already has blocks, the builder asks "Split this form into pages?": your questions move to Page 1, and an empty Page 2 is added after it. Select **Add pages**.
+3. Give each page a **Title**, in its settings or in the title box at the top of the page on the canvas. The title is what respondents see as the step's name. New pages are called "Untitled page".
+4. Add blocks to each page as usual. With a page selected, new blocks go at the end of it.
+5. Select **Save**.
+<Gif alt="Splitting a form into pages and naming them" />
+
+### Add, move and delete pages
+
+- **Add page after "…"**, below the canvas, adds an empty page after the page you are working on.
+- **Move page up** and **Move page down**, at the top of each page, change the order.
+- **Delete page…**, in a page's settings, asks what to do with its contents:
+
+| Choice | What happens |
+|---|---|
+| **Page only (move contents to the previous page)** | The contents move to the end of the previous page, in the same order. For the first page, they move to the start of the next page. |
+| **Page and its contents** | The page and everything on it are deleted. |
+
+- **Remove pages**, offered instead of Delete page… when only one page is left, makes the form one page again, with that page's contents.
+
+### Choose progress and a review page
+
+1. Select the form's title at the top of the canvas. The settings show **Form settings**, with **Navigation**.
+2. **Show progress** is on by default: it shows "Step 2 of 5" above each page title.
+3. Under **Progress style**, choose **Text only ("Step 2 of 5")** or **Bar and text**, which adds a bar above the text.
+4. Turn on **Review page before submit** for a last step where respondents check their answers.
+5. Select **Save**.
+
+<Note>
+The app your form is used in can show the bar, or hide it, whatever you choose under Progress style. Its developer decides.
+</Note>
+
+## What happens behind the scenes
+
+What respondents see:
+
+- **One page at a time.** The page title is a heading, and focus moves to it on every page change.
+- **Next checks only the page it is on.** A required question left empty, or any other problem, stops the respondent there with the "There is a problem" summary. **Back** never checks.
+- **The last page shows Submit,** or **Review** when the review page is on. Pressing Enter on any other page means Next, never Submit.
+- **Progress:** "Step 2 of 4" counts the pages the respondent will see, and the review page is the last step. The count can change as answers show or hide pages. With **Bar and text**, a bar with one segment per step sits above the text: done, current and still to come. It is decoration only; screen readers hear the text. There is no list of steps to jump between.
+- **Hidden pages are skipped** both ways, and aren't counted.
+- **The review page,** "Review your answers", lists every question that is showing, page by page, with "Not answered" for empty ones. Each page has a **Change** button that opens it; from there, **Return to review** checks the page and goes back. **Submit** is on the review page.
+- **When the respondent submits,** every page is checked again; if one has a problem, the form opens at the first such page.
+
+How it works:
+
+- **Answers are kept across pages,** and a page refresh opens the page the respondent was on.
+- **The navigation settings only apply while the form has pages.** If you remove the pages, they are kept, and come back if you add pages again.
+- **Save progress "On the app's server"** is only available for forms with pages, because it saves at each page change.
+
+## Rules the builder enforces
+
+| What you try | What the builder says |
+|---|---|
+| Save a page with no blocks on it | Page "Contact": a page must contain at least one block. |
+| Save a page with an empty title | Page 2 (untitled): a page needs a title. |
+| Save a form with pages and a block outside them | Block "Name": this form has pages, so every block must be inside a page. |
+| Give the first page conditions | Page "About you": the first page can't have conditions — it is always shown. |
+| Move a page with conditions so it becomes the first page | Can't move "Contact" up: "Contact" would become the first page, and the first page can't have conditions — it is always shown. Remove the conditions on "Contact" first. |
+| Move the first page up | Can't move "About you" up: it's already the first page. |
+
+The names in quotation marks are examples; the builder uses yours. If you choose Remove pages while Save progress is "On the app's server", it switches to "Only while the form is open", and the builder says so.
+
+## Troubleshooting
+
+**The first page has no Logic to set.** The first page is always shown, so it can't have conditions. Put the questions that only some respondents need on a later page, or in a group with conditions.
+
+**A page never appears.** Its conditions don't pass, or every block on it is hidden or shows nothing. A page with nothing to show is skipped.
+
+**The step count changes while the respondent fills in the form.** A page has conditions, and an answer showed or hid it. This is expected.
+
+**The progress bar doesn't show in your app.** The app's developer may have turned it off, or the app doesn't use the form's stylesheet, which draws the bar. The "Step 2 of 4" text always shows when Show progress is on.
+
+## More about building forms
+
+<Series />

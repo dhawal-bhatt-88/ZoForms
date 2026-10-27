@@ -1,0 +1,84 @@
+---
+title: Groups
+summary: Put questions together under one heading, and show or hide them all at once.
+template: how-to
+badges: [Structure]
+appliesTo: [builder, package]
+updated: 2026-10-27
+prev: /docs/build/layout-and-media/audio
+next: /docs/build/structure/repeating-groups
+---
+
+<LiveExample form="groups" />
+
+## When you'd use this
+
+<UseCases>
+<UseCase title="A section with its own heading">
+Put the questions about an emergency contact together under "Emergency contact", as in the example above. The group's label is the section's heading.
+</UseCase>
+<UseCase title="Several questions that show together">
+Give the group a condition, and every question in it shows or hides with it, such as a "Parent or guardian" group shown only when the respondent is under 18.
+</UseCase>
+<UseCase title="Sections within sections">
+Put a group inside another group. Groups nest to any depth.
+</UseCase>
+</UseCases>
+
+When the questions are to be answered once per person, item or visit, use a [repeating group](/docs/build/structure/repeating-groups) instead.
+
+## Before you start
+
+- You need a form open in the editor.
+- A group must hold at least one block before the form can be saved. Add the group first, then the questions in it.
+- A group collects no answer of its own. It has no Required and no Help text, isn't numbered, and can't be the source of a condition.
+
+## Steps
+
+1. Below the last block, select **+** (Insert a block), or type `/` in the line beside it.
+2. Under **Structure**, choose **Group**. Typing `section` finds it too. An empty group, "Untitled group", is added and selected.
+3. In **Label**, write the group's heading.
+4. With the group selected, insert blocks as usual: each one is added at the end of the group. With a block inside the group selected, the next one goes right after it.
+5. To bring in a block that is already on the form, drag it into the group by its handle (**Drag to reorder**), or select it and, under **Position**, choose the group in **Move to…** and select **Move**.
+6. Select **Save**.
+<Gif alt="Adding a group and putting questions in it" />
+
+<Note>
+To take a block out of a group, choose **Top level (outside any group)** in **Move to…**, or drag it out.
+</Note>
+
+To delete a group, select it and choose **Delete group…**. The builder asks what to do with what is inside:
+
+| Choice | What happens |
+|---|---|
+| **Group only (keep questions)** | The group goes, and its contents move up to where the group was, in the same order. Its own conditions stop applying to them. |
+| **Group and its questions** | The group and everything in it are deleted. |
+
+## What happens behind the scenes
+
+- **The group is shown as a section:** its label is a heading, with its questions under it. In a form without pages a group's heading is level 2; in a form with pages, level 3, under the page title. Each group inside another is one level lower, down to level 6.
+- **A group's conditions apply to everything in it.** A question shows only when its own conditions pass and every group around it is showing.
+- **A group that shows nothing is hidden,** heading and all: when every block in it is hidden by its conditions, or shows nothing, such as an empty Text block.
+- **Groups don't change the answers.** Each question's answer is sent under its own id, as if the group weren't there.
+
+## Rules the builder enforces
+
+| What you try | What the builder says |
+|---|---|
+| Save a group with no blocks in it | Group "Emergency contact": a group must contain at least one block. |
+| Save a group with an empty label | An unlabelled group at the top level: a group needs a label. (the start says where the group is) |
+| Delete a group and its questions, when a question outside it has a condition on one inside | Can't delete "Emergency contact" and its questions — these questions outside it have conditions that depend on something inside it: |
+
+The names in quotation marks are examples; the builder uses yours.
+
+## Troubleshooting
+
+**The form won't save, and points at the group.** The group is empty. Add a block to it, or delete it.
+
+**A question inside the group never shows.** The group itself is hidden by its conditions, or by those of a group around it. Check each one.
+
+**A group isn't offered as the source of a condition.** Groups can't be sources. Use one of the questions inside it.
+
+## More about building forms
+
+<Series />

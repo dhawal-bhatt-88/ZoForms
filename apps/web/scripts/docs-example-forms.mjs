@@ -194,6 +194,80 @@ const FORMS = [
       },
     ],
   },
+  // Structure (CP6): a group, a repeating group, and a form with pages, progress bar and review page.
+  {
+    file: "build/structure/groups.form.json",
+    title: "Group example",
+    blocks: [
+      {
+        id: "emergency_contact",
+        type: "group",
+        label: "Emergency contact",
+        blocks: [
+          { id: "contact_name", type: "short", label: "Name", required: true },
+          { id: "contact_relationship", type: "short", label: "Relationship" },
+          { id: "contact_phone", type: "phone", label: "Phone number", required: true },
+        ],
+      },
+    ],
+  },
+  {
+    file: "build/structure/repeating-groups.form.json",
+    title: "Repeating group example",
+    blocks: [
+      {
+        id: "medications",
+        type: "group",
+        label: "Current medications",
+        repeats: true,
+        repeatLabel: "medication",
+        minOccurs: 0,
+        maxOccurs: 10,
+        blocks: [
+          { id: "medication_name", type: "short", label: "Medication name", required: true },
+          { id: "medication_dose", type: "short", label: "Dose" },
+        ],
+      },
+    ],
+  },
+  {
+    file: "build/structure/pages.form.json",
+    title: "Pages example",
+    navigation: { progressStyle: "bar", reviewPage: true },
+    blocks: [
+      {
+        id: "page_about",
+        type: "page",
+        title: "About you",
+        blocks: [
+          { id: "preferred_name", type: "short", label: "Preferred name", required: true },
+          { id: "age", type: "number", label: "Age", required: true },
+          {
+            id: "guardian_name",
+            type: "short",
+            label: "Parent or guardian's name",
+            required: true,
+            enableWhen: [{ question: "age", operator: "<", answer: 18 }],
+          },
+        ],
+      },
+      {
+        id: "page_contact",
+        type: "page",
+        title: "Contact",
+        blocks: [
+          { id: "email", type: "email", label: "Email address", required: true },
+          { id: "phone", type: "phone", label: "Best phone number to reach you" },
+        ],
+      },
+      {
+        id: "page_visit",
+        type: "page",
+        title: "Your visit",
+        blocks: [{ id: "reason_for_visit", type: "long", label: "What brings you in today?", required: true }],
+      },
+    ],
+  },
 ];
 
 // Only the files named on the command line, if any, so building a new example
@@ -222,7 +296,7 @@ try {
   );
   for (const form of building) {
     const { id } = JSON.parse(await call("POST", "/v1/forms", token, { title: form.title }));
-    await call("PUT", `/v1/forms/${id}/schema`, token, { title: form.title, blocks: form.blocks });
+    await call("PUT", `/v1/forms/${id}/schema`, token, { title: form.title, blocks: form.blocks, ...(form.navigation ? { navigation: form.navigation } : {}) });
     const artifact = await call("GET", `/v1/forms/${id}/artifact`, token);
     fs.writeFileSync(path.join(CONTENT, form.file), artifact);
     console.log(`wrote content/docs/${form.file}`);

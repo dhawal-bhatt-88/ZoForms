@@ -20,6 +20,7 @@ const PAGES = [
   ["dropdown", "/docs/build/question-types/dropdown"],
   ...["short-answer", "long-answer", "multiple-choice", "checkboxes", "number", "email", "phone-number", "link", "date", "time", "linear-scale", "grid", "matrix", "rating", "ranking", "respondents-country"].map((n) => [n, `/docs/build/question-types/${n}`]),
   ...["layout-blocks", "image", "video", "audio"].map((n) => [n, `/docs/build/layout-and-media/${n}`]),
+  ...["groups", "repeating-groups", "pages"].map((n) => [n, `/docs/build/structure/${n}`]),
   ["show-questions-conditionally", "/docs/build/show-questions-conditionally"],
   ["form-renderer", "/docs/integrate/reference/form-renderer"],
   ["follow-up-question", "/docs/examples/follow-up-question"],
@@ -276,6 +277,62 @@ const THEMES = ["light", "dark"];
         const excerpt = await P.locator("pre").first().textContent();
         check(`${name}: no player, and the schema's content`, players === 0 && excerpt.includes(`"content": "${src}"`), `${players} players; ${excerpt}`);
       }
+
+      // Groups: the label is the section's heading, level 2 in a form without pages.
+      await load(P, urlOf("groups"));
+      const legend = await P.locator(".zf-form fieldset legend h2").first().textContent();
+      check("groups: the label is a level 2 heading", legend === "Emergency contact", legend);
+
+      // Repeating groups: from no entries to one, its names, removing with answers, and the error prefix.
+      await load(P, urlOf("repeating-groups"));
+      const entries = () => P.locator(".zf-repeat-instance").count();
+      const startsEmpty = (await entries()) === 0 && (await P.getByRole("button", { name: "Add medication", exact: true }).count()) === 1;
+      check("repeating-groups: starts with no entries and Add medication", startsEmpty);
+      await P.getByRole("button", { name: "Add medication", exact: true }).click();
+      const heading = await P.locator(".zf-repeat-instance legend").first().textContent();
+      const addAnother = await P.getByRole("button", { name: "Add another medication", exact: true }).count();
+      const remove = await P.getByRole("button", { name: "Remove medication 1", exact: true }).count();
+      check("repeating-groups: Medication 1, Add another medication, Remove medication 1", heading.trim() === "Medication 1" && addAnother === 1 && remove === 1, `${heading} ${addAnother} ${remove}`);
+      await P.getByLabel("Medication name", { exact: true }).fill("Sertraline");
+      let asked = null;
+      P.once("dialog", (d) => { asked = d.message(); d.accept(); });
+      await P.getByRole("button", { name: "Remove medication 1", exact: true }).click();
+      await P.waitForTimeout(300);
+      const said = await P.locator(".zf-repeat-status").textContent();
+      check("repeating-groups: removing an entry with answers asks first, then says so", asked === "Remove medication 1? Its answers will be deleted." && said === "Medication 1 removed." && (await entries()) === 0, `${asked} | ${said}`);
+      await P.getByRole("button", { name: "Add medication", exact: true }).click();
+      await submit();
+      await P.waitForTimeout(300);
+      const repeatSummary = (await P.locator(".zf-error-summary").textContent()) || "";
+      check("repeating-groups: the summary names the entry", repeatSummary.includes('Medication 1: "Medication name" is required.'), repeatSummary);
+
+      // Pages: progress, Next checking its own page, the condition, and the review page.
+      await load(P, urlOf("pages"));
+      const step = async () => ((await P.locator(".zf-progress").first().textContent()) || "").replace(/\s+/g, " ").trim();
+      const bar = await P.locator(".zf-progress-bar").count();
+      check("pages: Step 1 of 4, with the bar", (await step()).startsWith("Step 1 of 4") && bar === 1, `${await step()} bar=${bar}`);
+      await P.getByRole("button", { name: "Next" }).click();
+      await P.waitForTimeout(300);
+      const firstPage = await errorsOf();
+      check("pages: Next checks the page it is on", firstPage.includes('"Preferred name" is required.') && firstPage.includes('"Age" is required.'), firstPage.join(" | "));
+      await P.getByLabel("Preferred name", { exact: true }).fill("Sam");
+      await P.getByLabel("Age", { exact: true }).fill("15");
+      const guardian = await P.getByLabel("Parent or guardian's name", { exact: true }).count();
+      check("pages: an age under 18 shows the guardian question", guardian === 1, `${guardian}`);
+      await P.getByLabel("Parent or guardian's name", { exact: true }).fill("Alex");
+      await P.getByRole("button", { name: "Next" }).click();
+      const second = await step();
+      await P.getByLabel("Email address", { exact: true }).fill("sam@example.org");
+      await P.getByRole("button", { name: "Next" }).click();
+      await P.getByLabel("What brings you in today?", { exact: true }).fill("Trouble sleeping.");
+      const last = await P.getByRole("button", { name: "Review" }).count();
+      check("pages: Step 2 of 4 on the second page, and Review on the last", second.startsWith("Step 2 of 4") && last === 1, `${second} review=${last}`);
+      await P.getByRole("button", { name: "Review" }).click();
+      await P.getByRole("heading", { name: /Review your answers/ }).waitFor();
+      const changes = await P.getByRole("button", { name: /^Change/ }).count();
+      const review = (await P.locator(".zf-review").textContent()) || "";
+      const submitHere = await P.getByRole("button", { name: "Submit" }).count();
+      check("pages: the review page, a Change per page, Not answered, and Submit", changes === 3 && review.includes("Not answered") && submitHere === 1, `${changes} changes; submit=${submitHere}`);
       await ctx.close();
     }
     {

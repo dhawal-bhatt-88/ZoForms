@@ -1,0 +1,78 @@
+{
+  "title": "Pages example",
+  "formId": "72415d86-79bf-4a2e-b9cf-b8dda52dd2e6",
+  "formVersionId": "def7db75-5f0a-4ae6-a123-277b5e3cfdf6",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "page_about",
+      "type": "page",
+      "title": "About you",
+      "blocks": [
+        {
+          "id": "preferred_name",
+          "type": "short",
+          "label": "Preferred name",
+          "required": true
+        },
+        {
+          "id": "age",
+          "type": "number",
+          "label": "Age",
+          "required": true
+        },
+        {
+          "id": "guardian_name",
+          "type": "short",
+          "label": "Parent or guardian's name",
+          "required": true,
+          "enableWhen": [
+            {
+              "id": "c_c97mbyr2",
+              "question": "age",
+              "operator": "<",
+              "answer": 18
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "page_contact",
+      "type": "page",
+      "title": "Contact",
+      "blocks": [
+        {
+          "id": "email",
+          "type": "email",
+          "label": "Email address",
+          "required": true
+        },
+        {
+          "id": "phone",
+          "type": "phone",
+          "label": "Best phone number to reach you",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "page_visit",
+      "type": "page",
+      "title": "Your visit",
+      "blocks": [
+        {
+          "id": "reason_for_visit",
+          "type": "long",
+          "label": "What brings you in today?",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "navigation": {
+    "showProgress": true,
+    "progressStyle": "bar",
+    "reviewPage": true
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "title": "Group example",
+  "formId": "ff75a5ef-b632-41f5-8d88-e08d49519079",
+  "formVersionId": "1a5b6a07-e086-45fc-bad9-17d17f8a390a",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "emergency_contact",
+      "type": "group",
+      "label": "Emergency contact",
+      "blocks": [
+        {
+          "id": "contact_name",
+          "type": "short",
+          "label": "Name",
+          "required": true
+        },
+        {
+          "id": "contact_relationship",
+          "type": "short",
+          "label": "Relationship",
+          "required": false
+        },
+        {
+          "id": "contact_phone",
+          "type": "phone",
+          "label": "Phone number",
+          "required": true
+        }
+      ]
+    }
+  ]
+}

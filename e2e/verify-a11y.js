@@ -100,6 +100,9 @@ const DOCS_PAGES = [
   ["Image", "/docs/build/layout-and-media/image"],
   ["Video", "/docs/build/layout-and-media/video"],
   ["Audio", "/docs/build/layout-and-media/audio"],
+  ["Groups", "/docs/build/structure/groups"],
+  ["Repeating groups", "/docs/build/structure/repeating-groups"],
+  ["Pages, progress and review", "/docs/build/structure/pages"],
   ["Show a question only when it applies", "/docs/build/show-questions-conditionally"],
   ["FormRenderer", "/docs/integrate/reference/form-renderer"],
   ["Follow-up question", "/docs/examples/follow-up-question"],
@@ -280,6 +283,35 @@ const structure = [];
         await P.locator(".zf-error-summary").waitFor();
         await audit(P, "Docs", `${name}: the example's error shown`, theme, { nav: true });
       }
+
+      // Structure examples (docs/briefs/BUILDER-BRIEF-DOCS-QUESTIONS.md, CP6), each with its own way to an error.
+      await go("/docs/build/structure/groups");
+      await P.locator(".zf-form").first().waitFor({ timeout: 30000 });
+      await P.getByRole("button", { name: "Submit" }).click();
+      await P.locator(".zf-error-summary").waitFor();
+      await audit(P, "Docs", "Groups: the example's error shown", theme, { nav: true });
+
+      await go("/docs/build/structure/repeating-groups");
+      await P.locator(".zf-form").first().waitFor({ timeout: 30000 });
+      await P.getByRole("button", { name: "Add medication" }).click();
+      await P.getByRole("button", { name: "Submit" }).click();
+      await P.locator(".zf-error-summary").waitFor();
+      await audit(P, "Docs", "Repeating groups: an entry added, its error shown", theme, { nav: true });
+
+      await go("/docs/build/structure/pages");
+      await P.locator(".zf-form").first().waitFor({ timeout: 30000 });
+      await P.getByRole("button", { name: "Next" }).click();
+      await P.locator(".zf-error-summary").waitFor();
+      await audit(P, "Docs", "Pages: the first page's error shown", theme, { nav: true });
+      await P.getByLabel("Preferred name", { exact: true }).fill("Sam");
+      await P.getByLabel("Age", { exact: true }).fill("34");
+      await P.getByRole("button", { name: "Next" }).click();
+      await P.getByLabel("Email address", { exact: true }).fill("sam@example.org");
+      await P.getByRole("button", { name: "Next" }).click();
+      await P.getByLabel("What brings you in today?", { exact: true }).fill("Trouble sleeping.");
+      await P.getByRole("button", { name: "Review" }).click();
+      await P.getByRole("heading", { name: /Review your answers/ }).waitFor();
+      await audit(P, "Docs", "Pages: the review page", theme, { nav: true });
 
       await go("/docs/examples/follow-up-question");
       await P.getByRole("radio", { name: "Yes" }).check();

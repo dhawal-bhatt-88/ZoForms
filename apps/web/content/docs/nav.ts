@@ -64,6 +64,14 @@ export const DOCS_NAV: DocsNavSection[] = [
           { title: "Audio", slug: "build/layout-and-media/audio", status: "live" },
         ],
       },
+      {
+        title: "Structure",
+        pages: [
+          { title: "Groups", slug: "build/structure/groups", status: "live" },
+          { title: "Repeating groups", slug: "build/structure/repeating-groups", status: "live" },
+          { title: "Pages, progress and review", slug: "build/structure/pages", status: "live" },
+        ],
+      },
       { title: "Show a question only when it applies", slug: "build/show-questions-conditionally", status: "live" },
     ],
   },

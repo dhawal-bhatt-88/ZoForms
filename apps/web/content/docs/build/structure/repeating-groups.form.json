@@ -1,0 +1,31 @@
+{
+  "title": "Repeating group example",
+  "formId": "73ba959c-e203-4cce-9dfe-c0991a6ab560",
+  "formVersionId": "f2e8af44-4dca-430a-a63e-2a0a755a04e8",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "medications",
+      "type": "group",
+      "label": "Current medications",
+      "repeats": true,
+      "repeatLabel": "medication",
+      "minOccurs": 0,
+      "maxOccurs": 10,
+      "blocks": [
+        {
+          "id": "medication_name",
+          "type": "short",
+          "label": "Medication name",
+          "required": true
+        },
+        {
+          "id": "medication_dose",
+          "type": "short",
+          "label": "Dose",
+          "required": false
+        }
+      ]
+    }
+  ]
+}

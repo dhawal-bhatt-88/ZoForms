@@ -1,0 +1,98 @@
+---
+title: Repeating groups
+summary: A group the respondent fills in once per item, adding and removing entries as they go.
+template: how-to
+badges: [Structure]
+appliesTo: [builder, package]
+updated: 2026-10-27
+prev: /docs/build/structure/groups
+next: /docs/build/structure/pages
+---
+
+<LiveExample form="repeating-groups" />
+
+## When you'd use this
+
+Use a repeating group when the same questions are asked about each of several things, and the respondent decides how many: each medication they take, each provider they have seen, each child in the household. In the example above, select **Add medication** to add an entry.
+
+<UseCases>
+<UseCase title="Any number, including none">
+Current medications, with a minimum of 0: the respondent starts with no entries and adds one per medication.
+</UseCase>
+<UseCase title="At least one">
+Previous providers, with a minimum of 1: the form starts with one entry, and it can't be removed.
+</UseCase>
+<UseCase title="Up to a limit">
+Household members, with a maximum of 6: Add stops working at the sixth entry.
+</UseCase>
+</UseCases>
+
+When the number of rows is fixed and known in advance, such as the days of the week, a [Grid](/docs/build/question-types/grid) is simpler.
+
+## Before you start
+
+- You need a form open in the editor, with a [group](/docs/build/structure/groups) holding the questions for one entry.
+- Decide the name for one entry. It is used in the middle of sentences, such as "Add another medication", so write it in lower case unless it is a name or an acronym.
+- Questions **outside** the repeating group can't depend on answers **inside** it: there is no telling which entry to read. If a question outside already has a condition on one inside, move or remove that condition first.
+
+## Steps
+
+1. Select the group.
+2. Turn on **Repeats**. Respondents now fill the group's questions once per entry, and can add and remove entries.
+3. In **Name for one entry**, write the singular name, such as `medication`. The line under it shows how it will read, such as "Medication 1 · Add another medication · Remove medication 1".
+4. In **Minimum entries**, set how many entries the form starts with, and the fewest the respondent can leave. Leave it at 1, or set 0 to let the respondent remove every entry.
+5. In **Maximum entries**, set the most entries allowed, or leave it blank for no limit.
+6. Select **Save**. On the canvas, the group shows a badge such as **Repeats · 0–10**.
+<Gif alt="Turning on Repeats and setting a name for one entry" />
+
+<Note>
+Turning **Repeats** off removes the name for one entry and the minimum and maximum. Turning it on again starts from "item", a minimum of 1 and no maximum.
+</Note>
+
+## What happens behind the scenes
+
+What respondents see:
+
+- **The form starts with the minimum number of entries.** With a minimum of 0 it starts with none, and shows only the Add button.
+- **Each entry is its own section,** headed with the name and its number, such as "Medication 1".
+- **Add** puts a new entry at the end and moves to it. It reads "Add medication" while there are no entries, and "Add another medication" after that.
+- **At the maximum, Add stops working,** and "You can add up to 10." shows next to it.
+- **Remove** is on every entry, and stops working while the number of entries is at the minimum.
+- **Removing an entry that has any answer asks first:** "Remove medication 2? Its answers will be deleted." An empty entry is removed without asking. There is no undo, and the entries after it are renumbered.
+- **Clear form** goes back to the minimum number of empty entries.
+- **Messages name the entry,** in the error summary: Medication 2: "Medication name" is required.
+- **On the review page** of a form with pages, each entry is listed under its own heading. A repeating group with no entries shows "None added".
+
+How it works:
+
+- **Required applies in every entry.** In the example, every medication added needs a name. No entries at all is fine, because the minimum is 0.
+- **Conditions inside an entry read that entry.** A question inside can depend on a question in the same entry, or on one outside the group; it is shown or hidden entry by entry.
+- **Repeating groups can hold groups and other repeating groups,** to any depth. Pages never repeat.
+- **The answers come as a list:** one set of answers per entry, in order, under the repeating group.
+
+## Rules the builder enforces
+
+| What you try | What the builder says |
+|---|---|
+| Save with no name for one entry | Group "Current medications": a repeating group needs a name for one entry, such as "patient". |
+| Save with a minimum that isn't a whole number of 0 or more | Group "Current medications": the minimum number of entries must be a whole number, 0 or more. |
+| Save with a maximum that isn't a whole number of 1 or more | Group "Current medications": the maximum number of entries must be a whole number, 1 or more, or left blank for no limit. |
+| Save with a maximum below the minimum | Group "Current medications": the maximum number of entries (2) can't be less than the minimum (3). |
+| Turn on Repeats when a question outside the group has a condition on one inside | Can't make "Current medications" repeat — these blocks outside it have conditions that use a question inside it: |
+| Move something so a condition would read a question inside a repeating group the dependent isn't in | Can't move "Dose" there — these blocks would have conditions on a question inside a repeating group they aren't in: |
+
+The names in quotation marks are examples; the builder uses yours. Each message about a setting also shows under that setting.
+
+## Troubleshooting
+
+**Repeats won't turn on.** A question outside the group has a condition on a question inside it. The message names it, with a link: remove that condition, or move the question into the group.
+
+**A question is missing from the list when you add a condition.** It is inside a repeating group the question you are editing isn't in. The panel says "Some questions aren't listed because they're inside a repeating group this block isn't in."
+
+**The form starts with an empty entry the respondent can't remove.** The minimum is 1. Set it to 0 if the respondent may have none.
+
+**The entry heading reads oddly, such as "Medications 1".** The name for one entry is plural. Use the singular, such as "medication".
+
+## More about building forms
+
+<Series />
