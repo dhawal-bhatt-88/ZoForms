@@ -21,7 +21,9 @@ Use a video to show something that is easier to watch than to read: a welcome fr
   - on **YouTube**, as a video link;
   - on **Vimeo**, as a video link, including unlisted videos;
   - as an **.mp4** or **.webm** file, at an address starting with `https://`, or at a path on the server of the app your form is used in, starting with a single `/`, such as `/videos/intro.mp4`.
-- **Captions are yours to add.** On YouTube and Vimeo, add them there. A video file has no captions on the form, so if it has speech, put a transcript in a Text block next to it.
+- **Captions are yours to add.** For a video with speech, do one of these:
+  - put it on **YouTube** or **Vimeo**, and add captions there; or
+  - for a **video file**, which can't have captions on the form, put a full transcript of everything it says in a Text block next to it.
 - A video has no Required and no Help text, isn't numbered, and can't be the source of a condition. It can have conditions of its own, under **Logic**.
 
 ## Steps
@@ -30,7 +32,8 @@ Use a video to show something that is easier to watch than to read: a welcome fr
 2. Under **Media**, choose **Video**. Typing `youtube`, `vimeo`, `mp4` or `webm` finds it too.
 3. In **Label**, say what the video is about. As the hint under it says, it is read aloud to screen-reader users as the player's name.
 4. In **URL**, paste the YouTube or Vimeo link, or the file's address or path.
-5. Select **Save**.
+5. If it is a video file with speech, insert a **Text** block right after it, and put the full transcript in its **Content**.
+6. Select **Save**.
 <Gif alt="Adding a Video with its label and link" />
 
 In the downloaded file, the URL is the block's `content`, exactly as you pasted it, without spaces at either end. For a video file on your app's server:
@@ -75,7 +78,7 @@ The video IDs in this table are made up; they show the form a link takes.
 
 **The builder doesn't recognise a YouTube link.** Use the link to the video itself, not to a playlist, channel or search, and remove any slash at the end.
 
-**Respondents who can't hear the video miss what is said.** Add captions on YouTube or Vimeo. For a video file, put a transcript in a Text block next to it.
+**Respondents who can't hear the video miss what is said.** Put the video on YouTube or Vimeo and add captions there. For a video file, which can't have captions, put a full transcript in a Text block next to it.
 
 ## More about building forms
 
