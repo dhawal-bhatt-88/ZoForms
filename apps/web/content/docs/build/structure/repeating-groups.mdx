@@ -4,7 +4,7 @@ summary: A group the respondent fills in once per item, adding and removing entr
 template: how-to
 badges: [Structure]
 appliesTo: [builder, package]
-updated: 2026-10-27
+updated: 2026-10-28
 prev: /docs/build/structure/groups
 next: /docs/build/structure/pages
 ---
@@ -60,7 +60,7 @@ What respondents see:
 - **Remove** is on every entry, and stops working while the number of entries is at the minimum.
 - **Removing an entry that has any answer asks first:** "Remove medication 2? Its answers will be deleted." An empty entry is removed without asking. There is no undo, and the entries after it are renumbered.
 - **Clear form** goes back to the minimum number of empty entries.
-- **Messages name the entry,** in the error summary: Medication 2: "Medication name" is required.
+- **Messages name the entry, then the question,** in the error summary: Medication 2: "Medication name" is required. A message that doesn't name the question gets the label too, such as Child 1: "Age": Must be at most 17.
 - **On the review page** of a form with pages, each entry is listed under its own heading. A repeating group with no entries shows "None added".
 
 How it works:

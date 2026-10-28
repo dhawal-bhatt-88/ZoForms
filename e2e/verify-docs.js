@@ -147,7 +147,11 @@ const THEMES = ["light", "dark"];
       };
       await says("short-answer", "Preferred name", "   ", '"Preferred name" is required.');
       await says("email", "Email address", "name@localhost", "Enter a valid email address.");
+      // In the summary, a message that doesn't name its question starts with the label (contract 12.5).
+      const emailSummary = (await P.locator(".zf-error-summary").textContent()) || "";
+      check("email: the summary line starts with the label", emailSummary.includes('"Email address": Enter a valid email address.'), emailSummary);
       await says("phone-number", "Best phone number to reach you", "555 0100 ext 12", "Enter a valid phone number.");
+      await says("link", "Referring practice's website", "javascript:alert(1)", "Enter a valid URL, including https://.");
       await says("link", "Referring practice's website", "example.org", "Enter a valid URL, including https://.");
 
       // Once shown, a message follows the answer and goes when it is fixed.
@@ -176,6 +180,24 @@ const THEMES = ["light", "dark"];
       await P.waitForTimeout(300);
       const choiceErrors = await errorsOf();
       check("multiple-choice: selecting the chosen option again clears it", choiceErrors.includes('"How would you like to attend sessions?" is required.'), choiceErrors.join(" | "));
+
+      // Multiple choice: Clear selection shows on the optional question once answered, never on the required one.
+      await load(P, urlOf("multiple-choice"));
+      await P.getByRole("radio", { name: "Video" }).click();
+      await P.getByRole("radio", { name: "Afternoon" }).click();
+      const onRequired = await P.getByRole("button", { name: "Clear selection, How would you like to attend sessions?" }).count();
+      const clearTime = P.getByRole("button", { name: "Clear selection, Which time of day suits you best?" });
+      const shown = (await clearTime.count()) === 1 ? await clearTime.textContent() : null;
+      check("multiple-choice: Clear selection on the optional question, not the required one", onRequired === 0 && shown === "Clear selection", `required=${onRequired} optional=${shown}`);
+      await clearTime.click();
+      const afternoon = await P.getByRole("radio", { name: "Afternoon" }).isChecked();
+      const focusedOption = await P.evaluate(() => {
+        let el = document.activeElement;
+        while (el?.shadowRoot?.activeElement) el = el.shadowRoot.activeElement;
+        return el?.value;
+      });
+      check("multiple-choice: Clear selection clears the answer, goes, and moves focus to the first option",
+        !afternoon && (await clearTime.count()) === 0 && focusedOption === "morning", `checked=${afternoon} focus=${focusedOption}`);
 
       // Checkboxes: the answer keeps the order the options were ticked in.
       await load(P, urlOf("checkboxes"));

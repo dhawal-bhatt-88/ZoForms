@@ -4,7 +4,7 @@ summary: An email address, checked for the right form.
 template: question-type
 badges: [Free text]
 appliesTo: [builder, package]
-updated: 2026-10-25
+updated: 2026-10-28
 prev: /docs/build/question-types/number
 next: /docs/build/question-types/phone-number
 ---
@@ -46,13 +46,13 @@ You need a form open in the editor.
 
 ## Validation and error messages
 
-The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. Once a message shows, it updates as the respondent types, and it goes when the answer is fixed.
+The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. In the summary, every line names the question: a message that doesn't already name it starts with the question's label in quotation marks. Once a message shows, it updates as the respondent types, and it goes when the answer is fixed.
 
-| Situation | Message |
-|---|---|
-| Required, and nothing typed | "Email address" is required. (the question's own label, in quotation marks) |
-| Required, and only spaces typed | The same message: an answer of only spaces counts as no answer. |
-| The answer isn't in the form name@example.org | Enter a valid email address. |
+| Situation | Message | In the summary |
+|---|---|---|
+| Required, and nothing typed | "Email address" is required. (the question's own label, in quotation marks) | The same |
+| Required, and only spaces typed | The same message: an answer of only spaces counts as no answer. | The same |
+| The answer isn't in the form name@example.org | Enter a valid email address. | "Email address": Enter a valid email address. |
 
 The check looks only at the address's form: some text, an @, and a domain with a dot in it, with no spaces. It ignores spaces before or after the address. The form can't tell whether the address exists.
 

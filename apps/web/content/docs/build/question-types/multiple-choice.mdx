@@ -4,7 +4,7 @@ summary: One answer from a short list, with every option shown at once.
 template: question-type
 badges: [Coded options]
 appliesTo: [builder, package]
-updated: 2026-10-25
+updated: 2026-10-28
 prev: /docs/build/question-types/long-answer
 next: /docs/build/question-types/checkboxes
 ---
@@ -58,19 +58,20 @@ Changing a code after the form is in use will not match answers already stored u
 
 ## Validation and error messages
 
-The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. Once a message shows, it updates as the respondent changes the answer, and it goes when the answer is fixed.
+The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. In the summary, every line names the question: a message that doesn't already name it starts with the question's label in quotation marks. Once a message shows, it updates as the respondent changes the answer, and it goes when the answer is fixed.
 
 | Situation | Message |
 |---|---|
 | Required, and no option chosen | "How would you like to attend sessions?" is required. (the question's own label, in quotation marks) |
 
-Selecting the chosen option again clears the answer.
+Selecting the chosen option again clears the answer. When Required is off, a **Clear selection** button also shows under the options while one is chosen. It clears the answer and moves focus to the first option. It's the keyboard's way to clear, because Space doesn't uncheck a radio button. In the example, "Which time of day suits you best?" has Required off, so it shows Clear selection once answered.
 
 ## Accessibility
 
 What the rendered form exposes to assistive technology:
 
 - The question is a group (`<fieldset>`) named by its label (`<legend>`). Each option is a native radio button, named by its option label.
+- Clear selection is named "Clear selection, " followed by the question's label.
 - The group's description (`aria-describedby`) is "Required", on a required question, then the help text, then any error. The red asterisk is hidden from assistive technology, so it is never read out as part of the name.
 - After a failed check, the group has `aria-invalid="true"`.
 

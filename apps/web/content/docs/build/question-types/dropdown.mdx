@@ -4,7 +4,7 @@ summary: One answer from a list of options, shown as a select menu.
 template: question-type
 badges: [Coded options]
 appliesTo: [builder, package]
-updated: 2026-10-24
+updated: 2026-10-28
 prev: /docs
 next: /docs/build/question-types/short-answer
 ---
@@ -60,15 +60,15 @@ Import from file takes a `.csv` or `.txt` file, read in your browser and never u
 
 ## Validation and error messages
 
-The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. `prepareSubmission` gives the same messages on your server.
+The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. In the summary, every line names the question: a message that doesn't already name it starts with the question's label in quotation marks. `prepareSubmission` gives the same messages on your server, without the label in front.
 
-| Situation | Message |
-|---|---|
-| Required, and no option chosen | "How was the client referred?" is required. (the question's own label, in quotation marks) |
-| The answer isn't the code of one of the options. The form can't send this; only a request sent straight to your endpoint can. | Select a valid option. |
-| The answer isn't in the `{ state, value }` shape | Invalid answer. |
-| One of your validators returns a message | Your message |
-| One of your validators throws, or returns something other than a message or `null` | This answer couldn't be checked. |
+| Situation | Message | In the summary |
+|---|---|---|
+| Required, and no option chosen | "How was the client referred?" is required. (the question's own label, in quotation marks) | The same |
+| The answer isn't the code of one of the options. The form can't send this; only a request sent straight to your endpoint can. | Select a valid option. | Not shown: only your server gives this |
+| The answer isn't in the `{ state, value }` shape | Invalid answer. | Not shown: only your server gives this |
+| One of your validators returns a message | Your message | "How was the client referred?": Your message |
+| One of your validators throws, or returns something other than a message or `null` | This answer couldn't be checked. | "How was the client referred?": This answer couldn't be checked. |
 
 Choosing "— Select —" again clears the answer.
 

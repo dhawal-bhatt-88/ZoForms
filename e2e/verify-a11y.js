@@ -284,6 +284,13 @@ const structure = [];
         await audit(P, "Docs", `${name}: the example's error shown`, theme, { nav: true });
       }
 
+      // The optional question's Clear selection shows only once it is answered (renderer 0.27.0).
+      await go("/docs/build/question-types/multiple-choice");
+      await P.locator(".zf-form").first().waitFor({ timeout: 30000 });
+      await P.getByRole("radio", { name: "Afternoon" }).click();
+      await P.locator(".zf-clear-selection").waitFor();
+      await audit(P, "Docs", "Multiple choice: Clear selection shown", theme, { nav: true });
+
       // Structure examples (docs/briefs/BUILDER-BRIEF-DOCS-QUESTIONS.md, CP6), each with its own way to an error.
       await go("/docs/build/structure/groups");
       await P.locator(".zf-form").first().waitFor({ timeout: 30000 });

@@ -4,7 +4,7 @@ summary: A phone number, checked for the characters a phone number uses.
 template: question-type
 badges: [Free text]
 appliesTo: [builder, package]
-updated: 2026-10-25
+updated: 2026-10-28
 prev: /docs/build/question-types/email
 next: /docs/build/question-types/link
 ---
@@ -46,13 +46,13 @@ You need a form open in the editor.
 
 ## Validation and error messages
 
-The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. Once a message shows, it updates as the respondent types, and it goes when the answer is fixed.
+The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. In the summary, every line names the question: a message that doesn't already name it starts with the question's label in quotation marks. Once a message shows, it updates as the respondent types, and it goes when the answer is fixed.
 
-| Situation | Message |
-|---|---|
-| Required, and nothing typed | "Best phone number to reach you" is required. (the question's own label, in quotation marks) |
-| Required, and only spaces typed | The same message: an answer of only spaces counts as no answer. |
-| Fewer than 7 characters, or a character a phone number doesn't use | Enter a valid phone number. |
+| Situation | Message | In the summary |
+|---|---|---|
+| Required, and nothing typed | "Best phone number to reach you" is required. (the question's own label, in quotation marks) | The same |
+| Required, and only spaces typed | The same message: an answer of only spaces counts as no answer. | The same |
+| Fewer than 7 characters, or a character a phone number doesn't use | Enter a valid phone number. | "Best phone number to reach you": Enter a valid phone number. |
 
 A phone number may use digits, spaces, `+`, brackets, `-` and `.`, and needs at least 7 of them. The check ignores spaces before or after the number. It doesn't check a country's numbering or whether the number exists.
 

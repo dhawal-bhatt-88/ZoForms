@@ -94,9 +94,17 @@ const FORMS = [
     title,
     blocks: [{ ...block, required: true }],
   })),
-  // The choice types (CP2).
+  // The choice types (CP2). Multiple choice also has an optional question, which
+  // shows Clear selection once answered (renderer 0.27.0 brief, CP2).
+  {
+    file: "build/question-types/multiple-choice.form.json",
+    title: "Multiple choice example",
+    blocks: [
+      { id: "attend_format", type: "choice", label: "How would you like to attend sessions?", required: true, options: options("In person", "Video", "Phone") },
+      { id: "time_of_day", type: "choice", label: "Which time of day suits you best?", required: false, options: options("Morning", "Afternoon", "Evening") },
+    ],
+  },
   ...[
-    ["multiple-choice", "Multiple choice example", { id: "attend_format", type: "choice", label: "How would you like to attend sessions?", options: options("In person", "Video", "Phone") }],
     ["checkboxes", "Checkboxes example", { id: "available_days", type: "checkbox", label: "Which days can you usually attend?", options: options("Monday", "Tuesday", "Wednesday", "Thursday", "Friday") }],
     ["respondents-country", "Respondent's country example", { id: "country", type: "country", label: "Country of residence" }],
   ].map(([name, title, block]) => ({

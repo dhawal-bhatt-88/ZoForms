@@ -4,7 +4,7 @@ summary: A table of fixed rows and typed columns, with an answer in every cell.
 template: question-type
 badges: [Coded options]
 appliesTo: [builder, package]
-updated: 2026-10-25
+updated: 2026-10-28
 prev: /docs/build/question-types/linear-scale
 next: /docs/build/question-types/matrix
 ---
@@ -91,7 +91,7 @@ The form checks the grid when the respondent selects Submit (or Next, on a form 
 | A required column's cell is empty | Required. (under that cell, for every empty cell) |
 | In the summary, for each required column with empty cells | "Weekly availability": answer "Available" in every row (5 missing). (the grid's label, the column's label and how many cells are empty) |
 
-In a Radio cell, selecting the chosen option again clears it. In a Dropdown cell, choosing "— Select —" clears it. A Short text cell takes up to 20,000 characters.
+In a Radio cell, selecting the chosen option again clears it. In a Radio column that isn't required, an answered cell also shows a **Clear** button after its options. It clears that cell only and moves focus to the cell's first option. In a Dropdown cell, choosing "— Select —" clears it. A Short text cell takes up to 20,000 characters.
 
 On the review page of a form with pages, each row with an answer is listed with its answered cells, such as "Session format: Video". When a column's label ends in a question mark, a colon or a full stop, no colon is added.
 
@@ -102,6 +102,7 @@ What the rendered form exposes to assistive technology:
 - The grid is a table named by its label, with column headers and row headers. Its description (`aria-describedby`) is the help text.
 - The table sits in a scrolling box named by the grid's label, which can take keyboard focus, so a keyboard user can scroll a wide grid.
 - Every cell's control is named by its row and column, such as "Monday, Available". A Radio cell is a group of native radio buttons, a Dropdown cell a native `<select>` whose first entry, "— Select —", means no answer, and a Short text cell a native text input.
+- Clear is named "Clear" followed by the cell's row and column, such as "Clear Monday, Available".
 - A required column's cells have `aria-required="true"`. The red asterisk is hidden from assistive technology, so it is never read out as part of a name.
 - A cell that fails a check has `aria-invalid="true"`, and its message is its description.
 - On a narrow screen the column labels shown in each card are hidden from assistive technology, because every cell is already named by its row and column.

@@ -1,7 +1,7 @@
 {
   "title": "Multiple choice example",
-  "formId": "d4d7c65c-6198-483d-ab5e-0b364c9cd35c",
-  "formVersionId": "88ec9fe4-9efe-43f4-bfcf-25436e18894a",
+  "formId": "b6647717-6063-470e-89a0-627b47ae1df7",
+  "formVersionId": "3a8c24dc-96ff-4e06-8722-a33cd50d330b",
   "schemaVersion": 2,
   "blocks": [
     {
@@ -21,6 +21,26 @@
         {
           "code": "phone",
           "label": "Phone"
+        }
+      ]
+    },
+    {
+      "id": "time_of_day",
+      "type": "choice",
+      "label": "Which time of day suits you best?",
+      "required": false,
+      "options": [
+        {
+          "code": "morning",
+          "label": "Morning"
+        },
+        {
+          "code": "afternoon",
+          "label": "Afternoon"
+        },
+        {
+          "code": "evening",
+          "label": "Evening"
         }
       ]
     }

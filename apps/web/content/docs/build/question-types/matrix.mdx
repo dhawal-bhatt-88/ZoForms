@@ -4,7 +4,7 @@ summary: Several rows answered on the same set of columns, one answer per row.
 template: question-type
 badges: [Coded options]
 appliesTo: [builder, package]
-updated: 2026-10-27
+updated: 2026-10-28
 prev: /docs/build/question-types/grid
 next: /docs/build/question-types/rating
 ---
@@ -64,14 +64,14 @@ The rows are stored as the matrix's `options`, and the columns as its `columns`.
 
 ## Validation and error messages
 
-The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. Once a message shows, it updates as the respondent changes the answer, and it goes when the answer is fixed.
+The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. In the summary, every line names the question: a message that doesn't already name it starts with the question's label in quotation marks. Once a message shows, it updates as the respondent changes the answer, and it goes when the answer is fixed.
 
 | Situation | Message |
 |---|---|
 | Required (or Answer every row on), and no row answered | "How satisfied were you with each part of your visit?" is required. (the question's own label, in quotation marks) |
 | Answer every row on, and some rows not answered | Answer every row of "How satisfied were you with each part of your visit?". |
 
-Once a row is answered, the respondent can change its answer but not clear it: only **Clear form**, which clears every answer in the form, does that. On the review page of a form with pages, each answered row is listed with its answer, such as "Booking: Satisfied".
+Choosing a row's selected answer again clears that row; once no row is answered, the question has no answer. When neither Required nor Answer every row is on, a **Clear selection** button shows under the table while any row is answered. It clears every row and moves focus to the first radio button. On the review page of a form with pages, each answered row is listed with its answer, such as "Booking: Satisfied".
 
 The matrix keeps its table layout at every width. When the table is wider than the space it has, as with many columns on a phone, it scrolls sideways in its own box.
 
@@ -81,6 +81,7 @@ What the rendered form exposes to assistive technology:
 
 - The question is a group (`<fieldset>`) named by its label (`<legend>`), holding a table with a header row of column labels.
 - Each row is a radio group named by its row label. Each radio button is named by its column label, and the arrow keys move between the radio buttons in a row.
+- Clear selection is named "Clear selection, " followed by the question's label.
 - The group's description (`aria-describedby`) is "Required", on a required question, then the help text, then any error. The red asterisk is hidden from assistive technology, so it is never read out as part of the name.
 - After a failed check, the group has `aria-invalid="true"`.
 

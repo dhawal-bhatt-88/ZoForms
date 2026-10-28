@@ -4,7 +4,7 @@ summary: A web address, checked for the right form.
 template: question-type
 badges: [Free text]
 appliesTo: [builder, package]
-updated: 2026-10-25
+updated: 2026-10-28
 prev: /docs/build/question-types/phone-number
 next: /docs/build/question-types/date
 ---
@@ -13,7 +13,7 @@ next: /docs/build/question-types/date
 
 ## When to use
 
-Use a link when you need a web address: a practice's website, a profile page, a shared document. The form checks that the answer is a complete address before it can be sent.
+Use a link when you need a web address: a practice's website, a profile page, a shared document. The form checks that the answer is a web address before it can be sent.
 
 Use something else when:
 
@@ -48,15 +48,15 @@ The box shows "https://…" until the respondent types. The builder has no setti
 
 ## Validation and error messages
 
-The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. Once a message shows, it updates as the respondent types, and it goes when the answer is fixed.
+The form checks the answer when the respondent selects Submit (or Next, on a form with pages). Each message shows under the question and in the "There is a problem" summary at the top of the form, where it links to the question. In the summary, every line names the question: a message that doesn't already name it starts with the question's label in quotation marks. Once a message shows, it updates as the respondent types, and it goes when the answer is fixed.
 
-| Situation | Message |
-|---|---|
-| Required, and nothing typed | "Referring practice's website" is required. (the question's own label, in quotation marks) |
-| Required, and only spaces typed | The same message: an answer of only spaces counts as no answer. |
-| The answer isn't a complete web address | Enter a valid URL, including https://. |
+| Situation | Message | In the summary |
+|---|---|---|
+| Required, and nothing typed | "Referring practice's website" is required. (the question's own label, in quotation marks) | The same |
+| Required, and only spaces typed | The same message: an answer of only spaces counts as no answer. | The same |
+| The answer isn't a web address | Enter a valid URL, including https://. | "Referring practice's website": Enter a valid URL, including https://. |
 
-A complete address starts with its scheme, such as `https://`. An address such as example.org, without it, is refused. The check ignores spaces before or after the address, and doesn't check that the address exists.
+A web address starts with `https://` or `http://`, then the site, such as https://example.org. Anything else is refused: an address without that start, such as example.org; one with a name before the site, such as https://user@example.org; and other kinds of address, such as mailto:, tel:, ftp:// and javascript:. The check ignores spaces before or after the address, and doesn't check that the address exists.
 
 ## Accessibility
 
@@ -75,6 +75,4 @@ What the rendered form exposes to assistive technology:
 
 ## Troubleshooting
 
-**"Enter a valid URL, including https://." for an address that looks right.** The address has no scheme, as in example.org. The form doesn't add `https://` for the respondent, so ask for it in the help text.
-
-**An answer that isn't a web address was accepted.** The check asks only for a complete address, not for a web address, so an answer that starts with something other than `https://` or `http://` can get through. That includes `javascript:` addresses, which aren't safe to open. Treat every Link answer as text the respondent typed: before anyone opens one, or shows it as a link, check that it starts with `https://`. [TODO: the Link check is to be tightened so it accepts web addresses only.]
+**"Enter a valid URL, including https://." for an address that looks right.** The address has no `https://` or `http://` at the start, as in example.org, or has a name before the site, as in https://user@example.org. The form doesn't add `https://` for the respondent, so ask for it in the help text.

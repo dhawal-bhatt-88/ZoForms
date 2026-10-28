@@ -4,7 +4,7 @@ summary: The React component that renders a form file, validates it and posts th
 template: api-reference
 badges: [React]
 appliesTo: [package]
-updated: 2026-10-24
+updated: 2026-10-28
 prev: /docs/build/show-questions-conditionally
 next: /docs/examples/follow-up-question
 ---
@@ -233,6 +233,7 @@ export const validators = [
 - A validator runs only when the question is visible, answered and passes every built-in check.
 - It must be pure, fast and synchronous, and must not use `window`, `document` or the network. The same code runs on your server.
 - A throw, an empty string, a number, an object or a promise fails closed: the question shows "This answer couldn't be checked." and the form can't be submitted.
+- In the error summary your message starts with the question's label in quotation marks, as does "This answer couldn't be checked.": for a question labelled Medical record number, `"Medical record number": Enter the MRN as MRN followed by 6 digits.` The message beside the field, and the one `prepareSubmission` returns, are as you wrote them.
 - The array is checked when the form mounts and whenever you pass a different array. An entry that isn't `{ field, validate }`, or names a field that isn't an answerable question, throws a `TypeError`.
 
 </Rules>
