@@ -146,8 +146,8 @@ importers:
         specifier: 3.1.0
         version: 3.1.0(acorn@8.17.0)
       '@zoworkhq/forms':
-        specifier: file:../../vendor/zoworkhq-forms-0.26.0.tgz
-        version: file:vendor/zoworkhq-forms-0.26.0.tgz(react@18.3.1)
+        specifier: file:../../vendor/zoworkhq-forms-0.27.0.tgz
+        version: file:vendor/zoworkhq-forms-0.27.0.tgz(react@18.3.1)
       lucide-react:
         specifier: ^1.23.0
         version: 1.23.0(react@18.3.1)
@@ -1251,9 +1251,9 @@ packages:
   '@xtuc/long@4.2.2':
     resolution: {integrity: sha512-NuHqBY1PB/D8xU6s/thBgOAiAP7HOYDQ32+BFZILJ8ivkUkAHQnWfn6WhL79Owj1qmUnoN/YPhktdIoucipkAQ==}
 
-  '@zoworkhq/forms@file:vendor/zoworkhq-forms-0.26.0.tgz':
-    resolution: {integrity: sha512-saShPoD2Nl6ejTPL0e9m/H4XhJSDa68sOf8rjJM5xbmb76VDYi4oym7+/Wwlo4VjI/GBxRqKUXRPrAoa3KWvjQ==, tarball: file:vendor/zoworkhq-forms-0.26.0.tgz}
-    version: 0.26.0
+  '@zoworkhq/forms@file:vendor/zoworkhq-forms-0.27.0.tgz':
+    resolution: {integrity: sha512-LgUNEueNAEhx6iJdR21SpvHh3UC2BlRMoLqNOzIPcY/L8wFbac2WH1go2pd+9zCF6U8VztcC8dOofG3m5U07lg==, tarball: file:vendor/zoworkhq-forms-0.27.0.tgz}
+    version: 0.27.0
     peerDependencies:
       react: '>=18'
 
@@ -4489,7 +4489,7 @@ snapshots:
 
   '@xtuc/long@4.2.2': {}
 
-  '@zoworkhq/forms@file:vendor/zoworkhq-forms-0.26.0.tgz(react@18.3.1)':
+  '@zoworkhq/forms@file:vendor/zoworkhq-forms-0.27.0.tgz(react@18.3.1)':
     dependencies:
       react: 18.3.1
 

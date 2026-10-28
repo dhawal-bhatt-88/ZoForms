@@ -10,7 +10,7 @@ import { readJson } from "./content";
 
 const PACKAGE_DIR = path.join(process.cwd(), "node_modules", "@zoworkhq", "forms");
 
-/** The installed version, e.g. "0.26.0": the top bar and every "Applies to". */
+/** The installed version, e.g. "0.27.0": the top bar and every "Applies to". */
 export function rendererVersion(): string {
   return (readJson(path.join(PACKAGE_DIR, "package.json")) as { version: string }).version;
 }

@@ -8,7 +8,7 @@ import Image from "next/image";
  *   form (GET /v1/forms/:id/artifact). The excerpt below is that file's text,
  *   shortened where it says "…", with the group's opening brackets and the
  *   formula's arguments on fewer lines.
- * - The screenshots are that file rendered by @zoworkhq/forms 0.26.0 in the
+ * - The screenshots are that file rendered by @zoworkhq/forms 0.27.0 in the
  *   external test app, light and dark, with the host page in the renderer's
  *   own surface and text colours. They show the group heading and the first
  *   question, the part the excerpt covers.

@@ -48,7 +48,7 @@ test.describe("docs", () => {
     const nav = page.getByRole("navigation", { name: "Docs" });
     await expect(nav.getByRole("link", { name: "Docs home" })).toHaveAttribute("aria-current", "page");
     const header = page.getByRole("banner");
-    await expect(header.getByText("@zoworkhq/forms 0.26.0")).toBeVisible();
+    await expect(header.getByText("@zoworkhq/forms 0.27.0")).toBeVisible();
     await expect(header.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
     await expect(header.getByRole("link", { name: "Release notes" })).toHaveCount(0);
   });
@@ -60,7 +60,7 @@ test.describe("docs", () => {
     await expect(page.getByRole("navigation", { name: "Docs" }).getByRole("link", { name: "Dropdown" })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toHaveText(/Docs\s*\/\s*Build forms\s*\/\s*Question types/);
     await expect(page.getByRole("link", { name: "View as Markdown" })).toHaveAttribute("href", "/docs/build/question-types/dropdown.md");
-    await expect(page.getByText("Applies to: Zowork Forms builder · @zoworkhq/forms 0.26.0 or later.")).toBeVisible();
+    await expect(page.getByText("Applies to: Zowork Forms builder · @zoworkhq/forms 0.27.0 or later.")).toBeVisible();
 
     const toc = page.getByRole("navigation", { name: "On this page" });
     await expect(toc).toBeVisible();

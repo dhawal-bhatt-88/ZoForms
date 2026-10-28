@@ -197,16 +197,21 @@ const THEMES = ["light", "dark"];
       const points = await P.locator(".zf-form").getByRole("radio").evaluateAll((els) => els.map((e) => e.value));
       check("linear-scale: points 1 to 5", JSON.stringify(points) === '["1","2","3","4","5"]', points.join(", "));
 
-      // Rating: selecting the same star again keeps the rating; "4 of 5" is stored as 4.
+      // Rating: selecting the same star again clears the rating; "4 of 5" is stored as 4.
       await load(P, urlOf("rating"));
       await P.getByRole("button", { name: "4 stars" }).click();
       await P.getByRole("button", { name: "4 stars" }).click();
-      const pressed = await P.getByRole("button", { name: "4 stars" }).getAttribute("aria-pressed");
+      const unpressed = await P.getByRole("button", { name: "4 stars" }).getAttribute("aria-pressed");
+      await submit();
+      await P.waitForTimeout(300);
+      const ratingErrors = await errorsOf();
+      check("rating: the same star again clears it", unpressed === "false" && ratingErrors.includes('"How would you rate your check-in experience today?" is required.'), `${unpressed} ${ratingErrors.join(" | ")}`);
+      await P.getByRole("button", { name: "4 stars" }).click();
       await submit();
       await P.getByText("Form submitted successfully.").waitFor();
       await P.getByRole("tab", { name: "Payload" }).click();
       const rated = (await P.getByRole("tabpanel").textContent()).replace(/\s+/g, "");
-      check("rating: the same star again keeps it, stored as 4", pressed === "true" && rated.includes('"checkin_rating":{"state":"answered","value":4}'), `${pressed} ${rated.slice(0, 200)}`);
+      check("rating: stored as 4", rated.includes('"checkin_rating":{"state":"answered","value":4}'), rated.slice(0, 200));
 
       // Ranking: ranked in the order selected; a partial ranking gets its message; unranking moves the rest up.
       await load(P, urlOf("ranking"));
