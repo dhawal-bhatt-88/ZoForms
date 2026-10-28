@@ -30,6 +30,7 @@ import {
   LayoutTemplate,
   Plus,
   Search,
+  SlidersHorizontal,
   Trash2,
   X,
 } from "lucide-react";
@@ -162,7 +163,7 @@ import {
   type FlatItem,
   type MoveTarget,
 } from "@/lib/tree-dnd";
-import { inspectorHeading, logicNoun } from "@/lib/inspector";
+import { inspectorHeading, logicNoun, TEXT_ONLY_TYPES, textFieldEdit } from "@/lib/inspector";
 import { CATALOG_BLOCK_COUNT, catalogLabel, matchCatalog, type CatalogItem } from "@/lib/block-catalog";
 import { parseCount, repeatBadgeText, repeatPreviewText } from "@/lib/repeat-settings";
 import { OptionImportDialog } from "@/components/option-import-dialog";
@@ -1884,7 +1885,20 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
    */
   function selectBlock(bid: string, toPane: boolean) {
     setSelectedId(bid);
-    if (toPane) requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById("block-label")?.focus()));
+    // Title and Label blocks have no Label field: their first field is Text.
+    const first = () => document.getElementById("block-label") ?? document.getElementById("block-content");
+    if (toPane) requestAnimationFrame(() => requestAnimationFrame(() => first()?.focus()));
+  }
+
+  /**
+   * Show Form settings: select nothing, which is what the pane shows them for. From
+   * the top bar's Form settings (or its menu item), focus moves to the pane's
+   * heading, so keyboard and screen-reader users land there; a click on empty
+   * canvas space leaves focus where it was.
+   */
+  function showFormSettings(focusPane: boolean) {
+    setSelectedId(null);
+    if (focusPane) requestAnimationFrame(() => requestAnimationFrame(() => document.getElementById(SETTINGS_PANE_HEADING_ID)?.focus()));
   }
 
   /** From the pane back to the selected block's place on the canvas: its card, or a page's title. */
@@ -2823,9 +2837,16 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         )}
 
         <div className="ml-auto flex flex-none items-center gap-2">
-          {/* From 1024px: everything in the bar. Below it, Download, the theme
-              and the form's actions move into one ⋯ menu, so Save, Cancel and
-              the save state stay on screen (restyle 4). */}
+          {/* From 1024px: everything in the bar. Below it, Form settings, Download,
+              the theme and the form's actions move into one ⋯ menu, so Save, Cancel
+              and the save state stay on screen (restyle 4). */}
+          {/* A group template has no form settings. */}
+          {!groupTemplate && (
+            <Button size="sm" onClick={() => showFormSettings(true)} aria-controls={SETTINGS_PANE_ID} className="hidden lg:inline-flex">
+              <SlidersHorizontal aria-hidden="true" className="h-3.5 w-3.5" />
+              Form settings
+            </Button>
+          )}
           <ThemeToggle className="hidden lg:inline-flex" />
           {!templateMode && (
             <>
@@ -2849,6 +2870,12 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
               label={templateMode ? "More actions" : "More form actions"}
               className={buttonClasses({ size: "sm", className: "px-2" })}
               items={[
+                ...(groupTemplate
+                  ? []
+                  : [
+                      { label: "Form settings", icon: SlidersHorizontal, onSelect: () => showFormSettings(true) },
+                      ...(templateMode ? ["separator" as const] : []),
+                    ]),
                 ...(templateMode
                   ? []
                   : [
@@ -2997,9 +3024,17 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         style={{ gridTemplateColumns: `minmax(0,1fr) 0px ${pane.width}px` }}
       >
         {/* Canvas: the page's main landmark. */}
-        <main className="overflow-auto bg-paper px-6 py-8">
-          <div className="mx-auto max-w-[680px]">
-            <div className="surface p-8">
+        <main
+          className="overflow-auto bg-paper px-6 py-8"
+          // A click on empty canvas space, around the form or inside it between blocks,
+          // shows Form settings. Keyboard users have the top bar's Form settings.
+          onClick={(e) => {
+            if ((e.target as HTMLElement).hasAttribute("data-canvas-blank")) showFormSettings(false);
+          }}
+          data-canvas-blank
+        >
+          <div className="mx-auto max-w-[680px]" data-canvas-blank>
+            <div className="surface p-8" data-canvas-blank>
               {groupTemplate ? (
                 // A group template has no title or description of its own: it is its group.
                 <p className="body-sm text-graphite">
@@ -3029,7 +3064,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                 </>
               )}
 
-              <div className="mt-6">
+              <div className="mt-6" data-canvas-blank>
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
@@ -3049,7 +3084,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                   }}
                 >
                   <SortableContext items={rows.map((r) => r.id)} strategy={noDisplacement}>
-                    <div className="relative flex flex-col gap-2.5">
+                    <div className="relative flex flex-col gap-2.5" data-canvas-blank>
                       {canvasTree()}
                       {dropAtEndOfForm && <DropLine at="bottom" />}
                     </div>
@@ -3154,35 +3189,38 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
               <h2 id={SETTINGS_PANE_HEADING_ID} className="eyebrow mb-3 text-graphite-soft">
                 {inspectorHeading(selected)}
               </h2>
-              <Field
-                id="block-label"
-                label={isPage(selected) ? "Title" : "Label"}
-                optional={false}
-                hint={
-                  selected.type === "image"
-                    ? "Also read aloud to screen-reader users — describe what the image shows."
-                    : selected.type === "video"
-                      ? "Read aloud to screen-reader users — describe what the video is about."
-                      : selected.type === "audio"
-                        ? "Read aloud to screen-reader users — say what the recording is."
-                        : undefined
-                }
-                className={paneField}
-              >
-                {(field) => (
-                  <Input
-                    {...field}
-                    value={blockName(selected)}
-                    onChange={(e) =>
-                      updateBlock(selected.id, isPage(selected) ? { title: e.target.value } : { label: e.target.value })
-                    }
-                    onFocus={(e) => (e.currentTarget.dataset.atFocus = e.currentTarget.value)}
-                    onBlur={(e) => {
-                      if (e.currentTarget.value !== e.currentTarget.dataset.atFocus) labelLeft(selected.id);
-                    }}
-                  />
-                )}
-              </Field>
+              {/* Title and Label blocks have one field, Text, below: their label follows it. */}
+              {!TEXT_ONLY_TYPES.includes(selected.type) && (
+                <Field
+                  id="block-label"
+                  label={isPage(selected) ? "Title" : "Label"}
+                  optional={false}
+                  hint={
+                    selected.type === "image"
+                      ? "Also read aloud to screen-reader users — describe what the image shows."
+                      : selected.type === "video"
+                        ? "Read aloud to screen-reader users — describe what the video is about."
+                        : selected.type === "audio"
+                          ? "Read aloud to screen-reader users — say what the recording is."
+                          : undefined
+                  }
+                  className={paneField}
+                >
+                  {(field) => (
+                    <Input
+                      {...field}
+                      value={blockName(selected)}
+                      onChange={(e) =>
+                        updateBlock(selected.id, isPage(selected) ? { title: e.target.value } : { label: e.target.value })
+                      }
+                      onFocus={(e) => (e.currentTarget.dataset.atFocus = e.currentTarget.value)}
+                      onBlur={(e) => {
+                        if (e.currentTarget.value !== e.currentTarget.dataset.atFocus) labelLeft(selected.id);
+                      }}
+                    />
+                  )}
+                </Field>
+              )}
 
               {/* A question's name, for score formulas (contract §17.8): only within reach of a scored group. */}
               {isAnswerable(selected) && isWithinScoreReach(schema.blocks, selected.id) && (() => {
@@ -3340,7 +3378,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                 </Field>
               )}
 
-              {["text", "title", "label"].includes(selected.type) && (
+              {selected.type === "text" && (
                 <Field
                   id="block-content"
                   label="Content"
@@ -3354,8 +3392,25 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                       {...field}
                       value={selected.content ?? ""}
                       onChange={(e) => updateBlock(selected.id, { content: e.target.value })}
-                      rows={selected.type === "text" ? 3 : 1}
+                      rows={3}
                       className="resize-none"
+                    />
+                  )}
+                </Field>
+              )}
+
+              {/*
+                A Title's or Label's one field: what respondents see. The label follows it
+                (textFieldEdit); blank, respondents see the label, which the placeholder shows.
+              */}
+              {TEXT_ONLY_TYPES.includes(selected.type) && (
+                <Field id="block-content" label="Text" optional={false} className="mb-4">
+                  {(field) => (
+                    <Input
+                      {...field}
+                      value={selected.content ?? ""}
+                      placeholder={selected.label}
+                      onChange={(e) => updateBlock(selected.id, textFieldEdit(selected, e.target.value))}
                     />
                   )}
                 </Field>
@@ -3641,7 +3696,8 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
             </div>
           ) : (
             <div>
-              <h2 id={SETTINGS_PANE_HEADING_ID} className="eyebrow mb-3 text-graphite-soft">
+              {/* Focused by the top bar's Form settings: a target, not a tab stop. */}
+              <h2 id={SETTINGS_PANE_HEADING_ID} tabIndex={-1} className="eyebrow mb-3 text-graphite-soft outline-none">
                 Form settings
               </h2>
               {paged && (

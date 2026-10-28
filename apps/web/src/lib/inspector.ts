@@ -15,6 +15,25 @@ function asksNothing(block: Block): boolean {
   return DISPLAY_BLOCK_TYPES.includes(block.type) || isPresentationalType(block.type);
 }
 
+/**
+ * Title and Label blocks show their `content`, or their `label` only when the
+ * content is empty. The inspector gives them one field, Text, which writes the
+ * content; the label follows it, so the block is named by what it says on the
+ * canvas, in jump links and in save messages.
+ */
+export const TEXT_ONLY_TYPES: readonly string[] = ["title", "label"];
+
+/**
+ * What typing `text` into a Title or Label block's Text field changes: the
+ * content as typed, and the label as the trimmed text. Blank text is stored as
+ * no text (the renderer would show spaces as they are), and the label is then
+ * the type's default ("Title", "Label"), which is what respondents see.
+ */
+export function textFieldEdit(block: Block, text: string): { content: string; label: string } {
+  const blank = !text.trim();
+  return { content: blank ? "" : text, label: blank ? BLOCK_META[block.type as keyof typeof BLOCK_META].question : text.trim() };
+}
+
 /** The inspector's heading: what the selected block is. A block that asks nothing is named by its type, never "Question". */
 export function inspectorHeading(block: Block): string {
   if (isPage(block)) return "Page";

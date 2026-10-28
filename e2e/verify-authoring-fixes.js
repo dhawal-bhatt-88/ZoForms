@@ -1,8 +1,10 @@
 // The authoring fixes found while writing the docs (docs/briefs/BUILDER-BRIEF-AUTHORING-FIXES.md):
 // Hidden field gone from the insert menu but still opening, saving and deleting; Respondent's
 // country's canvas and keywords; display blocks no longer called "Question"; a new Matrix's
-// rows; distinct default page titles; and the save rules for a linear scale's Min and Max and
-// a number's Minimum and Maximum (API 400 naming the block, and the same message inline).
+// rows; distinct default page titles; the save rules for a linear scale's Min and Max and
+// a number's Minimum and Maximum (API 400 naming the block, and the same message inline);
+// Title and Label blocks' one Text field; and the visible ways into Form settings. Each
+// changed inspector and canvas state is screenshotted in light and dark.
 const { OUT, API, WEB, PrismaClient, launchBrowser } = require("./_setup");
 const prisma = new PrismaClient();
 
@@ -79,6 +81,15 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     const search = async (q) => { await P.getByPlaceholder("Search blocks…").fill(q); await sleep(100); return menuOptions(); };
     const add = async (name) => { await openMenu(); await P.getByRole("option", { name, exact: true }).click(); };
     const save = async () => { await P.getByRole("button", { name: "Save", exact: true }).click(); await P.getByText("All changes saved").waitFor({ timeout: 10000 }); };
+    // A state in light, then dark (the class the theme script sets), then back to light.
+    const shot = async (name) => {
+      for (const theme of ["light", "dark"]) {
+        await P.evaluate((dark) => document.documentElement.classList.toggle("dark", dark), theme === "dark");
+        await sleep(250);
+        await P.screenshot({ path: `${OUT}/authoring-${name}-${theme}.png` });
+      }
+      await P.evaluate(() => document.documentElement.classList.remove("dark"));
+    };
 
     await P.goto(`${WEB}/app/forms/${legacyId}/edit`);
     await P.getByText("All changes saved").waitFor();
@@ -115,7 +126,7 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     check('country: the canvas shows a select reading "Select a country…"', await country.getByText("Select a country…", { exact: true }).isVisible());
     check('country: …and says "15 countries, and Other"', await country.getByText("15 countries, and Other", { exact: true }).isVisible());
     check('country: nothing says "Auto-detected"', (await P.getByText(/auto-detected/i).count()) === 0);
-    await P.screenshot({ path: `${OUT}/authoring-1-hidden-and-country.png` });
+    await shot("1-hidden-and-country");
 
     await card("b_ref00001").locator("span.truncate").first().click();
     await card("b_ref00001").getByRole("button", { name: "Delete", exact: true }).click();
@@ -133,12 +144,13 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
       await add(item);
       check(`${heading}: the inspector is headed "${heading}"`, (await inspectorHeading()) === heading, await inspectorHeading());
       check(`${heading}: Logic says "Show this ${noun} only when…"`, await logicSays(noun));
+      if (heading === "Heading") await shot("2-display-heading");
     }
     check('the canvas names a heading "Edit heading: …", not "Edit question"',
       (await P.getByRole("button", { name: "Edit heading: Section heading", exact: true }).count()) === 1);
     await add("Short answer");
     check('a question is still headed "Question", with "Show this question only when…"', (await inspectorHeading()) === "Question" && await logicSays("question"));
-    await P.screenshot({ path: `${OUT}/authoring-2-display-heading.png` });
+    await shot("2-question-heading");
 
     // Fix 7: a new Matrix's rows are rows; Add row continues them; codes stay empty.
     await add("Matrix");
@@ -150,7 +162,7 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
       JSON.stringify(await P.locator('aside input[id^="columns-"][id$="-label"]').evaluateAll((es) => es.map((e) => e.value))) === '["Column 1","Column 2","Column 3"]');
     await P.getByRole("button", { name: "Add row", exact: true }).click();
     check('matrix: Add row gives "Row 4"', (await rowLabels())[3] === "Row 4", JSON.stringify(await rowLabels()));
-    await P.screenshot({ path: `${OUT}/authoring-3-matrix-rows.png` });
+    await shot("3-matrix-rows");
     await save();
 
     // Fix 8: distinct default page titles.
@@ -161,7 +173,7 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     await P.locator('input[aria-label="Page 2 title"]').fill("Page 3");
     await P.getByRole("button", { name: 'Add page after "Page 3"' }).click();
     check('a page added when "Page 3" is taken is "Page 4"', JSON.stringify(await pageTitles()) === '["Page 1","Page 3","Page 4"]', JSON.stringify(await pageTitles()));
-    await P.screenshot({ path: `${OUT}/authoring-4-page-titles.png` });
+    await shot("4-page-titles");
 
     // ---------- fixes 3 and 6 in the editor: the same rules and messages, under their fields ----------
     const bookingId = await create("Booking");
@@ -190,7 +202,7 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     check("scale: Min above Max shows under Max", (await errorText("scale-max")) === "Max (3) can't be less than Min (5)." && (await errorText("scale-min")) === null, await errorText("scale-max"));
     check("scale: …as an alert, with Max marked invalid", (await fieldError("scale-max").getAttribute("role")) === "alert" && (await P.locator("#scale-max").getAttribute("aria-invalid")) === "true");
     check("scale: …shown once, not again under Logic", (await timesShown("can't be less than Min")) === 1 && (await redMessages()) === 1);
-    await P.screenshot({ path: `${OUT}/authoring-5-scale-error.png` });
+    await shot("5-scale-error");
     const scaleRefusal = await refusedSave();
     check("scale: the save is refused with the same message, naming the block",
       scaleRefusal === `Couldn't save: Block "How easy was booking?": Max (3) can't be less than Min (5).`, scaleRefusal);
@@ -216,7 +228,7 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     await P.locator("#number-min").fill("10");
     await P.locator("#number-max").fill("5");
     check("number: Minimum above Maximum shows under Maximum", (await errorText("number-max")) === "Maximum (5) can't be less than Minimum (10)." && (await redMessages()) === 1, await errorText("number-max"));
-    await P.screenshot({ path: `${OUT}/authoring-6-number-error.png` });
+    await shot("6-number-error");
     const numberRefusal = await refusedSave();
     check("number: the save is refused with the same message, naming the block",
       numberRefusal === `Couldn't save: Block "Age": Maximum (5) can't be less than Minimum (10).`, numberRefusal);
@@ -234,6 +246,82 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     saved = [...walk((await stored(bookingId)).blocks)];
     const clearedNumber = saved.find((b) => b.type === "number");
     check("saved: a cleared Minimum is left out, the Maximum kept", !("min" in clearedNumber) && clearedNumber.max === 120.5, JSON.stringify(clearedNumber));
+
+    // ---------- fix 4: Title and Label have one field, Text; the label follows it ----------
+    const notesId = await create("Visit notes");
+    await put(notesId, { title: "Visit notes", blocks: [
+      { id: "b_q0000001", type: "short", label: "Your name", required: false },
+      // Saved before this fix: a label respondents see only because the content is empty.
+      { id: "b_oldtitl1", type: "title", label: "Before your visit", content: "" },
+    ] });
+    await P.goto(`${WEB}/app/forms/${notesId}/edit`);
+    await P.getByText("All changes saved").waitFor();
+    const text = P.locator("#block-content");
+    await card("b_oldtitl1").locator("div.text-xl").click();
+    check("an older title: the Text field is empty, its placeholder the label respondents see",
+      (await text.inputValue()) === "" && (await text.getAttribute("placeholder")) === "Before your visit");
+    for (const [item, type, defaultText, defaultLabel] of [["Title", "title", "Section title", "Title"], ["Label", "label", "Label", "Label"]]) {
+      await add(item);
+      const id = await P.locator("[data-block-id]").last().getAttribute("data-block-id");
+      check(`${item}: one field, Text, and no Label field`,
+        (await P.locator("#block-label").count()) === 0 && (await P.getByLabel("Text", { exact: true }).count()) === 1 && (await text.inputValue()) === defaultText);
+      await text.fill(item === "Title" ? "About your appointment" : "Contact details");
+      const typed = item === "Title" ? "About your appointment" : "Contact details";
+      check(`${item}: the canvas shows the text, and the card is named by it`,
+        (await card(id).innerText()).includes(typed) && (await P.getByRole("button", { name: `Edit ${type}: ${typed}`, exact: true }).count()) === 1);
+      if (item === "Title") await shot("7-title-inspector");
+      await text.fill("   ");
+      check(`${item}: blank text shows "${defaultLabel}", which the placeholder says`,
+        (await card(id).innerText()).includes(defaultLabel) && (await text.getAttribute("placeholder")) === defaultLabel);
+      await text.fill(typed);
+    }
+    await save();
+    const notes = [...walk((await stored(notesId)).blocks)];
+    check("saved: each block's label follows its text; the older title is untouched",
+      JSON.stringify(notes.filter((b) => b.type === "title" || b.type === "label").map((b) => [b.label, b.content ?? ""]))
+        === JSON.stringify([["Before your visit", ""], ["About your appointment", "About your appointment"], ["Contact details", "Contact details"]]),
+      JSON.stringify(notes));
+    // From the keyboard, selecting a title moves focus to its Text field.
+    await P.getByRole("button", { name: "Edit title: About your appointment", exact: true }).focus();
+    await P.keyboard.press("Enter");
+    await sleep(300);
+    check("keyboard: Enter on a title's card moves focus to its Text field", await text.evaluate((e) => e === document.activeElement));
+
+    // ---------- fix 9: visible ways into Form settings ----------
+    const paneHeading = P.locator("aside h2").first();
+    const formSettingsButton = P.getByRole("button", { name: "Form settings", exact: true });
+    check("top bar: a Form settings button, controlling the settings pane",
+      (await formSettingsButton.count()) === 1 && (await formSettingsButton.getAttribute("aria-controls")) === "settings-pane");
+    await formSettingsButton.focus();
+    await P.keyboard.press("Enter");
+    await sleep(300);
+    check("keyboard: Form settings shows Form settings and moves focus to its heading",
+      (await paneHeading.textContent()) === "Form settings" && await paneHeading.evaluate((e) => e === document.activeElement));
+    check("…the heading is a focus target, not a tab stop", (await paneHeading.getAttribute("tabindex")) === "-1");
+    await shot("8-form-settings");
+    await card("b_q0000001").locator("span.truncate").first().click();
+    check("selecting a block shows its settings again", (await paneHeading.textContent()) === "Question");
+    // Empty space beside the form, then empty space inside it, below the blocks.
+    await P.locator("main").click({ position: { x: 20, y: 400 } });
+    check("a click on empty canvas space beside the form shows Form settings", (await paneHeading.textContent()) === "Form settings");
+    await card("b_q0000001").locator("span.truncate").first().click();
+    const surface = P.locator("main .surface");
+    const box = await surface.boundingBox();
+    await P.mouse.click(box.x + box.width / 2, box.y + box.height - 8);
+    check("a click on empty space inside the form shows Form settings", (await paneHeading.textContent()) === "Form settings");
+    await card("b_q0000001").locator("span.truncate").first().click();
+    await card("b_q0000001").locator("span.truncate").first().click();
+    check("a click on a block keeps it selected", (await paneHeading.textContent()) === "Question");
+    // Below 1024px the bar is tight: Form settings is in the ⋯ menu.
+    await P.setViewportSize({ width: 900, height: 1000 });
+    await sleep(300);
+    check("below 1024px: no Form settings button in the bar", !(await formSettingsButton.isVisible()));
+    await P.getByRole("button", { name: "More form actions", exact: true }).click();
+    await P.getByRole("menuitem", { name: "Form settings", exact: true }).click();
+    await sleep(300);
+    check("below 1024px: Form settings in the ⋯ menu shows Form settings, focus on its heading",
+      (await paneHeading.textContent()) === "Form settings" && await paneHeading.evaluate((e) => e === document.activeElement));
+    await P.setViewportSize({ width: 1440, height: 1200 });
   } catch (e) {
     check("script ran without error", false, e.stack);
     try { const p = browser?.contexts()[0]?.pages()[0]; if (p) await p.screenshot({ path: `${OUT}/authoring-failure.png` }); } catch {}

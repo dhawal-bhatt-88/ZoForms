@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { newBlock, newGroup, newPage, type Block } from "@formbuilder/form-schema";
-import { inspectorHeading, logicNoun } from "./inspector";
+import { inspectorHeading, logicNoun, TEXT_ONLY_TYPES, textFieldEdit } from "./inspector";
 
 describe("inspectorHeading", () => {
   it.each([
@@ -45,5 +45,22 @@ describe("logicNoun (Show this ___ only when…)", () => {
     expect(logicNoun(newBlock("short"))).toBe("question");
     expect(logicNoun(newGroup() as Block)).toBe("group");
     expect(logicNoun(newPage() as Block)).toBe("page");
+  });
+});
+
+describe("textFieldEdit (Title and Label: one Text field, the label follows it)", () => {
+  it("writes the content as typed and the label trimmed", () => {
+    expect(textFieldEdit(newBlock("title"), "  Your visit ")).toEqual({ content: "  Your visit ", label: "Your visit" });
+    expect(textFieldEdit(newBlock("label"), "Appointment details")).toEqual({ content: "Appointment details", label: "Appointment details" });
+  });
+
+  it("blank text leaves the type's default as the label, which respondents then see", () => {
+    expect(textFieldEdit(newBlock("title"), "")).toEqual({ content: "", label: "Title" });
+    // Spaces only count as blank: the renderer would show them, not the label.
+    expect(textFieldEdit(newBlock("label"), "   ")).toEqual({ content: "", label: "Label" });
+  });
+
+  it("only Title and Label blocks get the one field", () => {
+    expect(TEXT_ONLY_TYPES).toEqual(["title", "label"]);
   });
 });

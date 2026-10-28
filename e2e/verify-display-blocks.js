@@ -174,11 +174,13 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     await add("Title");
     const titleCard = () => cards.last();
     check("title preview: its content", (await titleCard().locator("div.text-xl").innerText()) === "Section title");
-    await content.fill("");
-    await rename("Your visit");
-    check("title preview: falls back to its label when the content is empty", (await titleCard().locator("div.text-xl").innerText()) === "Your visit");
+    // One field, Text: the label follows it, and blank shows the default, as respondents see it.
+    await P.locator("#block-content").fill("");
+    check("title preview: empty text shows its default label, Title", (await titleCard().locator("div.text-xl").innerText()) === "Title");
+    await P.locator("#block-content").fill("Your visit");
+    check("title preview: its text", (await titleCard().locator("div.text-xl").innerText()) === "Your visit");
     await add("Label");
-    await content.fill("Appointment details");
+    await P.locator("#block-content").fill("Appointment details");
     check("label preview: its content", (await cards.last().locator("div.uppercase").textContent()) === "Appointment details");
     await add("Divider");
     check("divider preview: a rule", (await cards.last().locator("hr").count()) === 1);
