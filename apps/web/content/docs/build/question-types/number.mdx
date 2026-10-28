@@ -4,7 +4,7 @@ summary: A number the respondent types, such as a count or an amount.
 template: question-type
 badges: []
 appliesTo: [builder, package]
-updated: 2026-10-25
+updated: 2026-10-28
 prev: /docs/build/question-types/checkboxes
 next: /docs/build/question-types/email
 ---
@@ -30,8 +30,9 @@ You need a form open in the editor.
 <Gif alt="Inserting a Number question from the block menu" />
 3. In **Label**, write the question.
 4. Add **Help text** to say what to enter when the answer is none, or which unit to use.
-5. Turn on **Required** if the question must be answered.
-6. Select **Save**.
+5. To limit the answer, set **Minimum**, **Maximum** or both. Leave them blank for no limit.
+6. Turn on **Required** if the question must be answered.
+7. Select **Save**.
 
 ## Settings
 
@@ -39,11 +40,13 @@ You need a form open in the editor.
 |---|---|---|
 | Label | `label` | "Number" |
 | Help text | `description` | none; left out of the file when empty |
+| Minimum | `min` | none; left out of the file when blank |
+| Maximum | `max` | none; left out of the file when blank |
 | Required | `required` | `false` |
 | Name (only inside a group with a score) | not in the downloaded file | made from the label |
 | Show this question only when… | `enableWhen`, and `enableLogic` with two or more conditions | none |
 
-Any number is accepted, including 0, decimals and negative numbers. The builder has no setting for a smallest or largest number; say in the help text what you expect.
+Any number is accepted, including 0, decimals and negative numbers, unless you set a Minimum or Maximum. Both can be decimals or negative too, and they can be equal. Respondents aren't told the limits until an answer breaks one, and the box's up and down arrows don't stop at them, so say the range in the help text, such as "0 to 120".
 
 **As a condition.** Other questions can be shown depending on a number, with is answered, is, is not, is greater than, is less than, is at least or is at most. You type the number to compare against. For example, show "Parent or guardian's name" only when an age question is less than 18.
 
@@ -55,6 +58,16 @@ The form checks the answer when the respondent selects Submit (or Next, on a for
 |---|---|
 | Required, and nothing typed | "How many times have you seen a therapist or counselor in the past 12 months?" is required. (the question's own label, in quotation marks) |
 | Required, and what's in the box isn't a number | The same message: anything that isn't a number counts as no answer. |
+| Less than the Minimum | Must be at least 18. (with your Minimum) |
+| More than the Maximum | Must be at most 120. (with your Maximum) |
+
+The Minimum and Maximum are checked whenever there's an answer, whether or not the question is required.
+
+**When you save.** The builder shows this under **Maximum** as you type, and won't save the form until it's fixed:
+
+| Situation | Message |
+|---|---|
+| Minimum is greater than Maximum | Maximum (5) can't be less than Minimum (10). (with your numbers) |
 
 ## Accessibility
 

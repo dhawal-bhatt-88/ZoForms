@@ -1,7 +1,8 @@
 // The authoring fixes found while writing the docs (docs/briefs/BUILDER-BRIEF-AUTHORING-FIXES.md):
 // Hidden field gone from the insert menu but still opening, saving and deleting; Respondent's
 // country's canvas and keywords; display blocks no longer called "Question"; a new Matrix's
-// rows; and distinct default page titles.
+// rows; distinct default page titles; and the save rules for a linear scale's Min and Max and
+// a number's Minimum and Maximum (API 400 naming the block, and the same message inline).
 const { OUT, API, WEB, PrismaClient, launchBrowser } = require("./_setup");
 const prisma = new PrismaClient();
 
@@ -40,6 +41,25 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
       { id: "b_cntry001", type: "country", label: "Where do you live?", required: false },
     ] });
     check("API: a form with a Hidden field still saves", r.status === 200, r.status);
+
+    // ---------- API: a scale's and a number's range (contract §6, builder only) ----------
+    const rangeId = await create("Range rules");
+    const scaleQ = (min, max) => ({ id: "b_scale001", type: "scale", label: "How easy was booking?", required: false, min, max });
+    const numberQ = (min, max) => ({ id: "b_numbr001", type: "number", label: "Age", required: false, ...(min === undefined ? {} : { min }), ...(max === undefined ? {} : { max }) });
+    const refused = async (blocks, message, name) => {
+      const res = await put(rangeId, { title: "t", blocks });
+      const body = await res.json();
+      check(`API: ${name} is refused (400) naming the block`, res.status === 400 && body.message === message, `${res.status} ${body.message}`);
+    };
+    await refused([scaleQ(5, 3)], `Block "How easy was booking?": Max (3) can't be less than Min (5).`, "a scale with Min above Max");
+    await refused([scaleQ(1.5, 5)], `Block "How easy was booking?": Min must be a whole number, such as 0 or 1.`, "a scale with a decimal Min");
+    await refused([scaleQ(1, 4.5)], `Block "How easy was booking?": Max must be a whole number, such as 5 or 10.`, "a scale with a decimal Max");
+    await refused([scaleQ(1, 21)], `Block "How easy was booking?": a scale can have at most 20 points; 1 to 21 has 21. Lower Max or raise Min.`, "a scale of 21 points");
+    await refused([numberQ(10, 5)], `Block "Age": Maximum (5) can't be less than Minimum (10).`, "a number with Minimum above Maximum");
+    const ok = await put(rangeId, { title: "t", blocks: [scaleQ(-10, 9), numberQ(0.5, 120.5), { ...numberQ(), id: "b_numbr002", label: "Count" }] });
+    const okStored = (await stored(rangeId)).blocks;
+    check("API: a 20-point scale and a number with decimal limits save, limits kept",
+      ok.status === 200 && okStored[1].min === 0.5 && okStored[1].max === 120.5 && !("min" in okStored[2]), `${ok.status} ${JSON.stringify(okStored)}`);
 
     // ---------- editor ----------
     browser = await launchBrowser();
@@ -142,6 +162,78 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     await P.getByRole("button", { name: 'Add page after "Page 3"' }).click();
     check('a page added when "Page 3" is taken is "Page 4"', JSON.stringify(await pageTitles()) === '["Page 1","Page 3","Page 4"]', JSON.stringify(await pageTitles()));
     await P.screenshot({ path: `${OUT}/authoring-4-page-titles.png` });
+
+    // ---------- fixes 3 and 6 in the editor: the same rules and messages, under their fields ----------
+    const bookingId = await create("Booking");
+    await P.goto(`${WEB}/app/forms/${bookingId}/edit`);
+    await P.getByText("All changes saved").waitFor();
+    const fieldError = (id) => P.locator(`#${id}-error`);
+    const errorText = async (id) => ((await fieldError(id).count()) ? (await fieldError(id).innerText()).trim() : null);
+    const redMessages = () => P.locator("aside [data-field-error]").count();
+    const timesShown = async (phrase) => (await P.locator("aside").innerText()).split(phrase).length - 1;
+    const notice = P.getByRole("alert").filter({ hasText: /Couldn't save/ });
+    const refusedSave = async () => {
+      await P.getByRole("button", { name: "Save", exact: true }).click();
+      await notice.waitFor({ timeout: 10000 });
+      const text = (await notice.innerText()).trim();
+      await P.getByRole("button", { name: "Dismiss" }).click();
+      return text;
+    };
+
+    await add("Linear scale");
+    await P.locator("#block-label").fill("How easy was booking?");
+    check("scale: the inspector says Min and Max are whole numbers, at most 20 points",
+      (await P.locator("#scale-range-help").innerText()) === "Whole numbers. Respondents see every point from Min to Max, at most 20."
+      && (await P.locator("#scale-min").getAttribute("aria-describedby")).includes("scale-range-help"));
+    await P.locator("#scale-max").fill("3");
+    await P.locator("#scale-min").fill("5");
+    check("scale: Min above Max shows under Max", (await errorText("scale-max")) === "Max (3) can't be less than Min (5)." && (await errorText("scale-min")) === null, await errorText("scale-max"));
+    check("scale: …as an alert, with Max marked invalid", (await fieldError("scale-max").getAttribute("role")) === "alert" && (await P.locator("#scale-max").getAttribute("aria-invalid")) === "true");
+    check("scale: …shown once, not again under Logic", (await timesShown("can't be less than Min")) === 1 && (await redMessages()) === 1);
+    await P.screenshot({ path: `${OUT}/authoring-5-scale-error.png` });
+    const scaleRefusal = await refusedSave();
+    check("scale: the save is refused with the same message, naming the block",
+      scaleRefusal === `Couldn't save: Block "How easy was booking?": Max (3) can't be less than Min (5).`, scaleRefusal);
+    await P.locator("#scale-min").fill("1.5");
+    check("scale: a decimal Min shows under Min, and no range message on top",
+      (await errorText("scale-min")) === "Min must be a whole number, such as 0 or 1." && (await errorText("scale-max")) === null);
+    await P.locator("#scale-min").fill("1");
+    await P.locator("#scale-max").fill("30");
+    check("scale: more than 20 points shows under Max, with the count",
+      (await errorText("scale-max")) === "A scale can have at most 20 points; 1 to 30 has 30. Lower Max or raise Min.", await errorText("scale-max"));
+    await P.locator("#scale-max").fill("20");
+    check("scale: 1 to 20 is fine: no message", (await redMessages()) === 0);
+    const points = await P.locator("[data-block-id]").first().locator("span.h-8.w-8").allTextContents();
+    check("scale: the canvas shows all 20 points, as respondents see them", points.length === 20 && points[19] === "20", JSON.stringify(points));
+
+    await add("Number");
+    await P.locator("#block-label").fill("Age");
+    check("number: Minimum and Maximum are offered, empty, and marked optional",
+      (await P.locator("#number-min").inputValue()) === "" && (await P.locator("#number-max").inputValue()) === ""
+      && (await P.getByLabel("Minimum optional", { exact: true }).count()) === 1 && (await P.getByLabel("Maximum optional", { exact: true }).count()) === 1);
+    check("number: the hint says blank is no limit and decimals are allowed",
+      (await P.locator("#number-range-help").innerText()) === "Leave blank for no limit. Decimals and negative numbers are allowed.");
+    await P.locator("#number-min").fill("10");
+    await P.locator("#number-max").fill("5");
+    check("number: Minimum above Maximum shows under Maximum", (await errorText("number-max")) === "Maximum (5) can't be less than Minimum (10)." && (await redMessages()) === 1, await errorText("number-max"));
+    await P.screenshot({ path: `${OUT}/authoring-6-number-error.png` });
+    const numberRefusal = await refusedSave();
+    check("number: the save is refused with the same message, naming the block",
+      numberRefusal === `Couldn't save: Block "Age": Maximum (5) can't be less than Minimum (10).`, numberRefusal);
+    await P.locator("#number-min").fill("-0.5");
+    await P.locator("#number-max").fill("120.5");
+    check("number: decimal and negative limits are fine", (await redMessages()) === 0);
+    await save();
+    let saved = [...walk((await stored(bookingId)).blocks)];
+    const savedScale = saved.find((b) => b.type === "scale");
+    const savedNumber = saved.find((b) => b.type === "number");
+    check("saved: the scale's 1 to 20, and the number's -0.5 to 120.5",
+      savedScale.min === 1 && savedScale.max === 20 && savedNumber.min === -0.5 && savedNumber.max === 120.5, JSON.stringify([savedScale, savedNumber]));
+    await P.locator("#number-min").fill("");
+    await save();
+    saved = [...walk((await stored(bookingId)).blocks)];
+    const clearedNumber = saved.find((b) => b.type === "number");
+    check("saved: a cleared Minimum is left out, the Maximum kept", !("min" in clearedNumber) && clearedNumber.max === 120.5, JSON.stringify(clearedNumber));
   } catch (e) {
     check("script ran without error", false, e.stack);
     try { const p = browser?.contexts()[0]?.pages()[0]; if (p) await p.screenshot({ path: `${OUT}/authoring-failure.png` }); } catch {}

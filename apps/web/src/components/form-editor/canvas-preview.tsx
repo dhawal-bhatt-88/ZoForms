@@ -42,6 +42,8 @@ import {
   isValidImageSource,
   OPTION_TYPES,
   questionNumbers,
+  SCALE_DEFAULTS,
+  SCALE_MAX_POINTS,
   type AnyBlockType,
   type Block,
   type GridBlock,
@@ -187,10 +189,11 @@ export function BlockPreview({ block }: { block: Block }) {
       </div>
     );
   if (block.type === "scale") {
-    const min = block.min ?? 1;
-    const max = block.max ?? 5;
+    // The points the renderer shows: from Min in steps of 1, at most SCALE_MAX_POINTS.
+    const min = block.min ?? SCALE_DEFAULTS.min;
+    const max = block.max ?? SCALE_DEFAULTS.max;
     const arr: number[] = [];
-    for (let n = min; n <= max && arr.length < 12; n++) arr.push(n);
+    for (let n = min; n <= max && arr.length < SCALE_MAX_POINTS; n++) arr.push(n);
     return (
       <div className="flex flex-wrap gap-1.5">
         {arr.map((n) => (

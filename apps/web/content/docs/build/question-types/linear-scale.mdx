@@ -4,7 +4,7 @@ summary: One point on a numbered range, such as 1 to 5, with every point shown.
 template: question-type
 badges: []
 appliesTo: [builder, package]
-updated: 2026-10-25
+updated: 2026-10-28
 prev: /docs/build/question-types/time
 next: /docs/build/question-types/grid
 ---
@@ -29,18 +29,10 @@ You need a form open in the editor.
 2. Under **Questions**, choose **Linear scale**. Typing `linear` or `nps` in the search box finds it too. The question is added and its settings open.
 <Gif alt="Inserting a Linear scale from the block menu" />
 3. In **Label**, write the question.
-4. Set **Min** and **Max**, the first and last points of the scale.
+4. Set **Min** and **Max**, the first and last points of the scale. Both are whole numbers, and a scale has at most 20 points.
 5. In **Help text**, say what the ends of the scale mean, such as "1 = very hard, 5 = very easy". The scale itself shows only numbers.
 6. Turn on **Required** if the question must be answered.
 7. Select **Save**.
-
-<Warning>
-The builder doesn't check Min and Max when you save, so check them yourself:
-
-- **Max must be at least Min.** With Max below Min, the scale shows no points at all, and a required scale can never be answered.
-- **Use whole numbers.** Points go up in steps of 1 from Min, so a Min of 1.5 gives 1.5, 2.5, 3.5 and so on.
-- **A scale shows at most 20 points.** With Min 1 and Max 30, it shows 1 to 20, and 21 to 30 can't be chosen.
-</Warning>
 
 ## Settings
 
@@ -66,6 +58,17 @@ The form checks the answer when the respondent selects Submit (or Next, on a for
 |---|---|
 | Required, and no point chosen | "How easy was it to book this appointment?" is required. (the question's own label, in quotation marks) |
 
+**When you save.** The builder checks Min and Max as you type, shows any problem under the field, and won't save the form until it's fixed:
+
+| Situation | Message |
+|---|---|
+| Min isn't a whole number | Min must be a whole number, such as 0 or 1. |
+| Max isn't a whole number | Max must be a whole number, such as 5 or 10. |
+| Max is less than Min | Max (3) can't be less than Min (5). (with your numbers) |
+| More than 20 points from Min to Max | A scale can have at most 20 points; 1 to 30 has 30. Lower Max or raise Min. |
+
+If you select **Save** anyway, the message at the top starts with the question, for example: Couldn't save: Block "How easy was it to book this appointment?": Max (3) can't be less than Min (5).
+
 ## Accessibility
 
 What the rendered form exposes to assistive technology:
@@ -81,11 +84,5 @@ What the rendered form exposes to assistive technology:
 | Screen reader | [TODO: not tested with a screen reader yet.] |
 
 ## Troubleshooting
-
-**The scale shows no points.** Max is lower than Min. Set Max to at least Min.
-
-**The last points of the scale are missing.** The scale has more than 20 points, and only the first 20 are shown. Narrow the range.
-
-**The points aren't whole numbers.** Min isn't a whole number. Points go up in steps of 1 from Min.
 
 **A condition such as is at most 2 doesn't pass while the scale is unanswered.** Every comparison except is answered needs an answer to compare against, so the dependent question stays hidden until a point is chosen.

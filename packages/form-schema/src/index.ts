@@ -295,7 +295,7 @@ export const QuestionBlock = z.object({
   level: z.number().int().min(1).max(3).optional(),
   /** static content: text copy, or the URL for image/video/audio */
   content: z.string().optional(),
-  /** linear scale bounds */
+  /** a linear scale's first and last points, or a number's limits (see `rangeSettingsProblems`) */
   min: z.number().optional(),
   max: z.number().optional(),
   ...shownWhen,
@@ -2295,6 +2295,51 @@ export function repeatSettingsProblems(
   return found.map((p) => ({ ...p, detail: p.rule.charAt(0).toUpperCase() + p.rule.slice(1) }));
 }
 
+/* ---------- linear scale and number settings (contract §6, builder only) ---------- */
+
+/** What the renderer uses when a scale has no `min` or `max`. */
+export const SCALE_DEFAULTS = { min: 1, max: 5 } as const;
+/** The most points the renderer shows: it stops after this many. */
+export const SCALE_MAX_POINTS = 20;
+
+export type RangeSetting = "min" | "max";
+
+/**
+ * The save rules for a linear scale's Min and Max and a number's Minimum and
+ * Maximum (contract §6, builder only: the renderer never throws for these, it
+ * draws no points, or only the first 20). One per field at fault; `rule` reads
+ * after the block's name in a save message, `detail` is the same text shown
+ * under that field. A scale's Min and Max must be whole numbers, Min no more
+ * than Max, with at most `SCALE_MAX_POINTS` points; a number's Minimum must be
+ * no more than its Maximum (either may be blank, and decimals are fine).
+ */
+export function rangeSettingsProblems(block: Block): { field: RangeSetting; rule: string; detail: string }[] {
+  const found: { field: RangeSetting; rule: string }[] = [];
+  if (block.type === "scale") {
+    const min = block.min ?? SCALE_DEFAULTS.min;
+    const max = block.max ?? SCALE_DEFAULTS.max;
+    if (!Number.isInteger(min)) found.push({ field: "min", rule: "Min must be a whole number, such as 0 or 1." });
+    if (!Number.isInteger(max)) found.push({ field: "max", rule: "Max must be a whole number, such as 5 or 10." });
+    if (!found.length) {
+      const points = max - min + 1;
+      if (min > max) {
+        found.push({ field: "max", rule: `Max (${max}) can't be less than Min (${min}).` });
+      } else if (points > SCALE_MAX_POINTS) {
+        found.push({
+          field: "max",
+          rule: `a scale can have at most ${SCALE_MAX_POINTS} points; ${min} to ${max} has ${points}. Lower Max or raise Min.`,
+        });
+      }
+    }
+  } else if (block.type === "number") {
+    const { min, max } = block;
+    if (min !== undefined && max !== undefined && min > max) {
+      found.push({ field: "max", rule: `Maximum (${max}) can't be less than Minimum (${min}).` });
+    }
+  }
+  return found.map((p) => ({ ...p, detail: p.rule.charAt(0).toUpperCase() + p.rule.slice(1) }));
+}
+
 /** The repeating groups enclosing an entry, outermost first — never the block itself (contract §12.3). */
 export function repeatChain(entry: TreeEntry): GroupBlock[] {
   return entry.ancestors.filter(isRepeatingGroup);
@@ -2334,6 +2379,8 @@ export function prefixRuleBreaker(source: TreeEntry, dependent: TreeEntry): Grou
  *  - the source is not inside a repeating group that doesn't also enclose the
  *    dependent (the prefix rule, §3.7);
  *  - only groups repeat, and a repeating group's settings are valid (§6, §12.1);
+ *  - a linear scale's Min and Max, and a number's Minimum and Maximum, are valid
+ *    (§6, builder only: `rangeSettingsProblems`);
  *  - every coded list has options, each with a label and a valid code, none
  *    repeated (§13.6). Empty codes are already filled when the form is parsed
  *    (§13.3), and a condition on a coded source must use one of its codes.
@@ -2345,7 +2392,8 @@ export function formProblems(form: { blocks: readonly Block[] }): ConditionProbl
 /**
  * The save problems on one block other than its own field rules — a display
  * block's content (`displayBlockProblem`), a repeating group's settings
- * (`repeatSettingsProblems`) and its option lists (`optionListProblems`). This is what the editor's Logic section lists:
+ * (`repeatSettingsProblems`), its option lists (`optionListProblems`) and a scale's or
+ * number's range (`rangeSettingsProblems`). This is what the editor's Logic section lists:
  * those messages are shown once, inline under the field they are about, not
  * again here. The save itself still checks everything (`formProblems`).
  */
@@ -2390,6 +2438,7 @@ function collectProblems(form: { blocks: readonly Block[] }, withFieldRules: boo
     const display = withFieldRules ? displayBlockProblem(entry) : null;
     if (display) problems.push(display);
     if (withFieldRules) for (const { rule } of optionListProblems(block)) add(entry, rule);
+    if (withFieldRules) for (const { rule } of rangeSettingsProblems(block)) add(entry, rule);
   }
 
   const firstPage = paged && isPage(form.blocks[0]) ? form.blocks[0] : undefined;

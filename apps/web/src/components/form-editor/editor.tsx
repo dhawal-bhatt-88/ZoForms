@@ -114,7 +114,10 @@ import {
   REPEAT_DEFAULTS,
   repeatsOnBlockers,
   repeatsOnScoreBlockers,
+  rangeSettingsProblems,
   repeatSettingsProblems,
+  SCALE_DEFAULTS,
+  SCALE_MAX_POINTS,
   resolveNameClashes,
   sameContent,
   sameOptionList,
@@ -2625,6 +2628,9 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   const selectedRepeatProblems = selected ? repeatSettingsProblems(selected) : [];
   const repeatProblem = (field: "repeatLabel" | "minOccurs" | "maxOccurs") =>
     selectedRepeatProblems.find((p) => p.field === field)?.detail;
+  // A scale's or a number's range: the save's rules and messages (rangeSettingsProblems), each under its field.
+  const selectedRangeProblems = selected ? rangeSettingsProblems(selected) : [];
+  const rangeProblem = (field: "min" | "max") => selectedRangeProblems.find((p) => p.field === field)?.detail;
   const numbers = questionNumbers(schema.blocks);
   /** The polite status line for one list: "2 conditions updated…", "Added 3 rows from the file." */
   const listStatus = (bid: string, ref: OptionListRef) =>
@@ -3398,28 +3404,74 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                 </div>
               )}
 
+              {/* A scale's first and last points (contract §6, builder only: rangeSettingsProblems). */}
               {selected.type === "scale" && (
-                <div className="mb-4 grid grid-cols-2 gap-2">
-                  <Field id="scale-min" label="Min" optional={false}>
-                    {(field) => (
-                      <Input
-                        {...field}
-                        type="number"
-                        value={selected.min ?? 1}
-                        onChange={(e) => updateBlock(selected.id, { min: Number(e.target.value) })}
-                      />
-                    )}
-                  </Field>
-                  <Field id="scale-max" label="Max" optional={false}>
-                    {(field) => (
-                      <Input
-                        {...field}
-                        type="number"
-                        value={selected.max ?? 5}
-                        onChange={(e) => updateBlock(selected.id, { max: Number(e.target.value) })}
-                      />
-                    )}
-                  </Field>
+                <div className="mb-4">
+                  <div className="grid grid-cols-2 items-start gap-2">
+                    <Field id="scale-min" label="Min" optional={false} error={rangeProblem("min")} errorRole="alert" describedBy="scale-range-help">
+                      {(field) => (
+                        <Input
+                          {...field}
+                          type="number"
+                          step={1}
+                          value={selected.min ?? SCALE_DEFAULTS.min}
+                          onChange={(e) => updateBlock(selected.id, { min: Number(e.target.value) })}
+                        />
+                      )}
+                    </Field>
+                    <Field id="scale-max" label="Max" optional={false} error={rangeProblem("max")} errorRole="alert" describedBy="scale-range-help">
+                      {(field) => (
+                        <Input
+                          {...field}
+                          type="number"
+                          step={1}
+                          value={selected.max ?? SCALE_DEFAULTS.max}
+                          onChange={(e) => updateBlock(selected.id, { max: Number(e.target.value) })}
+                        />
+                      )}
+                    </Field>
+                  </div>
+                  <p id="scale-range-help" className="mt-1.5 text-[0.75rem] leading-relaxed text-graphite">
+                    Whole numbers. Respondents see every point from Min to Max, at most {SCALE_MAX_POINTS}.
+                  </p>
+                </div>
+              )}
+
+              {/* A number's limits, both optional (contract §6, builder only: rangeSettingsProblems). */}
+              {selected.type === "number" && (
+                <div className="mb-4">
+                  <div className="grid grid-cols-2 items-start gap-2">
+                    {(
+                      [
+                        ["min", "Minimum"],
+                        ["max", "Maximum"],
+                      ] as const
+                    ).map(([key, label]) => (
+                      <Field
+                        key={key}
+                        id={`number-${key}`}
+                        label={label}
+                        optional
+                        error={rangeProblem(key)}
+                        errorRole="alert"
+                        describedBy="number-range-help"
+                      >
+                        {(field) => (
+                          <Input
+                            {...field}
+                            type="number"
+                            step="any"
+                            inputMode="decimal"
+                            value={selected[key] ?? ""}
+                            onChange={(e) => updateBlock(selected.id, { [key]: parseCount(e.target.value) })}
+                          />
+                        )}
+                      </Field>
+                    ))}
+                  </div>
+                  <p id="number-range-help" className="mt-1.5 text-[0.75rem] leading-relaxed text-graphite">
+                    Leave blank for no limit. Decimals and negative numbers are allowed.
+                  </p>
                 </div>
               )}
 
