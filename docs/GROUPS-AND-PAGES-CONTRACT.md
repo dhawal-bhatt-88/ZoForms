@@ -1,6 +1,6 @@
 # Groups and Pages — Schema Contract
 
-Status: agreed 25 Sep 2026; amended 5 Oct 2026 for repeating groups (§12, with matching changes in §1–§8); amended 6 Oct 2026 for coded options and option import (§13); amended 7 Oct 2026 for the grid block (§14); amended 9 Oct 2026 for custom condition logic (§15); amended 13 Oct 2026 for host validators (§16); amended 14 Oct 2026 for grid layout by available width (§14.5); amended 14 Oct 2026 for the required marker and ranking announcements (§7); amended 15 Oct 2026 for scoring (§17, with matching changes in §1, §6 and §13.1); amended 15 Oct 2026 for the package rename (`@zoworkhq/forms`, public prefix `zf-`: §7, §8, §12.6, §14.5); amended 27 Oct 2026 for new page titles (§2.5) and builder-only save rules for scale and number (§6). Shared by the builder repo and the `@zoworkhq/forms` renderer repo.
+Status: agreed 25 Sep 2026; amended 5 Oct 2026 for repeating groups (§12, with matching changes in §1–§8); amended 6 Oct 2026 for coded options and option import (§13); amended 7 Oct 2026 for the grid block (§14); amended 9 Oct 2026 for custom condition logic (§15); amended 13 Oct 2026 for host validators (§16); amended 14 Oct 2026 for grid layout by available width (§14.5); amended 14 Oct 2026 for the required marker and ranking announcements (§7); amended 15 Oct 2026 for scoring (§17, with matching changes in §1, §6 and §13.1); amended 15 Oct 2026 for the package rename (`@zoworkhq/forms`, public prefix `zf-`: §7, §8, §12.6, §14.5); amended 27 Oct 2026 for new page titles (§2.5) and builder-only save rules for scale and number (§6); amended 28 Oct 2026 for empty answers and link answers (§5); amended 28 Oct 2026 for clearing answers (§7, §14.5) and naming the question in each error summary entry (§12.5); amended 28 Oct 2026 for video captions (§10) and the form's title and description (§7). Shared by the builder repo and the `@zoworkhq/forms` renderer repo.
 Both implementations must follow this file exactly. Change it here first, then in both repos.
 
 ## 1. Shapes
@@ -72,6 +72,13 @@ navigation?: {
 `answers` stays a flat map keyed by block id. Groups and pages contribute nothing. **Exception:** a repeating group contributes an array of instance objects under its own id (§12.4).
 The payload filter now walks the tree and keeps only **visible answerable questions**. Unknown ids, groups, pages and presentational blocks are dropped. "Answerable" is one list in `/core`, shared by validation and the payload filter.
 
+**Empty answers.** An answered value that is an empty array, an empty object, or a string that is empty or whitespace only counts as no answer, for every question type: `required`, conditions, scores, the review page and the payload all see `{ state: "empty" }`, and `prepareSubmission` returns it that way. The rendered form never sends such a value; the rule guards hand-made payloads. Non-blank text is never trimmed. A grid applies the rule per cell (§14.2).
+
+**Link answers.** `/core`, and so the browser, accepts a `link` answer only when its trimmed text parses with the URL constructor to `protocol` `https:` or `http:`, with a non-empty host and no `user@` or `user:pass@` credentials. This is decided by parsing, never by string prefix. Anything else is rejected with "Enter a valid URL, including https://.". The stored value keeps its surrounding whitespace, as for every free-text answer. Both repos share this test table:
+
+- **Accepted:** `https://example.org`; `HTTPS://example.org/a?b=1`; `http://example.org`; `  https://example.org  `.
+- **Rejected:** `javascript:alert(1)`; `JavaScript:void(0)`; ` javascript:alert(1)`; `data:text/html,hi`; `mailto:a@b.org`; `tel:+15551234567`; `ftp://example.org`; `example.org`; `//example.org`; `https://`; `https://user@example.org`; `https://user:pass@example.org`.
+
 ## 6. Integrity checks
 
 The builder rejects these at save (400 naming the block). The renderer throws at mount (defence against hand-edited schemas):
@@ -98,6 +105,7 @@ The builder rejects these at save (400 naming the block). The renderer throws at
 
 ## 7. Rendering (renderer only)
 
+- **Form title and description:** the renderer never shows the form's `title` or `description`; the host does, and owns the page's `h1`.
 - Group → `<fieldset>` with a `<legend>` containing the label as a heading.
 - Heading level: in a single-page form, root-level groups use `h2`; in a paged form the page title is `h2` and its root-level groups `h3`. Each nesting level adds one, **capped at `h6`** (nesting continues; only the level stops rising). Author heading blocks keep their own `level`.
 - Public class names include `zf-group`, `zf-group-legend`, `zf-page`, `zf-page-title`, `zf-nav`, `zf-next`, `zf-back`, `zf-progress`, `zf-progress-bar`, `zf-review` (additive under the existing class-name policy, which starts at the first release to a client). This list is not exhaustive; the renderer's `classNames` constant and its contract test are the complete, authoritative list.
@@ -105,6 +113,7 @@ The builder rejects these at save (400 naming the block). The renderer throws at
 - Repeating groups render as described in §12.6.
 - **Required marker:** the visible `*` is decoration only and is never part of any accessible name, whether or not the package stylesheet is loaded. A required question's name is exactly its label (e.g. "Priorities", never "Priorities *"). "Required" is conveyed by native `required`, by `aria-required`, or, on questions rendered as a fieldset, by a "Required" description listed first in the fieldset's `aria-describedby`.
 - **Ranking:** each option button's name is exactly its option label. Its description gives its rank ("Ranked 2 of 3") or "Not ranked". Each ranking question has a polite status region, present from first render, that announces every change: "Speed ranked 2 of 3." when ranking, and "Speed unranked. Order: 1 Cost, 2 Quality." (or "Speed unranked. Nothing ranked.") when un-ranking.
+- **Clearing an answer:** choosing the selected option of a `choice` again clears it, and so does pressing the pressed star of a `rating` again. In a `matrix`, choosing a row's selected column again clears that row; once no row is answered the matrix is empty. A `choice` that is not `required`, and a `matrix` with neither `required` nor `completeRequired`, also shows a **Clear selection** button while it has an answer. It clears the whole question and moves focus to the question's first radio. Its accessible name is "Clear selection, {label}", with the visible text first. A cleared answer is `{ state: "empty" }` (§5). Grid radio cells: §14.5.
 
 ## 8. Paged behaviour (renderer only)
 
@@ -140,7 +149,7 @@ Both are presentational: no value, never validated, never a condition source, ne
 
 ## 10. Display block: `video`
 
-Presentational, like `text` and `image` (§9): no value, never validated, never a condition source, never numbered, no help text shown; may carry its own `enableWhen`; `required` is ignored. `content` is the source, trimmed first; the builder stores the trimmed value. The block's `label` is the player's accessible name (`title`).
+Presentational, like `text` and `image` (§9): no value, never validated, never a condition source, never numbered, no help text shown; may carry its own `enableWhen`; `required` is ignored. `content` is the source, trimmed first; the builder stores the trimmed value. The block's `label` is the player's accessible name (`title`). A video file may also carry `captions?: string`, a captions file (see **Captions** below).
 
 **Recognised sources** — anything else renders nothing, never an error. Recognition is done by parsing the URL, never by substring search: protocol must be `https:`; the host must match exactly (no port, no `user@` credentials); the path must match exactly (no trailing slash variants).
 
@@ -165,11 +174,21 @@ Both repos implement this identically and share this test table:
 - A responsive 16:9 frame at full width for YouTube and Vimeo; the native `<video>` keeps the file's own aspect ratio, `max-width: 100%`.
 - Never autoplays. `<video>` has `controls`, `preload="metadata"`, `playsinline`.
 - Iframes: `title` = label, `loading="lazy"`, `allow="encrypted-media; picture-in-picture; fullscreen"`, `allowfullscreen`, `sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"` (each verified necessary in a real browser; the last lets "Watch on YouTube/Vimeo" open as a normal tab rather than a crippled sandboxed one), `referrerpolicy="strict-origin-when-cross-origin"` (sends only the site's origin, never the page path; YouTube refuses to play embeds sent with no referrer).
-- Captions are the author's responsibility on YouTube and Vimeo; direct video files have no caption support in v1.
 - `rel=0` only limits YouTube's end-of-video suggestions to the same channel; it does not remove them.
 - `<video>` has no `referrerpolicy` attribute, so a third-party video file is requested with the host page's own referrer policy. Hosts should set `Referrer-Policy: strict-origin-when-cross-origin` (the browser default) or stricter, so the page path is never sent.
 
-**Host setup:** the host's Content Security Policy must allow `frame-src https://www.youtube-nocookie.com https://player.vimeo.com` for those players, and `media-src` for wherever its own video files live.
+**Captions:**
+- **YouTube and Vimeo:** captions are the author's responsibility, set on that service. `captions` is ignored there.
+- **Video files:** `captions` is the address of a captions file, trimmed first; the builder stores the trimmed value. It is recognised when it is a valid source per §9 (absolute `https://` with no credentials, or root-relative, resolved against `assetBase`) whose path, before any `?` or `#`, ends in `.vtt` (case-insensitive). It renders as `<track kind="captions" label="Captions">` inside the `<video>`, with no `default`: captions are off until the respondent turns them on in the player.
+- **Missing or broken:** an absent, blank or unrecognised `captions` renders the video without a track, never an error; the renderer warns in development when it is not blank. A captions file that fails to load leaves the video playing without captions.
+- **Another origin:** when the captions file's origin differs from the page's, the `<video>` gets `crossorigin="anonymous"`, so the browser requests both the captions and the video file with CORS. If the video then fails to load, it is rendered once more without `crossorigin` and without captions, and the renderer warns in development. It is not retried again: if that load fails too, the video renders nothing, as any failed video file does.
+- **Builder:** the setting is not editable yet; schemas without `captions` render as before.
+
+Both repos share this captions test table, on a recognised video file:
+- **Recognised:** `https://cdn.example.com/intro.vtt`; `https://cdn.example.com/intro.VTT?v=2`; `/captions/intro.vtt`; `  /captions/intro.vtt  `.
+- **Not recognised:** empty; `http://cdn.example.com/intro.vtt`; `//cdn.example.com/intro.vtt`; `https://user@cdn.example.com/intro.vtt`; `https://cdn.example.com/intro.srt`; `https://cdn.example.com/?file=intro.vtt`; `/captions/`; `data:text/vtt,WEBVTT`; `javascript:alert(1)`.
+
+**Host setup:** the host's Content Security Policy must allow `frame-src https://www.youtube-nocookie.com https://player.vimeo.com` for those players, and `media-src` for wherever its own video and captions files live. A captions file on another origin than the page also needs `Access-Control-Allow-Origin` on both the captions file and the video file.
 
 **Known limit:** as with images (§9), a recognised source that fails to play still counts as displayable in `/core`.
 
@@ -274,7 +293,7 @@ Question values keep the existing `BlockValue` wire format (`{ state, value }`);
 - For every **visible** repeating group, `/core` checks that the instance count is between `minOccurs` and `maxOccurs`. The UI cannot produce a count outside these limits, so this guards against hand-crafted payloads and uses the existing vague message ("Invalid answer.").
 - `prepareSubmission` and `validateSubmission` also reject a repeating group's value that is not an array, or an instance that is not an object, with the same vague message. They strip hidden and unknown answers per instance, as at the root.
 - `ValidationError` gains `path: (string | number)[]`: block ids and 0-based instance positions from the root to the question, e.g. `["patients", 1, "payments", 0, "amount"]`. For a question outside any repeat, `path` is `[blockId]`. `blockId` stays as it is.
-- In the browser, the error summary puts the enclosing instances, outermost first, in front of the existing message, which already names the question: `Patient 2, Payment 1: "Amount" is required.`
+- In the browser, every error summary entry names its question. A message that doesn't already name it gets the question's label in quotes in front, as the grid's entries do (§14.3): `"Age": Must be at most 17.` Messages that already name the question (`"Age" is required.`, `Answer every row of "Symptoms".`, `Rank every option in "Priorities".`, matched exactly) and grid entries are shown as they are; so is every message on a question with a blank label. Inside repeating groups the enclosing instances come first, outermost first: `Patient 2, Payment 1: "Amount" is required.`, `Child 1: "Age": Must be at most 17.` Messages beside the field, and `ValidationError.message`, don't change.
 
 ### 12.6 Rendering (renderer only)
 
@@ -477,6 +496,7 @@ The builder refuses these at save (400 naming the block); the renderer throws at
 
 - **Wide layout:** a `<table>` named by the grid's visible label through `aria-labelledby` (no separate `<caption>`, so the label isn't shown twice), with column headers (`scope="col"`) and row headers (`scope="row"`). Required columns show the required marker in their header.
 - Every cell input's accessible name is "{row label}, {column label}" (e.g. "Cannabis, Frequency"). A radio cell is a small radio group with that name; each radio is named by its option label.
+- **Clearing a radio cell:** choosing a radio cell's selected option again clears the cell. In a column that is not required, a radio cell with an answer also shows a **Clear** button after its radios, named "Clear {row label}, {column label}" (e.g. "Clear Cannabis, Frequency"). It clears that cell only and moves focus to the cell's first radio.
 - **Narrow layout:** when the **space available to the grid** is below **34rem**, each row is shown as a card — the row label as a heading, then one labelled field per column. Accessible names are the same in both layouts. The space is measured on the grid itself (a CSS container query on its wrapper), **never the viewport**, because the form may sit in a narrow side panel on a wide screen, or inside nested groups. The grid's breakpoint is lower than the form's own 40rem width on purpose: grids usually sit indented inside groups or repeats, and at 40rem every indented grid would become cards even on a wide desktop.
 - **Wide but too wide:** above that breakpoint, if the table is still wider than the space available, the table scrolls horizontally inside its own wrapper. The wrapper is a `role="region"` with `tabindex="0"` and the grid label as its accessible name, so keyboard users can scroll it. The page itself never scrolls sideways because of a grid. Without the package stylesheet, the plain table is shown and these layout rules don't apply.
 - Labels are plain text (§13.7).
