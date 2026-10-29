@@ -1,5 +1,6 @@
 // `video` authoring in the builder (contract §10): the recognised-source save rule (API + editor,
-// same message), canvas previews that load nothing third-party, help text, trimming, and the
+// same message), canvas previews that load nothing third-party, help text, trimming, captions on a
+// video file (shown only for a file, the save rule, kept but hidden on YouTube and Vimeo), and the
 // artifact for the end-to-end render.
 const fs = require("fs");
 const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, noIds, hasIds } = require("./_setup");
@@ -21,6 +22,11 @@ const YOUTUBE = "https://youtu.be/dQw4w9WgXcQ?t=90";
 const VIMEO = "https://vimeo.com/76979871";
 const FILE = "/videos/intro.mp4";
 const UNRECOGNISED = "https://www.youtube.com/playlist?list=PL123";
+const CAPTIONS = "/captions/intro.vtt";
+const NOT_CAPTIONS = "https://cdn.example.com/intro.srt";
+const CAPTIONS_RULE = "add the address of a .vtt captions file (https:// or a path on your app's server such as /captions/intro.vtt), or leave Captions empty.";
+const CAPTIONS_MSG = (p) => `Video "${p}": ${CAPTIONS_RULE}`;
+const CAPTIONS_DETAIL = CAPTIONS_RULE.charAt(0).toUpperCase() + CAPTIONS_RULE.slice(1);
 // Hosts the canvas must never contact: it names the video instead of loading a player.
 const THIRD_PARTY = /youtube\.com|youtu\.be|youtube-nocookie\.com|ytimg\.com|vimeo\.com|vimeocdn\.com/;
 const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield* walk(b.blocks); } };
@@ -62,6 +68,25 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     check("API: a padded source saves, stored trimmed", r.status === 200 && s1.blocks[0].content === YOUTUBE, JSON.stringify(s1.blocks[0]));
     r = await put(apiId, { title: "t", blocks: [vid(YOUTUBE), { id: "q", type: "short", label: "Q" }] });
     check("API: the same source without the padding is no change (409 NO_CHANGES)", r.status === 409 && (await r.json()).code === "NO_CHANGES");
+
+    // Captions on a video file (contract §10).
+    const withCaptions = (content, captions) => ({ ...vid(content), captions });
+    r = await put(apiId, { title: "t", blocks: [withCaptions(FILE, NOT_CAPTIONS)] });
+    check("API: an unrecognised captions address on a video file is refused (400) with the message", r.status === 400 && (await msg(r)) === CAPTIONS_MSG("Intro"));
+    r = await put(apiId, { title: "t", blocks: [{ id: "p1", type: "page", title: "Visit", blocks: [withCaptions(FILE, "javascript:alert(1)")] }] });
+    check("API: refused inside a page, named by its path", r.status === 400 && (await msg(r)) === CAPTIONS_MSG("Visit › Intro"));
+    r = await put(apiId, { title: "t", blocks: [withCaptions(FILE, `  ${CAPTIONS} \n`)] });
+    let sc = (await stored(apiId)).blocks[0];
+    check("API: a padded captions address saves, stored trimmed", r.status === 200 && sc.captions === CAPTIONS, JSON.stringify(sc));
+    r = await put(apiId, { title: "t", blocks: [withCaptions(FILE, "   ")] });
+    sc = (await stored(apiId)).blocks[0];
+    check("API: blank captions save, left out of the stored block", r.status === 200 && !("captions" in sc), JSON.stringify(sc));
+    r = await put(apiId, { title: "t", blocks: [withCaptions(YOUTUBE, NOT_CAPTIONS)] });
+    sc = (await stored(apiId)).blocks[0];
+    check("API: captions on YouTube aren't checked, and are kept", r.status === 200 && sc.captions === NOT_CAPTIONS, JSON.stringify(sc));
+    r = await put(apiId, { title: "t", blocks: [{ id: "img", type: "image", label: "Logo", required: false, content: "/images/logo.png", captions: CAPTIONS }] });
+    sc = (await stored(apiId)).blocks[0];
+    check("API: captions on a block that isn't a video are dropped", r.status === 200 && !("captions" in sc), JSON.stringify(sc));
     await remove(apiId);
 
     // ---------- editor ----------
@@ -80,6 +105,7 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     const cards = P.locator("[data-block-id]");
     const labelInput = P.locator("#block-label");
     const urlInput = P.locator("#block-url");
+    const captionsInput = P.locator("#block-captions");
     // A block in the insert menu (a listbox of options).
     const pick = (name) => P.getByRole("option", { name, exact: true }).click();
     const add = async (name) => { await P.getByTitle("Insert a block").click(); await pick(name); };
@@ -96,6 +122,15 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     // The preview is the last truncated span on the card; the first is the card's own label.
     const preview = (label) => cardOf(label).locator("span.min-w-0.truncate").last();
     const notice = P.getByRole("alert").filter({ hasText: /Couldn't save/ });
+    // The page in light, then dark (the class the theme script sets), then back to light.
+    const shot = async (name) => {
+      for (const theme of ["light", "dark"]) {
+        await P.evaluate((dark) => document.documentElement.classList.toggle("dark", dark), theme === "dark");
+        await sleep(250);
+        await P.screenshot({ path: `${OUT}/${name}-${theme}.png` });
+      }
+      await P.evaluate(() => document.documentElement.classList.remove("dark"));
+    };
     const save = async () => { await P.getByRole("button", { name: "Save", exact: true }).click(); await P.getByText("All changes saved").waitFor({ timeout: 10000 }); };
 
     const formId = await create("Clinic tour");
@@ -141,6 +176,7 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
 
     await urlInput.fill(`  ${YOUTUBE}  `);
     check("video: a recognised YouTube link clears the message", (await inline().count()) === 0 && (await urlInput.getAttribute("aria-invalid")) !== "true");
+    check("captions: no Captions field for an empty, unrecognised or YouTube source", (await captionsInput.count()) === 0);
     check("video canvas: YouTube shows its ID and start time", (await preview("Welcome from the team").innerText()) === "YouTube video · dQw4w9WgXcQ · from 1:30",
       await preview("Welcome from the team").innerText());
 
@@ -148,11 +184,40 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     await add("Video"); await rename("Pharmacy walkthrough");
     await urlInput.fill(VIMEO);
     check("video canvas: Vimeo shows its ID", (await preview("Pharmacy walkthrough").innerText()) === "Vimeo video · 76979871");
+    check("captions: no Captions field for Vimeo", (await captionsInput.count()) === 0);
 
     // A file on the app's own server, shown only when the patient asks for a tour.
     await add("Video"); await rename("Clinic tour");
     await urlInput.fill(` ${FILE}\t`);
     check("video canvas: a file shows its trimmed path", (await preview("Clinic tour").innerText()) === `Video file · ${FILE}`);
+
+    // Captions: only for a video file, right after URL.
+    const fieldIds = await P.locator("aside input, aside textarea").evaluateAll((els) => els.map((e) => e.id).filter(Boolean));
+    check("captions: a video file shows Captions, optional, right after URL",
+      (await captionsInput.isVisible()) && fieldIds.indexOf("block-captions") === fieldIds.indexOf("block-url") + 1 &&
+      (await P.locator('label[for="block-captions"]').innerText()).replace(/\s+/g, " ").trim() === "Captions optional", fieldIds.join(", "));
+    check("captions: the hint says they start off",
+      await P.locator("aside").getByText("Captions are off until the respondent turns them on in the player.").isVisible());
+    check("captions: the placeholder names a .vtt address", (await captionsInput.getAttribute("placeholder")) === "A .vtt address, e.g. /captions/intro.vtt");
+    await captionsInput.fill(NOT_CAPTIONS);
+    check("captions: an unrecognised address shows the rule inline, under Captions, and marks it invalid",
+      (await inline().innerText()) === CAPTIONS_DETAIL && (await captionsInput.getAttribute("aria-invalid")) === "true" && (await redMessages()) === 1,
+      await inline().innerText().catch(() => ""));
+    await P.getByRole("button", { name: "Save", exact: true }).click();
+    await notice.waitFor({ timeout: 10000 });
+    const captionsSaveMsg = (await notice.innerText()).replace(/^Couldn't save:\s*/, "").trim();
+    check("save refused: unrecognised captions, naming the video", captionsSaveMsg === CAPTIONS_MSG("Clinic tour"), captionsSaveMsg);
+    await P.getByRole("button", { name: "Dismiss" }).click();
+    await shot("video-3-captions-error");
+    await captionsInput.fill(`  ${CAPTIONS} `);
+    check("captions: a recognised address clears the message", (await inline().count()) === 0 && (await captionsInput.getAttribute("aria-invalid")) !== "true");
+    // Switching to YouTube hides the field and keeps the value; back to a file shows it again.
+    await urlInput.fill(YOUTUBE);
+    const hiddenOnYouTube = (await captionsInput.count()) === 0;
+    await urlInput.fill(` ${FILE}\t`);
+    check("captions: hidden while the source is YouTube, and the value kept for when it is a file again",
+      hiddenOnYouTube && (await captionsInput.inputValue()) === `  ${CAPTIONS} `);
+    await shot("video-4-captions");
     const choiceId = await cardOf("Would you like a tour of the clinic?").getAttribute("data-block-id");
     const videoIds = await Promise.all(["Welcome from the team", "Pharmacy walkthrough"].map((l) => cardOf(l).getAttribute("data-block-id")));
     await P.getByRole("button", { name: "Add condition" }).click();
@@ -173,6 +238,8 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     const srcs = all.filter((b) => b.type === "video").map((b) => b.content);
     check("saved: video sources trimmed", JSON.stringify(srcs) === JSON.stringify([YOUTUBE, VIMEO, FILE]), JSON.stringify(srcs));
     check('saved: no description on any video', all.filter((b) => b.type === "video").every((b) => !("description" in b)));
+    const savedCaptions = all.filter((b) => b.type === "video").map((b) => b.captions ?? null);
+    check("saved: captions trimmed, on the video file only", JSON.stringify(savedCaptions) === JSON.stringify([null, null, CAPTIONS]), JSON.stringify(savedCaptions));
 
     // Re-typing a source with padding is no change: the comparison trims as the save does.
     await cardOf("Pharmacy walkthrough").locator("span.truncate", { hasText: /^Pharmacy walkthrough$/ }).click();
@@ -187,6 +254,8 @@ const walk = function* (bs) { for (const b of bs) { yield b; if (b.blocks) yield
     check("artifact: each video has its label, required: false and no description",
       aVideos.every((b) => b.label && b.required === false && !("description" in b)) &&
       JSON.stringify(aVideos.map((b) => b.label)) === JSON.stringify(["Welcome from the team", "Pharmacy walkthrough", "Clinic tour"]));
+    check("artifact: the video file carries its captions, the others none",
+      JSON.stringify(aVideos.map((b) => b.captions ?? null)) === JSON.stringify([null, null, CAPTIONS]), JSON.stringify(aVideos.map((b) => b.captions)));
     check("artifact: the conditional video carries its condition",
       JSON.stringify(noIds(aVideos[2].enableWhen)) === JSON.stringify([{ question: choiceId, operator: "=", answer: "yes" }]) && hasIds(aVideos[2].enableWhen) && aVideos.slice(0, 2).every((b) => !b.enableWhen));
     saveArtifact("builder-video-schema.json", raw);

@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   buildArtifact,
+  captionsProblem,
   displayBlockProblem,
   findBlock,
   formProblems,
   FormSchema,
   isAnswerable,
   newBlock,
+  parseCaptionsSource,
   parseVideoSource,
   questionNumbers,
   sourceOperators,
@@ -222,6 +224,110 @@ describe("stored and exported values", () => {
       label: "Intro",
       required: false,
       content: "https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=1m30s",
+    });
+  });
+});
+
+/* ---------- captions on a video file (contract §10) ---------- */
+
+/** Contract §10's captions test table, verbatim (the renderer tests the same one). */
+const CAPTIONS_RECOGNISED: [string, string][] = [
+  ["https://cdn.example.com/intro.vtt", "https://cdn.example.com/intro.vtt"],
+  ["https://cdn.example.com/intro.VTT?v=2", "https://cdn.example.com/intro.VTT?v=2"],
+  ["/captions/intro.vtt", "/captions/intro.vtt"],
+  ["  /captions/intro.vtt  ", "/captions/intro.vtt"],
+];
+const CAPTIONS_NOT_RECOGNISED = [
+  "",
+  "http://cdn.example.com/intro.vtt",
+  "//cdn.example.com/intro.vtt",
+  "https://user@cdn.example.com/intro.vtt",
+  "https://cdn.example.com/intro.srt",
+  "https://cdn.example.com/?file=intro.vtt",
+  "/captions/",
+  "data:text/vtt,WEBVTT",
+  "javascript:alert(1)",
+];
+
+describe("parseCaptionsSource — contract §10 captions table", () => {
+  it.each(CAPTIONS_RECOGNISED)("recognises %j", (src, expected) => {
+    expect(parseCaptionsSource(src)).toBe(expected);
+  });
+  it.each(CAPTIONS_NOT_RECOGNISED)("does not recognise %j", (src) => {
+    expect(parseCaptionsSource(src)).toBeNull();
+  });
+  it("does not recognise a missing value", () => {
+    expect(parseCaptionsSource(undefined)).toBeNull();
+  });
+});
+
+const CAPTIONS_MSG = (path: string) =>
+  `Video "${path}": add the address of a .vtt captions file (https:// or a path on your app's server such as /captions/intro.vtt), or leave Captions empty.`;
+const FILE = "https://cdn.example.com/intro.mp4";
+
+describe("save rule: captions", () => {
+  it("rejects an unrecognised captions address on a video file, naming the block by its path", () => {
+    expect(messages(video("v", FILE, "Intro", { captions: "https://cdn.example.com/intro.srt" }))).toEqual([CAPTIONS_MSG("Intro")]);
+    expect(messages(page("p1", [group("g", [video("v", "/videos/a.webm", "Intro", { captions: "javascript:alert(1)" })])]))).toEqual([
+      CAPTIONS_MSG("P1 › G › Intro"),
+    ]);
+  });
+
+  it("accepts a recognised captions address, and none at all", () => {
+    expect(messages(video("a", FILE, "A", { captions: " /captions/intro.vtt " }), video("b", FILE, "B"), video("c", FILE, "C", { captions: "  " }))).toEqual([]);
+  });
+
+  it("skips captions on YouTube, Vimeo or an unrecognised source, where the field is hidden", () => {
+    const bad = { captions: "https://cdn.example.com/intro.srt" };
+    expect(messages(video("a", "https://youtu.be/dQw4w9WgXcQ", "A", bad), video("b", "https://vimeo.com/76979871", "B", bad))).toEqual([]);
+    // Only the source's own message: the captions wait until the source is a video file.
+    expect(messages(video("c", "https://cdn.example.com/intro.mov", "C", bad))).toEqual([VIDEO_MSG("C")]);
+  });
+
+  it("the editor's inline message is the save message without the block's name", () => {
+    const blocks = [video("v", FILE, "Intro", { captions: "/captions/intro.srt" })];
+    const problem = captionsProblem(findBlock(blocks, "v")!)!;
+    expect(problem.message).toBe(formProblems({ blocks })[0].message);
+    expect(problem.detail).toBe(
+      "Add the address of a .vtt captions file (https:// or a path on your app's server such as /captions/intro.vtt), or leave Captions empty.",
+    );
+    expect(captionsProblem(findBlock([video("ok", FILE, "OK", { captions: "/captions/intro.vtt" })], "ok")!)).toBeNull();
+  });
+});
+
+describe("captions: stored and exported values", () => {
+  const identity = { formId: "f", formVersionId: "v" };
+  const parse = (...blocks: Block[]) => FormSchema.parse({ title: "t", blocks }).blocks;
+
+  it("is stored trimmed, and left out when blank", () => {
+    const [kept, blank] = parse(video("a", FILE, "A", { captions: "  /captions/intro.vtt \n" }), video("b", FILE, "B", { captions: "   " }));
+    expect(kept.captions).toBe("/captions/intro.vtt");
+    expect(JSON.parse(JSON.stringify(blank))).not.toHaveProperty("captions");
+  });
+
+  it("is kept on a video whose source changed to YouTube or Vimeo", () => {
+    const [v] = parse(video("v", "https://youtu.be/dQw4w9WgXcQ", "V", { captions: "/captions/intro.vtt" }));
+    expect(v.captions).toBe("/captions/intro.vtt");
+  });
+
+  it("is dropped from every block that isn't a video", () => {
+    const blocks = parse(
+      { id: "i", type: "image", label: "I", required: false, content: "/images/a.png", captions: "/captions/a.vtt" } as Block,
+      { id: "a", type: "audio", label: "A", required: false, content: "/audio/a.mp3", captions: "/captions/a.vtt" } as Block,
+      { ...choice("q"), captions: "/captions/a.vtt" } as Block,
+    );
+    for (const block of blocks) expect(block).not.toHaveProperty("captions");
+  });
+
+  it("the artifact carries it as stored", () => {
+    const artifact = buildArtifact({ title: "t", blocks: [video("v", FILE, "Intro", { captions: " /captions/intro.vtt " })] }, identity);
+    expect(JSON.parse(JSON.stringify(artifact.blocks[0]))).toEqual({
+      id: "v",
+      type: "video",
+      label: "Intro",
+      required: false,
+      content: FILE,
+      captions: "/captions/intro.vtt",
     });
   });
 });

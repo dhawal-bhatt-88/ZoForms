@@ -42,6 +42,7 @@ import {
   applyImport,
   blockName,
   canBeRequired,
+  captionsProblem,
   columnTypeChangeWarning,
   conditionAnswerOptions,
   conditionNumbersInText,
@@ -105,6 +106,7 @@ import {
   optionListProblems,
   parseLogicText,
   parseOptionFile,
+  parseVideoSource,
   placeholderOptions,
   questionNumbers,
   removeBlockFromTree,
@@ -2638,6 +2640,8 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   const selected = selectedEntry?.block ?? null;
   // The same rule and message as the save (displayBlockProblem in form-schema).
   const selectedDisplayProblem = selectedEntry ? (displayBlockProblem(selectedEntry)?.message ?? null) : null;
+  // A video file's captions: the save's rule (captionsProblem), under Captions without the block's name.
+  const selectedCaptionsProblem = selectedEntry ? (captionsProblem(selectedEntry)?.detail ?? null) : null;
   // A repeating group's settings: the save's rules and messages (repeatSettingsProblems), each under its field.
   const selectedRepeatProblems = selected ? repeatSettingsProblems(selected) : [];
   const repeatProblem = (field: "repeatLabel" | "minOccurs" | "maxOccurs") =>
@@ -3440,6 +3444,30 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                             ? "YouTube or Vimeo link, or an .mp4 / .webm address"
                             : "An .mp3, .m4a, .ogg or .wav address"
                       }
+                      className="text-[0.8125rem]"
+                    />
+                  )}
+                </Field>
+              )}
+
+              {/* Only for a video file: YouTube and Vimeo set their own captions, and the
+                  renderer ignores a stored value there (contract §10), so it is kept, hidden. */}
+              {selected.type === "video" && parseVideoSource(selected.content)?.kind === "file" && (
+                <Field
+                  id="block-captions"
+                  label="Captions"
+                  hint="Captions are off until the respondent turns them on in the player."
+                  error={selectedCaptionsProblem}
+                  errorRole="alert"
+                  className="mb-4"
+                >
+                  {(field) => (
+                    <Input
+                      {...field}
+                      mono
+                      value={selected.captions ?? ""}
+                      onChange={(e) => updateBlock(selected.id, { captions: e.target.value })}
+                      placeholder="A .vtt address, e.g. /captions/intro.vtt"
                       className="text-[0.8125rem]"
                     />
                   )}

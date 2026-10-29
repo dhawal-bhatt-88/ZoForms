@@ -4,7 +4,7 @@ summary: A YouTube or Vimeo video, or an .mp4 or .webm file, played on the form.
 template: how-to
 badges: [Display blocks]
 appliesTo: [builder, package]
-updated: 2026-10-25
+updated: 2026-10-29
 prev: /docs/build/layout-and-media/image
 next: /docs/build/layout-and-media/audio
 ---
@@ -23,7 +23,8 @@ Use a video to show something that is easier to watch than to read: a welcome fr
   - as an **.mp4** or **.webm** file, at an address starting with `https://`, or at a path on the server of the app your form is used in, starting with a single `/`, such as `/videos/intro.mp4`.
 - **Captions are yours to add.** For a video with speech, do one of these:
   - put it on **YouTube** or **Vimeo**, and add captions there; or
-  - for a **video file**, which can't have captions on the form, put a full transcript of everything it says in a Text block next to it.
+  - for a **video file**, put a captions file online too: a WebVTT file, ending in `.vtt`, at an address starting with `https://` or at a path on the server of the app your form is used in, such as `/captions/intro.vtt`; or
+  - for a **video file** with no captions file, put a full transcript of everything it says in a Text block next to it.
 - A video has no Required and no Help text, isn't numbered, and can't be the source of a condition. It can have conditions of its own, under **Logic**.
 
 ## Steps
@@ -32,7 +33,7 @@ Use a video to show something that is easier to watch than to read: a welcome fr
 2. Under **Media**, choose **Video**. Typing `youtube`, `vimeo`, `mp4` or `webm` finds it too.
 3. In **Label**, say what the video is about. As the hint under it says, it is read aloud to screen-reader users as the player's name.
 4. In **URL**, paste the YouTube or Vimeo link, or the file's address or path.
-5. If it is a video file with speech, insert a **Text** block right after it, and put the full transcript in its **Content**.
+5. If it is a video file with speech, put its captions file's address or path in **Captions**. The field shows once the URL is a video file. If there is no captions file, insert a **Text** block right after the video instead, and put the full transcript in its **Content**.
 6. Select **Save**.
 <Gif alt="Adding a Video with its label and link" />
 
@@ -40,12 +41,16 @@ In the downloaded file, the URL is the block's `content`, exactly as you pasted 
 
 <FormExcerpt form="video" block="welcome_video" field="content" />
 
+The Captions address is the block's `captions`, without spaces at either end. It is left out of the file when Captions is empty.
+
 ## What happens behind the scenes
 
 - **YouTube and Vimeo videos play in that service's own player,** in a frame as wide as the form, 16:9. YouTube's player is loaded from `youtube-nocookie.com`.
 - **A start time on a YouTube link is kept,** from `t=` or `start=`, such as `?t=90` or `?t=1m30s`.
 - **A video file plays in the browser's own player,** at its own shape, never wider than the form.
 - **Videos never start by themselves.**
+- **Captions on a video file are off until the respondent turns them on** in the browser's player, where they are listed as "Captions". A captions file that can't be found or fails to load leaves the video playing without captions.
+- **Captions stay with the video if you change its URL to YouTube or Vimeo,** but the field is hidden and they aren't used: those players show the captions set on YouTube or Vimeo. Change the URL back to a video file and Captions shows again, with its address.
 - **At the end of a YouTube video, YouTube may suggest other videos** from the same channel. That can't be turned off.
 - **A link or address that isn't recognised shows nothing,** and so does a video file that fails to load: never an error for the respondent.
 - **Nothing from a video is sent** with the answers.
@@ -55,6 +60,7 @@ In the downloaded file, the URL is the block's `content`, exactly as you pasted 
 | What you try | What the builder says |
 |---|---|
 | Save a video with no URL, or one that isn't recognised | Video "Welcome": paste a YouTube or Vimeo link, or the address of an .mp4 or .webm file (https:// or a path on your app's server such as /videos/intro.mp4). (under the URL field, the same text, starting with a capital) |
+| Save a video file whose Captions address isn't recognised | Video "Welcome": add the address of a .vtt captions file (https:// or a path on your app's server such as /captions/intro.vtt), or leave Captions empty. (under the Captions field, without the video's name, starting with a capital) |
 
 The name in quotation marks is the video's path in the form: the page and groups it is in, then its label.
 
@@ -72,13 +78,27 @@ What is recognised, after spaces at either end are removed:
 
 The video IDs in this table are made up; they show the form a link takes.
 
+What is recognised as a captions address, after spaces at either end are removed:
+
+| Recognised | Not recognised |
+|---|---|
+| `https://cdn.example.com/intro.vtt` | `http://cdn.example.com/intro.vtt`: must be `https://` |
+| `https://cdn.example.com/intro.VTT?v=2` | `https://cdn.example.com/intro.srt`: only .vtt files |
+| `/captions/intro.vtt` | `//cdn.example.com/intro.vtt`: two slashes at the start |
+| | `https://user@cdn.example.com/intro.vtt`: a name before the site |
+| | `https://cdn.example.com/?file=intro.vtt`: the file name must be in the path, not after `?` |
+
 ## Troubleshooting
 
 **The video doesn't show in your app, though the form saved.** If it is on YouTube or Vimeo, the app's developer may need to allow those players in the app's security settings (its Content Security Policy). If it is a file, check the address opens in a browser, and for a path starting with `/`, check it on the app your form is used in.
 
 **The builder doesn't recognise a YouTube link.** Use the link to the video itself, not to a playlist, channel or search, and remove any slash at the end.
 
-**Respondents who can't hear the video miss what is said.** Put the video on YouTube or Vimeo and add captions there. For a video file, which can't have captions, put a full transcript in a Text block next to it.
+**Captions don't show in your app.** Captions start off: check that the respondent turned them on in the player. Then check that the captions address opens in a browser, and for a path starting with `/`, check it on the app your form is used in. The app's developer may also need to:
+- allow the captions file's site in the app's security settings (its Content Security Policy's `media-src`), as for the video file;
+- when the captions file is on a different site from the app, serve both the captions file and the video file with `Access-Control-Allow-Origin`. Without it the video can't load with its captions, so it plays once more without them.
+
+**Respondents who can't hear the video miss what is said.** Add captions: on YouTube or Vimeo, set them there; for a video file, put a captions file's address in **Captions**. For a video file with no captions file, put a full transcript in a Text block next to it.
 
 ## More about building forms
 

@@ -295,6 +295,8 @@ export const QuestionBlock = z.object({
   level: z.number().int().min(1).max(3).optional(),
   /** static content: text copy, or the URL for image/video/audio */
   content: z.string().optional(),
+  /** video only: a .vtt captions file, used when the source is a video file (contract §10; `captionsProblem`). */
+  captions: z.string().optional(),
   /** a linear scale's first and last points, or a number's limits (see `rangeSettingsProblems`) */
   min: z.number().optional(),
   max: z.number().optional(),
@@ -647,11 +649,18 @@ export const PageBlock = z.object({
 function withoutIdleRepeatSettings(raw: unknown): unknown {
   if (typeof raw !== "object" || raw === null) return raw;
   const node = raw as Record<string, unknown>;
-  if (node.type !== "group" && node.type !== "page") return withoutIdleCompleteRequired(node);
+  if (node.type !== "group" && node.type !== "page") return withoutIdleCompleteRequired(withoutStrayCaptions(node));
   if (node.type === "group" && node.repeats === true) return raw;
   const { repeats, repeatLabel: _label, minOccurs: _min, maxOccurs: _max, ...rest } = node;
   // Anything but true or false is left for the parser to reject.
   return repeats === false || repeats === undefined ? rest : { ...rest, repeats };
+}
+
+/** `captions` belongs to a video (contract §10); on any other block it is dropped, never stored or exported. */
+function withoutStrayCaptions(node: Record<string, unknown>): Record<string, unknown> {
+  if (node.type === "video" || !("captions" in node)) return node;
+  const { captions: _captions, ...rest } = node;
+  return rest;
 }
 
 /** The question types `completeRequired` applies to, and how the inspector names it. */
@@ -688,6 +697,11 @@ const SourceBlock = QuestionBlock.extend({
     .string()
     .optional()
     .transform((src) => src?.trim()),
+  /** A video's captions file, stored trimmed and left out when blank (contract §10). */
+  captions: z
+    .string()
+    .optional()
+    .transform((src) => src?.trim() || undefined),
 });
 const OtherQuestionBlock = QuestionBlock.extend({ type: QuestionType.exclude([...SOURCE_BLOCK_TYPES]) });
 
@@ -2048,6 +2062,41 @@ export function parseAudioSource(raw: string | undefined): string | null {
   return AUDIO_FILE_EXTENSION.test(new URLImpl(src, PLACEHOLDER_BASE).pathname) ? src : null;
 }
 
+const CAPTIONS_FILE_EXTENSION = /\.vtt$/i;
+
+/**
+ * Contract §10: a video file's captions address, trimmed, when it is
+ * recognised, otherwise null. Recognised is a valid source per §9 (absolute
+ * `https://` with no credentials, or root-relative) whose path, before any `?`
+ * or `#`, ends in .vtt, in any case. The renderer implements the same rule
+ * and shares the same test table.
+ */
+export function parseCaptionsSource(raw: string | undefined): string | null {
+  const src = validSource(raw);
+  if (src === null) return null;
+  return CAPTIONS_FILE_EXTENSION.test(new URLImpl(src, PLACEHOLDER_BASE).pathname) ? src : null;
+}
+
+/**
+ * The save rule for a video's captions, or null when it's fine: a captions
+ * address that isn't recognised, on a video whose source is a video file. On
+ * YouTube, Vimeo or an unrecognised source the Captions field is hidden, so a
+ * stored value is kept and not checked (the renderer ignores it there).
+ * Shared by the save rules and the editor's inline message under Captions.
+ */
+export function captionsProblem(entry: TreeEntry): ConditionProblem | null {
+  const { block } = entry;
+  if (block.type !== "video" || !(block.captions ?? "").trim()) return null;
+  if (parseVideoSource(block.content)?.kind !== "file" || parseCaptionsSource(block.captions) !== null) return null;
+  const rule =
+    "add the address of a .vtt captions file (https:// or a path on your app's server such as /captions/intro.vtt), or leave Captions empty.";
+  return {
+    blockId: block.id,
+    message: `Video "${pathText(entry)}": ${rule}`,
+    detail: rule.charAt(0).toUpperCase() + rule.slice(1),
+  };
+}
+
 /** A block's path of names, page title first, e.g. "About you › Logo". */
 function pathText(entry: TreeEntry): string {
   const chain = [...entry.ancestors, entry.block];
@@ -2391,7 +2440,7 @@ export function formProblems(form: { blocks: readonly Block[] }): ConditionProbl
 
 /**
  * The save problems on one block other than its own field rules — a display
- * block's content (`displayBlockProblem`), a repeating group's settings
+ * block's content (`displayBlockProblem`), a video's captions (`captionsProblem`), a repeating group's settings
  * (`repeatSettingsProblems`), its option lists (`optionListProblems`) and a scale's or
  * number's range (`rangeSettingsProblems`). This is what the editor's Logic section lists:
  * those messages are shown once, inline under the field they are about, not
@@ -2437,6 +2486,8 @@ function collectProblems(form: { blocks: readonly Block[] }, withFieldRules: boo
     }
     const display = withFieldRules ? displayBlockProblem(entry) : null;
     if (display) problems.push(display);
+    const captions = withFieldRules ? captionsProblem(entry) : null;
+    if (captions) problems.push(captions);
     if (withFieldRules) for (const { rule } of optionListProblems(block)) add(entry, rule);
     if (withFieldRules) for (const { rule } of rangeSettingsProblems(block)) add(entry, rule);
   }
