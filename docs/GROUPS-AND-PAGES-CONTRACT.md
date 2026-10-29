@@ -36,7 +36,7 @@ navigation?: {
 
 ## 2. Structure rules
 
-1. Groups nest to **any depth**. There is no depth limit.
+1. Groups nest to **any depth** in the renderer: it has no depth limit. The builder refuses a group nested more than 20 deep at save (§6, builder only).
 2. `page` may appear only at the root — never inside a group or another page.
 3. If any root item is a page, **every** root item must be a page (no mixed root).
 4. Block ids are unique across the whole tree, including group and page ids.
@@ -101,7 +101,8 @@ The builder rejects these at save (400 naming the block). The renderer throws at
 **Builder only.** The builder also rejects these at save (400 naming the block). The renderer does not throw for them and renders such a schema as it does today: a scale with `min` above `max` shows no points, and one with more than 20 points shows the first 20.
 
 - a `scale` whose `min` or `max` is not a whole number, whose `min` is greater than its `max`, or that has more than 20 points (`max − min + 1`); an absent `min` counts as 1 and an absent `max` as 5;
-- a `number` whose `min` is greater than its `max`.
+- a `number` whose `min` is greater than its `max`;
+- a group nested more than 20 deep: inside 20 or more other groups (a page doesn't count). The renderer mounts deeper nesting.
 
 ## 7. Rendering (renderer only)
 
