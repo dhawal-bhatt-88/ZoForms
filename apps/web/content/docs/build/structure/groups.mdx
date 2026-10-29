@@ -21,7 +21,7 @@ Put the questions about an emergency contact together under "Emergency contact",
 Give the group a condition, and every question in it shows or hides with it, such as a "Parent or guardian" group shown only when the respondent is under 18.
 </UseCase>
 <UseCase title="Sections within sections">
-Put a group inside another group. Groups nest to any depth.
+Put a group inside another group. Groups nest up to 20 deep.
 </UseCase>
 </UseCases>
 
@@ -67,6 +67,7 @@ To delete a group, select it and choose **Delete group…**. The builder asks wh
 |---|---|
 | Save a group with no blocks in it | Group "Emergency contact": a group must contain at least one block. |
 | Save a group with an empty label | An unlabelled group at the top level: a group needs a label. (the start says where the group is) |
+| Save a group inside 20 other groups | Group "Section › … › Details": groups can be nested at most 20 deep, and this group is inside 20 others. Move it up a level. (the start names every group around it) |
 | Delete a group and its questions, when a question outside it has a condition on one inside | Can't delete "Emergency contact" and its questions — these questions outside it have conditions that depend on something inside it: |
 
 The names in quotation marks are examples; the builder uses yours.

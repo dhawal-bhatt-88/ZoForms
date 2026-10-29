@@ -147,7 +147,7 @@ export class TeamService {
       subject: `You're invited to ${org?.name ?? "a team"} on Zowork Forms`,
       html: this.mail.layout(
         `Join ${org?.name ?? "the team"} on Zowork Forms`,
-        `You've been invited as <strong>${role[0] + role.slice(1).toLowerCase()}</strong>. Accept to get started.`,
+        ["You've been invited as ", { strong: role[0] + role.slice(1).toLowerCase() }, ". Accept to get started."],
         { label: "Accept invite", url: acceptUrl },
       ),
     });

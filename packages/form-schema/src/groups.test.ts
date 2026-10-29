@@ -21,11 +21,13 @@ import {
   unwrapGroup,
   updateBlockInTree,
   walkBlocks,
+  MAX_GROUP_DEPTH,
   type Block,
   type Condition,
   type GroupBlock,
   type LeafBlock,
 } from "./index";
+import { templateProblems } from "./templates";
 import { opts } from "./test-utils/options";
 
 /* ---------- fixtures ---------- */
@@ -231,6 +233,43 @@ describe("formProblems over the tree", () => {
     expect(message).toBe(
       'Group "G": a condition depends on "INNER", which is inside this group. A group can\'t depend on its own questions.',
     );
+  });
+
+  describe("nesting depth (contract §6, builder only)", () => {
+    /** `levels` groups, each inside the one before: g1 › g2 › … with a question at the bottom. */
+    const nested = (levels: number): GroupBlock => {
+      let inner: Block = leaf("bottom");
+      for (let level = levels; level >= 1; level--) inner = group(`g${level}`, [inner]);
+      return inner as GroupBlock;
+    };
+    // Named by its path, as every structure rule names a block.
+    const path = Array.from({ length: 21 }, (_, i) => `G${i + 1}`).join(" › ");
+    const tooDeep = `Group "${path}": groups can be nested at most 20 deep, and this group is inside 20 others. Move it up a level.`;
+
+    it("accepts groups nested 20 deep", () => {
+      expect(MAX_GROUP_DEPTH).toBe(20);
+      expect(problemsOf(nested(20))).toEqual([]);
+    });
+
+    it("refuses 21, naming the group that is too deep", () => {
+      expect(problemsOf(nested(21))).toEqual([tooDeep]);
+    });
+
+    it("names only the outermost group too deep, however deep it goes", () => {
+      expect(problemsOf(nested(60))).toEqual([tooDeep]);
+    });
+
+    it("doesn't count a page as a level", () => {
+      expect(problemsOf({ id: "p", type: "page", title: "Page 1", blocks: [nested(20)] })).toEqual([]);
+      expect(formProblems({ blocks: [{ id: "p", type: "page", title: "Page 1", blocks: [nested(21)] }] }).map((p) => p.detail)).toEqual([
+        "groups can be nested at most 20 deep, and this group is inside 20 others. Move it up a level.",
+      ]);
+    });
+
+    it("refuses a group template nested too deep", () => {
+      expect(templateProblems("group", { title: "T", blocks: [nested(21)] })).toEqual([tooDeep]);
+      expect(templateProblems("group", { title: "T", blocks: [nested(20)] })).toEqual([]);
+    });
   });
 
   it("rejects a group as a condition source", () => {

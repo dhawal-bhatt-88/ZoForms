@@ -87,7 +87,7 @@ const nestedGroups = (levels) => {
 const PROBES = {
   "empty form": { title: "Empty", blocks: [] },
   "only presentational blocks": { title: "P", blocks: [{ id: "hd", type: "heading", label: "Just a heading" }, { id: "ti", type: "title", label: "A title" }] },
-  "groups nested 58 deep (the deepest that saves)": { title: "Deep", blocks: [nestedGroups(58)] },
+  "groups nested 20 deep (the deepest that saves, contract §6)": { title: "Deep", blocks: [nestedGroups(20)] },
   "repeating group inside a repeating group": {
     title: "R", blocks: [{ id: "o", type: "group", label: "Outer", repeats: true, repeatLabel: "visit", minOccurs: 1, maxOccurs: 3,
       blocks: [{ id: "i", type: "group", label: "Inner", repeats: true, repeatLabel: "dose", minOccurs: 0, maxOccurs: 5, blocks: [sq("x")] }] }],

@@ -1,6 +1,7 @@
 // Release audit, areas 2, 4 and 5: ids, request body limits, deeply nested JSON,
 // and form versions (every save inserts one; concurrent and stale saves; restore;
-// Download reads the latest and writes nothing).
+// Download reads the latest and writes nothing, and refuses a file the renderer
+// would refuse).
 //
 // Usage: node scripts/audit/versions-and-inputs.js   (API on AUDIT_API_URL, default :4100)
 const { call, signup, check, note, run, short, prisma } = require("./_lib");
@@ -57,11 +58,18 @@ run("Versions and inputs", async () => {
   r = await call("PUT", `/v1/forms/${form.id}/schema`, T, { title: "V", blocks: [q("a", "Tab 1's careful edit"), q("b", "Added in tab 1")] });
   const tab1 = r.json?.version;
   // Tab 2 opened at `base` and now saves its own change, with no idea tab 1 saved.
-  r = await call("PUT", `/v1/forms/${form.id}/schema`, T, { title: "V", blocks: [q("a", "Tab 2's edit")] });
+  n = (await rows()).length;
+  r = await call("PUT", `/v1/forms/${form.id}/schema?baseVersion=${base.version}`, T, { title: "V", blocks: [q("a", "Tab 2's edit")] });
   const latest = (await call("GET", `/v1/forms/${form.id}/artifact`, T)).json;
-  check("a save from a tab that is behind → refused, not silently replacing the newer version",
-    !ok(r), `tab 2 opened at v${base.version}, tab 1 saved v${tab1}, tab 2 then saved → ${r.status} v${r.json?.version}; the download now has ${latest.blocks.length} question(s): ${latest.blocks.map((b) => JSON.stringify(b.label)).join(", ")}`);
-  note("the save request carries no base version", "PUT /v1/forms/:id/schema takes the schema only (apps/web/src/lib/api.ts saveSchema); the server compares with nothing but the latest content");
+  check("V1: a save from a tab that is behind → refused, not silently replacing the newer version",
+    r.status === 409 && r.json?.code === "VERSION_CONFLICT" && r.json?.latestVersion === tab1 && (await rows()).length === n,
+    `tab 2 opened at v${base.version}, tab 1 saved v${tab1}, tab 2 then saved → ${r.status} v${r.json?.version}; the download now has ${latest.blocks.length} question(s): ${latest.blocks.map((b) => JSON.stringify(b.label)).join(", ")}`);
+  check("V1: …and the download still has tab 1's work", latest.blocks.some((b) => b.label === "Added in tab 1"));
+  r = await call("PUT", `/v1/forms/${form.id}/schema?baseVersion=${tab1}`, T, { title: "V", blocks: [q("a", "Tab 2's edit"), q("b", "Added in tab 1")] });
+  check("V1: tab 2 saving its edits on top of the latest (\"Save mine as a new version\") → saved", ok(r) && r.json.version === tab1 + 1, short(r));
+  r = await call("PUT", `/v1/forms/${form.id}/schema?baseVersion=nope`, T, { title: "V", blocks: [q("a", "x")] });
+  check("V1: a baseVersion that isn't a version number → 400", r.status === 400, short(r));
+  note("V1: a save without baseVersion", "still accepted, as before (scripts); the editor always sends it (stale-save.test.tsx)");
 
   // ---------- restore ----------
   n = (await rows()).length;
@@ -79,6 +87,17 @@ run("Versions and inputs", async () => {
     d1.json.formVersionId === restored.id && d1.text === d2.text && JSON.stringify(await rows()) === before,
     `formVersionId ${d1.json.formVersionId}; content-disposition ${d1.headers.get("content-disposition")}`);
 
+  // ---------- V2: download refuses a file the renderer would refuse ----------
+  // Stored behind the save rules' back: two blocks with the same id, which every save refuses.
+  const brokenRows = (await rows()).length;
+  await prisma.formVersion.create({ data: { formId: form.id, version: (await rows()).at(-1).version + 1, schema: { title: "V", blocks: [q("dup", "One"), q("dup", "Two")] } } });
+  r = await call("GET", `/v1/forms/${form.id}/artifact`, T);
+  check("V2: download of a form the renderer would refuse → 422 FORM_INVALID naming the problem, and no file",
+    r.status === 422 && r.json?.code === "FORM_INVALID" && /^The renderer would refuse this form: .*dup/.test(r.json?.message ?? "") && !r.headers.get("content-disposition"), short(r));
+  check("V2: …and nothing was written", (await rows()).length === brokenRows + 1);
+  r = await call("PUT", `/v1/forms/${form.id}/schema`, T, { title: "V", blocks: [q("a", "Fixed")] });
+  check("V2: once a good version is saved, download works again", ok(r) && ok(await call("GET", `/v1/forms/${form.id}/artifact`, T)), short(r));
+
   // ---------- body limits ----------
   const big = (kb) => JSON.stringify({ settingsPaneWidth: 400, pad: "x".repeat(kb * 1024) });
   r = await call("PATCH", "/v1/auth/me/preferences", T, big(150));
@@ -91,14 +110,17 @@ run("Versions and inputs", async () => {
   check("malformed JSON → 400", r.status === 400, short(r));
 
   // ---------- deeply nested JSON ----------
-  for (const levels of [20, 60, 130, 200]) {
+  r = await call("PUT", `/v1/forms/${form.id}/schema`, T, { title: "V", blocks: [nestedGroups(20)] });
+  check("N1: form save, groups nested 20 deep → saved", ok(r), short(r));
+  for (const levels of [21, 60, 130, 200]) {
     r = await call("PUT", `/v1/forms/${form.id}/schema`, T, { title: "V", blocks: [nestedGroups(levels)] });
-    check(`form save, groups nested ${levels} deep → not a 500`, r.status < 500, short(r));
+    check(`N1: form save, groups nested ${levels} deep → 400 naming the group, not a 500`,
+      r.status === 400 && /Group 21": groups can be nested at most 20 deep, and this group is inside 20 others\. Move it up a level\./.test(r.json?.message ?? ""), short(r));
   }
   r = await call("PUT", `/v1/forms/${form.id}/schema`, T, { title: "V", blocks: [{ ...q("x", "X"), extra: nestedObject(300) }] });
   check("form save, an unknown key holding 300-deep JSON → not a 500", r.status < 500, short(r));
   r = await call("POST", "/v1/templates", T, { kind: "group", name: "deep", content: nestedGroups(200) });
-  check("group template, groups nested 200 deep → not a 500", r.status < 500, short(r));
+  check("N1: group template, groups nested 200 deep → 400, not a 500", r.status === 400, short(r));
   r = await call("POST", "/v1/templates", T, { kind: "form", name: "deep", content: { title: "x", blocks: [q("x", "X")], extra: nestedObject(300) } });
   check("form template, an unknown key holding 300-deep JSON → not a 500", r.status < 500, short(r));
   r = await call("PATCH", "/v1/auth/me/preferences", T, { settingsPaneWidth: nestedObject(300) });

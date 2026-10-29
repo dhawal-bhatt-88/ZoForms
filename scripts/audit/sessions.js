@@ -200,6 +200,21 @@ run("Sign-in and sessions", async () => {
     const bothAfter = await prisma.membership.findMany({ where: { userId: sb.json.user.id } });
     check("way 5, after the merge: an account in its sign-up organisation and an invited one keeps only the sign-up one",
       bothAfter.length === 1 && bothAfter[0].orgId === bothOwnOrg, JSON.stringify(bothAfter));
+
+    // The sign-up organisation is never matched as invited: an account invited elsewhere and refused
+    // (one team per account) leaves an Invite row for the other organisation only.
+    const refusedAddr = emailFor("way5-refused");
+    const sr = await call("POST", "/v1/auth/signup", null, { email: refusedAddr, password: "Attacker-pw-123!", name: "Refused" });
+    const refusedOwnOrg = decode(sr.json.token).orgId;
+    const early = await prisma.invite.create({ data: { orgId: atkOrg, email: refusedAddr, role: "EDITOR", token: `${sr.json.user.id}-refused`, expiresAt: new Date(Date.now() + 86_400_000) } });
+    const refusedAccept = await call("POST", `/v1/invites/${early.token}/accept`, null, { password: "Attacker-pw-123!" });
+    const rows = await prisma.invite.findMany({ where: { email: refusedAddr }, select: { orgId: true, status: true } });
+    check("merge rule: an account in its own team, invited elsewhere, is refused, and its only Invite row is the other team's",
+      refusedAccept.status === 409 && rows.length === 1 && rows[0].orgId === atkOrg && rows[0].orgId !== refusedOwnOrg, `${short(refusedAccept)}; ${JSON.stringify(rows)}`);
+    const gr = await auth.loginWithGoogle(JSON.stringify({ email: refusedAddr, email_verified: true, name: "Refused" }));
+    const refusedAfter = await prisma.membership.findMany({ where: { userId: sr.json.user.id } });
+    check("merge rule: …and the Google merge keeps its sign-up organisation, signing in to it",
+      refusedAfter.length === 1 && refusedAfter[0].orgId === refusedOwnOrg && decode(gr.token).orgId === refusedOwnOrg, JSON.stringify(refusedAfter));
   } finally {
     OAuth2Client.prototype.verifyIdToken = realVerify;
   }

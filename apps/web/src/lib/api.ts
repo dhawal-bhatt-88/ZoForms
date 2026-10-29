@@ -25,6 +25,8 @@ export class ApiError extends Error {
     message: string,
     readonly status: number,
     readonly code?: string,
+    /** With VERSION_CONFLICT: the form's latest version now. */
+    readonly latestVersion?: number,
   ) {
     super(message);
     this.name = "ApiError";
@@ -59,14 +61,16 @@ async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
     let code: string | undefined;
+    let latestVersion: number | undefined;
     try {
       const body = await res.json();
       if (body?.message) message = String(body.message);
       if (typeof body?.code === "string") code = body.code;
+      if (typeof body?.latestVersion === "number") latestVersion = body.latestVersion;
     } catch {
       /* ignore */
     }
-    throw new ApiError(message, res.status, code);
+    throw new ApiError(message, res.status, code, latestVersion);
   }
   return res;
 }
@@ -273,12 +277,14 @@ export function getForm(id: string) {
 }
 
 /**
- * Save the schema as a new version. Rejects with ApiError 409 and code
- * "NO_CHANGES" when it matches the current version, or "VERSION_CONFLICT" when
- * another save got there first.
+ * Save the schema as a new version. `baseVersion` is the version the edit
+ * started from: if another save made a newer one since, nothing is saved.
+ * Rejects with ApiError 409 and code "NO_CHANGES" when it matches the current
+ * version, or "VERSION_CONFLICT" (with `latestVersion`) when the form was saved
+ * since `baseVersion` or another save got there first.
  */
-export function saveSchema(id: string, schema: FormSchema) {
-  return req<{ ok: boolean; versionId: string; version: number; schema: FormSchema }>(`/v1/forms/${id}/schema`, {
+export function saveSchema(id: string, schema: FormSchema, baseVersion: number) {
+  return req<{ ok: boolean; versionId: string; version: number; schema: FormSchema }>(`/v1/forms/${id}/schema?baseVersion=${baseVersion}`, {
     method: "PUT",
     body: JSON.stringify(schema),
   });

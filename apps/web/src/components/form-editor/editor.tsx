@@ -202,6 +202,7 @@ import { canEditAs, useMe } from "@/lib/use-can-edit";
 import { SETTINGS_PANE_HEADING_ID, SETTINGS_PANE_ID, SettingsPaneHandle, useSettingsPane } from "./settings-pane";
 import { SaveStatus, useSaveAnnouncement } from "./save-status";
 import { LeaveLink } from "./leave-link";
+import { StaleSaveDialog } from "./stale-save-dialog";
 import { BlockChips, BlockIcon, BlockPreview, DropLine, GroupBox, PAGE_BOX, PAGE_HEADER, PageLabel, RequiredMark } from "./canvas-preview";
 import {
   ApiError,
@@ -1593,6 +1594,10 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   const [schema, setSchema] = useState<FormSchema | null>(null);
   // The latest saved version's content: the baseline for dirty-state and Cancel.
   const [saved, setSaved] = useState<FormSchema | null>(null);
+  // That version's number: every form save sends it, so a save from a tab that is behind is refused (409).
+  const [baseVersion, setBaseVersion] = useState<number | null>(null);
+  // A form save refused for that reason: the dialog asking what to do with these edits.
+  const [stale, setStale] = useState<{ base: number; latest: number } | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -1655,10 +1660,45 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         const latest = editorContent(s, f.title);
         setSchema(latest);
         setSaved(latest);
+        setBaseVersion(f.versions[0]?.version ?? null);
         setSelectedId(s?.blocks?.[0]?.id ?? null);
       })
       .catch(() => setLoadError(true));
   }, [id, templateId]);
+
+  /** Save the form as the version after `from`; adopt what was stored. */
+  async function saveFormFrom(sent: FormSchema, from: number) {
+    const r = await saveSchema(id, sent, from);
+    setSaved(r.schema);
+    setSchema((s) => (s === sent ? r.schema : s));
+    setBaseVersion(r.version);
+    saveAnnouncement.announce("Changes saved.");
+  }
+
+  /** The stale-save dialog's "Load the latest version": these edits are dropped. */
+  async function loadLatest() {
+    const f = await getForm(id);
+    const latest = editorContent(f.versions[0]?.schema, f.title);
+    setSchema(latest);
+    setSaved(latest);
+    setBaseVersion(f.versions[0]?.version ?? null);
+    setNotice(null);
+    setStale(null);
+    saveAnnouncement.announce(`Loaded version ${f.versions[0]?.version}.`);
+  }
+
+  /** The stale-save dialog's "Save mine as a new version", on top of the latest. */
+  async function saveMine() {
+    if (!schema || !stale) return;
+    try {
+      await saveFormFrom(schema, stale.latest);
+      setStale(null);
+    } catch (e) {
+      // Saved again in the meantime: the dialog now names that version.
+      if (e instanceof ApiError && e.code === "VERSION_CONFLICT" && e.latestVersion) setStale({ base: stale.base, latest: e.latestVersion });
+      else throw e;
+    }
+  }
 
   /** A template's content as the editor holds it: a group template as the only block of a form. */
   function templateContent(t: TemplateDetail): FormSchema {
@@ -1707,7 +1747,9 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         setTemplate({ name: t.name, kind: t.kind, version: t.version, scope: t.scope });
         stored = templateContent(t);
       } else {
-        stored = (await saveSchema(id, sent)).schema;
+        if (baseVersion === null) return;
+        await saveFormFrom(sent, baseVersion);
+        return;
       }
       setSaved(stored);
       setSchema((s) => (s === sent ? stored : s));
@@ -1720,6 +1762,9 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         setSaved(filled);
         setSchema((s) => (s === sent ? filled : s));
         saveAnnouncement.announce("Changes saved.");
+      } else if (e instanceof ApiError && e.code === "VERSION_CONFLICT" && templateId === undefined && baseVersion !== null && e.latestVersion) {
+        // Nothing was saved, and the edits are kept: the author chooses what happens to them.
+        setStale({ base: baseVersion, latest: e.latestVersion });
       } else if (e instanceof ApiError && e.code === "VERSION_CONFLICT") {
         // Keep the unsaved edits; the author decides whether to reload.
         notify({ tone: "fail", text: e.message });
@@ -2943,6 +2988,15 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         />
       )}
       {confirmPaging && <PagingDialog onConfirm={convertToPages} onClose={() => setConfirmPaging(false)} />}
+      {stale && (
+        <StaleSaveDialog
+          base={stale.base}
+          latest={stale.latest}
+          onLoadLatest={loadLatest}
+          onSaveMine={saveMine}
+          onClose={() => setStale(null)}
+        />
+      )}
       {confirmingCancel && (
         <ConfirmDialog
           title="Discard unsaved changes?"

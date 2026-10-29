@@ -2450,6 +2450,13 @@ export function problemsBesideContent(form: { blocks: readonly Block[] }, blockI
   return collectProblems(form, false).filter((p) => p.blockId === blockId);
 }
 
+/**
+ * How deep groups may nest at save (contract §6, builder only): a group inside
+ * this many others is fine, one more is refused. Pages don't count. The
+ * renderer has no limit; storing much deeper fails in the database.
+ */
+export const MAX_GROUP_DEPTH = 20;
+
 function collectProblems(form: { blocks: readonly Block[] }, withFieldRules: boolean): ConditionProblem[] {
   const entries = walkBlocks(form.blocks);
   const problems: ConditionProblem[] = [];
@@ -2479,6 +2486,10 @@ function collectProblems(form: { blocks: readonly Block[] }, withFieldRules: boo
     } else if (isGroup(block)) {
       if (!block.label.trim()) add(entry, "a group needs a label.");
       if (block.blocks.length === 0) add(entry, "a group must contain at least one block.");
+      // Named once, on the outermost group too deep: the ones inside it go with it.
+      if (entry.ancestors.filter(isGroup).length === MAX_GROUP_DEPTH) {
+        add(entry, `groups can be nested at most ${MAX_GROUP_DEPTH} deep, and this group is inside ${MAX_GROUP_DEPTH} others. Move it up a level.`);
+      }
       if (withFieldRules) for (const { rule } of repeatSettingsProblems(block)) add(entry, rule);
     }
     if (paged && entry.depth === 0 && !isPage(block)) {

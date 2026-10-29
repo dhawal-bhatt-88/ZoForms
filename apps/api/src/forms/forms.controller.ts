@@ -6,6 +6,7 @@ import {
   Param,
   Post,
   Put,
+  Query,
   Res,
   UseGuards,
 } from "@nestjs/common";
@@ -36,13 +37,18 @@ export class FormsController {
     return this.forms.create(user, body?.title?.trim() || "Untitled form");
   }
 
+  /**
+   * `?baseVersion=N`: the version the edit started from. If it isn't the latest
+   * any more, nothing is saved (409 VERSION_CONFLICT). The editor always sends it.
+   */
   @Put(":id/schema")
   saveSchema(
     @CurrentUser() user: AuthUser,
     @Param("id") id: string,
     @Body() body: unknown,
+    @Query("baseVersion") baseVersion?: string,
   ) {
-    return this.forms.saveSchema(user, id, body);
+    return this.forms.saveSchema(user, id, body, baseVersion);
   }
 
   /** Download the current version as a schema artifact. Read-only. */

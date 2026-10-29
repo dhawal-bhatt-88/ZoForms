@@ -3,6 +3,7 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  UnprocessableEntityException,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import {
@@ -22,9 +23,19 @@ import type { AuthUser } from "../auth/current-user.decorator";
 import { assertCanEdit } from "../auth/can-edit";
 import { describeSchemaError } from "../common/schema-errors";
 import { TemplatesService } from "../templates/templates.service";
+import { RendererCore } from "./renderer-core";
 
 /** Versions are append-only, so a form's current version is its highest `version`. */
 const LATEST_VERSION = { orderBy: { version: "desc" }, take: 1 } as const;
+
+/** A save that started from a version that isn't the latest any more, or lost a race to another save. */
+function versionConflict(latestVersion: number | undefined) {
+  return new ConflictException({
+    message: "This form was saved elsewhere. Reload to get the latest version.",
+    code: "VERSION_CONFLICT",
+    latestVersion,
+  });
+}
 
 /**
  * The download's file name: the title in lower case, each run of anything but
@@ -42,6 +53,7 @@ export class FormsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly templates: TemplatesService,
+    private readonly renderer: RendererCore,
   ) {}
 
   /* ---------- authenticated (scoped to the user's org) ---------- */
@@ -120,10 +132,8 @@ export class FormsService {
     } catch (e) {
       // A concurrent save claimed this version number first (@@unique([formId, version])).
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-        throw new ConflictException({
-          message: "This form was saved elsewhere. Reload to get the latest version.",
-          code: "VERSION_CONFLICT",
-        });
+        const latest = await this.prisma.formVersion.findFirst({ where: { formId: form.id }, ...LATEST_VERSION, select: { version: true } });
+        throw versionConflict(latest?.version);
       }
       throw e;
     }
@@ -159,11 +169,19 @@ export class FormsService {
     return { ok: true, versionId: created.id, version: created.version };
   }
 
-  async saveSchema(user: AuthUser, id: string, raw: unknown) {
+  async saveSchema(user: AuthUser, id: string, raw: unknown, baseVersionRaw?: string) {
     this.assertCanEdit(user);
+    const baseVersion = baseVersionRaw === undefined ? undefined : Number(baseVersionRaw);
+    if (baseVersion !== undefined && !(Number.isInteger(baseVersion) && baseVersion >= 1)) {
+      throw new BadRequestException("baseVersion must be a version number: a whole number from 1.");
+    }
     const parsed = FormSchema.safeParse(raw);
     if (!parsed.success) throw new BadRequestException(describeSchemaError(raw, parsed.error));
     const form = await this.get(user, id);
+    // Saved from a version that is no longer the latest: saving now would silently
+    // replace someone's newer work, so nothing is saved and the editor asks.
+    const latestVersion = form.versions[0]?.version;
+    if (baseVersion !== undefined && baseVersion !== latestVersion) throw versionConflict(latestVersion);
     // Conditions get their ids and items their logic text before anything is
     // checked (contract §15.6): the text is the logic, and any tree or
     // enableBehavior sent with it is dropped. A condition sent without an id
@@ -198,7 +216,9 @@ export class FormsService {
 
   /**
    * The export artifact for the form's current version. A pure read: it writes
-   * nothing, so downloading can never create or alter a version.
+   * nothing, so downloading can never create or alter a version. Refused (422
+   * FORM_INVALID, naming the problem) if the renderer wouldn't show the file:
+   * the checks are the renderer's own, from the same @zoworkhq/forms as the web app.
    */
   async getArtifact(user: AuthUser, id: string) {
     const form = await this.get(user, id);
@@ -207,6 +227,10 @@ export class FormsService {
     // Identity, schema format and navigation are stamped by buildArtifact, never
     // stored in or read from the schema itself.
     const artifact = buildArtifact(current.schema, { formId: form.id, formVersionId: current.id });
+    const problem = this.renderer.mountProblem(artifact);
+    if (problem) {
+      throw new UnprocessableEntityException({ message: `The renderer would refuse this form: ${problem}`, code: "FORM_INVALID" });
+    }
     return { fileName: downloadFileName(artifact.title, current.version), artifact };
   }
 

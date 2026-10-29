@@ -38,7 +38,8 @@ async function waitFor(url) {
     await ctx.addInitScript((t) => localStorage.setItem("frame_token", t), token);
     const page = await ctx.newPage();
     let schemaPuts = 0;
-    page.on("request", (r) => { if (r.method() === "PUT" && r.url().endsWith("/schema")) schemaPuts++; });
+    // A save is PUT …/schema?baseVersion=N: match the path, not the whole URL.
+    page.on("request", (r) => { if (r.method() === "PUT" && new URL(r.url()).pathname.endsWith("/schema")) schemaPuts++; });
 
     const status = page.locator("[data-save-state]");
     // In the top bar: a confirmation dialog has a Cancel of its own.
@@ -117,22 +118,22 @@ async function waitFor(url) {
 
     // --- 409 NO_CHANGES is a no-op; VERSION_CONFLICT keeps edits and asks to reload ---
     await desc.press("End"); await desc.pressSequentially("!", { delay: 30 });
-    await page.route("**/v1/forms/*/schema", (r) => r.fulfill({ status: 409, contentType: "application/json",
+    await page.route("**/v1/forms/*/schema?*", (r) => r.fulfill({ status: 409, contentType: "application/json",
       body: JSON.stringify({ statusCode: 409, message: "No changes to save.", code: "NO_CHANGES" }) }));
     await saveBtn.click();
     await status.getByText("All changes saved").waitFor();
     check("409 NO_CHANGES -> treated as saved, no error", (await page.locator("text=Couldn't save").count()) === 0);
-    await page.unroute("**/v1/forms/*/schema");
+    await page.unroute("**/v1/forms/*/schema?*");
 
     await desc.press("End"); await desc.pressSequentially("?", { delay: 30 });
     const conflictMsg = "This form was saved elsewhere. Reload to get the latest version.";
-    await page.route("**/v1/forms/*/schema", (r) => r.fulfill({ status: 409, contentType: "application/json",
+    await page.route("**/v1/forms/*/schema?*", (r) => r.fulfill({ status: 409, contentType: "application/json",
       body: JSON.stringify({ statusCode: 409, message: conflictMsg, code: "VERSION_CONFLICT" }) }));
     await saveBtn.click();
     await page.getByText(conflictMsg).waitFor();
     check("409 VERSION_CONFLICT -> shows reload message", true);
     check("conflict keeps unsaved edits", (await desc.inputValue()) === "Hello!?" && !(await blocked(saveBtn)), await desc.inputValue());
-    await page.unroute("**/v1/forms/*/schema");
+    await page.unroute("**/v1/forms/*/schema?*");
 
     // --- real 409s from the API carry the codes the editor relies on ---
     const same = await fetch(`${API}/v1/forms/${form.id}/schema`, { method: "PUT", headers: H,

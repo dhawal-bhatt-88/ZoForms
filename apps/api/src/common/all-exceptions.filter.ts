@@ -50,6 +50,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
     // Optional machine-readable reason, for clients that must tell apart errors
     // sharing a status (e.g. the two 409s a form save can return).
     let code: string | undefined;
+    // With VERSION_CONFLICT: the form's latest version, so the editor can say which.
+    let latestVersion: number | undefined;
     if (isHttp) {
       const body = exception.getResponse();
       message =
@@ -58,6 +60,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
           : ((body as Record<string, unknown>).message as string) ?? exception.message;
       if (typeof body === "object" && typeof (body as Record<string, unknown>).code === "string") {
         code = (body as Record<string, unknown>).code as string;
+      }
+      if (typeof body === "object" && typeof (body as Record<string, unknown>).latestVersion === "number") {
+        latestVersion = (body as Record<string, unknown>).latestVersion as number;
       }
     }
 
@@ -74,6 +79,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       statusCode: status,
       message,
       ...(code ? { code } : {}),
+      ...(latestVersion !== undefined ? { latestVersion } : {}),
       error: isHttp ? exception.name : parser ? "BadRequest" : "InternalServerError",
       path: req.url,
       timestamp: new Date().toISOString(),
