@@ -6,56 +6,93 @@ Severity is the brief's: **Blocker** can expose or corrupt data, let one organis
 
 The scripts that reproduce most findings are in [scripts/audit/](../../scripts/audit/README.md). They run only against localhost, make only throwaway accounts, and delete them when they end. Every throwaway account, organisation, invite and audit row was deleted; afterwards the local database had none left.
 
+## After the release fixes
+
+Brief: [BUILDER-BRIEF-RELEASE-FIXES.md](../briefs/BUILDER-BRIEF-RELEASE-FIXES.md). Commits `3540fc6` (sign-in and access), `bdead6a` (contract: group depth) and `0b81b34` (email, Next.js, stale saves, Download, group depth); the checks and this update are the commit after them. The summary tables now carry a **Status** for each finding: fixed in a commit, later, on hold: deployment, on hold: decision, or accepted. Their audit-time column, reproduced or suspected, is now **Evidence**.
+
+Re-running [scripts/audit/](../../scripts/audit/README.md) against the fixed build: no check fails. Every blocker the scripts reproduced (S1, I1, P1, S2) no longer reproduces, nor does any should-fix in CP1 or CP2.
+
+**Production images, rebuilt after the fixes (Linux, Docker).** All three built on the first attempt: API 1.59 GB, web 446 MB, admin 430 MB, with Next.js 15.5.28; the web image has sharp 0.35.5. The API image, against a throwaway Postgres 16, applied all 21 migrations and started, which means it loaded the renderer's `/core` (0.27.0, from the vendored tarball): the API doesn't start without it. Checked against it, 17 of 17:
+
+- a sign-up response carries no verification link;
+- a stale save is refused with 409 `VERSION_CONFLICT` and `latestVersion`;
+- Download returns the form file, which passes the renderer's mount checks;
+- Download of a stored version the renderer would refuse is 422 `FORM_INVALID`, naming the problem, with no file;
+- forgot-password answers only `{"ok":true}`;
+- the web and admin images serve their pages, and the web image's client code calls the API it was built for.
+
+The image also refuses to start in production with a missing, short (`a`) or example `JWT_SECRET`, and with `RETURN_EMAIL_LINKS_FOR_TESTS=true`, each with its message. `public-pages.js` passes on the web image. The containers, network, images and the database's volume were removed.
+
+### Decisions
+
+- **Deployment is out of scope:** D1 (HTTPS), D2 and D3 (missing URLs falling back to localhost), D5 (Google Fonts at build time), proxy and trusted-IP settings, and DEP3 (Nest 11): on hold: deployment. DEP3 is there because proxy-addr's advisory becomes reachable once `trust proxy` is set behind a load balancer, and fixing it, with multer, qs and the SSE advisory, needs Nest 11.
+- **Rate limiting** and **Privacy and Terms pages:** on hold: decision, as before.
+- **Reset and verification links** are never in a response, except with the test-only `RETURN_EMAIL_LINKS_FOR_TESTS`, which the API refuses in production. Forgot-password gives the same answer for every address.
+- **Every signed-in request** checks the membership, the user and the organisation (401 otherwise), and the role is read fresh. Sign-in refuses a suspended user or organisation, and an account in no organisation, with a message.
+- **Revocation:** `User.sessionsValidFrom`. A password reset and a Google claim revoke every older token: web, admin and impersonation. There is no sign-out-everywhere.
+- **Verification now unlocks inviting:** an unverified account can't invite. Without email configured, an account made with a password can't verify, invite or reset (DEPLOY.md says so). With email configured, invite links go only by email, and accepting one verifies the account.
+- **Google sign-in into an unverified account:** the account becomes the Google user's: verified, no password, older tokens revoked, memberships that came from an invite to the address removed, and a new organisation if none is left. "Came from an invite" is worked out, not stored: a membership in an organisation that has an Invite row for the address, in any status. The organisation made at sign-up never has one. **Accepted:** an account removed from its own team and later invited back loses that team on a Google claim, and gets a new organisation instead.
+- **One organisation per account (version 1):** inviting or accepting while in another team is refused; there's no switcher.
+- **Impersonation:** never yourself, another platform admin or a suspended user or team. The admin console refuses impersonation tokens.
+- **Stale saves:** `baseVersion` is optional for scripts at the API; the editor always sends it, and asks when a save is refused.
+- **Download** runs the renderer's `assertSchemaIntegrity`, `resolveNavigation` and `resolveDrafts` from `@zoworkhq/forms/core`, installed from the web app's own vendored tarball. Mount also runs `assertFormIdentity`, which `/core` doesn't export: it checks that `formId` and `formVersionId` are non-blank strings. Download stamps both from database UUIDs, after the stored content, so no file the builder can produce fails it. **No renderer hand-over needed.**
+- **Groups nest at most 20 deep** in the builder (contract §2.1 and §6, `bdead6a`; the renderer has no limit).
+- **Dependencies:** next 15.5.28 and sharp 0.35.5; body-parser 1.20.9. `pnpm audit`: 102 findings before, 83 after, none reachable but zod's (later, L11).
+- **Later:** L10 (the editor's hydration warning) and L11 (zod 4), with T5 (`home.spec.ts`).
+
 ## Summary
 
 ### Blockers (6)
 
-| ID | Finding | Status | Size |
-|---|---|---|---|
-| [S1](#3-sign-in-and-sessions) | Without email configured (`RESEND_API_KEY` is documented as optional), `forgot-password` returns the reset link to whoever asks: anyone can take over any account by its address. | Reproduced, on the production image | Small |
-| [I1](#2-organisation-isolation) | A removed member keeps reading the organisation's forms, versions, downloads and templates for up to 30 days with their old token. | Reproduced | Small |
-| [P1](#1-permissions) | Suspending a user or an organisation does nothing outside the admin console: they still sign in, read, save and download. | Reproduced | Small (with I1) |
-| [S2](#3-sign-in-and-sessions) | Google sign-in merges into an existing, unverified password account with the same address, so whoever registered the address first keeps access to the real owner's account. Applies once Google sign-in is configured. | Reproduced (Google's verifier stubbed) | Small |
-| [DEP1](#7-dependencies) | Next.js 15.5.20 has critical advisories, including unauthenticated remote code execution in the image optimiser; the web app serves `/_next/image`. | Suspected: reachability not confirmed | Small |
-| [D1](#6-build-and-deploy) | The documented deployment serves passwords and 30-day tokens over plain HTTP on ports open to the internet; HTTPS is "optional". | Suspected (from the deploy docs) | Medium |
+| ID | Finding | Evidence | Size | Status |
+|---|---|---|---|---|
+| [S1](#3-sign-in-and-sessions) | Without email configured (`RESEND_API_KEY` is documented as optional), `forgot-password` returns the reset link to whoever asks: anyone can take over any account by its address. | Reproduced, on the production image | Small | Fixed in `3540fc6` |
+| [I1](#2-organisation-isolation) | A removed member keeps reading the organisation's forms, versions, downloads and templates for up to 30 days with their old token. | Reproduced | Small | Fixed in `3540fc6` |
+| [P1](#1-permissions) | Suspending a user or an organisation does nothing outside the admin console: they still sign in, read, save and download. | Reproduced | Small (with I1) | Fixed in `3540fc6` |
+| [S2](#3-sign-in-and-sessions) | Google sign-in merges into an existing, unverified password account with the same address, so whoever registered the address first keeps access to the real owner's account. Applies once Google sign-in is configured. | Reproduced (Google's verifier stubbed) | Small | Fixed in `3540fc6` |
+| [DEP1](#7-dependencies) | Next.js 15.5.20 has critical advisories, including unauthenticated remote code execution in the image optimiser; the web app serves `/_next/image`. | Suspected: reachability not confirmed | Small | Fixed in `0b81b34` |
+| [D1](#6-build-and-deploy) | The documented deployment serves passwords and 30-day tokens over plain HTTP on ports open to the internet; HTTPS is "optional". | Suspected (from the deploy docs) | Medium | On hold: deployment |
 
 I1 and P1 share one fix: the auth guard checks, on every request, that the membership still exists and that the user and organisation are active.
 
-### Should fix (20)
+### Should fix (21)
 
-| ID | Finding | Status | Size |
-|---|---|---|---|
-| V1 | A save from a tab that is behind silently replaces the newer version; nobody is told. | Reproduced | Medium |
-| S3 | Tokens can't be revoked: sign-out only clears the browser, and a password reset leaves old tokens working. | Reproduced | Medium |
-| S4 | Lead 6: a user who belongs to organisation A and accepts an invite to B can never reach B. | Reproduced | Medium |
-| S5 | Sign-in returns a 500 for a user with no organisation, such as a removed member. | Reproduced | Small |
-| S6 | Email verification proves nothing (sign-up returns the link) and unlocks nothing. | Reproduced | Small |
-| S7 | The organisation name goes unescaped into the invite email's HTML and subject. | Reproduced | Small |
-| S8 | A user who signed up with Google can't accept an invite: accepting needs a password. | Suspected | Small |
-| P2 | A platform admin can impersonate another platform admin; what they then do is logged as the other admin. | Reproduced | Small |
-| N1 | Groups nested 60 or more deep pass every check, then fail with a 500 when stored. | Reproduced | Small |
-| V2 | Download doesn't run the renderer's integrity check. Nothing found today would fail it. | Confirmed from code | Medium |
-| D2 | Production builds silently fall back to `http://localhost:4000` when `NEXT_PUBLIC_API_URL` is missing. | Reproduced | Small |
-| D3 | The API boots in production with `PUBLIC_TENANT_URL` unset, so its emails link to `http://localhost:3000`. | Reproduced | Small |
-| D4 | Any `JWT_SECRET` is accepted in production except the dev default, even one character. | Reproduced | Small |
-| D5 | The web and admin builds download Google Fonts at build time; the admin Docker build failed on it once. | Reproduced | Small |
-| DEP2 | Denial-of-service advisories in code that is reachable: body-parser (compressed bodies) and zod (large collections). | Suspected | Small |
-| T1 | e2e "fetch failed": `nest --watch` restarts whenever `apps/api/src` or form-schema's built `.d.ts` changes, and the API is down for about a second each time. | Reproduced | Small |
-| T2 | `docs.spec.ts` flakes on steps that wait for client-side JavaScript, under parallel `next dev`. | Reproduced (sibling steps) | Small |
-| T3 | A leftover Vite holds port 5173; nothing in the repo starts or checks it. | Suspected | Small |
-| T4 | Eight parallel workers against one `next dev` produce timeouts; one worker doesn't. | Reproduced | Small |
-| D6 | CI's e2e job runs the Playwright suite against `next dev`, the setup T2 and T4 make flaky. | Suspected | Small |
+| ID | Finding | Evidence | Size | Status |
+|---|---|---|---|---|
+| V1 | A save from a tab that is behind silently replaces the newer version; nobody is told. | Reproduced | Medium | Fixed in `0b81b34` |
+| S3 | Tokens can't be revoked: sign-out only clears the browser, and a password reset leaves old tokens working. | Reproduced | Medium | Fixed in `3540fc6` (a password reset and a Google claim revoke; no sign-out-everywhere, by decision) |
+| S4 | Lead 6: a user who belongs to organisation A and accepts an invite to B can never reach B. | Reproduced | Medium | Fixed in `3540fc6`: a second organisation is refused (one per account) |
+| S5 | Sign-in returns a 500 for a user with no organisation, such as a removed member. | Reproduced | Small | Fixed in `3540fc6` |
+| S6 | Email verification proves nothing (sign-up returns the link) and unlocks nothing. | Reproduced | Small | Fixed in `3540fc6` |
+| S7 | The organisation name goes unescaped into the invite email's HTML and subject. | Reproduced | Small | Fixed in `0b81b34` |
+| S8 | A user who signed up with Google can't accept an invite: accepting needs a password. | Suspected | Small | Later |
+| P2 | A platform admin can impersonate another platform admin; what they then do is logged as the other admin. | Reproduced | Small | Fixed in `3540fc6` |
+| N1 | Groups nested 60 or more deep pass every check, then fail with a 500 when stored. | Reproduced | Small | Fixed in `0b81b34` (contract `bdead6a`) |
+| V2 | Download doesn't run the renderer's integrity check. Nothing found today would fail it. | Confirmed from code | Medium | Fixed in `0b81b34`, at Download; at save time: later |
+| D2 | Production builds silently fall back to `http://localhost:4000` when `NEXT_PUBLIC_API_URL` is missing. | Reproduced | Small | On hold: deployment |
+| D3 | The API boots in production with `PUBLIC_TENANT_URL` unset, so its emails link to `http://localhost:3000`. | Reproduced | Small | On hold: deployment |
+| D4 | Any `JWT_SECRET` is accepted in production except the dev default, even one character. | Reproduced | Small | Fixed in `3540fc6` |
+| D5 | The web and admin builds download Google Fonts at build time; the admin Docker build failed on it once. | Reproduced | Small | On hold: deployment |
+| DEP2 | Denial-of-service advisories in code that is reachable: body-parser (compressed bodies) and zod (large collections). | Suspected | Small | body-parser: fixed in `0b81b34`. zod: later (L11) |
+| DEP3 | Advisories that only Nest 11 fixes: proxy-addr (critical, IP spoofing through a trust subnet), multer (DoS), qs (DoS) and @nestjs/core (SSE injection). `@nestjs/platform-express` 10.4.22, the newest 10.x, pins them. None is reachable today, but proxy-addr becomes reachable once `trust proxy` is set behind a load balancer. | Found during the release fixes (CP2) | Medium | On hold: deployment |
+| T1 | e2e "fetch failed": `nest --watch` restarts whenever `apps/api/src` or form-schema's built `.d.ts` changes, and the API is down for about a second each time. | Reproduced | Small | Later |
+| T2 | `docs.spec.ts` flakes on steps that wait for client-side JavaScript, under parallel `next dev`. | Reproduced (sibling steps) | Small | Later |
+| T3 | A leftover Vite holds port 5173; nothing in the repo starts or checks it. | Suspected | Small | Later |
+| T4 | Eight parallel workers against one `next dev` produce timeouts; one worker doesn't. | Reproduced | Small | Later |
+| D6 | CI's e2e job runs the Playwright suite against `next dev`, the setup T2 and T4 make flaky. | Suspected | Small | Later |
 
 One observation isn't a defect: the local database holds a single form, so the integrity gate's database pass checked little. Re-run it against real data before release (V3).
 
-### Later (9)
+### Later (12)
 
-L1 any `localhost` origin is allowed by CORS in production · L2 the impersonation token travels in the URL · L3 tokens in `localStorage` with no `script-src` CSP · L4 `GET /v1/invites/:token` isn't throttled · L5 the option import file has no size cap · L6 the API image is 1.58 GB with dev dependencies and runs as root · L7 critical advisories in dev-only tools (vitest, tinypool) · L8 the admin console is open to the internet (its data is behind `AdminGuard`) · L9 the minimum password is 6 characters · T5 `home.spec.ts` flakes on a click before hydration, as T2 (found during the release fixes).
+L1 any `localhost` origin is allowed by CORS in production · L2 the impersonation token travels in the URL · L3 tokens in `localStorage` with no `script-src` CSP · L4 `GET /v1/invites/:token` isn't throttled · L5 the option import file has no size cap · L6 the API image is 1.58 GB with dev dependencies and runs as root · L7 critical advisories in dev-only tools (vitest, tinypool) · L8 the admin console is open to the internet (its data is behind `AdminGuard`) · L9 the minimum password is 6 characters · T5 `home.spec.ts` flakes on a click before hydration, as T2 · L10 the editor's loading skeleton renders the settings pane 280px wide on the server and 300px in the browser, a hydration warning in development · L11 zod 4 (DEP2's zod advisory), reachable only by a signed-in author. T5, L10 and L11 were found during the release fixes.
+
+Status: all later.
 
 ### Already known (recorded, not re-investigated)
 
-- **Rate limiting on signed-in routes:** on hold by decision. Only the credential routes are throttled: sign-up, login, Google, reset and verification at 30 a minute per IP, forgot-password at 5, and invite accept. That includes the login throttle of 30 a minute per IP.
-- **Privacy and Terms pages:** on hold by decision.
+- **Rate limiting on signed-in routes:** on hold: decision. Only the credential routes are throttled: sign-up, login, Google, reset and verification at 30 a minute per IP, forgot-password at 5, and invite accept. That includes the login throttle of 30 a minute per IP.
+- **Privacy and Terms pages:** on hold: decision.
 - **The renderer package:** audited in its own repo. Here it's used only as the integrity check in area 5.
 
 ### What passed
