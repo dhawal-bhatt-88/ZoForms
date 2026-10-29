@@ -11,7 +11,7 @@
 // a certificate. Keyboard and screen-reader passes stay manual.
 const path = require("path");
 const fs = require("fs");
-const { API, WEB, OUT, ROOT, PrismaClient, launchBrowser, opts } = require("./_setup");
+const { API, WEB, OUT, ROOT, PrismaClient, launchBrowser, opts, markVerified } = require("./_setup");
 const { default: AxeBuilder } = require(require.resolve("@axe-core/playwright", { paths: [path.join(ROOT, "apps/web")] }));
 const prisma = new PrismaClient();
 
@@ -130,6 +130,7 @@ const structure = [];
     const json = { "Content-Type": "application/json" };
     const signup = async (email, name) => (await (await fetch(API + "/v1/auth/signup", { method: "POST", headers: json, body: JSON.stringify({ email, password: "Verify-pass-123!", name }) })).json()).token;
     const A = await signup(emails.author, "Author");
+    await markVerified(prisma, emails.author); // the author invites below
     const E = await signup(emails.empty, "Empty");
     const H = { ...json, Authorization: `Bearer ${A}` };
     const put = async (id, schema) => {

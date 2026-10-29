@@ -29,6 +29,9 @@ model User {
   emailVerified     Boolean      @default(false)
   status            String       @default("active") // active | suspended
   createdAt         DateTime     @default(now())
+  // Tokens issued before this are refused: set by a password reset and by a Google
+  // sign-in that claims an unverified account. Null = every unexpired token is valid.
+  sessionsValidFrom DateTime?
   // The form editor's settings pane width in px, as the author last left it; null = the default.
   settingsPaneWidth Int?
   memberships       Membership[]

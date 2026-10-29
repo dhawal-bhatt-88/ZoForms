@@ -1,11 +1,12 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
 import { randomBytes } from "crypto";
-import { Role } from "@prisma/client";
+import { Invite, Role } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthService } from "../auth/auth.service";
 import { MailService } from "../mail/mail.service";
@@ -15,6 +16,8 @@ import type { AuthUser } from "../auth/current-user.decorator";
 const ROLES: Role[] = ["OWNER", "ADMIN", "EDITOR", "VIEWER"];
 const MANAGER_ROLES: Role[] = ["OWNER", "ADMIN"];
 const INVITE_TTL_DAYS = 7;
+/** A user belongs to one organisation in version 1. */
+const ONE_TEAM = "ALREADY_IN_ANOTHER_TEAM";
 
 @Injectable()
 export class TeamService {
@@ -86,10 +89,11 @@ export class TeamService {
 
   async listInvites(user: AuthUser) {
     await this.assertManager(user);
-    return this.prisma.invite.findMany({
+    const invites = await this.prisma.invite.findMany({
       where: { orgId: user.orgId, status: "pending" },
       orderBy: { createdAt: "desc" },
     });
+    return invites.map((i) => this.present(i));
   }
 
   async createInvite(user: AuthUser, dto: { email?: string; role?: string }) {
@@ -102,10 +106,27 @@ export class TeamService {
     if (role === "OWNER" && actor.role !== "OWNER") {
       throw new ForbiddenException("Only an owner can invite another owner.");
     }
+    // An unverified account may not belong to whoever signed it up, so it can't let anyone in.
+    const inviter = await this.prisma.user.findUnique({ where: { id: user.sub }, select: { emailVerified: true } });
+    if (!inviter?.emailVerified) {
+      throw new ForbiddenException({
+        message: "Verify your email address before inviting teammates.",
+        code: "EMAIL_NOT_VERIFIED",
+      });
+    }
     const alreadyMember = await this.prisma.membership.findFirst({
       where: { orgId: user.orgId, user: { email } },
     });
     if (alreadyMember) throw new BadRequestException("That person is already on your team.");
+    const inAnotherTeam = await this.prisma.membership.findFirst({
+      where: { orgId: { not: user.orgId }, user: { email } },
+    });
+    if (inAnotherTeam) {
+      throw new ConflictException({
+        message: `${email} already belongs to another team. An account can belong to only one team.`,
+        code: ONE_TEAM,
+      });
+    }
 
     const token = randomBytes(24).toString("hex");
     const expiresAt = new Date(Date.now() + INVITE_TTL_DAYS * 86_400_000);
@@ -114,8 +135,8 @@ export class TeamService {
       create: { orgId: user.orgId, email, role, token, invitedById: user.sub, expiresAt },
       update: { role, token, invitedById: user.sub, expiresAt, status: "pending", acceptedAt: null },
     });
-    // Send the invite email (no-op without Resend); always return the accept
-    // link too so the flow works before email is configured.
+    // Send the invite email (no-op without Resend). The accept link comes back
+    // only while email isn't configured, so the inviter can pass it on.
     const org = await this.prisma.organization.findUnique({
       where: { id: user.orgId },
       select: { name: true },
@@ -130,7 +151,7 @@ export class TeamService {
         { label: "Accept invite", url: acceptUrl },
       ),
     });
-    return { invite, acceptUrl };
+    return this.mail.enabled ? { invite: this.present(invite) } : { invite, acceptUrl };
   }
 
   async revokeInvite(user: AuthUser, id: string) {
@@ -172,6 +193,16 @@ export class TeamService {
         !!userRecord.passwordHash &&
         (await this.auth.verifyPassword(password, userRecord.passwordHash));
       if (!ok) throw new BadRequestException("Incorrect password for this account.");
+      const inAnotherTeam = await this.prisma.membership.findFirst({
+        where: { userId: userRecord.id, orgId: { not: invite.orgId } },
+      });
+      if (inAnotherTeam) {
+        const org = await this.prisma.organization.findUnique({ where: { id: invite.orgId }, select: { name: true } });
+        throw new ConflictException({
+          message: `Your account already belongs to another team, so you can't join ${org?.name ?? "this team"}. An account can belong to only one team.`,
+          code: ONE_TEAM,
+        });
+      }
     } else {
       if (password.length < 6) {
         throw new BadRequestException("Choose a password of at least 6 characters.");
@@ -194,10 +225,25 @@ export class TeamService {
       where: { id: invite.id },
       data: { status: "accepted", acceptedAt: new Date() },
     });
+    // With email configured, the link reached them only by email: the address is theirs.
+    if (this.mail.enabled && !userRecord.emailVerified) {
+      await this.prisma.user.update({ where: { id: userRecord.id }, data: { emailVerified: true } });
+    }
     return this.auth.issueForUserId(userRecord.id);
   }
 
   /* ---------- helpers ---------- */
+
+  /**
+   * An invite as managers see it. With email configured, its token stays out:
+   * the link then reaches only the invitee's inbox, which is what lets accepting
+   * it verify the address.
+   */
+  private present(invite: Invite): Invite | Omit<Invite, "token"> {
+    if (!this.mail.enabled) return invite;
+    const { token: _token, ...rest } = invite;
+    return rest;
+  }
 
   private acceptUrl(token: string) {
     const base = env.PUBLIC_TENANT_URL;
@@ -225,13 +271,10 @@ export class TeamService {
     return this.prisma.membership.count({ where: { orgId, role: "OWNER" } });
   }
 
+  /** AuthGuard has checked the membership and read the role for this request. */
   private async assertMember(user: AuthUser): Promise<{ role: Role }> {
-    const m = await this.prisma.membership.findFirst({
-      where: { orgId: user.orgId, userId: user.sub },
-      select: { role: true },
-    });
-    if (!m) throw new ForbiddenException("You are not a member of this team.");
-    return m;
+    if (!user.role) throw new ForbiddenException("You are not a member of this team.");
+    return { role: user.role };
   }
 
   private async assertManager(user: AuthUser): Promise<{ role: Role }> {

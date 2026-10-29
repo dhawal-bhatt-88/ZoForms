@@ -70,7 +70,7 @@ export class FormsService {
   }
 
   async create(user: AuthUser, title: string) {
-    await this.assertCanEdit(user);
+    this.assertCanEdit(user);
     return this.prisma.form.create({
       data: {
         title,
@@ -140,7 +140,7 @@ export class FormsService {
 
   /** Restore by appending an old version's content as a new version; no row is modified. */
   async restoreVersion(user: AuthUser, id: string, versionId: string) {
-    await this.assertCanEdit(user);
+    this.assertCanEdit(user);
     const form = await this.get(user, id);
     const source = await this.prisma.formVersion.findFirst({
       where: { id: versionId, formId: form.id },
@@ -160,7 +160,7 @@ export class FormsService {
   }
 
   async saveSchema(user: AuthUser, id: string, raw: unknown) {
-    await this.assertCanEdit(user);
+    this.assertCanEdit(user);
     const parsed = FormSchema.safeParse(raw);
     if (!parsed.success) throw new BadRequestException(describeSchemaError(raw, parsed.error));
     const form = await this.get(user, id);
@@ -211,7 +211,7 @@ export class FormsService {
   }
 
   async duplicate(user: AuthUser, id: string) {
-    await this.assertCanEdit(user);
+    this.assertCanEdit(user);
     const form = await this.get(user, id);
     const schema = form.versions[0]?.schema ?? emptyForm(form.title);
     const title = `${form.title} (copy)`;
@@ -238,7 +238,7 @@ export class FormsService {
   }
 
   async createWithSchema(user: AuthUser, schema: unknown) {
-    await this.assertCanEdit(user);
+    this.assertCanEdit(user);
     const parsed = FormSchema.parse(schema);
     return this.prisma.form.create({
       data: {
@@ -253,7 +253,7 @@ export class FormsService {
 
   async remove(user: AuthUser, id: string) {
     await this.assertOwned(user, id);
-    await this.assertCanEdit(user);
+    this.assertCanEdit(user);
     await this.prisma.form.delete({ where: { id } });
     return { ok: true };
   }
@@ -270,6 +270,6 @@ export class FormsService {
 
   /** Viewers can read everything in the org but never mutate. */
   private assertCanEdit(user: AuthUser) {
-    return assertCanEdit(this.prisma, user);
+    assertCanEdit(user);
   }
 }

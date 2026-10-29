@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
@@ -17,8 +18,38 @@ type IssueUser = {
   id: string;
   email: string;
   name: string | null;
-  memberships: { orgId: string; org: { workspaces: { id: string }[] } }[];
+  status: string;
+  memberships: { orgId: string; org: { status: string; workspaces: { id: string }[] } }[];
 };
+
+/**
+ * What issue() needs, oldest membership first. A user belongs to one
+ * organisation (version 1), so the order only matters for data from before that
+ * rule; it keeps the choice predictable.
+ */
+const WITH_MEMBERSHIPS = {
+  memberships: {
+    orderBy: { createdAt: "asc" },
+    include: { org: { include: { workspaces: { orderBy: { createdAt: "asc" } } } } },
+  },
+} as const;
+
+/** The name of the organisation made for a new account. */
+const teamName = (name: string | null) => (name ? `${name}'s team` : "My workspace");
+
+/** A new organisation, with its one workspace, for a nested create. */
+const newOrg = (name: string | null) => ({
+  name: teamName(name),
+  slug: "org-" + Math.random().toString(36).slice(2, 10),
+  workspaces: { create: { name: "My Workspace" } },
+});
+
+/**
+ * sessionsValidFrom for "from now on": every token issued before this moment is
+ * refused. Tokens carry their issue time to the millisecond (`issuedAtMs`), so
+ * the one a password reset returns, signed just after, stays valid.
+ */
+export const sessionsStart = () => new Date();
 
 @Injectable()
 export class AuthService {
@@ -42,45 +73,26 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await this.createAccount(email, name?.trim() || null, passwordHash);
     const emailVerifyUrl = await this.createEmailToken(user.id);
-    return { ...this.issue(user), emailVerifyUrl };
+    return { ...this.issue(user), ...(env.RETURN_EMAIL_LINKS_FOR_TESTS ? { emailVerifyUrl } : {}) };
   }
 
   /** Create a user + their own org/workspace (OWNER). passwordHash is null for OAuth users. */
   private createAccount(email: string, name: string | null, passwordHash: string | null) {
-    const teamName = name ? `${name}'s team` : "My workspace";
     return this.prisma.user.create({
       data: {
         email,
         name,
         passwordHash,
         emailVerified: passwordHash === null, // OAuth emails are pre-verified
-        memberships: {
-          create: {
-            role: "OWNER",
-            org: {
-              create: {
-                name: teamName,
-                slug: "org-" + Math.random().toString(36).slice(2, 10),
-                workspaces: { create: { name: "My Workspace" } },
-              },
-            },
-          },
-        },
+        memberships: { create: { role: "OWNER", org: { create: newOrg(name) } } },
       },
-      include: {
-        memberships: { include: { org: { include: { workspaces: true } } } },
-      },
+      include: WITH_MEMBERSHIPS,
     });
   }
 
   async login(emailRaw: string, password: string) {
     const email = (emailRaw || "").trim().toLowerCase();
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-      include: {
-        memberships: { include: { org: { include: { workspaces: true } } } },
-      },
-    });
+    const user = await this.prisma.user.findUnique({ where: { email }, include: WITH_MEMBERSHIPS });
     if (
       !user ||
       !user.passwordHash ||
@@ -98,11 +110,7 @@ export class AuthService {
       select: { id: true, email: true, name: true, emailVerified: true, settingsPaneWidth: true },
     });
     if (!user) throw new UnauthorizedException();
-    const membership = await this.prisma.membership.findFirst({
-      where: { orgId: auth.orgId, userId: auth.sub },
-      select: { role: true },
-    });
-    return { ...user, role: membership?.role ?? "VIEWER", orgId: auth.orgId };
+    return { ...user, role: auth.role, orgId: auth.orgId };
   }
 
   /** Sets or clears (null) the signed-in author's preferences: for now, the settings pane width. */
@@ -158,7 +166,12 @@ export class AuthService {
     if (user.emailVerified) return { ok: true, alreadyVerified: true };
     await this.prisma.emailToken.deleteMany({ where: { userId } });
     const url = await this.createEmailToken(userId);
-    return { ok: true, verifyUrl: url };
+    // emailSent: false when email isn't configured, so the page doesn't claim a link went out.
+    return {
+      ok: true,
+      emailSent: this.mail.enabled,
+      ...(env.RETURN_EMAIL_LINKS_FOR_TESTS ? { verifyUrl: url } : {}),
+    };
   }
 
   /* ---------- password + token helpers (shared with invites) ---------- */
@@ -173,11 +186,8 @@ export class AuthService {
 
   /** Issue a fresh token for a user id (used after accepting an invite). */
   async issueForUserId(userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: { memberships: { include: { org: { include: { workspaces: true } } } } },
-    });
-    if (!user || !user.memberships[0]) throw new UnauthorizedException();
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, include: WITH_MEMBERSHIPS });
+    if (!user) throw new UnauthorizedException();
     return this.issue(user);
   }
 
@@ -206,23 +216,43 @@ export class AuthService {
       throw new UnauthorizedException("Your Google account has no verified email.");
     }
 
-    let user = await this.prisma.user.findUnique({
-      where: { email },
-      include: { memberships: { include: { org: { include: { workspaces: true } } } } },
+    const user = await this.prisma.user.findUnique({ where: { email }, include: WITH_MEMBERSHIPS });
+    if (!user) return this.issue(await this.createAccount(email, payload?.name?.trim() || null, null));
+    if (!user.emailVerified) await this.claimUnverified(user.id, email, payload?.name?.trim() || null);
+    return this.issueForUserId(user.id);
+  }
+
+  /**
+   * Google has proved this address, but the account with it was never verified:
+   * whoever made it may not own the address. So it becomes the Google user's
+   * alone: verified, no password, every token issued before now refused, and
+   * only the organisation it made at sign-up kept. A membership that came from
+   * an invite to this address is removed, since whoever set the password may
+   * have accepted that invite. If nothing is left, a new organisation of its own.
+   */
+  private async claimUnverified(userId: string, email: string, name: string | null) {
+    const invitedOrgIds = (
+      await this.prisma.invite.findMany({ where: { email }, select: { orgId: true } })
+    ).map((i) => i.orgId);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { emailVerified: true, passwordHash: null, sessionsValidFrom: sessionsStart() },
+      });
+      if (invitedOrgIds.length) {
+        await tx.membership.deleteMany({ where: { userId, orgId: { in: invitedOrgIds } } });
+      }
+      if (!(await tx.membership.count({ where: { userId } }))) {
+        await tx.membership.create({ data: { user: { connect: { id: userId } }, role: "OWNER", org: { create: newOrg(name) } } });
+      }
     });
-    if (!user) {
-      user = await this.createAccount(email, payload?.name?.trim() || null, null);
-    } else if (!user.emailVerified) {
-      await this.prisma.user.update({ where: { id: user.id }, data: { emailVerified: true } });
-    }
-    return this.issue(user);
   }
 
   /* ---------- forgot / reset password ---------- */
 
   async forgotPassword(emailRaw: string) {
     const email = (emailRaw || "").trim().toLowerCase();
-    // Always return ok so we never reveal whether an account exists.
+    // Always the same answer, so it never reveals whether an account exists.
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { ok: true };
     const user = await this.prisma.user.findUnique({ where: { email }, select: { id: true } });
     if (!user) return { ok: true };
@@ -242,8 +272,9 @@ export class AuthService {
         { label: "Reset password", url },
       ),
     });
-    // Surface the link only in dev (no Resend configured) so the flow is testable.
-    return this.mail.enabled ? { ok: true } : { ok: true, resetUrl: url };
+    // Without email configured nothing is sent (the mailer logs that), and the
+    // answer is the same: the link is in it only with the test-only setting.
+    return env.RETURN_EMAIL_LINKS_FOR_TESTS ? { ok: true, resetUrl: url } : { ok: true };
   }
 
   async resetPassword(token: string, password: string) {
@@ -258,21 +289,29 @@ export class AuthService {
     await this.prisma.$transaction([
       this.prisma.user.update({
         where: { id: record.userId },
-        data: { passwordHash, emailVerified: true },
+        // The link came by email, so the address is proven; tokens from before the reset stop working.
+        data: { passwordHash, emailVerified: true, sessionsValidFrom: sessionsStart() },
       }),
       this.prisma.emailToken.deleteMany({ where: { userId: record.userId, type: "reset" } }),
     ]);
     return this.issueForUserId(record.userId);
   }
 
+  /** A token for the user's organisation. Refused for a suspended user or organisation, or no organisation. */
   private issue(user: IssueUser) {
+    if (user.status !== "active") throw new ForbiddenException("This account is suspended.");
     const membership = user.memberships[0];
+    if (!membership?.org.workspaces[0]) {
+      throw new ForbiddenException("Your account isn't part of a team. Ask a team owner or admin to invite you.");
+    }
+    if (membership.org.status !== "active") throw new ForbiddenException("Your team's account is suspended.");
     const workspace = membership.org.workspaces[0];
     const payload = {
       sub: user.id,
       email: user.email,
       orgId: membership.orgId,
       workspaceId: workspace.id,
+      issuedAtMs: Date.now(),
     };
     return {
       token: this.jwt.sign(payload),

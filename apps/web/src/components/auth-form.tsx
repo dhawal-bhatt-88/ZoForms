@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button, Callout, Field, Input } from "@/components/ui";
-import { GOOGLE_CLIENT_ID, googleLogin, login, signup } from "@/lib/api";
+import { GOOGLE_CLIENT_ID, googleLogin, login, signup, SIGNED_OUT_QUERY } from "@/lib/api";
 import { GoogleButton } from "@/components/google-button";
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
@@ -13,6 +13,11 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const [password, setPassword] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Sent here by a signed-in call the API refused (lib/api.ts).
+  const [signedOut, setSignedOut] = useState(false);
+  useEffect(() => {
+    if (!isSignup && window.location.search.slice(1).split("&").includes(SIGNED_OUT_QUERY)) setSignedOut(true);
+  }, [isSignup]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -51,6 +56,10 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
             ? "Build forms with logic and scoring, then download them for your app."
             : "Log in to your Zowork Forms workspace."}
         </p>
+
+        {signedOut && (
+          <Callout role="status" tone="info" title="Your session has ended. Sign in again to continue." className="mt-5" />
+        )}
 
         {GOOGLE_CLIENT_ID && (
           <>

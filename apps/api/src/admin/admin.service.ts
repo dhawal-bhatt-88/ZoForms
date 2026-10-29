@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
@@ -6,6 +6,8 @@ import type { AdminActor } from "./admin.guard";
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger("Admin");
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
@@ -194,7 +196,11 @@ export class AdminService {
     return { ok: true };
   }
 
-  /** Issue a token that logs the admin in as the target user (for support). */
+  /**
+   * Issue a token that logs the admin in as the target user (for support). Never
+   * as themselves or another platform admin: what an admin does is recorded
+   * under their own name. Refused, and recorded, if tried.
+   */
   async impersonate(actor: AdminActor, id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
@@ -202,14 +208,44 @@ export class AdminService {
         id: true,
         email: true,
         name: true,
-        memberships: { take: 1, select: { orgId: true, org: { select: { workspaces: { take: 1, select: { id: true } } } } } },
+        isAdmin: true,
+        status: true,
+        memberships: {
+          take: 1,
+          orderBy: { createdAt: "asc" },
+          select: {
+            orgId: true,
+            org: { select: { status: true, workspaces: { take: 1, orderBy: { createdAt: "asc" }, select: { id: true } } } },
+          },
+        },
       },
     });
     if (!user) throw new NotFoundException("User not found");
+    const refusal =
+      user.id === actor.id
+        ? { reason: "self", message: "You can't impersonate yourself." }
+        : user.isAdmin
+          ? { reason: "admin", message: "Platform admins can't be impersonated." }
+          : null;
+    if (refusal) {
+      this.logger.warn(`${actor.email} tried to impersonate ${user.email}: refused (${refusal.reason}).`);
+      await this.audit(actor, "user.impersonation_refused", "user", id, { email: user.email, reason: refusal.reason });
+      throw new ForbiddenException(refusal.message);
+    }
+    // Their token would be refused on every request anyway.
+    if (user.status !== "active") throw new BadRequestException("This user is suspended. Reactivate them before impersonating.");
     const m = user.memberships[0];
+    if (m && m.org.status !== "active") throw new BadRequestException("This user's team is suspended. Reactivate it before impersonating.");
     if (!m || !m.org.workspaces[0]) throw new BadRequestException("User has no workspace to impersonate.");
     const token = this.jwt.sign(
-      { sub: user.id, email: user.email, orgId: m.orgId, workspaceId: m.org.workspaces[0].id, impersonatedBy: actor.id },
+      {
+        sub: user.id,
+        email: user.email,
+        orgId: m.orgId,
+        workspaceId: m.org.workspaces[0].id,
+        impersonatedBy: actor.id,
+        issuedAtMs: Date.now(),
+      },
       { expiresIn: "1h" },
     );
     await this.audit(actor, "user.impersonated", "user", id, { email: user.email });

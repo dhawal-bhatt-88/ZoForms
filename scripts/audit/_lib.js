@@ -126,4 +126,7 @@ async function run(title, body) {
 
 const short = (r) => `${r.status} ${r.text.slice(0, 200)}`;
 
-module.exports = { ROOT, API, RUN, PASSWORD, prisma, call, signup, emailFor, decode, check, note, run, short, cleanup };
+/** Mark an account verified, as following the emailed link would (shared with the e2e suites). */
+const markVerified = (email) => require("../../e2e/_accounts").markVerified(prisma, email);
+
+module.exports = { ROOT, API, RUN, PASSWORD, prisma, call, signup, emailFor, decode, check, note, run, short, cleanup, markVerified };

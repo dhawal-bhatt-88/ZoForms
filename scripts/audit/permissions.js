@@ -5,10 +5,10 @@
 // - Membership changes after sign-in: a lowered role, a removed member.
 // - Suspension: a suspended user, and a member of a suspended organisation.
 // - Platform admin: AuditLog rows for impersonation, deletes and suspensions, and
-//   impersonating another platform admin.
+//   impersonating another platform admin, yourself, or a suspended user.
 //
 // Usage: node scripts/audit/permissions.js   (API on AUDIT_API_URL, default :4100)
-const { call, signup, emailFor, decode, check, note, run, short, prisma, PASSWORD } = require("./_lib");
+const { call, signup, emailFor, decode, check, note, run, short, prisma, PASSWORD, markVerified } = require("./_lib");
 
 const q = (id, label) => ({ id, type: "short", label, required: false });
 const ok = (r) => r.status >= 200 && r.status < 300;
@@ -26,8 +26,10 @@ async function addMember(ownerToken, who, role) {
 
 run("Permissions", async () => {
   const owner = await signup("owner", "Owner");
+  await markVerified(owner.email); // only a verified account can invite
   const T = owner.token;
   const admin = await addMember(T, "admin", "ADMIN");
+  await markVerified(admin.email); // the admin invites in the matrix
   const editor = await addMember(T, "editor", "EDITOR");
   const viewer = await addMember(T, "viewer", "VIEWER");
   const roles = { OWNER: owner, ADMIN: admin, EDITOR: editor, VIEWER: viewer };
@@ -137,7 +139,7 @@ run("Permissions", async () => {
   r = await call("PUT", `/v1/forms/${formA.id}/schema`, removed.token, { title: "x", blocks: [q("s", "x")] });
   check("removed member, old token: save → refused", !ok(r), short(r));
   r = await call("POST", "/v1/auth/login", null, { email: removed.email, password: PASSWORD });
-  note("removed member signs in again", `${short(r)}${r.json?.token ? ` → token for org ${decode(r.json.token).orgId === decode(T).orgId ? "A (the one they were removed from)" : decode(r.json.token).orgId}` : ""}`);
+  check("S5: removed member signs in again → 403 with a message, not a 500", r.status === 403 && /isn't part of a team/.test(r.json?.message ?? ""), short(r));
 
   // ---------- platform admin ----------
   const pa = await signup("platform-admin");
@@ -186,7 +188,14 @@ run("Permissions", async () => {
 
   // Impersonating another platform admin, then acting as them in the admin console.
   r = await call("POST", `/v1/admin/users/${pa2.id}/impersonate`, pa.token);
-  note("admin impersonates another platform admin", short(r));
+  check("P2: admin impersonates another platform admin → refused (403)", r.status === 403, short(r));
+  r = await call("POST", `/v1/admin/users/${pa.id}/impersonate`, pa.token);
+  check("P2: admin impersonates themselves → refused (403)", r.status === 403, short(r));
+  const refusals = await prisma.auditLog.findMany({ where: { actorId: pa.id, action: "user.impersonation_refused" } });
+  check("P2: both refusals are in the audit log under the real admin", refusals.length === 2 && refusals.every((x) => x.actorEmail === pa.email), JSON.stringify(refusals.map((x) => x.meta)));
+  const asUser = (await call("POST", `/v1/admin/users/${editor.id}/impersonate`, pa.token)).json?.token;
+  r = await call("GET", "/v1/admin/overview", asUser);
+  check("P2: an impersonation token on the admin console → refused", !ok(r), short(r));
   if (ok(r)) {
     const asPa2 = r.json.token;
     const ov = await call("GET", "/v1/admin/overview", asPa2);
@@ -198,5 +207,5 @@ run("Permissions", async () => {
   }
   // Impersonating someone who is suspended.
   r = await call("POST", `/v1/admin/users/${sus.id}/impersonate`, pa.token);
-  note("admin impersonates a suspended user", short(r));
+  check("P2: admin impersonates a suspended user → refused", !ok(r), short(r));
 });

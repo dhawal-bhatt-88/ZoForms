@@ -76,4 +76,6 @@ function atLeast(version, minimum) {
   return true;
 }
 
-module.exports = { ROOT, OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, opts, noIds, hasIds, ZF_RENDERER, rendererVersion, atLeast, RENDERER_CORE };
+const { markVerified } = require("./_accounts");
+
+module.exports = { ROOT, OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, opts, noIds, hasIds, ZF_RENDERER, rendererVersion, atLeast, RENDERER_CORE, markVerified };

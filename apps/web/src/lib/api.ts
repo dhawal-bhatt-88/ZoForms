@@ -31,7 +31,15 @@ export class ApiError extends Error {
   }
 }
 
-/** Authenticated fetch: adds the token, handles 401, and throws ApiError on failure. */
+/** The sign-in page's `?` when a signed-in call was refused: it says the session has ended. */
+export const SIGNED_OUT_QUERY = "signedOut=1";
+
+/**
+ * Authenticated fetch: adds the token, handles 401, and throws ApiError on failure.
+ * A 401 to a call that carried a token means the session no longer counts (the
+ * member was removed, suspended, or the password was reset): the token is
+ * cleared and, in the app, the page goes to sign-in, which says why.
+ */
 async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
   const token = getToken();
   const res = await fetch(`${API_URL}${path}`, {
@@ -43,10 +51,10 @@ async function apiFetch(path: string, init?: RequestInit): Promise<Response> {
       ...(init?.headers ?? {}),
     },
   });
-  if (res.status === 401 && typeof window !== "undefined") {
+  if (res.status === 401 && token && typeof window !== "undefined") {
     logout();
     const p = window.location.pathname;
-    if (p.startsWith("/app")) window.location.href = "/login";
+    if (p.startsWith("/app")) window.location.href = `/login?${SIGNED_OUT_QUERY}`;
   }
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
@@ -147,7 +155,8 @@ export function verifyEmail(token: string) {
   });
 }
 export function resendVerification() {
-  return req<{ ok: boolean; alreadyVerified?: boolean; verifyUrl?: string }>(
+  // emailSent: false when email isn't set up on the server, so nothing went out.
+  return req<{ ok: boolean; alreadyVerified?: boolean; emailSent?: boolean; verifyUrl?: string }>(
     "/v1/auth/resend-verification",
     { method: "POST" },
   );
@@ -188,8 +197,9 @@ export function removeMember(userId: string) {
 export function listInvites() {
   return req<Invite[]>("/v1/team/invites");
 }
+/** acceptUrl comes back only while the server can't send email; then the inviter passes it on. */
 export function createInvite(email: string, role: Role) {
-  return req<{ invite: Invite; acceptUrl: string }>("/v1/team/invites", {
+  return req<{ invite: Invite; acceptUrl?: string }>("/v1/team/invites", {
     method: "POST",
     body: JSON.stringify({ email, role }),
   });

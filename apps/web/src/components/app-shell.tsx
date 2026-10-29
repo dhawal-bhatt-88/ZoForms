@@ -46,7 +46,13 @@ export default function AppShell({
   async function onResend() {
     try {
       const r = await resendVerification();
-      setVerifyMsg(r.alreadyVerified ? "Already verified." : "Verification email sent.");
+      setVerifyMsg(
+        r.alreadyVerified
+          ? "Already verified."
+          : r.emailSent === false
+            ? "Email isn't set up on this server, so we couldn't send the link."
+            : "Verification email sent.",
+      );
     } catch {
       setVerifyMsg("Couldn't send — try again.");
     }

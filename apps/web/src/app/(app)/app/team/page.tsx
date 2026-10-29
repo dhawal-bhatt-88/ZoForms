@@ -19,11 +19,13 @@ import {
   type Column,
 } from "@/components/ui";
 import {
+  ApiError,
   createInvite,
   listInvites,
   listMembers,
   me,
   removeMember,
+  resendVerification,
   revokeInvite,
   setMemberRole,
   type Invite,
@@ -54,6 +56,8 @@ export default function TeamPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
   const [myRole, setMyRole] = useState<Role>("VIEWER");
+  // Only a verified account can invite (the API refuses otherwise).
+  const [self, setSelf] = useState<{ email: string; emailVerified: boolean } | null>(null);
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
   const [removing, setRemoving] = useState<Member | null>(null);
 
@@ -61,11 +65,12 @@ export default function TeamPage() {
 
   async function load() {
     try {
-      const self = await me();
-      setMyRole(self.role);
+      const you = await me();
+      setMyRole(you.role);
+      setSelf({ email: you.email, emailVerified: you.emailVerified });
       const [m, inv] = await Promise.all([
         listMembers(),
-        self.role === "OWNER" || self.role === "ADMIN" ? listInvites() : Promise.resolve([] as Invite[]),
+        you.role === "OWNER" || you.role === "ADMIN" ? listInvites() : Promise.resolve([] as Invite[]),
       ]);
       setMembers(m);
       setInvites(inv);
@@ -184,9 +189,12 @@ export default function TeamPage() {
 
       {status === "ok" && (
         <div className="space-y-8">
-          {canManage && (
+          {canManage && self && (
             <InvitePanel
               myRole={myRole}
+              email={self.email}
+              verified={self.emailVerified}
+              onUnverified={() => setSelf({ ...self, emailVerified: false })}
               onInvited={(invite) => setInvites((v) => [invite, ...v.filter((i) => i.email !== invite.email)])}
             />
           )}
@@ -227,8 +235,69 @@ export default function TeamPage() {
   );
 }
 
-/** Invite someone by email, with a role; the link is shown to copy until email delivery is set up. */
-function InvitePanel({ myRole, onInvited }: { myRole: Role; onInvited: (invite: Invite) => void }) {
+/** Why an unverified account can't invite, and a way to get the link again. */
+function VerifyFirst({ email }: { email: string }) {
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState<string | null>(null);
+
+  async function onResend() {
+    setSending(true);
+    try {
+      const r = await resendVerification();
+      setSent(
+        r.alreadyVerified
+          ? "Your email is already verified. Reload this page to invite."
+          : r.emailSent === false
+            ? "Email isn't set up on this server, so we couldn't send the link."
+            : `Verification email sent to ${email}. Follow the link in it, then come back here.`,
+      );
+    } catch {
+      setSent("Couldn't send — try again.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <Callout
+      role="status"
+      tone="warn"
+      title="Verify your email address before inviting teammates."
+      action={
+        !sent && (
+          <Button variant="secondary" size="sm" pending={sending} onClick={onResend}>
+            Resend verification email
+          </Button>
+        )
+      }
+    >
+      {sent ?? (
+        <>
+          Only someone who has confirmed <span className="font-medium text-ink">{email}</span> is theirs can let others into
+          the team.
+        </>
+      )}
+    </Callout>
+  );
+}
+
+/**
+ * Invite someone by email, with a role. Until email delivery is set up, the
+ * link comes back to copy; once it is, the invite goes only by email.
+ */
+function InvitePanel({
+  myRole,
+  email: yourEmail,
+  verified,
+  onUnverified,
+  onInvited,
+}: {
+  myRole: Role;
+  email: string;
+  verified: boolean;
+  onUnverified: () => void;
+  onInvited: (invite: Invite) => void;
+}) {
   const toast = useToast();
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("EDITOR");
@@ -247,11 +316,16 @@ function InvitePanel({ myRole, onInvited }: { myRole: Role; onInvited: (invite: 
     try {
       const { invite, acceptUrl } = await createInvite(email.trim(), role);
       onInvited(invite);
-      setLastLink({ email: invite.email, url: acceptUrl });
+      setLastLink(acceptUrl ? { email: invite.email, url: acceptUrl } : null);
       setEmail("");
-      toast.show({ tone: "pass", title: `Invited ${invite.email} as ${roleName(invite.role).toLowerCase()}.`, detail: "Copy the invite link below and send it to them." });
+      toast.show({
+        tone: "pass",
+        title: `Invited ${invite.email} as ${roleName(invite.role).toLowerCase()}.`,
+        detail: acceptUrl ? "Copy the invite link below and send it to them." : "We've emailed them the invite link.",
+      });
     } catch (err) {
-      toast.show({ tone: "fail", title: `Couldn't invite ${email.trim()}.`, detail: (err as Error).message });
+      if (err instanceof ApiError && err.code === "EMAIL_NOT_VERIFIED") onUnverified();
+      else toast.show({ tone: "fail", title: `Couldn't invite ${email.trim()}.`, detail: (err as Error).message });
     } finally {
       setInviting(false);
     }
@@ -268,6 +342,9 @@ function InvitePanel({ myRole, onInvited }: { myRole: Role; onInvited: (invite: 
       }
       description="Share the invite link with your teammate. Email delivery starts once Resend is configured."
     >
+      {!verified ? (
+        <VerifyFirst email={yourEmail} />
+      ) : (
       <form onSubmit={onInvite} noValidate className="grid gap-4 sm:grid-cols-[1.6fr_1fr_auto] sm:items-start">
         <Field label="Email" error={emailError} required>
           {(field) => (
@@ -296,6 +373,7 @@ function InvitePanel({ myRole, onInvited }: { myRole: Role; onInvited: (invite: 
           Invite
         </Button>
       </form>
+      )}
       {lastLink && (
         <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-rule-strong bg-paper-sunk px-3 py-2">
           <span className="min-w-0 flex-1 truncate font-mono text-[0.75rem] text-ink" title={lastLink.url}>

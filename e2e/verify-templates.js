@@ -8,7 +8,7 @@
 // inserted twice is rendered in the external test app, and both copies' conditions are checked.
 const fs = require("fs");
 const path = require("path");
-const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, opts } = require("./_setup");
+const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, opts, markVerified } = require("./_setup");
 const prisma = new PrismaClient();
 
 const results = [];
@@ -70,7 +70,8 @@ const HEALTH = {
       }
       return f.id;
     };
-    // A viewer in the author's organisation, through the real invite.
+    // A viewer in the author's organisation, through the real invite (only a verified account can invite).
+    await markVerified(prisma, `verify-templates-author-${tag}@example.test`);
     const viewerEmail = `verify-templates-viewer-${tag}@example.test`;
     emails.push(viewerEmail);
     const invite = await (await fetch(API + "/v1/team/invites", { method: "POST", headers: auth(A), body: JSON.stringify({ email: viewerEmail, role: "VIEWER" }) })).json();

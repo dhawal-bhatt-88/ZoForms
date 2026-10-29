@@ -1,17 +1,13 @@
 import { ForbiddenException } from "@nestjs/common";
-import type { PrismaClient } from "@prisma/client";
 import type { AuthUser } from "./current-user.decorator";
 
 /**
  * Authors write; viewers only read. An author is any member of the
- * organisation who isn't a VIEWER. Shared by forms and templates.
+ * organisation who isn't a VIEWER. Shared by forms and templates. The role is
+ * the one AuthGuard read from the database for this request.
  */
-export async function assertCanEdit(prisma: PrismaClient, user: AuthUser): Promise<void> {
-  const m = await prisma.membership.findFirst({
-    where: { orgId: user.orgId, userId: user.sub },
-    select: { role: true },
-  });
-  if (!m || m.role === "VIEWER") {
+export function assertCanEdit(user: AuthUser): void {
+  if (user.role === "VIEWER") {
     throw new ForbiddenException("Viewers have read-only access.");
   }
 }

@@ -22,7 +22,8 @@ export class MailService {
   async send(msg: MailMessage): Promise<boolean> {
     const to = Array.isArray(msg.to) ? msg.to : [msg.to];
     if (!this.enabled) {
-      this.logger.log(`[skipped — no RESEND_API_KEY] "${msg.subject}" → ${to.join(", ")}`);
+      // Never the message itself: it can hold a sign-in link.
+      this.logger.log(`Email isn't configured (RESEND_API_KEY unset): "${msg.subject}" to ${to.join(", ")} not sent.`);
       return false;
     }
     try {

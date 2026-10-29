@@ -92,7 +92,7 @@ export class TemplatesService {
   }
 
   async create(user: AuthUser, body: { kind?: unknown; name?: unknown; description?: unknown; content?: unknown }) {
-    await assertCanEdit(this.prisma, user);
+    assertCanEdit(user);
     const kind = parseKind(body.kind);
     const name = parseName(body.name);
     const description = parseDescription(body.description);
@@ -151,7 +151,7 @@ export class TemplatesService {
   /** Copy a system template, or one of the organisation's own, into an editable organisation template. */
   async duplicate(user: AuthUser, id: string) {
     const t = await this.visible(user, id);
-    await assertCanEdit(this.prisma, user);
+    assertCanEdit(user);
     const created = await this.prisma.template.create({
       data: {
         orgId: user.orgId,
@@ -178,7 +178,7 @@ export class TemplatesService {
     if (t.orgId === null) {
       throw new ForbiddenException("System templates can't be changed. Duplicate it to make your own copy.");
     }
-    await assertCanEdit(this.prisma, user);
+    assertCanEdit(user);
     return t;
   }
 }

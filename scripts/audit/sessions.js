@@ -1,6 +1,7 @@
 // Release audit, area 3: sign-in, sessions, email verification, password reset,
-// invites, a member of two organisations, the invite email's HTML, and Google
-// sign-in merging into an existing account.
+// invites, a member of two organisations, the invite email's HTML, invites with
+// email configured, and Google sign-in merging into an existing account,
+// including one made by accepting someone else's invite (way 5).
 //
 // The last two drive the API's compiled services in this process (apps/api/dist,
 // so build the API first): the mailer is replaced by one that records the message,
@@ -12,7 +13,7 @@
 process.env.GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || "audit-stub.apps.googleusercontent.com";
 const path = require("path");
 const fs = require("fs");
-const { ROOT, call, signup, emailFor, decode, check, note, run, short, prisma, PASSWORD } = require("./_lib");
+const { ROOT, call, signup, emailFor, decode, check, note, run, short, prisma, PASSWORD, markVerified } = require("./_lib");
 
 const q = (id, label) => ({ id, type: "short", label, required: false });
 const ok = (r) => r.status >= 200 && r.status < 300;
@@ -27,36 +28,39 @@ run("Sign-in and sessions", async () => {
   note("token claims and lifetime", `${Object.keys(claims).join(", ")}; expires ${(claims.exp - claims.iat) / 86400} days after issue; alg ${JSON.parse(Buffer.from(v.token.split(".")[0], "base64url")).alg}`);
 
   // ---------- email verification ----------
-  note("sign-up response carries the verify link", v.body.emailVerifyUrl ? `yes: ${v.body.emailVerifyUrl.replace(/[0-9a-f]{48}$/, "<token>")}` : "no");
+  check("S6: the sign-up response has no verify link", !v.body.emailVerifyUrl && !JSON.stringify(v.body).includes("/verify-email/"), v.body.emailVerifyUrl ?? "");
   const resend = await call("POST", "/v1/auth/resend-verification", v.token);
-  note("resend-verification response carries the link", resend.json?.verifyUrl ? "yes" : short(resend));
-  const vtoken = (resend.json?.verifyUrl || v.body.emailVerifyUrl).split("/verify-email/")[1];
+  check("S6: the resend-verification response has no link (emailSent: false without email)", !resend.json?.verifyUrl && resend.json?.emailSent === false, short(resend));
+  // The link as the email would carry it: from the database, standing in for the inbox.
+  const vtoken = (await prisma.emailToken.findFirst({ where: { userId: v.id, type: "verify" } })).token;
   let r = await call("POST", "/v1/auth/verify-email", null, { token: vtoken });
   const me = await call("GET", "/v1/auth/me", v.token);
-  check("the link from the API's own response verifies the account (no inbox needed)", ok(r) && me.json?.emailVerified === true, short(r));
+  check("the emailed link verifies the account", ok(r) && me.json?.emailVerified === true, short(r));
 
   // ---------- password reset ----------
   const other = await signup("reset-target", "Target");
   r = await call("POST", "/v1/auth/forgot-password", null, { email: other.email });
-  note("forgot-password response (email not configured, as locally)", r.json?.resetUrl ? "carries resetUrl" : short(r));
-  if (r.json?.resetUrl) {
-    const rt = r.json.resetUrl.split("/reset-password/")[1];
-    const taken = await call("POST", "/v1/auth/reset-password", null, { token: rt, password: "Taken-over-123!" });
-    const loginNew = await call("POST", "/v1/auth/login", null, { email: other.email, password: "Taken-over-123!" });
-    check("without email configured, anyone who knows an address can reset its password and sign in",
-      !(ok(taken) && ok(loginNew)), `reset ${taken.status}, sign-in with the new password ${loginNew.status}`);
-    const oldToken = await call("GET", "/v1/forms", other.token);
-    check("token issued before the password reset still works afterwards → refused", !ok(oldToken), short(oldToken));
-  }
+  const nobody = await call("POST", "/v1/auth/forgot-password", null, { email: emailFor("no-such-account") });
+  check("S1: without email configured, forgot-password returns no reset link", !r.json?.resetUrl && !r.text.includes("/reset-password/"), short(r));
+  check("S1: and the same answer as for an address with no account", r.status === nobody.status && r.text === nobody.text, `${short(r)} | ${short(nobody)}`);
+  // The owner of the inbox resets: the token from the database stands in for the email.
+  const rt = (await prisma.emailToken.findFirst({ where: { userId: other.id, type: "reset" } })).token;
+  const reset = await call("POST", "/v1/auth/reset-password", null, { token: rt, password: "Owner-reset-123!" });
+  check("the emailed reset link resets the password", ok(reset), short(reset));
+  const oldToken = await call("GET", "/v1/forms", other.token);
+  check("S3: token issued before the password reset still works afterwards → refused", !ok(oldToken), short(oldToken));
 
   // ---------- sign-out ----------
   const webApi = fs.readFileSync(path.join(ROOT, "apps/web/src/lib/api.ts"), "utf8");
   note("web sign-out", /export function logout\(\)[^}]*removeItem/.test(webApi) ? "removes the token from localStorage only; the API has no sign-out route" : "?");
   r = await call("GET", "/v1/forms", v.token);
-  check("a token after the user 'signs out' (nothing revoked server-side) → refused", !ok(r), short(r));
+  note("a token after the user 'signs out' (no sign-out-everywhere, by decision; a password reset revokes)", short(r));
 
   // ---------- invites ----------
   const owner = await signup("inv-owner", "Inviter");
+  r = await call("POST", "/v1/team/invites", owner.token, { email: emailFor("invitee"), role: "EDITOR" });
+  check("an unverified account inviting → refused (403 EMAIL_NOT_VERIFIED)", r.status === 403 && r.json?.code === "EMAIL_NOT_VERIFIED", short(r));
+  await markVerified(owner.email);
   const inv = await call("POST", "/v1/team/invites", owner.token, { email: emailFor("invitee"), role: "EDITOR" });
   const itok = inv.json.acceptUrl.split("/invite/")[1];
   r = await call("GET", `/v1/invites/${itok}`);
@@ -75,36 +79,20 @@ run("Sign-in and sessions", async () => {
   check("a revoked invite → refused", !ok(r), short(r));
   note("an invite's lifetime", `${Math.round((new Date(inv.json.invite.expiresAt) - Date.now()) / 86400000)} days; re-inviting the same email replaces the token`);
 
-  // ---------- lead 6: a member of two organisations ----------
+  // ---------- lead 6: a member of two organisations (refused: one organisation per account) ----------
   const u = await signup("two-orgs", "Two Orgs");
   const uOrgA = decode(u.token).orgId;
   const ownerB = await signup("org-b-owner", "Org B");
+  await markVerified(ownerB.email);
   const orgB = decode(ownerB.token).orgId;
-  const bForm = (await call("POST", "/v1/forms", ownerB.token, { title: "B's form" })).json;
-  await call("PUT", `/v1/forms/${bForm.id}/schema`, ownerB.token, { title: "B's form", blocks: [q("b", "B only")] });
   const invB = await call("POST", "/v1/team/invites", ownerB.token, { email: u.email, role: "EDITOR" });
-  const acc = await call("POST", `/v1/invites/${invB.json.acceptUrl.split("/invite/")[1]}/accept`, null, { password: PASSWORD });
-  const which = (t) => (decode(t).orgId === uOrgA ? "A (their own)" : decode(t).orgId === orgB ? "B (the one just joined)" : "?");
-  const members = await prisma.membership.findMany({ where: { userId: u.id }, select: { orgId: true, role: true } });
-  note("lead 6: memberships after accepting B's invite", members.map((m) => `${m.orgId === uOrgA ? "A" : "B"}:${m.role}`).join(", "));
-  note("lead 6: the accept response's token is for organisation", ok(acc) ? which(acc.json.token) : short(acc));
-  const login = await call("POST", "/v1/auth/login", null, { email: u.email, password: PASSWORD });
-  note("lead 6: signing in again gives organisation", which(login.json.token));
-  const tokens = [acc.json?.token, login.json?.token].filter(Boolean);
-  let reachesB = false;
-  for (const t of tokens) {
-    const list = await call("GET", "/v1/forms", t);
-    const get = await call("GET", `/v1/forms/${bForm.id}`, t);
-    if (list.json?.some((f) => f.id === bForm.id) || ok(get)) reachesB = true;
-  }
-  check("lead 6: the user can reach organisation B with any token they can get", reachesB, "every token is for A; B's forms are 404");
-  // Order without orderBy: the same query, 20 times.
-  const order = new Set();
-  for (let i = 0; i < 20; i++) {
-    const x = await prisma.user.findUnique({ where: { id: u.id }, include: { memberships: true } });
-    order.add(x.memberships.map((m) => (m.orgId === uOrgA ? "A" : "B")).join(""));
-  }
-  note("lead 6: memberships order over 20 identical reads (no orderBy)", [...order].join(" | "));
+  check("lead 6: inviting someone already in another team → refused (409 ALREADY_IN_ANOTHER_TEAM)", invB.status === 409 && invB.json?.code === "ALREADY_IN_ANOTHER_TEAM", short(invB));
+  // An invite from before the rule.
+  const early = await prisma.invite.create({ data: { orgId: orgB, email: u.email, role: "EDITOR", token: `${u.id}-early`, expiresAt: new Date(Date.now() + 86_400_000) } });
+  const acc = await call("POST", `/v1/invites/${early.token}/accept`, null, { password: PASSWORD });
+  check("lead 6: accepting an earlier invite while in another team → refused (409)", acc.status === 409 && acc.json?.code === "ALREADY_IN_ANOTHER_TEAM", short(acc));
+  const members = await prisma.membership.findMany({ where: { userId: u.id }, select: { orgId: true } });
+  check("lead 6: still in one organisation, their own", members.length === 1 && members[0].orgId === uOrgA, JSON.stringify(members));
 
   // ---------- lead 5: the invite email with a hostile organisation name ----------
   const hostileName = `<img src=x onerror=alert(1)><a href="https://evil.example">Click here to keep your account</a>`;
@@ -116,11 +104,34 @@ run("Sign-in and sessions", async () => {
   const sent = [];
   const mail = { enabled: false, layout: MailService.prototype.layout, send: async (m) => (sent.push(m), true) };
   const team = new TeamService(prisma, null, mail);
-  await team.createInvite({ ...decode(hostile.token) }, { email: emailFor("hostile-invitee"), role: "EDITOR" });
+  await markVerified(hostile.email);
+  await team.createInvite({ ...decode(hostile.token), role: "OWNER" }, { email: emailFor("hostile-invitee"), role: "EDITOR" });
   const email = sent[0];
   fs.mkdirSync(OUT, { recursive: true });
   fs.writeFileSync(path.join(OUT, "invite-email-hostile.html"), email.html);
   check("lead 5: the organisation name is escaped in the invite email", !email.html.includes("<img src=x"), `subject: ${email.subject}\nhtml saved to ${path.join(OUT, "invite-email-hostile.html")}`);
+
+  // ---------- way 5 (a): invites with email configured ----------
+  {
+    const mailed = [];
+    const mailOn = { enabled: true, layout: MailService.prototype.layout, send: async (m) => (mailed.push(m), true) };
+    const { AuthService } = require(path.join(API_DIST, "auth/auth.service.js"));
+    const { JwtService } = apiRequire("@nestjs/jwt");
+    const { env } = require(path.join(API_DIST, "config/env.js"));
+    const authOn = new AuthService(prisma, new JwtService({ secret: env.JWT_SECRET, signOptions: { expiresIn: "30d" } }), mailOn);
+    const teamOn = new TeamService(prisma, authOn, mailOn);
+    const mgr = { ...decode(owner.token), role: "OWNER" };
+    const res = await teamOn.createInvite(mgr, { email: emailFor("mailed-invitee"), role: "EDITOR" });
+    check("way 5 (a): with email configured, the invite response has no link and no token",
+      !("acceptUrl" in res) && !("token" in res.invite) && !JSON.stringify(res).includes("/invite/"), JSON.stringify(res).slice(0, 200));
+    const listed = await teamOn.listInvites(mgr);
+    check("way 5 (a): …nor does the invite list", listed.length > 0 && listed.every((i) => !("token" in i)), JSON.stringify(listed[0]));
+    check("way 5 (a): …the link went out by email", mailed.some((m) => m.html.includes("/invite/")));
+    const mailedToken = (await prisma.invite.findFirst({ where: { email: emailFor("mailed-invitee") } })).token;
+    await teamOn.acceptInvite(mailedToken, { password: PASSWORD, name: "Mailed" });
+    const joined = await prisma.user.findUnique({ where: { email: emailFor("mailed-invitee") } });
+    check("way 5 (a): accepting the emailed link marks the new account verified", joined.emailVerified === true);
+  }
 
   // ---------- lead 4: Google sign-in merges into an existing password account ----------
 
@@ -151,6 +162,44 @@ run("Sign-in and sessions", async () => {
     check("lead 4: Google sign-in to an address someone else registered (unverified) → kept apart",
       !sameUser || !ok(seen),
       `attacker's account was unverified: ${!before.emailVerified}; Google sign-in returned the same user: ${sameUser}; attacker's password still signs in: ${ok(atk)}; attacker downloads the real owner's form: ${seen.status}${seen.text?.includes("Private question") ? " (with its content)" : ""}`);
+    const claimed = await prisma.user.findUnique({ where: { id: attackerUserId } });
+    check("lead 4: the claimed account is verified and has no password", claimed.emailVerified && claimed.passwordHash === null);
+    const attackerToken = await call("GET", "/v1/forms", r.json.token);
+    check("lead 4: the attacker's sign-up token → refused", attackerToken.status === 401, short(attackerToken));
+    check("lead 4: the account kept the organisation it made at sign-up", decode(g.token).orgId === decode(r.json.token).orgId);
+
+    // Way 5: the attacker invites the address into their own team and accepts the invite themselves.
+    const atkOwner = await signup("way5-attacker", "Way 5 attacker");
+    await markVerified(atkOwner.email);
+    const atkOrg = decode(atkOwner.token).orgId;
+    const victim5 = emailFor("way5-victim");
+    const inv5 = await call("POST", "/v1/team/invites", atkOwner.token, { email: victim5, role: "EDITOR" });
+    const acc5 = await call("POST", `/v1/invites/${inv5.json.invite.token}/accept`, null, { password: "Attacker-pw-123!", name: "Victim" });
+    const v5 = await prisma.user.findUnique({ where: { email: victim5 }, include: { memberships: true } });
+    check("way 5, before the merge: the attacker made an unverified account for the address, in the attacker's team only",
+      ok(acc5) && !v5.emailVerified && v5.memberships.length === 1 && v5.memberships[0].orgId === atkOrg, `${short(acc5)}; ${JSON.stringify(v5.memberships)}`);
+    const g5 = await auth.loginWithGoogle(JSON.stringify({ email: victim5, email_verified: true, name: "Real Victim" }));
+    const after5 = await prisma.membership.findMany({ where: { userId: v5.id } });
+    check("way 5, after the merge: no longer in the attacker's team; owner of a new organisation of their own",
+      after5.length === 1 && after5[0].orgId !== atkOrg && after5[0].role === "OWNER" && decode(g5.token).orgId === after5[0].orgId, JSON.stringify(after5));
+    const vf = (await call("POST", "/v1/forms", g5.token, { title: "Victim's own form" })).json;
+    r = await call("GET", `/v1/forms/${vf.id}`, atkOwner.token);
+    check("way 5, after the merge: the attacker can't read the real owner's new form (404)", r.status === 404, short(r));
+    r = await call("GET", "/v1/forms", acc5.json.token);
+    check("way 5, after the merge: the token the attacker got by accepting → refused", r.status === 401, short(r));
+    r = await call("POST", "/v1/auth/login", null, { email: victim5, password: "Attacker-pw-123!" });
+    check("way 5, after the merge: the attacker's password no longer signs in", !ok(r), short(r));
+
+    // Way 5 with data from before the rule: an account made at sign-up that also joined someone's team by invite.
+    const both = emailFor("way5-both");
+    const sb = await call("POST", "/v1/auth/signup", null, { email: both, password: "Attacker-pw-123!", name: "Both" });
+    const bothOwnOrg = decode(sb.json.token).orgId;
+    await prisma.invite.create({ data: { orgId: atkOrg, email: both, role: "EDITOR", token: `${sb.json.user.id}-pre`, status: "accepted", acceptedAt: new Date(), expiresAt: new Date(Date.now() + 86_400_000) } });
+    await prisma.membership.create({ data: { orgId: atkOrg, userId: sb.json.user.id, role: "EDITOR" } });
+    await auth.loginWithGoogle(JSON.stringify({ email: both, email_verified: true, name: "Both" }));
+    const bothAfter = await prisma.membership.findMany({ where: { userId: sb.json.user.id } });
+    check("way 5, after the merge: an account in its sign-up organisation and an invited one keeps only the sign-up one",
+      bothAfter.length === 1 && bothAfter[0].orgId === bothOwnOrg, JSON.stringify(bothAfter));
   } finally {
     OAuth2Client.prototype.verifyIdToken = realVerify;
   }

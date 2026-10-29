@@ -65,9 +65,9 @@ mkdir -p ~/zowork-forms
 ```
 
 Create `~/zowork-forms/.env.prod` from [`deploy/.env.prod.example`](deploy/.env.prod.example) and fill in real values:
-- a strong `POSTGRES_PASSWORD` and `JWT_SECRET`. The API refuses to start in production with the dev secret.
+- a strong `POSTGRES_PASSWORD` and `JWT_SECRET`. In production the API refuses to start when `JWT_SECRET` is missing, is one of the example values, or is shorter than 32 characters.
 - `PUBLIC_API_URL=http://<ELASTIC_IP>:4000` and `PUBLIC_TENANT_URL=http://<ELASTIC_IP>:3000`. The second is used in invite, verification and password-reset links.
-- Optionally, `RESEND_API_KEY` and `MAIL_FROM` to send email, and `GOOGLE_CLIENT_ID` for Google sign-in. Without a Resend key, emails are logged, not sent.
+- Optionally, `RESEND_API_KEY` and `MAIL_FROM` to send email, and `GOOGLE_CLIENT_ID` for Google sign-in. Without a Resend key, emails are logged, not sent, so accounts made with a password can't verify their email, invite teammates or reset a password. Google accounts are verified by Google and can invite.
 
 The Postgres user is `zowork_forms`, the database `formbuilder`.
 

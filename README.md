@@ -119,14 +119,15 @@ Or use `pnpm db:studio`. Then sign in at http://localhost:3002 with the same ema
 | --- | --- | --- |
 | `DATABASE_URL` | ✅ | PostgreSQL connection string |
 | `PORT` | | API port (default `4000`) |
-| `NODE_ENV` | | `development` (default), `test` or `production`. Production refuses the dev `JWT_SECRET`. |
+| `NODE_ENV` | | `development` (default), `test` or `production`. Production refuses a missing, example or short `JWT_SECRET`. |
 | `PUBLIC_API_URL` | | The API's public origin, allowed by CORS (default `http://localhost:4000`) |
 | `PUBLIC_TENANT_URL` | | The builder's public origin: allowed by CORS, and used in invite, verification and password-reset links (default `http://localhost:3000`) |
 | `CORS_ORIGINS` | | Extra origins allowed by CORS, comma-separated. Localhost, the API's own host and the two origins above are always allowed. |
-| `JWT_SECRET` | ✅ in production | Signs auth tokens. Use a long random string. |
-| `RESEND_API_KEY` | | Sends email through Resend. Without it, emails are logged and not sent. |
+| `JWT_SECRET` | ✅ in production | Signs auth tokens. Use a long random string: in production, at least 32 characters and not an example value. |
+| `RESEND_API_KEY` | | Sends email through Resend. Without it, emails are logged and not sent, so accounts made with a password can't verify their email, invite teammates or reset a password. |
 | `MAIL_FROM` | | The sender (default `Zowork Forms <onboarding@resend.dev>`) |
 | `GOOGLE_CLIENT_ID` | | Turns on Google sign-in: the OAuth client id the API checks tokens against |
+| `RETURN_EMAIL_LINKS_FOR_TESTS` | | Test only. `true` puts verification and password-reset links in API responses. The API refuses to start with it on in production. |
 
 **`apps/web/.env.local`** ([example](apps/web/.env.local.example))
 
