@@ -7,7 +7,7 @@ import ts from "typescript";
  * than written by hand (docs brief, "Accuracy rules"):
  *   - names, types, required and each prop's doc comment from
  *     dist/react/index.d.ts (`interface FormRendererProps`);
- *   - defaults from dist/react/index.js, where FormRenderer's props are
+ *   - defaults from dist/react/index.js, where FillForm's props are
  *     destructured with them. The types can't say what a default is.
  *
  * The result is committed beside the page (form-renderer.props.json) and
@@ -68,9 +68,9 @@ export function formRendererReference(dir = PACKAGE_DIR): Reference {
   );
   if (!props) throw new Error("dist/react/index.d.ts has no interface FormRendererProps");
 
-  // FormRenderer passes every prop but drafts and onDraftProblem on to FillForm, which sets the defaults.
+  // FormRenderer passes every prop but drafts, onDraftProblem and onRenderError on to FillForm, which sets the defaults.
   const js = fs.readFileSync(path.join(dir, "dist", "react", "index.js"), "utf8");
-  const defaults = new Map([...destructuredDefaults(js, "FormRenderer"), ...destructuredDefaults(js, "FillForm")]);
+  const defaults = destructuredDefaults(js, "FillForm");
 
   return {
     package: `@zoworkhq/forms ${version}`,

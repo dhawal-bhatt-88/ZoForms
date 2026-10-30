@@ -19,7 +19,7 @@
     "@nestjs/platform-express": "^10.4.4",
     "@nestjs/throttler": "^6.3.0",
     "@prisma/client": "^5.20.0",
-    "@zoworkhq/forms": "file:../../vendor/zoworkhq-forms-0.27.0.tgz",
+    "@zoworkhq/forms": "file:../../vendor/zoworkhq-forms-0.28.0.tgz",
     "bcryptjs": "^3.0.3",
     "body-parser": "1.20.9",
     "dotenv": "^16.4.5",

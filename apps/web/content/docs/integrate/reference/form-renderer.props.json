@@ -1,5 +1,5 @@
 {
-  "package": "@zoworkhq/forms 0.27.0",
+  "package": "@zoworkhq/forms 0.28.0",
   "source": "dist/react/index.d.ts (interface FormRendererProps) and dist/react/index.js (defaults)",
   "props": [
     {
@@ -56,7 +56,7 @@
       "type": "DraftsOptions",
       "required": false,
       "default": null,
-      "doc": "What drafts need from the host (drafts contract section 3): a scope, and a key (device mode) or three functions (server mode). Used only when the schema asks for device or server drafts."
+      "doc": "What drafts need from the host (drafts contract section 3): a scope, and a key (device mode) or three functions (server mode). In session mode a scope and owner are optional and key the tab's copy. `mode: 'off'` stores nothing anywhere, whatever the schema asks for."
     },
     {
       "name": "onDraftProblem",
@@ -78,6 +78,13 @@
       "required": false,
       "default": null,
       "doc": "The host's own checks (contract section 16), run with the built-in ones: on Next, Submit and Return to review, and live on flagged questions. Pass the same array to prepareSubmission on the server, or they can be bypassed. Checked at mount and whenever a different array is passed."
+    },
+    {
+      "name": "onRenderError",
+      "type": "(error: unknown, info: { componentStack?: string; }) => void",
+      "required": false,
+      "default": null,
+      "doc": "The form could not be shown (contract section 7): a schema or a setting the renderer refuses — the checks that used to throw at mount — or any other error while rendering it. In its place the respondent sees \"This form can't be shown right now. Please try again later.\" and the host's own page stays up. Called once per failure, however often the host re-renders. The form tries again when `schema` or `endpoint` changes; a form refused for its `validators`, which are often written inline and so new on every render, tries again when it gets a new React `key`."
     }
   ]
 }

@@ -83,8 +83,8 @@ importers:
         specifier: ^5.20.0
         version: 5.22.0(prisma@5.22.0)
       '@zoworkhq/forms':
-        specifier: file:../../vendor/zoworkhq-forms-0.27.0.tgz
-        version: file:vendor/zoworkhq-forms-0.27.0.tgz(react@18.3.1)
+        specifier: file:../../vendor/zoworkhq-forms-0.28.0.tgz
+        version: file:vendor/zoworkhq-forms-0.28.0.tgz(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       bcryptjs:
         specifier: ^3.0.3
         version: 3.0.3
@@ -153,8 +153,8 @@ importers:
         specifier: 3.1.0
         version: 3.1.0(acorn@8.17.0)
       '@zoworkhq/forms':
-        specifier: file:../../vendor/zoworkhq-forms-0.27.0.tgz
-        version: file:vendor/zoworkhq-forms-0.27.0.tgz(react@18.3.1)
+        specifier: file:../../vendor/zoworkhq-forms-0.28.0.tgz
+        version: file:vendor/zoworkhq-forms-0.28.0.tgz(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       lucide-react:
         specifier: ^1.23.0
         version: 1.23.0(react@18.3.1)
@@ -1267,11 +1267,13 @@ packages:
   '@xtuc/long@4.2.2':
     resolution: {integrity: sha512-NuHqBY1PB/D8xU6s/thBgOAiAP7HOYDQ32+BFZILJ8ivkUkAHQnWfn6WhL79Owj1qmUnoN/YPhktdIoucipkAQ==}
 
-  '@zoworkhq/forms@file:vendor/zoworkhq-forms-0.27.0.tgz':
-    resolution: {integrity: sha512-LgUNEueNAEhx6iJdR21SpvHh3UC2BlRMoLqNOzIPcY/L8wFbac2WH1go2pd+9zCF6U8VztcC8dOofG3m5U07lg==, tarball: file:vendor/zoworkhq-forms-0.27.0.tgz}
-    version: 0.27.0
+  '@zoworkhq/forms@file:vendor/zoworkhq-forms-0.28.0.tgz':
+    resolution: {integrity: sha512-TtTunkJBpyk+sjj/T6lt5tg35Vdd2z/6o2evbpDeENQV1WdLSK/NYQ/d6R6RqQDhpH1SrbzLGXx2WtPlEGY9MA==, tarball: file:vendor/zoworkhq-forms-0.28.0.tgz}
+    version: 0.28.0
+    engines: {node: '>=20'}
     peerDependencies:
-      react: '>=18'
+      react: ^18.0.0 || ^19.0.0
+      react-dom: ^18.0.0 || ^19.0.0
 
   accepts@1.3.8:
     resolution: {integrity: sha512-PYAthTa2m2VKxuvSD3DPC/Gy+U+sOA1LAuT8mkmRuvw+NACSaeXEQ+NHcVF7rONl6qcaxV3Uuemwawk+7+SJLw==}
@@ -4524,9 +4526,10 @@ snapshots:
 
   '@xtuc/long@4.2.2': {}
 
-  '@zoworkhq/forms@file:vendor/zoworkhq-forms-0.27.0.tgz(react@18.3.1)':
+  '@zoworkhq/forms@file:vendor/zoworkhq-forms-0.28.0.tgz(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
       react: 18.3.1
+      react-dom: 18.3.1(react@18.3.1)
 
   accepts@1.3.8:
     dependencies:

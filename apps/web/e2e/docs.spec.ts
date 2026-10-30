@@ -19,6 +19,10 @@ const EXAMPLE = "/docs/examples/follow-up-question";
 const FOLLOW_UP_FORM = JSON.parse(
   fs.readFileSync(path.join(__dirname, "../content/docs/examples/follow-up-question.form.json"), "utf8"),
 );
+/** The installed renderer: the top bar and every "Applies to" name it. */
+const RENDERER_VERSION = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "../node_modules/@zoworkhq/forms/package.json"), "utf8"),
+).version as string;
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
 /** The deepest focused element, through shadow roots: a short description of it. */
@@ -48,7 +52,7 @@ test.describe("docs", () => {
     const nav = page.getByRole("navigation", { name: "Docs" });
     await expect(nav.getByRole("link", { name: "Docs home" })).toHaveAttribute("aria-current", "page");
     const header = page.getByRole("banner");
-    await expect(header.getByText("@zoworkhq/forms 0.27.0")).toBeVisible();
+    await expect(header.getByText(`@zoworkhq/forms ${RENDERER_VERSION}`)).toBeVisible();
     await expect(header.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
     await expect(header.getByRole("link", { name: "Release notes" })).toHaveCount(0);
   });
@@ -60,7 +64,7 @@ test.describe("docs", () => {
     await expect(page.getByRole("navigation", { name: "Docs" }).getByRole("link", { name: "Dropdown" })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toHaveText(/Docs\s*\/\s*Build forms\s*\/\s*Question types/);
     await expect(page.getByRole("link", { name: "View as Markdown" })).toHaveAttribute("href", "/docs/build/question-types/dropdown.md");
-    await expect(page.getByText("Applies to: Zowork Forms builder · @zoworkhq/forms 0.27.0 or later.")).toBeVisible();
+    await expect(page.getByText(`Applies to: Zowork Forms builder · @zoworkhq/forms ${RENDERER_VERSION} or later.`)).toBeVisible();
 
     const toc = page.getByRole("navigation", { name: "On this page" });
     await expect(toc).toBeVisible();
@@ -190,8 +194,10 @@ test.describe("docs", () => {
       expect(await focused(page)).toMatchObject({ tag: "div", className: "zf-error-summary", inShadow: true });
 
       await summary.getByRole("link", { name: '"Therapist\'s name" is required.' }).click();
-      expect(await focused(page)).toMatchObject({ tag: "input", id: "therapist_name", inShadow: true });
-      await expect(page.getByRole("textbox", { name: "Therapist's name" })).toHaveAccessibleDescription(/is required/);
+      expect(await focused(page)).toMatchObject({ tag: "input", inShadow: true });
+      const name = page.getByRole("textbox", { name: "Therapist's name" });
+      await expect(name).toBeFocused();
+      await expect(name).toHaveAccessibleDescription(/is required/);
     });
 
     test("Payload and Server output come from the real submit; a hidden answer is left out", async ({ page }) => {
@@ -211,7 +217,37 @@ test.describe("docs", () => {
       const server = JSON.parse((await page.getByRole("region", { name: "prepareSubmission(schema, body)" }).textContent()) ?? "");
       expect(server.ok).toBe(true);
       expect(server.answers).toEqual({ sees_therapist: { state: "answered", value: { code: "no", label: "No" } } });
+      // What a host stores: the checked key and time from the real body, and the answers.
+      expect(server.submission).toMatchObject({
+        formId: FOLLOW_UP_FORM.formId,
+        idempotencyKey: payload.idempotencyKey,
+        submittedAt: payload.submittedAt,
+        answers: server.answers,
+      });
       await expect(page.getByText("Computed in your browser by prepareSubmission")).toBeVisible();
+      await expect(page.getByText("Store submission, never the request body.")).toBeVisible();
+    });
+
+    test("nothing stays in the tab: no prompt on coming back, and a refresh starts a new form", async ({ page }) => {
+      const stored = () => page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.startsWith("@zoworkhq/forms:")));
+      await page.goto(EXAMPLE);
+      await page.getByRole("radio", { name: "Yes" }).check();
+      await page.getByRole("textbox", { name: "Therapist's name" }).fill("Dr. Rivera");
+      expect(await stored()).toEqual([]);
+
+      await page.reload();
+      await expect(page.locator(".zf-form")).toBeVisible();
+      await expect(page.getByRole("radio", { name: "Yes" })).not.toBeChecked();
+
+      await page.getByRole("radio", { name: "Yes" }).check();
+      await page.getByRole("navigation", { name: "Docs" }).getByRole("link", { name: "Docs home" }).click();
+      // A fresh dev server compiles the page on this first visit, which can take longer than the default 5s.
+      await expect(page).toHaveURL(/\/docs$/, { timeout: 20_000 });
+      await page.goBack();
+      await expect(page.locator(".zf-form")).toBeVisible();
+      await expect(page.getByRole("radio", { name: "Yes" })).not.toBeChecked();
+      await expect(page.getByText("Continue where you left off?")).toHaveCount(0);
+      expect(await stored()).toEqual([]);
     });
 
     test("the tabs work from the keyboard", async ({ page }) => {

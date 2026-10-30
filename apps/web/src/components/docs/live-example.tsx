@@ -27,7 +27,10 @@ import { Tabs, type TabSpec } from "./tabs";
  * `--zf-*` properties still reach in, as they would in a host's page.
  *
  * Submitting goes to a stand-in endpoint (lib/docs/example-fetch.ts) that
- * exists only while this is mounted. Nothing leaves the page.
+ * exists only while this is mounted. Nothing leaves the page, and with drafts
+ * off nothing stays in the tab either: a reader coming back gets a new form,
+ * never the "Continue where you left off?" prompt. The host chooses that, so it
+ * isn't in the form file or the React code shown.
  */
 export function LiveExample({
   name,
@@ -53,6 +56,7 @@ export function LiveExample({
   const [run, setRun] = useState(0);
   const [payload, setPayload] = useState<unknown>(null);
   const [server, setServer] = useState<unknown>(null);
+  const [renderError, setRenderError] = useState<string | null>(null);
   const [density, setDensity] = useState<Density>("standard");
   const dark = useDarkTheme();
   const mount = useShadowMount(css);
@@ -112,10 +116,21 @@ export function LiveExample({
           {mount.node &&
             createPortal(
               <div data-zf-theme={dark ? "dark" : undefined} data-zf-density={offerDensity ? density : undefined}>
-                <FormRenderer key={run} schema={schema} endpoint={endpoint} />
+                <FormRenderer
+                  key={run}
+                  schema={schema}
+                  endpoint={endpoint}
+                  drafts={{ mode: "off" }}
+                  onRenderError={(error) => setRenderError(error instanceof Error ? error.message : String(error))}
+                />
               </div>,
               mount.node,
             )}
+          {renderError !== null && (
+            <p role="alert" className="body-sm mt-3 text-graphite">
+              This example&rsquo;s form file can&rsquo;t be shown: {renderError}
+            </p>
+          )}
         </div>
       ),
     },
@@ -146,8 +161,8 @@ export function LiveExample({
         <>
           <CodeBlock code={reactCode ?? ""} lang="jsx" />
           <p className="body-sm text-graphite">
-            This page also renders the form in a shadow root, to keep the docs&rsquo; own styles off it, and posts to a
-            stand-in endpoint. Your app needs neither.
+            This page also renders the form in a shadow root, to keep the docs&rsquo; own styles off it, posts to a
+            stand-in endpoint, and keeps no drafts. Your app needs none of these.
           </p>
         </>
       ),
@@ -178,6 +193,7 @@ export function LiveExample({
             <p className="body-sm text-graphite">
               Computed in your browser by <code className="font-mono">prepareSubmission</code> from{" "}
               <code className="font-mono">@zoworkhq/forms/core</code>, the same function your server runs on that body.
+              Store <code className="font-mono">submission</code>, never the request body.
             </p>
             <CodeBlock code={JSON.stringify(server, null, 2)} lang="json" title="prepareSubmission(schema, body)" />
           </>

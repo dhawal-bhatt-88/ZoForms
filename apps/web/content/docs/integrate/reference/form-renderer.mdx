@@ -240,6 +240,29 @@ export const validators = [
 
 </Prop>
 
+<Prop name="onRenderError">
+
+Called when the form can't be shown: a schema or setting the renderer refuses, or a fault while rendering. In its place the respondent sees "This form can't be shown right now. Please try again later.", and your page stays up. The first argument is the error, the second `{ componentStack }`.
+
+```jsx
+<FormRenderer
+  schema={schema}
+  endpoint="/api/submissions"
+  onRenderError={(error, { componentStack }) => report(error, componentStack)}
+/>
+```
+
+<Rules>
+
+- It's called once per failure.
+- These errors don't reach a host error boundary. Use this to report them.
+- A development build also shows the error's text in the message and logs it. A production build shows only the message.
+- After a failure the form tries again when `schema` or `endpoint` changes. A form refused for its `validators`, which are often written inline and so new on every render, tries again when it gets a new React `key`.
+
+</Rules>
+
+</Prop>
+
 ## Related
 
 - [Follow-up question](/docs/examples/follow-up-question): a live form, with the payload it posts and what `prepareSubmission` returns.

@@ -16,15 +16,16 @@ export function rendererCoreFile(): string {
   for (const dir of require.resolve.paths("@zoworkhq/forms") ?? []) {
     const manifest = join(dir, "@zoworkhq", "forms", "package.json");
     if (existsSync(manifest)) {
-      const pkg = JSON.parse(readFileSync(manifest, "utf8")) as { exports: { "./core": { import: string } } };
-      return join(dirname(manifest), pkg.exports["./core"].import);
+      const pkg = JSON.parse(readFileSync(manifest, "utf8")) as { exports: { "./core": { import: { default: string } } } };
+      return join(dirname(manifest), pkg.exports["./core"].import.default);
     }
   }
   throw new Error("@zoworkhq/forms isn't installed for the API.");
 }
 
-// /core is an ES module only. The API compiles to CommonJS, where TypeScript
-// would turn import() into require(), which can't load it: so a real import().
+// /core has an ES module entry and a CommonJS one, and rendererCoreFile() names
+// the ES module. The API compiles to CommonJS, where TypeScript would turn
+// import() into require(), which can't load that file: so a real import().
 const nativeImport = new Function("url", "return import(url)") as (url: string) => Promise<unknown>;
 
 export type { MountChecks };

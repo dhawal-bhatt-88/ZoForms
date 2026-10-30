@@ -1,6 +1,8 @@
-import { readFileSync } from "fs";
+import { execFileSync } from "child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
 import { join } from "path";
 import { pathToFileURL } from "url";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { buildArtifact } from "@formbuilder/form-schema";
 import { RendererCore, rendererCoreFile, type MountChecks } from "./renderer-core";
@@ -22,6 +24,31 @@ describe("the API's renderer is the web app's", () => {
 });
 
 describe("RendererCore", () => {
+  // The API starts on this: without /core it doesn't start. The runner can't do the real
+  // import() (see below), so this compiles the file to CommonJS, as `nest build` does, and
+  // starts it in plain Node, in the API's node_modules so the lookup finds the installed package.
+  it("loads /core from the installed package as the built API does at start-up", () => {
+    const dir = mkdtempSync(join(__dirname, "../../node_modules/.renderer-core-"));
+    try {
+      const source = readFileSync(join(__dirname, "renderer-core.ts"), "utf8");
+      const { outputText } = ts.transpileModule(source, {
+        compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2021, experimentalDecorators: true, esModuleInterop: true },
+      });
+      writeFileSync(join(dir, "renderer-core.js"), outputText);
+      const start = join(dir, "start.js");
+      writeFileSync(
+        start,
+        `const { RendererCore } = require("./renderer-core.js");
+        const core = new RendererCore();
+        core.onModuleInit().then(() => console.log(JSON.stringify(core.mountProblem(JSON.parse(process.argv[2])))));`,
+      );
+      const good = buildArtifact({ title: "T", blocks: [{ id: "a", type: "short", label: "A", required: false }] }, IDS);
+      expect(execFileSync(process.execPath, [start, JSON.stringify(good)], { encoding: "utf8" }).trim()).toBe("null");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("passes a file the renderer shows, and names why it would refuse one", async () => {
     const core = new RendererCore();
     // The same file the API loads, through the test runner's own import().
