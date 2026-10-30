@@ -1268,7 +1268,7 @@ packages:
     resolution: {integrity: sha512-NuHqBY1PB/D8xU6s/thBgOAiAP7HOYDQ32+BFZILJ8ivkUkAHQnWfn6WhL79Owj1qmUnoN/YPhktdIoucipkAQ==}
 
   '@zoworkhq/forms@file:vendor/zoworkhq-forms-0.28.0.tgz':
-    resolution: {integrity: sha512-TtTunkJBpyk+sjj/T6lt5tg35Vdd2z/6o2evbpDeENQV1WdLSK/NYQ/d6R6RqQDhpH1SrbzLGXx2WtPlEGY9MA==, tarball: file:vendor/zoworkhq-forms-0.28.0.tgz}
+    resolution: {integrity: sha512-702tPJiQJM0XpRdHA2XeHLRpguEsxSMnEd7D4G8s9v8e3+VVHYTzn+UZKwYAv5elVTa6WZ+jLMk6KIaeXRonPw==, tarball: file:vendor/zoworkhq-forms-0.28.0.tgz}
     version: 0.28.0
     engines: {node: '>=20'}
     peerDependencies:
