@@ -1,0 +1,92 @@
+---
+title: clearDrafts
+summary: Deletes saved progress from this browser, typically when someone signs out.
+template: function-reference
+badges: [React]
+appliesTo: [package]
+updated: 2026-10-30
+prev: /docs/integrate/reference/prepare-submission
+next: /docs/integrate/reference/posted-body
+---
+
+## Import
+
+```jsx check=browser
+import { clearDrafts, ClearDraftsError } from '@zoworkhq/forms/react';
+```
+
+It's for the browser. It deletes from this tab's `sessionStorage` and this device's IndexedDB. Server drafts are yours to delete.
+
+## Signature
+
+<Signature of="clearDrafts" />
+
+```jsx check=statements
+await clearDrafts({ owner: userId }); // every draft and tab entry saved with this owner
+await clearDrafts({ scope });         // every draft and tab entry for this scope
+await clearDrafts();                  // everything: the whole device database and every tab entry
+```
+
+## Parameters
+
+Pass one of `scope` or `owner`, or neither.
+
+<FieldList of="ClearDraftsOptions">
+<Field name="scope">
+Every device draft and tab entry for this scope, across forms.
+</Field>
+<Field name="owner">
+Every device draft and tab entry saved with this owner, across scopes and forms. This is the usual call when someone signs out. Drafts saved without an `owner` are not touched.
+</Field>
+</FieldList>
+
+With neither, it deletes every device draft on this device (the whole database) and every tab entry the package wrote in this tab, scoped or not. An entry with no scope or owner can only be removed this way.
+
+## Returns
+
+A promise that resolves once everything you asked for is gone. It never resolves without having cleared.
+
+<Warning>
+It clears storage, not a form on screen. A form still mounted keeps its answers in memory and writes them again at its next save, so call it once the form has gone.
+</Warning>
+
+Where `sessionStorage` or IndexedDB doesn't exist at all, nothing can have been stored there, so there is nothing to clear. It also works on a plain-HTTP page.
+
+## Errors
+
+`clearDrafts` tries both storages, so whatever could be cleared has been. If a delete fails, the promise rejects with a `ClearDraftsError`.
+
+<FieldList of="ClearDraftsError">
+<Field name="failed">
+Which storage couldn't be cleared.
+</Field>
+<Field name="cause">
+The first underlying error. It isn't enumerable, so `JSON.stringify` leaves it out.
+</Field>
+</FieldList>
+
+<Signature of="ClearDraftsFailure" />
+
+Its message is `clearDrafts could not clear sessionStorage and indexedDB.`, naming only the storage that failed.
+
+```jsx check=statements
+try {
+  await clearDrafts({ owner: userId });
+} catch (error) {
+  if (error instanceof ClearDraftsError) reportError(error.failed);
+  else throw error;
+}
+```
+
+Two calls are refused, and the promise rejects with a `TypeError`:
+
+| Call | Message |
+|---|---|
+| Both `scope` and `owner` | `clearDrafts takes { scope } or { owner }, not both — call it once for each.` |
+| An argument that isn't an object | `clearDrafts takes { scope?, owner? } — for one scope, call clearDrafts({ scope }).` |
+
+Both could mean either all of those drafts or only the ones that match both, and a wrong guess deletes drafts.
+
+## Related
+
+- [`FormRenderer`](/docs/integrate/reference/form-renderer): the `drafts` prop, where `scope` and `owner` are set.

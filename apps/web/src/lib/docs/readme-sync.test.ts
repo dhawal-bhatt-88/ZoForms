@@ -1,0 +1,156 @@
+import { createHash } from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { unified } from "unified";
+import remarkGfm from "remark-gfm";
+import remarkParse from "remark-parse";
+import { describe, expect, it } from "vitest";
+import { isDeveloperPage } from "./code-examples";
+import { CONTENT_DIR, getLivePages, getPage, readReference, type DocsPage } from "./content";
+import { textOf, walk, type MdNode } from "./mdast";
+import { typeReference } from "./reference";
+
+/*
+ * Keeping the developer pages and the renderer's README in step (docs brief,
+ * "Not contradicting the README"). Three things:
+ *   - renderer-sources.json pins the README and both contracts by hash, so any
+ *     change to one stops here until someone re-reads the pages against it;
+ *   - what both state as data (props and their defaults, the drafts options,
+ *     engines and peers) is compared;
+ *   - every message the pages quote must be a message the package really has.
+ *
+ * After a package upgrade, re-read the README's diff against these pages, then
+ * regenerate the pin with
+ *
+ *   DOCS_WRITE_REFERENCE=1 pnpm --filter web exec vitest run src/lib/docs/readme-sync.test.ts
+ */
+
+const PACKAGE_DIR = path.join(process.cwd(), "node_modules", "@zoworkhq", "forms");
+const REPO_DOCS = path.join(process.cwd(), "..", "..", "docs");
+const PIN = path.join(CONTENT_DIR, "integrate", "renderer-sources.json");
+
+const sha256 = (text: string) => createHash("sha256").update(text.replace(/\r\n/g, "\n")).digest("hex");
+const read = (full: string) => fs.readFileSync(full, "utf8");
+
+const readme = read(path.join(PACKAGE_DIR, "README.md"));
+const manifest = JSON.parse(read(path.join(PACKAGE_DIR, "package.json"))) as {
+  version: string;
+  engines: { node: string };
+  exports: Record<string, unknown>;
+  peerDependencies: Record<string, string>;
+};
+const tree = unified().use(remarkParse).use(remarkGfm).parse(readme) as unknown as MdNode;
+
+/** The first table after a heading, as rows of cell text. */
+function tableAfter(heading: string): string[][] {
+  const nodes = tree.children ?? [];
+  const at = nodes.findIndex((n) => n.type === "heading" && textOf(n) === heading);
+  const table = nodes.slice(at).find((n) => n.type === "table");
+  if (at < 0 || !table) throw new Error(`The README has no table after "${heading}"`);
+  return (table.children ?? []).map((row) => (row.children ?? []).map(textOf));
+}
+
+/** The first code block after a heading. */
+function codeAfter(heading: string): string {
+  const nodes = tree.children ?? [];
+  const at = nodes.findIndex((n) => n.type === "heading" && textOf(n) === heading);
+  const code = nodes.slice(at).find((n) => n.type === "code");
+  if (at < 0 || !code?.value) throw new Error(`The README has no code after "${heading}"`);
+  return code.value;
+}
+
+describe("the sources the developer pages were read against", () => {
+  const fresh = {
+    package: `@zoworkhq/forms ${manifest.version}`,
+    readme: sha256(readme),
+    groupsAndPagesContract: sha256(read(path.join(REPO_DOCS, "GROUPS-AND-PAGES-CONTRACT.md"))),
+    draftsContract: sha256(read(path.join(REPO_DOCS, "DRAFTS-CONTRACT.md"))),
+  };
+  if (process.env.DOCS_WRITE_REFERENCE) fs.writeFileSync(PIN, `${JSON.stringify(fresh, null, 2)}\n`);
+
+  it("haven't changed since. If this fails, re-read the pages against what changed", () => {
+    expect(JSON.parse(read(PIN))).toEqual(fresh);
+  });
+});
+
+describe("the FormRenderer page and the README", () => {
+  const rows = tableAfter("FormRenderer props").slice(1);
+  const props = readReference("integrate/reference/form-renderer")!.props;
+
+  it("list the same props", () => {
+    expect(rows.map((r) => r[0])).toEqual(props.map((p) => p.name));
+  });
+
+  it("give the same defaults", () => {
+    expect(rows.map((r) => r[2])).toEqual(props.map((p) => (p.required ? "required" : p.default ?? "")));
+  });
+
+  it("give the same options for drafts", () => {
+    const options = [...codeAfter("Drafts and data in the browser").matchAll(/^\s*(\w+)\??:/gm)].map((m) => m[1]);
+    const [drafts] = typeReference(["DraftsOptions"]).types;
+    expect(options).toEqual(drafts.members.map((m) => m.name));
+  });
+});
+
+describe("the overview and the package", () => {
+  const page = getPage("integrate/overview")!;
+
+  it("name the three entry points the package exports", () => {
+    expect(Object.keys(manifest.exports).sort()).toEqual(["./core", "./react", "./styles.css"]);
+    for (const entry of Object.keys(manifest.exports)) expect(page.body).toContain(`@zoworkhq/forms/${entry.slice(2)}`);
+  });
+
+  it("state the same requirements", () => {
+    expect(manifest.engines.node).toBe(">=20");
+    expect(manifest.peerDependencies).toEqual({ react: "^18.0.0 || ^19.0.0", "react-dom": "^18.0.0 || ^19.0.0" });
+    expect(readme).toContain("It needs `react` and `react-dom` 18 or 19. On a server, `/core` needs Node 20 or later.");
+    expect(page.body).toContain("It needs `react` and `react-dom` 18 or 19, and on a server `/core` needs Node 20 or later.");
+  });
+});
+
+describe("the messages the developer pages quote", () => {
+  const dist = path.join(PACKAGE_DIR, "dist");
+  /** The package's strings as a reader sees them, em dashes and all. */
+  const decode = (js: string) => js.replace(/\\u([0-9a-f]{4})/gi, (_, hex: string) => String.fromCharCode(parseInt(hex, 16))).replace(/\\"/g, '"');
+  const corpus = decode(read(path.join(dist, "react", "index.js")) + fs.readdirSync(dist).filter((f) => f.endsWith(".js")).map((f) => read(path.join(dist, f))).join("\n"));
+
+  /** The package's template strings, each as a pattern: a message with a value in it. */
+  const templates = [...corpus.matchAll(/`([^`\n]*\$\{[^`\n]*)`/g)]
+    // Enough words of its own that it can't match just anything.
+    .filter((m) => m[1].replace(/\$\{.*?\}/g, "").length >= 12)
+    .map((m) => new RegExp(`^${m[1].replace(/[.*+?^()|[\]\\]/g, "\\$&").replace(/\$\{.*?\}/g, ".*")}$`));
+
+  const inCorpus = (message: string) => {
+    if (corpus.includes(message) || templates.some((t) => t.test(message))) return true;
+    // A page writes {label} where the package builds the text from the question.
+    const parts = message.split(/\{\w+\}/).filter(Boolean);
+    return /\{\w+\}/.test(message) && parts.every((p) => corpus.includes(p));
+  };
+
+  const quotedIn = (page: DocsPage) => {
+    const found: string[] = [];
+    for (const node of walk(page.tree)) {
+      if (node.type === "text") for (const [, quoted] of (node.value ?? "").matchAll(/"([A-Z][^"\n]*[.?!])"/g)) found.push(quoted);
+      // Messages holding quotation marks are in code, whole.
+      if (node.type === "inlineCode" && /^(Invalid submission|clearDrafts |This form uses|Submission failed|Must be at|"\{label\}"|Answer every|Rank every|Cannot validate)/.test(node.value ?? "")) found.push(node.value ?? "");
+    }
+    return found;
+  };
+
+  const pages = getLivePages().filter((p) => isDeveloperPage(p.slug));
+
+  it("finds them", () => {
+    expect(pages.flatMap(quotedIn).length).toBeGreaterThan(20);
+  });
+
+  it.each(pages.map((p) => [p.slug, p] as const))("%s quotes only real messages", (_, page) => {
+    expect(quotedIn(page).filter((m) => !inCorpus(m))).toEqual([]);
+  });
+
+  it("fails on a message the package doesn't have", () => {
+    expect(inCorpus("Form submitted successfully.")).toBe(true);
+    expect(inCorpus("Form was submitted successfully.")).toBe(false);
+    expect(inCorpus("Submission failed with status 422")).toBe(true);
+    expect(inCorpus("Submission failed: status 422")).toBe(false);
+  });
+});

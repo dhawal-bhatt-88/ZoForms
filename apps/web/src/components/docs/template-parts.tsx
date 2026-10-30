@@ -3,7 +3,7 @@ import { ArrowRight, Film } from "lucide-react";
 import { cn } from "@formbuilder/ui";
 import { Callout, StatusChip } from "@/components/ui";
 import { docsHref, sectionPages } from "@/lib/docs/nav";
-import type { ReferenceProp } from "@/lib/docs/reference";
+import type { ReferenceProp, ReferenceType } from "@/lib/docs/reference";
 
 /*
  * The components a page's MDX may use beyond Markdown and the callouts, by
@@ -125,6 +125,50 @@ export function Prop({ name, prop, children }: Children & { name: string; prop: 
       </dl>
       <div className="mt-3">{children}</div>
     </section>
+  );
+}
+
+/**
+ * A type's fields as a table: name, type and required from the page's
+ * generated `<page>.types.json`, and each description from the `Field` the
+ * page writes for it. reference.test.ts holds the two lists to each other.
+ */
+export function FieldList({ children }: Children) {
+  return (
+    <div className="surface scroll-x relative my-5 overflow-x-auto">
+      <table className="w-full border-collapse text-[0.8125rem]">
+        <thead>
+          <tr>
+            {["Field", "Type", "Required", "What it is"].map((h) => (
+              <th
+                key={h}
+                scope="col"
+                className="whitespace-nowrap border-b border-rule bg-paper-sunk px-4 py-2.5 text-left font-mono text-[0.625rem] font-medium uppercase tracking-[0.11em] text-graphite-soft"
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>{children}</tbody>
+      </table>
+    </div>
+  );
+}
+
+/** One field's row. Its name, type and required come from the package. */
+export function Field({ member, children }: Children & { member: ReferenceType["members"][number] }) {
+  return (
+    <tr className="border-b border-rule last:border-b-0">
+      <td className="px-4 py-2.5 align-top">
+        <code className="whitespace-nowrap font-mono text-[0.75rem] text-ink">{member.name}</code>
+      </td>
+      <td className="px-4 py-2.5 align-top">
+        <code className="font-mono text-[0.75rem] text-ink">{member.type}</code>
+      </td>
+      <td className="px-4 py-2.5 align-top text-ink">{member.required ? "Yes" : "No"}</td>
+      <td className="px-4 py-2.5 align-top text-ink [&_p]:my-0">{children}</td>
+    </tr>
   );
 }
 

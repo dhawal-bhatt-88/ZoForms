@@ -1,0 +1,127 @@
+---
+title: The posted body
+summary: What the browser sends to your endpoint, field by field, and the response it expects back.
+template: data-reference
+badges: [Server]
+appliesTo: [package]
+updated: 2026-10-30
+prev: /docs/integrate/reference/clear-drafts
+next: /docs/examples/follow-up-question
+---
+
+## At a glance
+
+When the respondent selects Submit and every check passes, `FormRenderer` sends one request:
+
+| What | Value |
+|---|---|
+| Method | `POST` |
+| Address | The `endpoint` prop |
+| Body | JSON |
+| Headers | `Content-Type: application/json`, plus anything `getAuthHeaders` returns |
+| Cookies | As `credentials` says, `same-origin` by default |
+| Time limit | `timeoutMs`, 30 seconds by default |
+
+Nothing is sent while the answers fail a check, and the form doesn't retry on its own. After a failure the respondent can send it again.
+
+## An example
+
+```json check=body
+{
+  "idempotencyKey": "6f1c1e0a-3c55-4a54-9d0e-6e6f6f1f7b3a",
+  "schemaVersion": 2,
+  "formId": "form-demo-1",
+  "formVersionId": "version-demo-3",
+  "submittedAt": "2026-10-30T09:15:00.000Z",
+  "answers": {
+    "preferred_name": { "state": "answered", "value": "Demo Client" },
+    "contact_email": { "state": "answered", "value": "client@example.org" },
+    "attend_format": { "state": "answered", "value": "video" },
+    "sees_therapist": { "state": "answered", "value": "no" },
+    "reason_for_visit": { "state": "empty" }
+  },
+  "derived": {}
+}
+```
+
+`therapist_name` isn't there: that question shows only when `sees_therapist` is Yes.
+
+## Fields
+
+<FieldList of="Submission">
+<Field name="idempotencyKey">
+Identifies this fill of the form. It stays the same across retries and after a refresh, and changes only when the respondent clears the form or starts over. A resumed draft keeps it too. Dedupe on it.
+</Field>
+<Field name="schemaVersion">
+The form file's `schemaVersion`. Every download from the builder has one.
+</Field>
+<Field name="formId">
+The form file's `formId`.
+</Field>
+<Field name="formVersionId">
+The form file's `formVersionId`, so you can tell which version the page rendered.
+</Field>
+<Field name="submittedAt">
+The time of this attempt on the respondent's clock, in UTC ISO-8601. A retry has a new one, so never dedupe on it, and record your own receipt time.
+</Field>
+<Field name="answers">
+The answers, by block id. See below.
+</Field>
+<Field name="derived">
+Always `{}`. The browser never sends scores: your server calculates them.
+</Field>
+</FieldList>
+
+## Answers
+
+`answers` holds visible questions only, keyed by block id. Groups and pages add nothing to its shape, so a question inside a group sits at the top level like any other.
+
+- An answered question is `{ "state": "answered", "value": … }`.
+- An unanswered question is `{ "state": "empty" }`. So is whitespace-only free text.
+- A question hidden by its conditions isn't there at all, though the respondent may have answered it before it was hidden. Hidden answers are never in the submission.
+
+The value depends on the question:
+
+| Question | `type` | `value` |
+|---|---|---|
+| Short answer, Long answer, Email, Phone number, Link | `short`, `long`, `email`, `phone`, `link` | The text exactly as typed |
+| Number, Linear scale, Rating | `number`, `scale`, `rating` | A number |
+| Date | `date` | `"YYYY-MM-DD"` |
+| Time | `time` | `"HH:MM"` |
+| Multiple choice, Dropdown | `choice`, `dropdown` | The option's code |
+| Respondent's country | `country` | The country's name |
+| Checkboxes, Multi-select, Ranking | `checkbox`, `multiselect`, `ranking` | An array of option codes, in the order chosen |
+| Matrix | `matrix` | `{ [rowCode]: columnCode }` |
+| Grid | `grid` | `{ [rowCode]: { [columnCode]: string } }`, with empty cells and rows left out |
+
+The browser sends codes, never labels. `prepareSubmission` looks the labels up in the form file you pass it.
+
+## Repeating groups
+
+A visible repeating group is an array under its own id, with one object per entry, in order. Each object is an `answers` map of its own, built by the same rules, and a repeating group inside it is an array inside that. With no entries it's `[]`. A hidden repeating group isn't there.
+
+```json
+{
+  "medications": [
+    { "medication_name": { "state": "answered", "value": "Demo medicine" }, "dose": { "state": "empty" } },
+    { "medication_name": { "state": "answered", "value": "Other demo medicine" }, "dose": { "state": "answered", "value": 2 } }
+  ]
+}
+```
+
+## The response
+
+**Any 2xx means the form was received.** The respondent sees "Form submitted successfully.", and `onSuccess` gets the response.
+
+**Anything else, or no answer within `timeoutMs`, is a failure.** The respondent sees "Submission failed. Your answers have been kept — please try again." and can send it again, with the same `idempotencyKey`.
+
+The form never reads the response body. To show your own message, use `onSuccess` or `onError`.
+
+`onError` receives an `Error` such as `Submission failed with status 422`. It doesn't carry the response, so the `errors` your endpoint returns can't reach the respondent or your `onError` code. Run the same checks in the browser with `validators` instead. [TODO: changing in 0.28.1]
+
+A submit that reached you but whose response never got back is sent again with the same key. Store it once, and answer the repeat with a 2xx.
+
+## Related
+
+- [`prepareSubmission` and `validateSubmission`](/docs/integrate/reference/prepare-submission): check this body on your server.
+- [`FormRenderer`](/docs/integrate/reference/form-renderer): `endpoint`, `credentials`, `getAuthHeaders` and `timeoutMs`.

@@ -1,0 +1,211 @@
+---
+title: prepareSubmission and validateSubmission
+summary: Check a posted body on your server against the form file, and get back the submission to store.
+template: function-reference
+badges: [Server]
+appliesTo: [package]
+updated: 2026-10-30
+prev: /docs/integrate/reference/form-renderer
+next: /docs/integrate/reference/clear-drafts
+---
+
+## Import
+
+```js check=esm
+import { prepareSubmission, validateSubmission } from '@zoworkhq/forms/core';
+```
+
+Or, in CommonJS:
+
+```js check=cjs run=node
+const { prepareSubmission, validateSubmission } = require('@zoworkhq/forms/core');
+```
+
+`/core` needs no React. On a server it needs Node 20 or later.
+
+## Signature
+
+`prepareSubmission` is the one call your endpoint needs. Never trust the browser's payload: pass it what was posted, with the same form file the form was rendered from.
+
+<Signature of="prepareSubmission" />
+
+`validateSubmission` is the lower-level check. It takes answers rather than a whole body, and returns only the errors.
+
+<Signature of="validateSubmission" />
+
+## Parameters
+
+### `prepareSubmission`
+
+| Parameter | What it is |
+|---|---|
+| `schema` | The form file, as an object. |
+| `body` | The posted body as parsed from JSON, in any shape. A bad one is rejected, never thrown on. |
+| `options` | Optional: your validators. |
+
+<FieldList of="ValidationOptions">
+<Field name="validators">
+Your own checks. Pass the same array the page gives `FormRenderer`, or they can be bypassed by posting straight to your endpoint.
+</Field>
+</FieldList>
+
+### `validateSubmission`
+
+| Parameter | What it is |
+|---|---|
+| `schema` | The form file, as an object. |
+| `answers` | An answers map, in the shape the browser posts. |
+| `scope` | Optional: `validators`, as above, and `pageId`. |
+
+<FieldList of="ValidationScope">
+<Field name="pageId">
+Check only this page's questions, as Next does in a form with pages. Without it, the whole form is checked.
+</Field>
+</FieldList>
+
+## Returns
+
+### `prepareSubmission`
+
+<Signature of="PreparedSubmission" />
+
+A successful result has these fields:
+
+| Field | What it is |
+|---|---|
+| `ok` | `true`. |
+| `submission` | What to store. |
+| `answers` | The same answers as `submission.answers`. |
+| `versionMismatch` | `true` when the body's `formId` or `formVersionId` differs from the form file's, or the body has none. Whether to refuse such a body is your call. |
+| `derived` | `{ scores }`, the same results as `submission.scores`, and `{ scores: [] }` for a form with none. |
+
+A failed result is `{ ok: false, errors }`, and has no scores.
+
+**Store only `result.submission`, never the body.** Nothing else from the request reaches it.
+
+<FieldList of="StoredSubmission">
+<Field name="formId">
+From the form file you passed, never from the body.
+</Field>
+<Field name="formVersionId">
+From the form file you passed, never from the body, even when `versionMismatch` is `true`. A stored submission doesn't say which version the respondent filled in. [TODO: changing in 0.28.1]
+</Field>
+<Field name="schemaVersion">
+From the form file, or `1` when it has none.
+</Field>
+<Field name="idempotencyKey">
+From the body, checked. Dedupe on it: store each key once, and answer a repeat with a 2xx.
+</Field>
+<Field name="submittedAt">
+From the body, checked. It comes from the respondent's clock, so record your own receipt time too.
+</Field>
+<Field name="answers">
+Rebuilt, with labels. See below.
+</Field>
+<Field name="scores">
+Calculated here from the form file and the validated answers. Anything score-like in the request is ignored. Each score is `null` with a `reason` when it has no value.
+</Field>
+</FieldList>
+
+### What each answer becomes
+
+Every answer is built afresh: exactly `{ "state": "empty" }` or `{ "state": "answered", "value": … }`, so no extra key survives. Answers to hidden or unknown questions are stripped, never a reason to reject.
+
+| Question | What `prepareSubmission` returns as `value` |
+|---|---|
+| Short answer, Long answer, Email, Phone number, Link | The text exactly as sent, never trimmed. Whitespace-only text comes back as `{ "state": "empty" }`. |
+| Number, Linear scale, Rating | A number. A plain decimal string such as `"500"` comes back as `500`. |
+| Date, Time, Respondent's country | The string. |
+| Multiple choice, Dropdown | `{ code, label }` |
+| Checkboxes, Multi-select, Ranking | `[{ code, label }, …]`, in the order sent |
+| Matrix | `[{ row, column }, …]`, each a `{ code, label }`: answered rows only, in the form's row order |
+| Grid | `[{ row, cells: [{ column, value }, …] }, …]`: answered rows in row order, answered cells in column order. A choice cell's `value` is `{ code, label }`, a text cell's is its text. A grid with no answered cell is `{ "state": "empty" }`. |
+
+The labels come from the form file you pass, never from the request. They are plain text: treat them as data, and escape them wherever you display them.
+
+A repeating group comes back as an array of objects under its own id, each built by these same rules.
+
+### `validateSubmission`
+
+An array of `ValidationError`, empty when the answers pass.
+
+<FieldList of="ValidationError">
+<Field name="blockId">
+The question's block id, or `""` for a fault in the request itself.
+</Field>
+<Field name="message">
+Ready to show. These are the messages the browser shows beside each question.
+</Field>
+<Field name="path">
+Where the error is: block ids and 0-based entry positions from the root, such as `["patients", 1, "payments", 0, "amount"]`, or just `[blockId]` outside any repeating group.
+</Field>
+<Field name="cause">
+Only on "This answer couldn't be checked.": what your validator threw or returned, for you to log. It isn't enumerable, so `JSON.stringify(errors)` never includes it.
+</Field>
+</FieldList>
+
+## Errors
+
+`prepareSubmission` **returns** `{ ok: false, errors }` for a bad request, and **throws** for a bad form file or a bad `validators` array, which are faults in your code rather than in the request.
+
+### Returned: the request
+
+Each of these has `blockId: ""` and `path: []`, and comes before any error in the answers. The first is returned alone.
+
+| Situation | `message` |
+|---|---|
+| The body isn't an object with an `answers` object | `Invalid submission: the body must be an object with an "answers" object.` |
+| `idempotencyKey` is missing or isn't 1–128 characters of A–Z, a–z, 0–9, `-` and `_` | `Invalid submission: idempotencyKey must be 1–128 characters of A–Z, a–z, 0–9, "-" and "_".` |
+| `submittedAt` is missing or isn't a real ISO-8601 UTC time | `Invalid submission: submittedAt must be an ISO-8601 UTC time such as "2026-10-30T09:15:00.000Z".` |
+
+### Returned: the answers
+
+Only visible questions are checked. `{label}`, `{min}` and `{max}` stand for the question's own values.
+
+| Situation | `message` |
+|---|---|
+| A required question has no answer | `"{label}" is required.` |
+| An answer isn't `{ state: "empty" }` or `{ state: "answered", value }` | "Invalid answer." |
+| Free text isn't a string | "Invalid answer." |
+| Free text is over 20,000 characters (`MAX_FREE_TEXT_LENGTH`) | "Your answer is too long." |
+| An email address isn't valid | "Enter a valid email address." |
+| A phone number isn't valid | "Enter a valid phone number." |
+| A link isn't an `https://` or `http://` address with a host and no user name | "Enter a valid URL, including https://." |
+| A number isn't a finite number or a plain decimal string | "Enter a valid number." |
+| A number is below `min` | `Must be at least {min}.` |
+| A number is above `max` | `Must be at most {max}.` |
+| A date isn't a real calendar `YYYY-MM-DD` | "Enter a valid date." |
+| A time isn't `HH:MM` or `HH:MM:SS` from `00:00` to `23:59` | "Enter a valid time." |
+| An option isn't a code exactly as stored: a label, the wrong case, a `{ code, label }` object, or a repeat | "Select a valid option." |
+| A country isn't on the list | "Select a valid option." |
+| A scale's value isn't one of its points | "Select a value from the scale." |
+| A rating isn't a whole number from 1 to 5 | "Select a rating from 1 to 5." |
+| A matrix names an unknown row or column | "Invalid answer." |
+| "Answer every row" is on, and a row is empty | `Answer every row of "{label}".` |
+| "Rank every option" is on, and an option is unranked | `Rank every option in "{label}".` |
+| A grid's required column is empty in a row | "Required.", once per cell, with the path ending in the row and column codes |
+| A grid's choice cell isn't an option of its column | "Select a valid option." |
+| A grid's text cell is over 20,000 characters | "Your answer is too long." |
+| A grid has the wrong shape, or an unknown row or column | "Invalid answer." |
+| A repeating group isn't an array, an entry isn't an object, or there are too few or too many entries | "Invalid answer." |
+| One of your validators returns a message | Your message, trimmed |
+| One of your validators throws, or returns anything but a message, `null` or `undefined` | "This answer couldn't be checked." |
+
+With no `maxOccurs`, a repeating group holds at most 1,000 entries (`DEFAULT_MAX_OCCURS`), and too many are refused on the count alone, before any entry is read.
+
+### Thrown
+
+Answer these with a 500, not a 422, and fix the cause. No request can make them happen.
+
+| Situation | What is thrown |
+|---|---|
+| The form file is malformed: an unknown type, a bad condition, or a text value that isn't text | An `Error` naming the block, such as `Block "a" has unknown type "nope".` |
+| The form file's `schemaVersion` is newer than this package supports | `This form uses schemaVersion 3, which this version of @zoworkhq/forms does not support (it supports 1 and 2). Upgrade @zoworkhq/forms to render it.` |
+| `validators` isn't an array, or an entry isn't `{ field, validate }`, or `field` isn't an answerable question | A `TypeError` naming the entry |
+| `validateSubmission` is given a `pageId` the form doesn't have | `Cannot validate page "x": this form has no page with that id.` |
+
+## Related
+
+- [The posted body](/docs/integrate/reference/posted-body): what `body` holds.
+- [`FormRenderer`](/docs/integrate/reference/form-renderer): the `validators` prop, and what the browser checks first.
+- [Quickstart](/docs/integrate/quickstart): `prepareSubmission` in a working endpoint.

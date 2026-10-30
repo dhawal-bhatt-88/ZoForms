@@ -5,26 +5,29 @@ template: api-reference
 badges: [React]
 appliesTo: [package]
 updated: 2026-10-30
-prev: /docs/build/show-questions-conditionally
-next: /docs/examples/follow-up-question
+prev: /docs/integrate/quickstart
+next: /docs/integrate/reference/prepare-submission
 ---
 
 ## Import
 
-```jsx
+```jsx check=browser
 import { FormRenderer } from '@zoworkhq/forms/react';
 import '@zoworkhq/forms/styles.css';
 ```
 
 The stylesheet is optional. Every rule in it has no specificity, so any rule of your own wins without `!important`.
 
-```jsx
+```jsx check=browser run=browser
+import { FormRenderer } from '@zoworkhq/forms/react';
 import schema from './intake-form.json';
 
 export function IntakeForm() {
   return <FormRenderer schema={schema} endpoint="/api/submissions" />;
 }
 ```
+
+Your own TypeScript needs a cast on a schema imported from JSON: `schema as FormSchema`, with `FormSchema` from `@zoworkhq/forms/core`.
 
 ## Props at a glance
 
@@ -36,17 +39,16 @@ export function IntakeForm() {
 
 The form file you downloaded from the builder, as an object.
 
-```jsx
-import schema from './intake-form.json';
-
+```jsx check=fragment
 <FormRenderer schema={schema} endpoint="/api/submissions" />
 ```
 
 <Rules>
 
-- It must have a `formId` and a `formVersionId`. Without one, `FormRenderer` throws "FormSchema is missing a formId — it is required and must be unique per form." or "FormSchema is missing a formVersionId — it is required and must change whenever the form changes." Every download from the builder has both.
-- It is checked when the form mounts, and a malformed schema throws: an unknown block type, a bad condition or an unsupported `schemaVersion`.
-- Pass the same schema to `prepareSubmission` on your server.
+- It is checked when the form mounts. A form file the renderer refuses, for an unknown block type, a bad condition or an unsupported `schemaVersion`, isn't shown: the respondent sees "This form can't be shown right now. Please try again later." in its place, your page stays up, and `onRenderError` gets the reason.
+- It must have a `formId` and a `formVersionId`. Every download from the builder has both. Without one, the reason is "FormSchema is missing a formId — it is required and must be unique per form." or "FormSchema is missing a formVersionId — it is required and must change whenever the form changes."
+- The renderer shows the questions, not the form's `title` or `description`. Your page shows those, and owns the `h1`. The renderer's own headings start at `h2`.
+- Pass the same form file to `prepareSubmission` on your server.
 
 </Rules>
 
@@ -54,17 +56,18 @@ import schema from './intake-form.json';
 
 <Prop name="endpoint">
 
-Where the form posts the answers. On Submit, once every built-in check and validator passes, `FormRenderer` sends a `POST` with `Content-Type: application/json`. The body holds `idempotencyKey`, `schemaVersion`, `formId`, `formVersionId`, `submittedAt`, `answers` and `derived`, which is always `{}`. See a real one on the Payload tab of the [follow-up question example](/docs/examples/follow-up-question).
+Where the form posts the answers. On Submit, once every built-in check and validator passes, `FormRenderer` sends a `POST` with `Content-Type: application/json`. [The posted body](/docs/integrate/reference/posted-body) lists every field and the response your endpoint must give.
 
-```jsx
+```jsx check=fragment
 <FormRenderer schema={schema} endpoint="https://api.example.com/v1/intake" />
 ```
 
 <Rules>
 
-- A full URL must use `https://`, except on `localhost` and `127.0.0.1`. Anything else throws "endpoint must use https:// — refusing to transmit form data over an insecure connection." A relative path such as `/api/submissions` is allowed.
-- A response that isn't OK (outside 200–299) counts as a failed submit.
-- `idempotencyKey` stays the same across retries and page refreshes. Only Clear form replaces it.
+- A full URL must use `https://`, or `http://` on `localhost` or `127.0.0.1`. Anything else is refused: the form isn't shown, and `onRenderError` gets "endpoint must use https:// — refusing to transmit form data over an insecure connection."
+- A relative path such as `/api/submissions` is allowed, and uses the page's own protocol.
+- Any 2xx means the form was received. Anything else, or no answer within `timeoutMs`, counts as a failed submit. The response body is never read.
+- `idempotencyKey` stays the same across retries and page refreshes. It changes only when the respondent clears the form or starts over.
 - The body carries the respondent's answers. Keep it out of request logs, error reports and analytics, and log ids such as `formId`, `formVersionId` and `idempotencyKey` instead.
 
 </Rules>
@@ -75,7 +78,7 @@ Where the form posts the answers. On Submit, once every built-in check and valid
 
 Passed to `fetch()` as its `credentials` option, the setting that decides whether cookies go with the request.
 
-```jsx
+```jsx check=fragment
 <FormRenderer schema={schema} endpoint="https://api.example.com/v1/intake" credentials="include" />
 ```
 
@@ -85,7 +88,7 @@ Passed to `fetch()` as its `credentials` option, the setting that decides whethe
 
 Headers to add to the request, such as an access token. It is called on every submit attempt, not once when the form mounts, so a form left open for a long time still sends a current token.
 
-```jsx
+```jsx check=fragment
 <FormRenderer
   schema={schema}
   endpoint="/api/submissions"
@@ -105,7 +108,7 @@ Headers to add to the request, such as an access token. It is called on every su
 
 Called with the `fetch()` response after a successful submit. The form is replaced by "Form submitted successfully.", focus moves to that message, and the progress kept for this form is removed.
 
-```jsx
+```jsx check=fragment
 <FormRenderer schema={schema} endpoint="/api/submissions" onSuccess={() => router.push('/thank-you')} />
 ```
 
@@ -115,13 +118,14 @@ Called with the `fetch()` response after a successful submit. The form is replac
 
 Called when submitting fails, with the error. That can be a network failure, the time limit (`timeoutMs`), `getAuthHeaders` failing, or a response that isn't OK, which arrives as `Error("Submission failed with status 500")` (with the real status). The form shows "Submission failed. Your answers have been kept — please try again." and keeps every answer.
 
-```jsx
+```jsx check=fragment
 <FormRenderer schema={schema} endpoint="/api/submissions" onError={(error) => reportError(error)} />
 ```
 
 <Rules>
 
 - It is only about submitting. Problems with drafts go to `onDraftProblem`.
+- The error doesn't carry the response, only its status in the message, so your endpoint's error body can't be read here. [TODO: changing in 0.28.1]
 
 </Rules>
 
@@ -131,7 +135,7 @@ Called when submitting fails, with the error. That can be a network failure, the
 
 How long, in milliseconds, the request may take before it is abandoned and counted as a failed submit.
 
-```jsx
+```jsx check=fragment
 <FormRenderer schema={schema} endpoint="/api/submissions" timeoutMs={10000} />
 ```
 
@@ -139,15 +143,46 @@ How long, in milliseconds, the request may take before it is abandoned and count
 
 <Prop name="drafts">
 
-What the form needs from your app to save progress beyond the open tab. The author chooses where progress is kept, under Save progress in the builder:
+How the form keeps a respondent's progress. The author chooses where it is kept, under Save progress in the builder, and your app supplies what that needs. Your app alone can turn it off.
 
-| Builder choice | Schema | What your app passes |
+| Builder choice | In the form file | What your app passes |
 |---|---|---|
-| Only while the form is open | no `drafts`, or `"session"` | nothing |
-| On this device | `"device"` | `scope` and `getKey` |
-| On the app's server (forms with pages only) | `"server"` | `scope`, `loadDraft`, `saveDraft` and `deleteDraft` |
+| Only while the form is open | no `drafts` | nothing; `scope` and `owner` are optional |
+| On this device | `"drafts": { "mode": "device" }` | `scope` and `getKey` |
+| On the app's server (forms with pages only) | `"drafts": { "mode": "server" }` | `scope`, `loadDraft`, `saveDraft` and `deleteDraft` |
+| Set by your app, whatever the file says | not in the file | `mode: 'off'`: nothing is stored anywhere, and a refresh starts a new form |
 
-```jsx
+<FieldList of="DraftsOptions">
+<Field name="mode">
+`'off'` stores nothing anywhere, and overrides the form file. For kiosks and shared devices.
+</Field>
+<Field name="scope">
+Who and whom, such as `${userId}:${patientId}`. It means nothing to the package, which stores only its hash.
+</Field>
+<Field name="owner">
+The user alone, for `clearDrafts({ owner })`.
+</Field>
+<Field name="label">
+Shown in the restore prompt, such as "Demo Client".
+</Field>
+<Field name="getKey">
+Device mode: the user's AES-GCM 256 key. The package never generates, stores or exports it.
+</Field>
+<Field name="expiresAfterDays">
+Device mode: 7 by default, and each save sets the expiry again.
+</Field>
+<Field name="loadDraft">
+Server mode: returns the saved draft, or `null`.
+</Field>
+<Field name="saveDraft">
+Server mode: stores the draft as it is.
+</Field>
+<Field name="deleteDraft">
+Server mode: deletes the draft.
+</Field>
+</FieldList>
+
+```jsx check=fragment
 <FormRenderer
   schema={schema}
   endpoint="/api/submissions"
@@ -163,9 +198,9 @@ What the form needs from your app to save progress beyond the open tab. The auth
 <Rules>
 
 - `scope` must identify the user, and the subject (patient, visit, episode) whenever the same form is filled in for more than one. Getting it wrong can restore one patient's answers into another patient's form.
-- `owner` identifies only the user, so `clearDrafts({ owner })` can clear all of that user's drafts at logout.
-- In device mode, `getKey` returns the user's AES-GCM 256 key. The package never generates, stores or exports it. `expiresAfterDays` defaults to 7, and each save sets the expiry again.
-- If your app hasn't provided what the chosen mode needs, the form falls back to keeping progress only while it is open, and `onDraftProblem` says why.
+- `scope` and `owner` are read once, when the form mounts. To switch to another user or patient, mount the form afresh, for example with a new React `key`.
+- If a mode can't be used, because of no scope, no key, no IndexedDB or a plain-HTTP page, the form falls back to session mode and `onDraftProblem` says why. Draft problems never block the form.
+- With `mode: 'off'` there are no drafts, so `onDraftProblem` is never called.
 
 </Rules>
 
@@ -175,7 +210,7 @@ What the form needs from your app to save progress beyond the open tab. The auth
 
 Called when drafts can't work as the author asked. The problem's `type` is one of `drafts-unavailable`, `draft-unreadable`, `draft-save-failed`, `draft-load-failed` or `draft-delete-failed`. Its `mode` is `device` or `server`. For `drafts-unavailable`, `reason` says what was missing.
 
-```jsx
+```jsx check=fragment
 <FormRenderer
   schema={schema}
   endpoint="/api/submissions"
@@ -194,10 +229,10 @@ Called when drafts can't work as the author asked. The problem's `type` is one o
 
 <Prop name="assetBase">
 
-Where your app serves its own files, for image, video and audio blocks whose source is a path starting with a single `/`. Pass it when your app is served under a sub-path, so `/images/a.png` loads from `/app/images/a.png`.
+Where your app serves its own files, for image, video and audio blocks whose source is a path starting with a single `/`. Pass it when your app is served under a sub-path, so `/images/a.png` loads from `/app/images/a.png`. With Vite, pass `import.meta.env.BASE_URL`.
 
-```jsx
-<FormRenderer schema={schema} endpoint="/api/submit" assetBase={import.meta.env.BASE_URL} />
+```jsx check=fragment
+<FormRenderer schema={schema} endpoint="/api/submit" assetBase="/app/" />
 ```
 
 <Rules>
@@ -213,17 +248,18 @@ Where your app serves its own files, for image, video and audio blocks whose sou
 
 Your own checks on answerable questions, run with the built-in ones: on Next, Submit and Return to review, and again as answers change on any question the last Submit or Next marked with an error. Each entry is `{ field, validate }`. `field` is a question's block id. `validate` returns an error message, or `null` when the answer is valid.
 
-```js
-// validators.js, imported by the page and by your server
+```js file=validators.js check=esm
+// Imported by the page and by your server. The types say value is unknown, so check it before using it as text.
 export const validators = [
   {
     field: 'mrn',
-    validate: ({ value }) => (/^MRN\d{6}$/.test(value) ? null : 'Enter the MRN as MRN followed by 6 digits.'),
+    validate: ({ value }) =>
+      typeof value === 'string' && /^MRN\d{6}$/.test(value) ? null : 'Enter the MRN as MRN followed by 6 digits.',
   },
 ];
 ```
 
-```jsx
+```jsx check=fragment
 <FormRenderer schema={schema} endpoint="/api/submissions" validators={validators} />
 ```
 
@@ -234,7 +270,7 @@ export const validators = [
 - It must be pure, fast and synchronous, and must not use `window`, `document` or the network. The same code runs on your server.
 - A throw, an empty string, a number, an object or a promise fails closed: the question shows "This answer couldn't be checked." and the form can't be submitted.
 - In the error summary your message starts with the question's label in quotation marks, as does "This answer couldn't be checked.": for a question labelled Medical record number, `"Medical record number": Enter the MRN as MRN followed by 6 digits.` The message beside the field, and the one `prepareSubmission` returns, are as you wrote them.
-- The array is checked when the form mounts and whenever you pass a different array. An entry that isn't `{ field, validate }`, or names a field that isn't an answerable question, throws a `TypeError`.
+- The array is checked when the form mounts and whenever you pass a different array. An entry that isn't `{ field, validate }`, or names a field that isn't an answerable question, is refused: the form isn't shown, and `onRenderError` gets a `TypeError` naming the entry. `prepareSubmission` throws the same error on your server.
 
 </Rules>
 
@@ -244,7 +280,7 @@ export const validators = [
 
 Called when the form can't be shown: a schema or setting the renderer refuses, or a fault while rendering. In its place the respondent sees "This form can't be shown right now. Please try again later.", and your page stays up. The first argument is the error, the second `{ componentStack }`.
 
-```jsx
+```jsx check=fragment
 <FormRenderer
   schema={schema}
   endpoint="/api/submissions"
@@ -265,6 +301,8 @@ Called when the form can't be shown: a schema or setting the renderer refuses, o
 
 ## Related
 
+- [The posted body](/docs/integrate/reference/posted-body): what the form sends, and the response it expects.
+- [`prepareSubmission` and `validateSubmission`](/docs/integrate/reference/prepare-submission): the server's side.
+- [`clearDrafts`](/docs/integrate/reference/clear-drafts): deleting saved progress.
 - [Follow-up question](/docs/examples/follow-up-question): a live form, with the payload it posts and what `prepareSubmission` returns.
 - [Show a question only when it applies](/docs/build/show-questions-conditionally): what happens to answers to hidden questions.
-- `prepareSubmission`, `clearDrafts` and `classNames` will get their own reference pages.

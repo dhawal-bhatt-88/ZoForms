@@ -1,0 +1,136 @@
+{
+  "package": "@zoworkhq/forms 0.28.0",
+  "types": [
+    {
+      "name": "PreparedSubmission",
+      "file": "core/index.d.ts",
+      "text": "type PreparedSubmission = {\n    ok: false;\n    errors: ValidationError[];\n} | {\n    ok: true;\n    submission: StoredSubmission;\n    answers: PreparedAnswers;\n    versionMismatch: boolean;\n    derived: {\n        scores: ScoreResult[];\n    };\n};",
+      "doc": null,
+      "members": []
+    },
+    {
+      "name": "StoredSubmission",
+      "file": "types.d.ts",
+      "text": "interface StoredSubmission {\n    formId: string;\n    formVersionId: string;\n    schemaVersion: number;\n    idempotencyKey: string;\n    submittedAt: string;\n    answers: PreparedAnswers;\n    scores: ScoreResult[];\n}",
+      "doc": "What a host's server stores for an accepted submission: prepareSubmission's `submission`. The ids and version come from the schema it was validated against, never from the body; the key and time are the body's, checked; the answers and scores are the ones prepareSubmission built. Nothing else from the body is in it.",
+      "members": [
+        {
+          "name": "formId",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "formVersionId",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "schemaVersion",
+          "type": "number",
+          "required": true,
+          "doc": "The schema's version, 1 when the schema has none."
+        },
+        {
+          "name": "idempotencyKey",
+          "type": "string",
+          "required": true,
+          "doc": "1–128 characters of A–Z, a–z, 0–9, \"-\" and \"_\". Dedupe on it."
+        },
+        {
+          "name": "submittedAt",
+          "type": "string",
+          "required": true,
+          "doc": "ISO-8601 UTC, from the respondent's clock. Record your own receipt time too."
+        },
+        {
+          "name": "answers",
+          "type": "PreparedAnswers",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "scores",
+          "type": "ScoreResult[]",
+          "required": true,
+          "doc": null
+        }
+      ]
+    },
+    {
+      "name": "ValidationError",
+      "file": "types.d.ts",
+      "text": "interface ValidationError {\n    blockId: string;\n    message: string;\n    path: (string | number)[];\n    cause?: unknown;\n}",
+      "doc": "One failed validation rule for one block. blockId is the anchor a host/FormRenderer uses to place the error next to the right field; message is already human-readable so callers don't need a second lookup table to render it.",
+      "members": [
+        {
+          "name": "blockId",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "message",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "path",
+          "type": "(string | number)[]",
+          "required": true,
+          "doc": "Block ids and 0-based instance positions from the root to the block, e.g. [\"patients\", 1, \"payments\", 0, \"amount\"]. Only repeating groups and their positions appear before the block's own id — plain groups and pages do not. `[blockId]` for a block outside any repeating group."
+        },
+        {
+          "name": "cause",
+          "type": "unknown",
+          "required": false,
+          "doc": "Only on \"This answer couldn't be checked.\" from a host validator that threw or returned a bad value (contract 16.6): the exception or value itself, for the host to log. Non-enumerable, like Error.cause, so JSON.stringify never sends it anywhere."
+        }
+      ]
+    },
+    {
+      "name": "ValidationOptions",
+      "file": "core/index.d.ts",
+      "text": "interface ValidationOptions {\n    validators?: readonly FieldValidator[];\n}",
+      "doc": null,
+      "members": [
+        {
+          "name": "validators",
+          "type": "readonly FieldValidator[]",
+          "required": false,
+          "doc": "The host's own checks (contract section 16). Pass the same array the page gives FormRenderer, or the host's rules are not enforced here."
+        }
+      ]
+    },
+    {
+      "name": "ValidationScope",
+      "file": "core/index.d.ts",
+      "text": "interface ValidationScope extends ValidationOptions {\n    pageId?: string;\n}",
+      "doc": null,
+      "members": [
+        {
+          "name": "pageId",
+          "type": "string",
+          "required": false,
+          "doc": "Validate only the questions inside this page — what Next checks in a paged form. Omitted, the whole form is validated."
+        }
+      ]
+    },
+    {
+      "name": "prepareSubmission",
+      "file": "core/index.d.ts",
+      "text": "function prepareSubmission(schema: FormSchema, body: unknown, options?: ValidationOptions): PreparedSubmission;",
+      "doc": "The one call a backend needs for an incoming submission: validate it against the schema, and return the submission to store. - `body` is the posted body as received (parsed JSON, any shape). One that is not an object with an `answers` object is rejected with one \"Invalid submission\" error, never a throw. So is a missing or malformed `idempotencyKey` (1–128 characters of A–Z, a–z, 0–9, \"-\", \"_\") or `submittedAt` (ISO-8601 UTC, a real instant). These errors have `blockId: ''` and `path: []`, and come before the answers' errors. - `submission` is what to store: the schema's formId, formVersionId and schemaVersion, the checked key and time, the answers and the scores. Nothing else from the body is in it. - Rejects on validation errors in visible questions, and on a visible repeating group whose value is not an array of objects, or whose instance count is outside minOccurs–maxOccurs (at most 1,000 when maxOccurs is absent, contract 12.1). - Every answer returned is built afresh (contract section 5): exactly `{ state: 'empty' }` or `{ state: 'answered', value }`, with nothing else that was sent. - Answers to hidden or unknown questions are stripped, never a reason to reject: a browser that kept a hidden answer did nothing wrong. Inside a repeating group this happens per instance. - Numeric strings answering number, scale or rating blocks come back as numbers. They are converted before validation, so \"3\" for a scale is judged as 3; a non-numeric string is not converted and still rejected. - Whitespace-only free text (short, long, email, phone, link) comes back as `{ state: 'empty' }`, so a required one is rejected. Any other text comes back exactly as sent — never trimmed. - Coded answers (choice, dropdown, checkbox, multiselect, ranking, matrix) come back with their labels, looked up from `schema` — never from the payload (contract 13.5): `{ code, label }` for choice and dropdown, `[{ code, label }, …]` in the submitted order for checkbox, multiselect and ranking, and `[{ row, column }, …]` (answered rows only, in row order) for matrix. The browser sends codes only; a label, or a `{ code, label }` object, in place of a code is rejected by validation. - A grid (contract 14.2) comes back as `[{ row, cells: [{ column, value }, …] }, …]`: answered rows in row order, answered cells in column order, a choice cell's value as `{ code, label }` and a text cell's as its text. Blank cells and rows with no answered cell are left out; a grid with no answered cell comes back as `{ state: 'empty' }`. - The host's validators (contract section 16), when given, run here as in the browser: pass the same array the page gives FormRenderer, or the host's rules can be bypassed by posting to the endpoint directly. A validator that throws or returns a bad value fails closed, with the original as the error's non-enumerable `cause`. - derived.scores holds every score in the form (contract section 17), calculated here from `schema` and the validated answers — `[]` when the form has none. Anything score-like in the request, a `derived` field included, is never read: the browser never sends scores. - versionMismatch flags a payload built against a different formId or formVersionId, so the caller can log it. Deciding whether to refuse it is the caller's policy. A schema that fails the integrity check throws, as everywhere else in /core: that is a fault in the server's schema, not in the payload. So does a malformed validators array (contract 16.2).",
+      "members": []
+    },
+    {
+      "name": "validateSubmission",
+      "file": "core/index.d.ts",
+      "text": "function validateSubmission(schema: FormSchema, answers: Answers, scope?: ValidationScope): ValidationError[];",
+      "doc": null,
+      "members": []
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+---
+title: How Zowork Forms fits your app
+summary: A form file from the builder, @zoworkhq/forms in your app, and your own endpoint. Answers go from the respondent's browser to your server.
+template: concept
+badges: []
+appliesTo: [package]
+updated: 2026-10-30
+prev: /docs/build/show-questions-conditionally
+next: /docs/integrate/quickstart
+---
+
+## In short
+
+An author builds a form in the Zowork Forms builder and downloads it as a JSON file. You put that file in your app, render it with `@zoworkhq/forms`, and receive the answers on your own server. The file is all your app needs from the builder.
+
+## How it fits together
+
+<Architecture />
+
+## Who does what
+
+| Part | Who runs it | What it does |
+|---|---|---|
+| Zowork Forms builder | Your form author | Holds the form's questions, logic and scores, and produces the form file. |
+| Form file | You keep it in your app | JSON that describes one saved version of the form. Each file has a `formId` and a `formVersionId`. |
+| `@zoworkhq/forms` in the browser | Your app | Shows the form, checks the answers, keeps the respondent's progress, and posts to your endpoint. |
+| `@zoworkhq/forms` on your server | Your server | Checks the posted body against the same form file and gives you the submission to store. |
+| Your endpoint and storage | You | Receive, check and store each submission. |
+
+## What you write
+
+- A page that renders `FormRenderer` with the form file and your endpoint.
+- An endpoint that passes the posted body to `prepareSubmission`, answers with a 2xx, and stores `result.submission`.
+- Your own storage. The package stores no submissions.
+
+Everything else is optional: [your own validators, drafts, sign-in and styling](/docs/integrate/reference/form-renderer) are all props or CSS.
+
+## The package's three entry points
+
+| Import | For | Runs in |
+|---|---|---|
+| `@zoworkhq/forms/react` | `FormRenderer`, `clearDrafts` and `classNames` | The browser. ES modules only. |
+| `@zoworkhq/forms/core` | `prepareSubmission` and the rest of the logic, with no React | Your server, or anywhere else. ES modules and CommonJS. |
+| `@zoworkhq/forms/styles.css` | The default stylesheet, which is optional | The browser. |
+
+There is no bare `@zoworkhq/forms` import. It needs `react` and `react-dom` 18 or 19, and on a server `/core` needs Node 20 or later.
+
+## Where answers go
+
+- The builder holds form definitions. It has nowhere to put answers: its database has no table for them.
+- `FormRenderer` makes one kind of request of its own: the `POST` to the `endpoint` you give it. It doesn't call the builder.
+- What a respondent types stays in their browser until that `POST`. How much of it is kept in the browser in the meantime depends on the form's drafts setting.
+- Images, video and audio in a form load from wherever the author pointed them, and YouTube and Vimeo videos load in those services' players. Those requests come from the respondent's browser, and they carry no answers.
+
+## Related
+
+- [Quickstart](/docs/integrate/quickstart): from install to a stored submission.
+- [`FormRenderer`](/docs/integrate/reference/form-renderer): every prop.
+- [`prepareSubmission` and `validateSubmission`](/docs/integrate/reference/prepare-submission): what your server gets.
+- [The posted body](/docs/integrate/reference/posted-body): what the browser sends, and what your endpoint must answer.

@@ -104,7 +104,12 @@ const DOCS_PAGES = [
   ["Repeating groups", "/docs/build/structure/repeating-groups"],
   ["Pages, progress and review", "/docs/build/structure/pages"],
   ["Show a question only when it applies", "/docs/build/show-questions-conditionally"],
+  ["How Zowork Forms fits your app", "/docs/integrate/overview"],
+  ["Quickstart", "/docs/integrate/quickstart"],
   ["FormRenderer", "/docs/integrate/reference/form-renderer"],
+  ["prepareSubmission", "/docs/integrate/reference/prepare-submission"],
+  ["clearDrafts", "/docs/integrate/reference/clear-drafts"],
+  ["The posted body", "/docs/integrate/reference/posted-body"],
   ["Follow-up question", "/docs/examples/follow-up-question"],
 ];
 

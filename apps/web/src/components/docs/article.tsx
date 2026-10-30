@@ -1,13 +1,14 @@
+import { Children as ReactChildren, cloneElement, isValidElement, type ReactElement } from "react";
 import Link from "next/link";
 import { evaluate } from "@mdx-js/mdx";
 import * as runtime from "react/jsx-runtime";
 import remarkGfm from "remark-gfm";
 import type { FormSchema } from "@zoworkhq/forms/core";
-import { readExampleForm, readReference, type DocsPage } from "@/lib/docs/content";
-import type { Reference } from "@/lib/docs/reference";
+import { readExampleForm, readReference, readTypes, type DocsPage } from "@/lib/docs/content";
+import type { Reference, ReferenceType } from "@/lib/docs/reference";
 import { exampleReactCode, formExcerpt } from "@/lib/docs/example-code";
 import type { MARKDOWN_COMPONENTS } from "@/lib/docs/markdown";
-import { remarkHeadingIds } from "@/lib/docs/mdast";
+import { remarkCodeTitles, remarkHeadingIds } from "@/lib/docs/mdast";
 import { markdownFor } from "@/lib/docs/page-markdown";
 import { rendererStyles, rendererVersion } from "@/lib/docs/renderer";
 import { TEMPLATES } from "@/lib/docs/templates";
@@ -15,13 +16,20 @@ import { Note, Tip, Warning } from "./callouts";
 import { CodeBlock, MdxPre } from "./code-block";
 import { LiveExample } from "./live-example";
 import { OnThisPage, PageEnd, PageHeader } from "./page-frame";
-import { Architecture, Door, Doors, Gif, Prop, PropsAtAGlance, Rules, Series, TryThis, UseCase, UseCases } from "./template-parts";
+import { Architecture, Door, Doors, Field, FieldList, Gif, Prop, PropsAtAGlance, Rules, Series, TryThis, UseCase, UseCases } from "./template-parts";
 
 /** The page's generated reference table (`<page>.props.json`); a page using Prop must have one. */
 function referenceOf(page: DocsPage): Reference {
   const reference = readReference(page.slug);
   if (!reference) throw new Error(`${page.file}: no ${page.slug}.props.json beside it`);
   return reference;
+}
+
+/** A type or function from the page's generated `<page>.types.json`. */
+function typeOf(page: DocsPage, name: string): ReferenceType {
+  const found = readTypes(page.slug)?.types.find((t) => t.name === name);
+  if (!found) throw new Error(`${page.file}: "${name}" isn't in ${page.slug}.types.json`);
+  return found;
 }
 
 /*
@@ -92,6 +100,20 @@ function components(page: DocsPage) {
       );
     },
     Rules,
+    Signature: ({ of }: { of: string }) => <CodeBlock code={typeOf(page, of).text} lang="ts" title={of} />,
+    // Each Field finds itself in its list's type.
+    FieldList: ({ of, children }: { of: string; children?: React.ReactNode }) => (
+      <FieldList>
+        {ReactChildren.map(children, (child) =>
+          isValidElement(child) ? cloneElement(child as ReactElement<{ owner?: ReferenceType }>, { owner: typeOf(page, of) }) : null,
+        )}
+      </FieldList>
+    ),
+    Field: ({ name, owner, children }: { name: string; owner?: ReferenceType; children?: React.ReactNode }) => {
+      const member = owner?.members.find((m) => m.name === name);
+      if (!member) throw new Error(`${page.file}: <Field name="${name}"> isn't a member of its <FieldList>`);
+      return <Field member={member}>{children}</Field>;
+    },
     TryThis,
     Doors,
     Door,
@@ -120,7 +142,7 @@ export async function DocsArticle({ page }: { page: DocsPage }) {
   const { default: Content } = await evaluate(page.body, {
     ...runtime,
     development: false,
-    remarkPlugins: [remarkGfm, remarkHeadingIds as never],
+    remarkPlugins: [remarkGfm, remarkHeadingIds as never, remarkCodeTitles as never],
   });
 
   return (

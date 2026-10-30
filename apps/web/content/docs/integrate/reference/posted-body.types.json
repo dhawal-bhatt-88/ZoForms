@@ -1,0 +1,55 @@
+{
+  "package": "@zoworkhq/forms 0.28.0",
+  "types": [
+    {
+      "name": "Submission",
+      "file": "types.d.ts",
+      "text": "interface Submission {\n    idempotencyKey: string;\n    schemaVersion?: number;\n    formId?: string;\n    formVersionId?: string;\n    submittedAt: string;\n    answers: Answers;\n    derived: Record<string, unknown>;\n}",
+      "doc": "The POST body FormRenderer sends on submit. schemaVersion mirrors the same optional field on FormSchema — the builder doesn't emit it yet, but JSON.stringify drops `undefined` keys automatically, so the payload already omits it today and will pick it up with zero code changes once the builder does. formId and formVersionId are required on FormSchema, so they are always present in practice. derived is always empty: the browser never sends scores (contract 17.5). prepareSubmission ignores whatever arrives in it and calculates scores from the schema it was given. idempotencyKey is fixed for the lifetime of one form fill and reused across every retry, so the backend can deduplicate an attempt that reached the server but whose response never made it back.",
+      "members": [
+        {
+          "name": "idempotencyKey",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "schemaVersion",
+          "type": "number",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "formId",
+          "type": "string",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "formVersionId",
+          "type": "string",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "submittedAt",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "answers",
+          "type": "Answers",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "derived",
+          "type": "Record<string, unknown>",
+          "required": true,
+          "doc": null
+        }
+      ]
+    }
+  ]
+}

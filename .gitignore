@@ -36,3 +36,6 @@ apps/*/.env.local
 
 # local file-upload storage (dev), no longer used: never commit it
 uploads/
+
+# Extracted docs code examples (src/lib/docs/code-examples.ts)
+.docs-check/

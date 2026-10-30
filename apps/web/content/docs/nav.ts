@@ -78,18 +78,30 @@ export const DOCS_NAV: DocsNavSection[] = [
   {
     title: "Integrate forms",
     items: [
+      { title: "How Zowork Forms fits your app", slug: "integrate/overview", status: "live" },
+      { title: "Quickstart", slug: "integrate/quickstart", status: "live" },
       {
-        title: "Quickstart",
-        slug: "integrate/quickstart",
+        title: "Build an intake page in Next.js",
+        slug: "integrate/tutorial-nextjs",
         status: "planned",
-        notes:
-          "The home page's FAQ sends developers here: install @zoworkhq/forms, render the form file, write the endpoint that receives the answers.",
+        notes: "Developer docs brief, CP5: App Router, 'use client', a route handler with prepareSubmission, deduping on idempotencyKey, onRenderError, a signed-in scope.",
       },
       {
         title: "How-to guides",
         pages: [
+          { title: "Validate and store submissions", slug: "integrate/validate-and-store", status: "planned", notes: "Developer docs brief, CP2." },
+          { title: "Add your own validation", slug: "integrate/custom-validation", status: "planned", notes: "Developer docs brief, CP2." },
+          { title: "Send the submission with your app's sign-in", slug: "integrate/sign-in", status: "planned", notes: "Developer docs brief, CP2." },
+          { title: "Handle errors", slug: "integrate/handle-errors", status: "planned", notes: "Developer docs brief, CP2." },
+          { title: "Use it with your framework", slug: "integrate/frameworks", status: "planned", notes: "Developer docs brief, CP2." },
+          { title: "Content Security Policy", slug: "integrate/content-security-policy", status: "planned", notes: "Developer docs brief, CP2." },
+          { title: "Serve images, video and audio", slug: "integrate/media", status: "planned", notes: "Developer docs brief, added at CP0: assetBase, referrer policy, captions over CORS." },
+          { title: "Update to a new form version", slug: "integrate/form-versions", status: "planned", notes: "Developer docs brief, CP2." },
+          { title: "Read scores", slug: "integrate/scores", status: "planned", notes: "Developer docs brief, CP2." },
+          { title: "Save progress (drafts)", slug: "integrate/drafts", status: "planned", notes: "Developer docs brief, CP3." },
+          { title: "Shared devices and kiosks", slug: "integrate/shared-devices", status: "planned", notes: "Developer docs brief, CP3." },
           {
-            title: "Styling: your app's CSS and the form",
+            title: "Style the form",
             slug: "integrate/styling",
             status: "planned",
             notes: [
@@ -106,7 +118,19 @@ export const DOCS_NAV: DocsNavSection[] = [
         title: "Reference",
         pages: [
           { title: "FormRenderer", slug: "integrate/reference/form-renderer", status: "live" },
-          { title: "prepareSubmission", slug: "integrate/reference/prepare-submission", status: "planned" },
+          { title: "prepareSubmission", slug: "integrate/reference/prepare-submission", status: "live" },
+          { title: "clearDrafts", slug: "integrate/reference/clear-drafts", status: "live" },
+          { title: "The posted body", slug: "integrate/reference/posted-body", status: "live" },
+          { title: "The form file", slug: "integrate/reference/form-file", status: "planned", notes: "Developer docs brief, CP4." },
+          { title: "CSS classes and custom properties", slug: "integrate/reference/css", status: "planned", notes: "Developer docs brief, CP4." },
+          { title: "Other /core exports", slug: "integrate/reference/core", status: "planned", notes: "Developer docs brief, CP4. The list is in reference/core-exports.json." },
+        ],
+      },
+      {
+        title: "Concepts",
+        pages: [
+          { title: "Answers and their states", slug: "integrate/concepts/answers", status: "planned", notes: "Developer docs brief, CP3." },
+          { title: "What is stored in the browser", slug: "integrate/concepts/browser-storage", status: "planned", notes: "Developer docs brief, CP3." },
         ],
       },
     ],
@@ -115,5 +139,15 @@ export const DOCS_NAV: DocsNavSection[] = [
     title: "Examples",
     items: [{ title: "Follow-up question", slug: "examples/follow-up-question", status: "live" }],
   },
-  { title: "Compliance and security", items: [] },
+  {
+    title: "Compliance and security",
+    items: [
+      {
+        title: "Where respondents' data goes",
+        slug: "compliance/data-flow",
+        status: "planned",
+        notes: "Developer docs brief, CP3. Facts only; anything that reads as a legal position is [TODO: legal review].",
+      },
+    ],
+  },
 ];

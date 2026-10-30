@@ -5,7 +5,7 @@ import type { DocsPage } from "./content";
 import { exampleReactCode, formExcerpt } from "./example-code";
 import { attributesOf, type MdNode } from "./mdast";
 import { docsHref, sectionPages } from "./nav";
-import type { Reference } from "./reference";
+import type { Reference, ReferenceType, TypeReference } from "./reference";
 import { TEMPLATES } from "./templates";
 
 /*
@@ -25,11 +25,20 @@ export type MarkdownContext = {
   exampleForm: (name: string) => Record<string, unknown>;
   /** An API reference page's generated table, when it has one. */
   reference?: Reference | null;
+  /** The page's other generated tables, when it has any. */
+  types?: TypeReference | null;
 };
 
 function referenceOf(ctx: MarkdownContext): Reference {
   if (!ctx.reference) throw new Error(`${ctx.page.file}: no reference table beside it`);
   return ctx.reference;
+}
+
+/** A type or function from the page's `<page>.types.json`. */
+function typeOf(ctx: MarkdownContext, name: string): ReferenceType {
+  const found = ctx.types?.types.find((t) => t.name === name);
+  if (!found) throw new Error(`${ctx.page.file}: "${name}" isn't in ${ctx.page.slug}.types.json`);
+  return found;
 }
 
 const p = (...children: MdNode[]): MdNode => ({ type: "paragraph", children });
@@ -117,6 +126,35 @@ export const MARKDOWN_COMPONENTS: Record<string, Convert> = {
   },
   Rules: (_, __, children) => [{ type: "blockquote", children: lead([strong("Rules:")], children) }],
 
+  Signature: (_, { of }, __, ctx) => [code("ts", typeOf(ctx, of).text)],
+  // One row of the table FieldList builds: its description is one paragraph.
+  Field: (_, { name }, children) => [{ type: "docsField", value: name, children }],
+  FieldList: (_, { of }, children, ctx) => {
+    const cell = (...nodes: MdNode[]) => ({ type: "tableCell", children: nodes });
+    return [
+      {
+        type: "table",
+        align: [],
+        children: [
+          { type: "tableRow", children: ["Field", "Type", "Required", "What it is"].map((h) => cell(text(h))) },
+          ...typeOf(ctx, of).members.map((member) => {
+            const row = children.find((c) => c.type === "docsField" && c.value === member.name);
+            if (!row) throw new Error(`${ctx.page.file}: <FieldList of="${of}"> has no <Field name="${member.name}">`);
+            return {
+              type: "tableRow",
+              children: [
+                cell({ type: "inlineCode", value: member.name }),
+                cell({ type: "inlineCode", value: member.type }),
+                cell(text(member.required ? "Yes" : "No")),
+                cell(...(row.children?.[0]?.children ?? [])),
+              ],
+            };
+          }),
+        ],
+      } as MdNode,
+    ];
+  },
+
   TryThis: (_, __, children) => children,
 
   // Each Door comes out as one paragraph; together they are a list.
@@ -151,6 +189,8 @@ function convert(nodes: MdNode[], ctx: MarkdownContext): MdNode[] {
       if (!fn) throw new Error(`${ctx.page.file}: no Markdown for <${node.name}>`);
       return fn(node, attributesOf(node), children ?? [], ctx).map((n) => relink(n, ctx.origin));
     }
+    // A fence's check words are for the code-example test, not for readers.
+    if (node.type === "code") return [{ ...node, meta: null }];
     return [relink(children ? { ...node, children } : node, ctx.origin)];
   });
 }

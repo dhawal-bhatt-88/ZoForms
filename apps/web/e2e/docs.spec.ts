@@ -47,7 +47,7 @@ test.describe("docs", () => {
     await expect(page).toHaveTitle("Zowork Forms documentation · Zowork Forms");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Zowork Forms documentation");
     await expect(page.getByRole("link", { name: /I build forms/ })).toHaveAttribute("href", "/docs/build/question-types/dropdown");
-    await expect(page.getByRole("link", { name: /I integrate forms/ })).toHaveAttribute("href", "/docs/integrate/reference/form-renderer");
+    await expect(page.getByRole("link", { name: /I integrate forms/ })).toHaveAttribute("href", "/docs/integrate/overview");
 
     const nav = page.getByRole("navigation", { name: "Docs" });
     await expect(nav.getByRole("link", { name: "Docs home" })).toHaveAttribute("aria-current", "page");
@@ -318,7 +318,8 @@ test.describe("docs", () => {
       expect(await page.evaluate(async () => (await fetch("/docs/llms.txt")).status)).toBe(200);
 
       await page.getByRole("navigation", { name: "Docs" }).getByRole("link", { name: "Docs home" }).click();
-      await expect(page).toHaveURL(/\/docs$/);
+      // A fresh dev server compiles the page on this first visit, which can take longer than the default 5s.
+      await expect(page).toHaveURL(/\/docs$/, { timeout: 20_000 });
       expect(await shimmed(page)).toBe(false);
       expect(await page.evaluate(() => Function.prototype.toString.call(window.fetch).includes("[native code]"))).toBe(true);
     });

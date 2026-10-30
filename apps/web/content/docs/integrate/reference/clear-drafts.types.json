@@ -1,0 +1,59 @@
+{
+  "package": "@zoworkhq/forms 0.28.0",
+  "types": [
+    {
+      "name": "ClearDraftsError",
+      "file": "react/index.d.ts",
+      "text": "class ClearDraftsError extends Error {\n    readonly failed: readonly ClearDraftsFailure[];\n    readonly cause: unknown;\n    constructor(failed: readonly ClearDraftsFailure[], cause: unknown);\n}",
+      "doc": "clearDrafts could not delete everything it was asked to (drafts contract section 8). `failed` names the storage; `cause` holds the first underlying error. Whatever could be cleared, was.",
+      "members": [
+        {
+          "name": "failed",
+          "type": "readonly ClearDraftsFailure[]",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "cause",
+          "type": "unknown",
+          "required": true,
+          "doc": null
+        }
+      ]
+    },
+    {
+      "name": "ClearDraftsFailure",
+      "file": "react/index.d.ts",
+      "text": "type ClearDraftsFailure = 'sessionStorage' | 'indexedDB';",
+      "doc": "Where clearDrafts could not delete what it was asked to.",
+      "members": []
+    },
+    {
+      "name": "ClearDraftsOptions",
+      "file": "react/index.d.ts",
+      "text": "interface ClearDraftsOptions {\n    scope?: string;\n    owner?: string;\n}",
+      "doc": "One of `scope` or `owner`, never both; or neither, for everything.",
+      "members": [
+        {
+          "name": "scope",
+          "type": "string",
+          "required": false,
+          "doc": "Every draft for this scope, across forms."
+        },
+        {
+          "name": "owner",
+          "type": "string",
+          "required": false,
+          "doc": "Every draft recorded with this owner, across scopes and forms — the usual logout call."
+        }
+      ]
+    },
+    {
+      "name": "clearDrafts",
+      "file": "react/index.d.ts",
+      "text": "function clearDrafts(options?: ClearDraftsOptions): Promise<void>;",
+      "doc": "For the host to call, e.g. on logout (drafts contract sections 3 and 8). - `{ owner }`: every device draft and tab entry recorded with that owner, whatever the scope or form. Drafts saved without an owner are not touched. - `{ scope }`: every device draft and tab entry for that scope. - no options: every device draft on this device (the whole database) and every tab entry the package wrote in this tab, scoped or not. Both `scope` and `owner` at once is refused with a TypeError: it could mean either their union or their overlap, and a wrong guess deletes drafts. Server drafts are never touched: deleting those is the host's decision. It clears storage, not a form on screen: a form still mounted writes its answers again at its next save, so call it once the form has unmounted. Works without Web Crypto: the hashes fall back to the package's own SHA-256. Where IndexedDB or sessionStorage doesn't exist, nothing was stored there. Rejects with ClearDraftsError when a delete fails, after trying both storages; never resolves without having cleared.",
+      "members": []
+    }
+  ]
+}

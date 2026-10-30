@@ -15,6 +15,16 @@ const results = [];
 const check = (name, pass, detail = "") => results.push([name, !!pass, detail]);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// The pages of docs/briefs/BUILDER-BRIEF-DEVELOPER-DOCS.md.
+const DEVELOPER_PAGES = [
+  ["overview", "/docs/integrate/overview"],
+  ["quickstart", "/docs/integrate/quickstart"],
+  ["form-renderer", "/docs/integrate/reference/form-renderer"],
+  ["prepare-submission", "/docs/integrate/reference/prepare-submission"],
+  ["clear-drafts", "/docs/integrate/reference/clear-drafts"],
+  ["posted-body", "/docs/integrate/reference/posted-body"],
+];
+
 const PAGES = [
   ["docs-home", "/docs"],
   ["dropdown", "/docs/build/question-types/dropdown"],
@@ -22,7 +32,7 @@ const PAGES = [
   ...["layout-blocks", "image", "video", "audio"].map((n) => [n, `/docs/build/layout-and-media/${n}`]),
   ...["groups", "repeating-groups", "pages"].map((n) => [n, `/docs/build/structure/${n}`]),
   ["show-questions-conditionally", "/docs/build/show-questions-conditionally"],
-  ["form-renderer", "/docs/integrate/reference/form-renderer"],
+  ...DEVELOPER_PAGES,
   ["follow-up-question", "/docs/examples/follow-up-question"],
 ];
 const urlOf = (name) => PAGES.find(([n]) => n === name)[1];
@@ -70,6 +80,17 @@ const THEMES = ["light", "dark"];
         }
         await ctx.close();
       }
+    }
+
+    // ---------- the narrowest screen ----------
+    {
+      const { ctx, P } = await open("light", 320);
+      for (const [name, url] of DEVELOPER_PAGES) {
+        await load(P, url);
+        const wide = await P.evaluate(() => document.documentElement.scrollWidth);
+        check(`${name} at 320px: nothing scrolls sideways`, wide <= 320, `${wide}px wide`);
+      }
+      await ctx.close();
     }
 
     // ---------- keyboard ----------

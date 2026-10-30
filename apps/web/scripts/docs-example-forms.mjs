@@ -79,6 +79,38 @@ const FORMS = [
       },
     ],
   },
+  // The file the developer pages' code runs against (docs/briefs/BUILDER-BRIEF-DEVELOPER-DOCS.md).
+  {
+    file: "integrate/intake-form.form.json",
+    title: "Client intake",
+    description: "We use this to prepare for the first visit.",
+    blocks: [
+      { id: "preferred_name", type: "short", label: "Preferred name", required: true },
+      { id: "contact_email", type: "email", label: "Email address", required: true },
+      {
+        id: "attend_format",
+        type: "choice",
+        label: "How would you like to attend sessions?",
+        required: true,
+        options: options("In person", "Video", "Phone"),
+      },
+      {
+        id: "sees_therapist",
+        type: "choice",
+        label: "Do you currently see a therapist?",
+        required: true,
+        options: options("Yes", "No"),
+      },
+      {
+        id: "therapist_name",
+        type: "short",
+        label: "Therapist's name",
+        required: true,
+        enableWhen: [{ question: "sees_therapist", operator: "=", answer: "yes" }],
+      },
+      { id: "reason_for_visit", type: "long", label: "What brings you in today?" },
+    ],
+  },
   // The simple inputs (docs/briefs/BUILDER-BRIEF-DOCS-QUESTIONS.md, CP1): one question each.
   ...[
     ["short-answer", "Short answer example", { id: "preferred_name", type: "short", label: "Preferred name", description: "The name you'd like staff to use." }],
@@ -304,7 +336,12 @@ try {
   );
   for (const form of building) {
     const { id } = JSON.parse(await call("POST", "/v1/forms", token, { title: form.title }));
-    await call("PUT", `/v1/forms/${id}/schema`, token, { title: form.title, blocks: form.blocks, ...(form.navigation ? { navigation: form.navigation } : {}) });
+    await call("PUT", `/v1/forms/${id}/schema`, token, {
+      title: form.title,
+      ...(form.description ? { description: form.description } : {}),
+      blocks: form.blocks,
+      ...(form.navigation ? { navigation: form.navigation } : {}),
+    });
     const artifact = await call("GET", `/v1/forms/${id}/artifact`, token);
     fs.writeFileSync(path.join(CONTENT, form.file), artifact);
     console.log(`wrote content/docs/${form.file}`);

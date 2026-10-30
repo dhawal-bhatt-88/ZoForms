@@ -15,11 +15,14 @@ export type MdNode = {
   depth?: number;
   value?: string;
   lang?: string | null;
+  /** A code fence's words after its language: what code-examples.ts reads. */
+  meta?: string | null;
   url?: string;
   name?: string | null;
   attributes?: { type: string; name?: string; value?: unknown }[];
   children?: MdNode[];
   data?: Record<string, unknown>;
+  position?: { start: { line: number } };
 };
 
 export function parseMdx(body: string): MdNode {
@@ -77,6 +80,29 @@ export function remarkHeadingIds() {
       if (node.type === "heading" && (node.depth === 2 || node.depth === 3)) {
         node.data = { ...node.data, hProperties: { id: slug(textOf(node)) } };
       }
+    }
+  };
+}
+
+/** A code fence's `key=value` words, as in `js file=server.js check=esm`. */
+export function fenceWords(meta: string | null | undefined): Record<string, string> {
+  return Object.fromEntries(
+    (meta ?? "")
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((word) => {
+        const at = word.indexOf("=");
+        return at < 0 ? [word, ""] : [word.slice(0, at), word.slice(at + 1)];
+      }),
+  );
+}
+
+/** The remark plugin that hands a fence's `file=` to the code block as its title. */
+export function remarkCodeTitles() {
+  return (tree: MdNode) => {
+    for (const node of walk(tree)) {
+      const { file } = fenceWords(node.type === "code" ? node.meta : null);
+      if (file) node.data = { ...node.data, hProperties: { "data-file": file } };
     }
   };
 }

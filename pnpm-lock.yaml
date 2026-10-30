@@ -201,6 +201,9 @@ importers:
       '@testing-library/user-event':
         specifier: ^14.6.8
         version: 14.6.8(@testing-library/dom@10.4.2)
+      '@types/express':
+        specifier: ^4.17.21
+        version: 4.17.25
       '@types/node':
         specifier: ^22.7.4
         version: 22.20.1
@@ -213,6 +216,9 @@ importers:
       autoprefixer:
         specifier: ^10.4.20
         version: 10.5.2(postcss@8.5.16)
+      express:
+        specifier: ^4.22.1
+        version: 4.22.1
       jsdom:
         specifier: ^26.1.0
         version: 26.1.0

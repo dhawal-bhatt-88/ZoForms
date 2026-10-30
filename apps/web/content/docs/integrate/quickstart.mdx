@@ -1,0 +1,179 @@
+---
+title: "Quickstart: render a form and receive answers"
+summary: Put a form file in a Vite and React app, receive the answers on a small Node server, and store them. About 10 minutes.
+template: tutorial
+badges: []
+appliesTo: [package]
+updated: 2026-10-30
+prev: /docs/integrate/overview
+next: /docs/integrate/reference/form-renderer
+---
+
+## What you'll build
+
+A page in a Vite and React app that shows a form, and a small Node server that checks each submission and stores it. It takes about 10 minutes.
+
+When you finish:
+
+- The respondent's answers go from their browser to your server.
+- Your server checks every submission with `prepareSubmission`, so it rejects anything the form wouldn't have sent.
+- A retried submission is stored once.
+
+## Before you start
+
+- **Node 20 or later.**
+- **A form file.** The form's author can send you one, or select **Download** in the editor. The file is named after the form and its version, such as `client-intake-v3.json`.
+- **A Vite and React app.** If you don't have one, make one. [Vite's guide](https://vite.dev/guide/) has the details.
+
+```sh
+npm create vite@latest intake-app -- --template react
+cd intake-app
+npm install
+```
+
+## Steps
+
+### 1. Install the package
+
+```sh
+npm install @zoworkhq/forms
+```
+
+The server in this quickstart uses Express. Any server works the same way.
+
+```sh
+npm install express@4
+```
+
+### 2. Put the form file in your app
+
+Copy the file to `src/intake-form.json`. The code below uses that name.
+
+### 3. Show the form
+
+Create the page. `FormRenderer` shows the form's questions, not its title, so your page shows the title and the description, and owns the `h1`.
+
+```jsx file=src/IntakePage.jsx check=browser run=browser
+import { FormRenderer } from '@zoworkhq/forms/react';
+import '@zoworkhq/forms/styles.css';
+import schema from './intake-form.json';
+
+export function IntakePage() {
+  return (
+    <main>
+      <h1>{schema.title}</h1>
+      {schema.description && <p>{schema.description}</p>}
+      <FormRenderer schema={schema} endpoint="/api/submit" />
+    </main>
+  );
+}
+```
+
+Replace `src/main.jsx` so the app shows that page. This also removes the template's `index.css`: its rules for elements such as `button` would beat the form's stylesheet, as any rule of your own does.
+
+```jsx file=src/main.jsx check=app
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { IntakePage } from './IntakePage.jsx';
+
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
+    <IntakePage />
+  </StrictMode>,
+);
+```
+
+### 4. Send `/api` to your server
+
+The form posts to `/api/submit`, on the same address as the page. During development, have Vite [pass those requests on](https://vite.dev/config/server-options#server-proxy) to your server. Replace `vite.config.js`:
+
+```js file=vite.config.js check=app
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  server: { proxy: { '/api': 'http://localhost:3000' } },
+});
+```
+
+### 5. Write the endpoint
+
+Create `store.js`. These two functions stand in for your own storage, and they lose everything when the server stops. Replace them when you're ready.
+
+```js file=store.js check=esm stub=store
+const submissions = new Map();
+
+export async function alreadyStored(key) {
+  return submissions.has(key);
+}
+
+export async function store(submission) {
+  submissions.set(submission.idempotencyKey, submission);
+  // Log ids, never answers.
+  console.log('Stored', submission.idempotencyKey);
+}
+```
+
+Create `server.js`, in the project's top folder.
+
+```js file=server.js check=esm run=server route=/api/submit
+import { readFileSync } from 'node:fs';
+import express from 'express';
+import { prepareSubmission } from '@zoworkhq/forms/core';
+import { alreadyStored, store } from './store.js';
+
+const schema = JSON.parse(readFileSync('./src/intake-form.json', 'utf8'));
+const app = express();
+app.use(express.json({ limit: '1mb' }));
+
+app.post('/api/submit', async (req, res) => {
+  const result = prepareSubmission(schema, req.body);
+  if (result.ok === false) return res.status(422).json({ errors: result.errors });
+
+  // A retry carries the same key: store each submission once.
+  const { submission } = result;
+  if (!(await alreadyStored(submission.idempotencyKey))) await store(submission);
+  res.json({ ok: true });
+});
+
+app.listen(3000);
+```
+
+Pass `prepareSubmission` the same form file the page renders. Store only `result.submission`, never the request's body.
+
+### 6. Run both
+
+In one terminal, start the server:
+
+```sh
+node server.js
+```
+
+In another, start the app:
+
+```sh
+npm run dev
+```
+
+Open the address Vite prints. By default that's `http://localhost:5173`.
+
+## Check it works
+
+1. Select **Submit** without answering. The form shows "There is a problem" with a link to each question, and sends nothing.
+2. Answer the required questions, then refresh the page. Your answers are still there.
+3. Select **Submit**. The form is replaced by "Form submitted successfully.", and the server's terminal prints `Stored`, followed by the submission's key.
+
+## Troubleshooting
+
+**"This form can't be shown right now. Please try again later."** The renderer refused the form file. In a development build the reason shows under the message. Often the file isn't a download from the builder, or was edited by hand.
+
+**"Submission failed. Your answers have been kept — please try again."** The browser got no 2xx from your endpoint. Check that `node server.js` is running, and that `vite.config.js` is as in step 4. Restart `npm run dev` after changing it.
+
+**Text fields have no borders, or buttons no background.** The default stylesheet didn't load, or a CSS reset beats it. Check the `styles.css` import in step 3.
+
+## Next steps
+
+- [`FormRenderer`](/docs/integrate/reference/form-renderer): every prop, including sign-in, drafts and your own validators.
+- [`prepareSubmission` and `validateSubmission`](/docs/integrate/reference/prepare-submission): what your server gets back, and every error.
+- [The posted body](/docs/integrate/reference/posted-body): what the browser sends, field by field.

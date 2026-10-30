@@ -3,7 +3,7 @@ import { assertSchemaIntegrity, type FormSchema } from "@zoworkhq/forms/core";
 import { getLivePages, pageFiles, readExampleForm } from "./content";
 import { MARKDOWN_COMPONENTS } from "./markdown";
 import { markdownFor } from "./page-markdown";
-import { attributesOf, lintMdx, walk } from "./mdast";
+import { attributesOf, fenceWords, lintMdx, walk } from "./mdast";
 import { DOCS_NAV, docsHref, isGroup, livePages } from "./nav";
 import { TEMPLATES, sectionsMatch } from "./templates";
 
@@ -30,6 +30,15 @@ describe("the docs content", () => {
   it.each(pages.map((p) => [p.file, p] as const))("%s has its template's sections, in order", (_, page) => {
     const h2 = page.headings.filter((h) => h.depth === 2).map((h) => h.text);
     expect(sectionsMatch(page.frontmatter.template, h2), `h2s: ${h2.join(" | ")}`).toBe(true);
+  });
+
+  it.each(pages.map((p) => [p.file, p] as const))("%s links only to pages that are live", (_, page) => {
+    const live = new Set(livePages().map((p) => docsHref(p.slug)));
+    const links = [...walk(page.tree)].flatMap((n) => {
+      const href = n.type === "link" ? n.url : n.name === "Door" ? attributesOf(n).href : undefined;
+      return href?.startsWith("/docs") ? [href.split("#")[0]] : [];
+    });
+    expect(links.filter((href) => !live.has(href) && !/\.\w+$/.test(href))).toEqual([]);
   });
 
   it("links each page to the previous and next in the navigation's order", () => {
@@ -65,5 +74,7 @@ describe("the docs content", () => {
     const md = markdownFor(page, "https://forms.example");
     expect(md.startsWith(`# ${page.frontmatter.title}\n`)).toBe(true);
     for (const name of components) expect(md).not.toMatch(new RegExp(`<${name}[\\s/>]`));
+    // Check words on a fence are for the code-example test.
+    if ([...walk(page.tree)].some((n) => n.type === "code" && Object.keys(fenceWords(n.meta)).length)) expect(md).not.toMatch(/^```\w+ /m);
   });
 });

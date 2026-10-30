@@ -3,7 +3,7 @@ import path from "node:path";
 import { parseFrontmatter, type DocsFrontmatter } from "./frontmatter";
 import { headingsOf, parseMdx, type Heading, type MdNode } from "./mdast";
 import { livePages } from "./nav";
-import type { Reference } from "./reference";
+import type { Reference, TypeReference } from "./reference";
 
 /*
  * Reading the docs' content files (apps/web/content/docs) on the server. Every
@@ -76,6 +76,16 @@ export function getLivePages(): DocsPage[] {
 export function readReference(pageSlug: string): Reference | null {
   const full = path.join(CONTENT_DIR, `${pageSlug}.props.json`);
   return fs.existsSync(full) ? (readJson(full) as Reference) : null;
+}
+
+/**
+ * A page's other generated tables and signatures: `<page>.types.json` beside
+ * it, generated from the package and checked by reference.test.ts. Null for a
+ * page without one.
+ */
+export function readTypes(pageSlug: string): TypeReference | null {
+  const full = path.join(CONTENT_DIR, `${pageSlug}.types.json`);
+  return fs.existsSync(full) ? (readJson(full) as TypeReference) : null;
 }
 
 /**

@@ -52,8 +52,8 @@ const LANGS: Record<string, string> = { js: "JavaScript", jsx: "JSX", ts: "TypeS
  * read for its text and language, never rendered as it is.
  */
 export function MdxPre({ children }: { children?: React.ReactNode }) {
-  const child = children as React.ReactElement<{ className?: string; children?: React.ReactNode }> | undefined;
+  const child = children as React.ReactElement<{ className?: string; children?: React.ReactNode; "data-file"?: string }> | undefined;
   const lang = child?.props?.className?.match(/language-(\S+)/)?.[1];
   const code = typeof child?.props?.children === "string" ? child.props.children : "";
-  return <CodeBlock code={code} lang={lang} />;
+  return <CodeBlock code={code} lang={lang} title={child?.props?.["data-file"]} />;
 }

@@ -1,0 +1,67 @@
+{
+  "package": "@zoworkhq/forms 0.28.0",
+  "types": [
+    {
+      "name": "DraftsOptions",
+      "file": "react/index.d.ts",
+      "text": "interface DraftsOptions {\n    mode?: 'off';\n    scope?: string;\n    owner?: string;\n    label?: string;\n    getKey?: () => Promise<CryptoKey>;\n    expiresAfterDays?: number;\n    loadDraft?: (ref: DraftRef) => Promise<Draft | null>;\n    saveDraft?: (draft: Draft) => Promise<void>;\n    deleteDraft?: (ref: DraftRef) => Promise<void>;\n}",
+      "doc": "What a host passes as FormRenderer's `drafts` prop (drafts contract section 3).",
+      "members": [
+        {
+          "name": "mode",
+          "type": "'off'",
+          "required": false,
+          "doc": "\"off\": store nothing, anywhere, and restore nothing — not even after a refresh. Overrides the schema's mode. For kiosks and shared devices."
+        },
+        {
+          "name": "scope",
+          "type": "string",
+          "required": false,
+          "doc": "Opaque: identifies the user and, when it matters, the subject (patient, visit…). Required for device and server modes; in session mode it keys the tab's copy. Read once, when the form mounts."
+        },
+        {
+          "name": "owner",
+          "type": "string",
+          "required": false,
+          "doc": "Opaque: identifies only the user, so clearDrafts({ owner }) can clear all of their drafts at logout without knowing their subjects."
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "required": false,
+          "doc": "Shown in the restore prompt, e.g. \"J. Smith\"."
+        },
+        {
+          "name": "getKey",
+          "type": "() => Promise<CryptoKey>",
+          "required": false,
+          "doc": "Device mode: the user's AES-GCM 256 key."
+        },
+        {
+          "name": "expiresAfterDays",
+          "type": "number",
+          "required": false,
+          "doc": "Device mode: default 7, sliding."
+        },
+        {
+          "name": "loadDraft",
+          "type": "(ref: DraftRef) => Promise<Draft | null>",
+          "required": false,
+          "doc": "Server mode."
+        },
+        {
+          "name": "saveDraft",
+          "type": "(draft: Draft) => Promise<void>",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "deleteDraft",
+          "type": "(ref: DraftRef) => Promise<void>",
+          "required": false,
+          "doc": null
+        }
+      ]
+    }
+  ]
+}
