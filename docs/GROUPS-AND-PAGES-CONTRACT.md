@@ -1,12 +1,12 @@
 # Groups and Pages — Schema Contract
 
-Status: agreed 25 Sep 2026; amended 5 Oct 2026 for repeating groups (§12, with matching changes in §1–§8); amended 6 Oct 2026 for coded options and option import (§13); amended 7 Oct 2026 for the grid block (§14); amended 9 Oct 2026 for custom condition logic (§15); amended 13 Oct 2026 for host validators (§16); amended 14 Oct 2026 for grid layout by available width (§14.5); amended 14 Oct 2026 for the required marker and ranking announcements (§7); amended 15 Oct 2026 for scoring (§17, with matching changes in §1, §6 and §13.1); amended 15 Oct 2026 for the package rename (`@zoworkhq/forms`, public prefix `zf-`: §7, §8, §12.6, §14.5); amended 27 Oct 2026 for new page titles (§2.5) and builder-only save rules for scale and number (§6); amended 28 Oct 2026 for empty answers and link answers (§5); amended 28 Oct 2026 for clearing answers (§7, §14.5) and naming the question in each error summary entry (§12.5); amended 28 Oct 2026 for video captions (§10) and the form's title and description (§7); amended 29 Oct 2026 for the builder's captions setting (§10). Shared by the builder repo and the `@zoworkhq/forms` renderer repo.
+Status: agreed 25 Sep 2026; amended 5 Oct 2026 for repeating groups (§12, with matching changes in §1–§8); amended 6 Oct 2026 for coded options and option import (§13); amended 7 Oct 2026 for the grid block (§14); amended 9 Oct 2026 for custom condition logic (§15); amended 13 Oct 2026 for host validators (§16); amended 14 Oct 2026 for grid layout by available width (§14.5); amended 14 Oct 2026 for the required marker and ranking announcements (§7); amended 15 Oct 2026 for scoring (§17, with matching changes in §1, §6 and §13.1); amended 15 Oct 2026 for the package rename (`@zoworkhq/forms`, public prefix `zf-`: §7, §8, §12.6, §14.5); amended 27 Oct 2026 for new page titles (§2.5) and builder-only save rules for scale and number (§6); amended 28 Oct 2026 for empty answers and link answers (§5); amended 28 Oct 2026 for clearing answers (§7, §14.5) and naming the question in each error summary entry (§12.5); amended 28 Oct 2026 for video captions (§10) and the form's title and description (§7); amended 29 Oct 2026 for the builder's captions setting (§10); amended 30 Oct 2026 for the renderer's nesting limit (§2.1, §6), value formats and stored answers (§5), text-value checks (§6), schemas the renderer refuses (§7) and the repeat ceiling (§12.1); amended 30 Oct 2026 for counts in the respondent's locale (§12.2) and refusing too many instances first (§12.5). Shared by the builder repo and the `@zoworkhq/forms` renderer repo.
 Both implementations must follow this file exactly. Change it here first, then in both repos.
 
 ## 1. Shapes
 
 ```ts
-// Group — any depth, at the root or inside a page/group
+// Group — nested up to the limit in §2.1, at the root or inside a page/group
 { id: string; type: "group"; label: string;
   enableWhen?: EnableWhenCondition[]; enableBehavior?: "any";
   repeats?: boolean; repeatLabel?: string;     // repeating group, see §12
@@ -36,7 +36,7 @@ navigation?: {
 
 ## 2. Structure rules
 
-1. Groups nest to **any depth** in the renderer: it has no depth limit. The builder refuses a group nested more than 20 deep at save (§6, builder only).
+1. Groups nest, with two limits. The **builder** refuses a group nested more than 20 deep at save: inside 20 or more other groups (§6, builder only). The **renderer** refuses, at mount and in `/core`, a group inside 100 or more other groups (§6). A page doesn't count towards either.
 2. `page` may appear only at the root — never inside a group or another page.
 3. If any root item is a page, **every** root item must be a page (no mixed root).
 4. Block ids are unique across the whole tree, including group and page ids.
@@ -79,6 +79,21 @@ The payload filter now walks the tree and keeps only **visible answerable questi
 - **Accepted:** `https://example.org`; `HTTPS://example.org/a?b=1`; `http://example.org`; `  https://example.org  `.
 - **Rejected:** `javascript:alert(1)`; `JavaScript:void(0)`; ` javascript:alert(1)`; `data:text/html,hi`; `mailto:a@b.org`; `tel:+15551234567`; `ftp://example.org`; `example.org`; `//example.org`; `https://`; `https://user@example.org`; `https://user:pass@example.org`.
 
+**Value formats.** `/core`, and so the browser, accepts these answered values for `number`, `date` and `time`, and rejects anything else with the type's usual message:
+
+- **`number`:** a finite JSON number, or a string whose trimmed text is a plain decimal number (`^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$`) with a finite value. `prepareSubmission` returns such a string as the number it reads as. Anything else is rejected with "Enter a valid number.": hexadecimal, `Infinity`, a value too large to be finite (`1e400`), a boolean, an array, an object. `min` and `max` apply to the number. `scale` and `rating` read a numeric string by the same rule before their own checks.
+- **`date`:** a string `YYYY-MM-DD` that is a real calendar date. Anything else, an array included, is rejected with "Enter a valid date.".
+- **`time`:** a string `HH:MM` or `HH:MM:SS`, with hours `00`–`23` and minutes and seconds `00`–`59`. Anything else is rejected with "Enter a valid time.". The renderer's own input sends `HH:MM`.
+
+Both repos share this test table:
+
+- **Number, accepted:** `42`; `-3.5`; `"50"` (as `50`); `" 7 "` (as `7`); `"1e2"` (as `100`); `".5"` (as `0.5`).
+- **Number, rejected:** `"0x10"`; `"Infinity"`; `"-Infinity"`; `"1e400"`; `"abc"`; `true`; `[5]`; `["5"]`; `{ "n": 5 }`; `null`. (`{}`, `[]` and `""` are empty answers under the rule above, not rejections.)
+- **Date, accepted:** `"2024-02-29"`. **Rejected:** `"2023-02-29"`; `"2024-13-01"`; `["2024-01-01"]`; `20240101`; `"+002024-01-01"`.
+- **Time, accepted:** `"09:30"`; `"23:59"`; `"00:00:59"`. **Rejected:** `"24:00"`; `"23:60"`; `"99:99"`; `"12:00:60"`; `["12:00"]`; `1200`.
+
+**What `prepareSubmission` returns.** Every answer it returns is built afresh, never the object that was sent: exactly `{ state: "empty" }`, or `{ state: "answered", value }` with the value rebuilt for its type: free text, `date`, `time` and `country` as the string; `number`, `scale` and `rating` as a number; coded answers labelled as in §13.5; a grid as in §14.2. Any other key on an answer, and any `value` on an empty answer, is dropped. The same applies inside every repeating-group instance (§12.4).
+
 ## 6. Integrity checks
 
 The builder rejects these at save (400 naming the block). The renderer throws at mount (defence against hand-edited schemas):
@@ -94,7 +109,10 @@ The builder rejects these at save (400 naming the block). The renderer throws at
 - `repeats: true` with a blank or missing `repeatLabel`;
 - `minOccurs` not a whole number ≥ 0; `maxOccurs` not a whole number ≥ 1, or less than `minOccurs`.
 - any §15.5 logic rule broken;
-- any §17.6 scoring rule broken.
+- any §17.6 scoring rule broken;
+- a group inside 100 or more other groups (a page doesn't count; §2.1);
+- `blocks` that is not an array, on the form, a group or a page; a block that is not an object with a string `id` and a string `type`; `options`, `columns` or `rows` present but not an array;
+- a text value the renderer shows that is present, not `null`, and not a string: the form's `title` and `description`; a block's `label`, `title`, `description` and `placeholder` (a repeating group's `repeatLabel` has its own check above); `content` on `text`, `heading`, `label` and `title` blocks; the `label` of every option, matrix column, grid row, grid column and grid-cell option. `null` counts as absent.
 
 `repeatLabel`, `minOccurs` and `maxOccurs` on a group without `repeats: true` are ignored, not rejected.
 
@@ -102,10 +120,11 @@ The builder rejects these at save (400 naming the block). The renderer throws at
 
 - a `scale` whose `min` or `max` is not a whole number, whose `min` is greater than its `max`, or that has more than 20 points (`max − min + 1`); an absent `min` counts as 1 and an absent `max` as 5;
 - a `number` whose `min` is greater than its `max`;
-- a group nested more than 20 deep: inside 20 or more other groups (a page doesn't count). The renderer mounts deeper nesting.
+- a group nested more than 20 deep: inside 20 or more other groups (a page doesn't count). The renderer mounts deeper nesting, up to its own limit above.
 
 ## 7. Rendering (renderer only)
 
+- **Schemas the renderer refuses.** Wherever this contract says the renderer *throws at mount* (§6, §13.6, §14.4, §15.5, §16.2, §17.6), the form is not shown. In its place the renderer shows "This form can't be shown right now. Please try again later." (`role="alert"`, class `zf-unavailable`) and passes the error to the host's `onRenderError` callback; the host's own page stays up. A development build also shows the error's text in the message. `/core` still throws the same errors to its callers (`assertSchemaIntegrity`, `validateSubmission`, `prepareSubmission`).
 - **Form title and description:** the renderer never shows the form's `title` or `description`; the host does, and owns the page's `h1`.
 - Group → `<fieldset>` with a `<legend>` containing the label as a heading.
 - Heading level: in a single-page form, root-level groups use `h2`; in a paged form the page title is `h2` and its root-level groups `h3`. Each nesting level adds one, **capped at `h6`** (nesting continues; only the level stops rising). Author heading blocks keep their own `level`.
@@ -225,12 +244,13 @@ Agreed 5 Oct 2026. A repeating group lets the respondent fill the same set of qu
   repeats: true;
   repeatLabel: string;      // singular noun for one instance, e.g. "patient"
   minOccurs?: number;       // whole number ≥ 0; default 1
-  maxOccurs?: number;       // whole number ≥ 1 and ≥ minOccurs; absent = no limit
+  maxOccurs?: number;       // whole number ≥ 1 and ≥ minOccurs; absent = at most 1,000
   enableWhen?: EnableWhenCondition[]; enableBehavior?: "any";
   blocks: Block[] }         // the template for one instance
 ```
 
 - A repeating group is a `group` with `repeats: true`. It follows every group rule in §2 unless this section says otherwise.
+- **An absent `maxOccurs`** means at most 1,000 instances, in the renderer and in `/core`: Add stops there as at any `maxOccurs` (§12.2), and `/core` rejects more (§12.5). An explicit `maxOccurs` above 1,000 is the author's choice and applies as written.
 - `label` is the section heading for the whole list (e.g. "Patients"). `repeatLabel` names one instance.
 - `repeatLabel` is used **verbatim** in buttons and messages ("Add another patient") and with its **first character upper-cased** in headings and the error summary ("Patient 2"). The builder tells authors to write it as it should appear mid-sentence (lower case unless it is a proper noun or acronym).
 - When "Repeats" is turned on, the builder writes `minOccurs: 1` and a `repeatLabel` of "item"; the author can change both.
@@ -241,7 +261,7 @@ Agreed 5 Oct 2026. A repeating group lets the respondent fill the same set of qu
 
 - The form starts with `minOccurs` instances. With `minOccurs: 0` it starts with none, showing only the Add button.
 - **Add** appends one instance at the end. Its text is "Add {repeatLabel}" when there are no instances and "Add another {repeatLabel}" otherwise.
-- At `maxOccurs`, Add is disabled and the text "You can add up to {maxOccurs}." is shown next to it. When an Add reaches the limit, that text is also announced through the repeat's polite status region, since focus has moved to the new instance and a disabled button is not focusable.
+- At `maxOccurs`, Add is disabled and the text "You can add up to {maxOccurs}." is shown next to it, the number in the respondent's locale ("You can add up to 1,000." in English). Every count the renderer shows in text — instance numbers, ranks, the progress step, missing grid cells, rating stars — is formatted the same way. When an Add reaches the limit, that text is also announced through the repeat's polite status region, since focus has moved to the new instance and a disabled button is not focusable.
 - **Remove** is offered on every instance and is disabled while the count equals `minOccurs`. With `minOccurs: 0`, every instance can be removed.
 - Removing an instance that holds any answer anywhere in its subtree (including hidden answers and nested instances) first asks: "Remove {repeatLabel} {n}? Its answers will be deleted." (`window.confirm`, as Clear form does). An instance with no answers is removed without asking.
 - Removing **deletes** the instance and everything in it from state and `sessionStorage`. This is deliberately unlike hiding (§3.6). There is no undo.
@@ -292,6 +312,7 @@ Question values keep the existing `BlockValue` wire format (`{ state, value }`);
 
 - `required` applies within each instance that exists. `completeRequired` keeps its meaning per instance.
 - For every **visible** repeating group, `/core` checks that the instance count is between `minOccurs` and `maxOccurs`. The UI cannot produce a count outside these limits, so this guards against hand-crafted payloads and uses the existing vague message ("Invalid answer.").
+- **Too many instances first.** Before anything else in the answers is checked, `/core` (and so the browser's check) looks for a repeating group, at any depth and visible or not, whose value is an array longer than its `maxOccurs` (§12.1). If it finds one, it returns "Invalid answer." for that group alone and checks nothing else, so an oversized payload is refused without walking its instances. The form never produces such a value, even for a hidden group (§12.7).
 - `prepareSubmission` and `validateSubmission` also reject a repeating group's value that is not an array, or an instance that is not an object, with the same vague message. They strip hidden and unknown answers per instance, as at the root.
 - `ValidationError` gains `path: (string | number)[]`: block ids and 0-based instance positions from the root to the question, e.g. `["patients", 1, "payments", 0, "amount"]`. For a question outside any repeat, `path` is `[blockId]`. `blockId` stays as it is.
 - In the browser, every error summary entry names its question. A message that doesn't already name it gets the question's label in quotes in front, as the grid's entries do (§14.3): `"Age": Must be at most 17.` Messages that already name the question (`"Age" is required.`, `Answer every row of "Symptoms".`, `Rank every option in "Priorities".`, matched exactly) and grid entries are shown as they are; so is every message on a question with a blank label. Inside repeating groups the enclosing instances come first, outermost first: `Patient 2, Payment 1: "Amount" is required.`, `Child 1: "Age": Must be at most 17.` Messages beside the field, and `ValidationError.message`, don't change.
