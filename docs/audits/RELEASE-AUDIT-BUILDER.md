@@ -83,9 +83,9 @@ I1 and P1 share one fix: the auth guard checks, on every request, that the membe
 
 One observation isn't a defect: the local database holds a single form, so the integrity gate's database pass checked little. Re-run it against real data before release (V3).
 
-### Later (12)
+### Later (13)
 
-L1 any `localhost` origin is allowed by CORS in production · L2 the impersonation token travels in the URL · L3 tokens in `localStorage` with no `script-src` CSP · L4 `GET /v1/invites/:token` isn't throttled · L5 the option import file has no size cap · L6 the API image is 1.58 GB with dev dependencies and runs as root · L7 critical advisories in dev-only tools (vitest, tinypool) · L8 the admin console is open to the internet (its data is behind `AdminGuard`) · L9 the minimum password is 6 characters · T5 `home.spec.ts` flakes on a click before hydration, as T2 · L10 the editor's loading skeleton renders the settings pane 280px wide on the server and 300px in the browser, a hydration warning in development · L11 zod 4 (DEP2's zod advisory), reachable only by a signed-in author. T5, L10 and L11 were found during the release fixes.
+L1 any `localhost` origin is allowed by CORS in production · L2 the impersonation token travels in the URL · L3 tokens in `localStorage` with no `script-src` CSP · L4 `GET /v1/invites/:token` isn't throttled · L5 the option import file has no size cap · L6 the API image is 1.58 GB with dev dependencies and runs as root · L7 critical advisories in dev-only tools (vitest, tinypool) · L8 the admin console is open to the internet (its data is behind `AdminGuard`) · L9 the minimum password is 6 characters · T5 `home.spec.ts` flakes on a click before hydration, as T2 · L10 the editor's loading skeleton renders the settings pane 280px wide on the server and 300px in the browser, a hydration warning in development · L11 zod 4 (DEP2's zod advisory), reachable only by a signed-in author · L12 the typecheck doesn't cover `apps/web/e2e/`, so a mistake in a spec shows only when the spec runs. T5, L10 and L11 were found during the release fixes, L12 adopting renderer 0.28.0.
 
 Status: all later.
 
@@ -355,6 +355,7 @@ No server-side code on them reads a session or calls the API. `/app` is a static
 | L7 | Critical advisories in dev-only tools (vitest, tinypool). | Reproduced (`pnpm audit`) | Area 7 | Upgrade vitest to 3.2.6 or later. | Small |
 | L8 | The admin console's port is open to the internet. Its data is behind `AdminGuard`, so only the static shell is public. | Suspected | [DEPLOY.md:49](../../DEPLOY.md) | Serve it only behind a VPN or an IP allowlist once HTTPS (D1) is in place. | Small |
 | L9 | The minimum password is 6 characters. | Suspected | [auth.service.ts:33](../../apps/api/src/auth/auth.service.ts#L33) | 10 or more, and check against a breached-password list. | Small |
+| L12 | The typecheck doesn't cover `apps/web/e2e/`: the web `tsconfig.json` excludes it, and CI's `pnpm typecheck` uses that. During the renderer 0.28.0 brief, a dropped backslash in a `docs.spec.ts` regex turned the rest of the line into a comment and reached the spec run, which stopped on a syntax error. The root `e2e/` suites are JavaScript, so nothing checks them either. | Reproduced | [tsconfig.json:22](../../apps/web/tsconfig.json#L22) | Typecheck `apps/web/e2e/` and `playwright.config.ts` with a tsconfig of their own. | Small |
 
 ## What couldn't be checked, and why
 

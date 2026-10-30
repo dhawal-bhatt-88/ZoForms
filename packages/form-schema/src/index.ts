@@ -516,7 +516,7 @@ export interface GroupBlock extends NoLeafFields {
   repeatLabel?: string;
   /** Fewest entries; a whole number, 0 or more. Absent means 1. */
   minOccurs?: number;
-  /** Most entries; a whole number, 1 or more and at least `minOccurs`. Absent means no limit. */
+  /** Most entries; a whole number, 1 or more and at least `minOccurs`. Absent means at most 1,000. */
   maxOccurs?: number;
   enableWhen?: Condition[];
   enableBehavior?: "any";
@@ -1378,6 +1378,9 @@ export function newGroup(taken?: Iterable<string>, label = DEFAULT_GROUP_LABEL):
 
 /** What turning "Repeats" on writes (contract §12.1); the author can change both. */
 export const REPEAT_DEFAULTS = { repeatLabel: "item", minOccurs: 1 } as const;
+
+/** The most entries a repeating group takes with no `maxOccurs`: the renderer's default (contract §12.1). */
+export const REPEAT_DEFAULT_MAX = 1000;
 
 /**
  * The title a new page gets (contract §2.5): "Page n", where n is the number of
@@ -2324,15 +2327,21 @@ export function repeatSettingsProblems(
   }
   const min = block.minOccurs;
   const minValid = min === undefined || (Number.isInteger(min) && min >= 0);
+  const max = block.maxOccurs;
   if (!minValid) {
     found.push({ field: "minOccurs", rule: "the minimum number of entries must be a whole number, 0 or more." });
+  } else if (max === undefined && (min ?? REPEAT_DEFAULTS.minOccurs) > REPEAT_DEFAULT_MAX) {
+    // The renderer refuses it: a blank maximum means 1,000, and that is below the minimum.
+    found.push({
+      field: "minOccurs",
+      rule: `the minimum number of entries (${min}) can't be more than 1,000 without a maximum. Set Maximum entries, or lower the minimum.`,
+    });
   }
-  const max = block.maxOccurs;
   if (max !== undefined) {
     if (!(Number.isInteger(max) && max >= 1)) {
       found.push({
         field: "maxOccurs",
-        rule: "the maximum number of entries must be a whole number, 1 or more, or left blank for no limit.",
+        rule: "the maximum number of entries must be a whole number, 1 or more, or left blank for at most 1,000.",
       });
     } else if (minValid && max < (min ?? REPEAT_DEFAULTS.minOccurs)) {
       found.push({
@@ -2453,7 +2462,7 @@ export function problemsBesideContent(form: { blocks: readonly Block[] }, blockI
 /**
  * How deep groups may nest at save (contract §6, builder only): a group inside
  * this many others is fine, one more is refused. Pages don't count. The
- * renderer has no limit; storing much deeper fails in the database.
+ * renderer's own limit is 100; storing much deeper fails in the database.
  */
 export const MAX_GROUP_DEPTH = 20;
 

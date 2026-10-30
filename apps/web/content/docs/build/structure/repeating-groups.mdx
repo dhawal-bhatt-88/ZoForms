@@ -4,7 +4,7 @@ summary: A group the respondent fills in once per item, adding and removing entr
 template: how-to
 badges: [Structure]
 appliesTo: [builder, package]
-updated: 2026-10-28
+updated: 2026-10-30
 prev: /docs/build/structure/groups
 next: /docs/build/structure/pages
 ---
@@ -41,12 +41,12 @@ When the number of rows is fixed and known in advance, such as the days of the w
 2. Turn on **Repeats**. Respondents now fill the group's questions once per entry, and can add and remove entries.
 3. In **Name for one entry**, write the singular name, such as `medication`. The line under it shows how it will read, such as "Medication 1 · Add another medication · Remove medication 1".
 4. In **Minimum entries**, set how many entries the form starts with, and the fewest the respondent can leave. Leave it at 1, or set 0 to let the respondent remove every entry.
-5. In **Maximum entries**, set the most entries allowed, or leave it blank for no limit.
+5. In **Maximum entries**, set the most entries allowed. Leave it blank for at most 1,000.
 6. Select **Save**. On the canvas, the group shows a badge such as **Repeats · 0–10**.
 <Gif alt="Turning on Repeats and setting a name for one entry" />
 
 <Note>
-Turning **Repeats** off removes the name for one entry and the minimum and maximum. Turning it on again starts from "item", a minimum of 1 and no maximum.
+Turning **Repeats** off removes the name for one entry and the minimum and maximum. Turning it on again starts from "item", a minimum of 1 and Maximum entries blank.
 </Note>
 
 ## What happens behind the scenes
@@ -57,6 +57,7 @@ What respondents see:
 - **Each entry is its own section,** headed with the name and its number, such as "Medication 1".
 - **Add** puts a new entry at the end and moves to it. It reads "Add medication" while there are no entries, and "Add another medication" after that.
 - **At the maximum, Add stops working,** and "You can add up to 10." shows next to it.
+- **With no maximum, Add stops working at 1,000 entries,** and "You can add up to 1,000." shows next to it. A maximum you set applies as written, even above 1,000.
 - **Remove** is on every entry, and stops working while the number of entries is at the minimum.
 - **Removing an entry that has any answer asks first:** "Remove medication 2? Its answers will be deleted." An empty entry is removed without asking. There is no undo, and the entries after it are renumbered.
 - **Clear form** goes back to the minimum number of empty entries.
@@ -76,7 +77,8 @@ How it works:
 |---|---|
 | Save with no name for one entry | Group "Current medications": a repeating group needs a name for one entry, such as "patient". |
 | Save with a minimum that isn't a whole number of 0 or more | Group "Current medications": the minimum number of entries must be a whole number, 0 or more. |
-| Save with a maximum that isn't a whole number of 1 or more | Group "Current medications": the maximum number of entries must be a whole number, 1 or more, or left blank for no limit. |
+| Save with a maximum that isn't a whole number of 1 or more | Group "Current medications": the maximum number of entries must be a whole number, 1 or more, or left blank for at most 1,000. |
+| Save with a minimum above 1,000 and no maximum | Group "Current medications": the minimum number of entries (1500) can't be more than 1,000 without a maximum. Set Maximum entries, or lower the minimum. |
 | Save with a maximum below the minimum | Group "Current medications": the maximum number of entries (2) can't be less than the minimum (3). |
 | Turn on Repeats when a question outside the group has a condition on one inside | Can't make "Current medications" repeat — these blocks outside it have conditions that use a question inside it: |
 | Move something so a condition would read a question inside a repeating group the dependent isn't in | Can't move "Dose" there — these blocks would have conditions on a question inside a repeating group they aren't in: |

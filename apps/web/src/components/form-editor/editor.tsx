@@ -3377,7 +3377,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                       {(
                         [
                           ["minOccurs", "Minimum entries", "1", "0 lets the respondent remove every entry."],
-                          ["maxOccurs", "Maximum entries", "No limit", "Leave blank for no limit."],
+                          ["maxOccurs", "Maximum entries", "1,000", "Leave blank for at most 1,000."],
                         ] as const
                       ).map(([field, label, placeholder, help]) => (
                         <Field

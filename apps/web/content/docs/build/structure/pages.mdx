@@ -4,7 +4,7 @@ summary: Split a form into pages shown one at a time, with a progress caption or
 template: how-to
 badges: [Structure]
 appliesTo: [builder, package]
-updated: 2026-10-28
+updated: 2026-10-30
 prev: /docs/build/structure/repeating-groups
 next: /docs/build/show-questions-conditionally
 ---
@@ -84,7 +84,8 @@ What respondents see:
 
 How it works:
 
-- **Answers are kept across pages,** and a page refresh opens the page the respondent was on.
+- **Answers are kept across pages,** and a refresh of the form's own page opens the page the respondent was on.
+- **Coming back any other way asks first.** With Save progress "Only while the form is open", a link to the form, Back or Forward, or a route change in the app shows "Continue where you left off?", with **Continue** and **Start over**, and none of the earlier answers on screen. An app that knows who is signed in can restore the answers without asking.
 - **The navigation settings only apply while the form has pages.** If you remove the pages, they are kept, and come back if you add pages again.
 - **Save progress "On the app's server"** is only available for forms with pages, because it saves at each page change.
 

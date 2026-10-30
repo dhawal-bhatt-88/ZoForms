@@ -132,11 +132,13 @@ const seed = () => ({
       ["minOccurs 1.5", (s) => { find(s.blocks, "patients").minOccurs = 1.5; },
         `Group "Patients › Patients": the minimum number of entries must be a whole number, 0 or more.`],
       ["maxOccurs 0", (s) => { find(s.blocks, "payments").maxOccurs = 0; },
-        `Group "Patients › Patients › Payments": the maximum number of entries must be a whole number, 1 or more, or left blank for no limit.`],
+        `Group "Patients › Patients › Payments": the maximum number of entries must be a whole number, 1 or more, or left blank for at most 1,000.`],
       ["maxOccurs 2.5", (s) => { find(s.blocks, "payments").maxOccurs = 2.5; },
-        `Group "Patients › Patients › Payments": the maximum number of entries must be a whole number, 1 or more, or left blank for no limit.`],
+        `Group "Patients › Patients › Payments": the maximum number of entries must be a whole number, 1 or more, or left blank for at most 1,000.`],
       ["maxOccurs below minOccurs", (s) => { Object.assign(find(s.blocks, "patients"), { minOccurs: 3, maxOccurs: 2 }); },
         `Group "Patients › Patients": the maximum number of entries (2) can't be less than the minimum (3).`],
+      ["minOccurs above 1,000 with no maximum", (s) => { const g = find(s.blocks, "patients"); g.minOccurs = 1500; delete g.maxOccurs; },
+        `Group "Patients › Patients": the minimum number of entries (1500) can't be more than 1,000 without a maximum. Set Maximum entries, or lower the minimum.`],
       ["prefix: a question outside every repeat on a patient's answer", (s) => { find(s.blocks, "followup").enableWhen = [answered("pname")]; },
         PREFIX("Block", "Patients › Follow-up", "Patient name", "Patients", "patient", `Move the block into "Patients", or base the condition on a different question.`)],
       ["prefix: a payment's question on one of its line items", (s) => { find(s.blocks, "refund").enableWhen = [answered("cost")]; },
@@ -261,7 +263,8 @@ const seed = () => ({
     check("the default preview", (await P.locator("#repeat-label-preview").textContent()) === "Item 1 · Add another item · Remove item 1");
     check("badge: Repeats · 1 or more", (await badge("patients")) === "Repeats · 1 or more", await badge("patients"));
     check("help texts", await aside.getByText("Write it as it would appear mid-sentence").isVisible()
-      && await aside.getByText("0 lets the respondent remove every entry.").isVisible() && await aside.getByText("Leave blank for no limit.").isVisible());
+      && await aside.getByText("0 lets the respondent remove every entry.").isVisible() && await aside.getByText("Leave blank for at most 1,000.").isVisible()
+      && (await field("maxOccurs").getAttribute("placeholder")) === "1,000");
     check("fields are labelled", (await aside.getByLabel("Name for one entry").count()) === 1 && (await aside.getByLabel("Minimum entries").count()) === 1 && (await aside.getByLabel("Maximum entries").count()) === 1);
 
     // Inline errors, each under its field and shown once (not again in the Logic section).
@@ -277,7 +280,10 @@ const seed = () => ({
     }
     await field("minOccurs").fill("1");
     await field("maxOccurs").fill("0");
-    check("inline: maximum 0", (await err("maxOccurs").textContent()) === "The maximum number of entries must be a whole number, 1 or more, or left blank for no limit.");
+    check("inline: maximum 0", (await err("maxOccurs").textContent()) === "The maximum number of entries must be a whole number, 1 or more, or left blank for at most 1,000.");
+    await field("maxOccurs").fill("");
+    await field("minOccurs").fill("1500");
+    check("inline: a minimum above 1,000 with no maximum", (await err("minOccurs").textContent()) === "The minimum number of entries (1500) can't be more than 1,000 without a maximum. Set Maximum entries, or lower the minimum.");
     await field("minOccurs").fill("3");
     await field("maxOccurs").fill("2");
     check("inline: maximum below minimum", (await err("maxOccurs").textContent()) === "The maximum number of entries (2) can't be less than the minimum (3).");

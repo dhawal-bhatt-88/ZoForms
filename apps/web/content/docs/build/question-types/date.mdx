@@ -4,7 +4,7 @@ summary: A calendar date, picked or typed in the browser's own date field.
 template: question-type
 badges: []
 appliesTo: [builder, package]
-updated: 2026-10-28
+updated: 2026-10-30
 prev: /docs/build/question-types/link
 next: /docs/build/question-types/time
 ---
@@ -56,6 +56,8 @@ The form checks the answer when the respondent selects Submit (or Next, on a for
 | Required, and no date given | "Date of birth" is required. (the question's own label, in quotation marks) |
 
 On the review page of a form with pages, the date is written out in full, in the respondent's browser language, such as 25 October 2026.
+
+The date field only produces a real date, written year-month-day. Your app's server checks again: anything else, such as `2023-02-29`, is refused with "Enter a valid date."
 
 ## Accessibility
 

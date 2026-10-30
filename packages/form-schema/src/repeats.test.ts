@@ -316,7 +316,7 @@ describe("repeating group save rules", () => {
   it("refuses a maxOccurs that isn't a whole number of 1 or more", () => {
     for (const maxOccurs of [0, -2, 2.5]) {
       expect(settings({ minOccurs: 0, maxOccurs })).toEqual([
-        'Group "Patients": the maximum number of entries must be a whole number, 1 or more, or left blank for no limit.',
+        'Group "Patients": the maximum number of entries must be a whole number, 1 or more, or left blank for at most 1,000.',
       ]);
     }
   });
@@ -326,6 +326,18 @@ describe("repeating group save rules", () => {
       'Group "Patients": the maximum number of entries (2) can\'t be less than the minimum (3).',
     ]);
     expect(settings({ minOccurs: undefined, maxOccurs: 1 })).toEqual([]);
+  });
+
+  it("refuses a minOccurs above 1,000 with no maxOccurs: the renderer's default maximum is below it", () => {
+    expect(settings({ minOccurs: 1500, maxOccurs: undefined })).toEqual([
+      'Group "Patients": the minimum number of entries (1500) can\'t be more than 1,000 without a maximum. Set Maximum entries, or lower the minimum.',
+    ]);
+    expect(settings({ minOccurs: 1000, maxOccurs: undefined })).toEqual([]);
+    expect(settings({ minOccurs: 1500, maxOccurs: 1500 })).toEqual([]);
+  });
+
+  it("leaves a maxOccurs above 1,000 as the author's choice", () => {
+    expect(settings({ minOccurs: 1, maxOccurs: 5000 })).toEqual([]);
   });
 
   it("doesn't compare against a minimum that is itself invalid", () => {
@@ -338,7 +350,7 @@ describe("repeating group save rules", () => {
     expect(repeatSettingsProblems(repeat("r", " ", [leaf("q")], { minOccurs: -1, maxOccurs: 0 }))).toEqual([
       { field: "repeatLabel", rule: 'a repeating group needs a name for one entry, such as "patient".', detail: 'A repeating group needs a name for one entry, such as "patient".' },
       { field: "minOccurs", rule: "the minimum number of entries must be a whole number, 0 or more.", detail: "The minimum number of entries must be a whole number, 0 or more." },
-      { field: "maxOccurs", rule: "the maximum number of entries must be a whole number, 1 or more, or left blank for no limit.", detail: "The maximum number of entries must be a whole number, 1 or more, or left blank for no limit." },
+      { field: "maxOccurs", rule: "the maximum number of entries must be a whole number, 1 or more, or left blank for at most 1,000.", detail: "The maximum number of entries must be a whole number, 1 or more, or left blank for at most 1,000." },
     ]);
     expect(repeatSettingsProblems(group("g", [leaf("q")]))).toEqual([]);
   });

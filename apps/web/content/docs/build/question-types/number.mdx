@@ -4,7 +4,7 @@ summary: A number the respondent types, such as a count or an amount.
 template: question-type
 badges: []
 appliesTo: [builder, package]
-updated: 2026-10-28
+updated: 2026-10-30
 prev: /docs/build/question-types/checkboxes
 next: /docs/build/question-types/email
 ---
@@ -62,6 +62,8 @@ The form checks the answer when the respondent selects Submit (or Next, on a for
 | More than the Maximum | Must be at most 120. (with your Maximum) | "How many times have you seen a therapist or counselor in the past 12 months?": Must be at most 120. |
 
 The Minimum and Maximum are checked whenever there's an answer, whether or not the question is required.
+
+The number box only produces numbers, so respondents won't normally see this, but your app's server checks again: anything else, such as `Infinity` or `1e400`, is refused with "Enter a valid number."
 
 **When you save.** The builder shows this under **Maximum** as you type, and won't save the form until it's fixed:
 

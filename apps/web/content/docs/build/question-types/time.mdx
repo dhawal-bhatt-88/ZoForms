@@ -4,7 +4,7 @@ summary: A time of day, picked or typed in the browser's own time field.
 template: question-type
 badges: []
 appliesTo: [builder, package]
-updated: 2026-10-28
+updated: 2026-10-30
 prev: /docs/build/question-types/date
 next: /docs/build/question-types/linear-scale
 ---
@@ -54,6 +54,8 @@ The form checks the answer when the respondent selects Submit (or Next, on a for
 | Situation | Message |
 |---|---|
 | Required, and no time given | "Preferred appointment time" is required. (the question's own label, in quotation marks) |
+
+The time field only produces a time on the 24-hour clock. Your app's server checks again: anything outside `00:00` to `23:59`, such as `24:00`, is refused with "Enter a valid time."
 
 ## Accessibility
 

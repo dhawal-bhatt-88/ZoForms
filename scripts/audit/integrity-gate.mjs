@@ -92,6 +92,8 @@ const PROBES = {
     title: "R", blocks: [{ id: "o", type: "group", label: "Outer", repeats: true, repeatLabel: "visit", minOccurs: 1, maxOccurs: 3,
       blocks: [{ id: "i", type: "group", label: "Inner", repeats: true, repeatLabel: "dose", minOccurs: 0, maxOccurs: 5, blocks: [sq("x")] }] }],
   },
+  "a maximum above 1,000 (the author's choice, contract §12.1)": { title: "R", blocks: [{ id: "r", type: "group", label: "R", repeats: true, repeatLabel: "entry", minOccurs: 1, maxOccurs: 5000, blocks: [sq("x")] }] },
+  "a minimum above 1,000 with no maximum": { title: "R", blocks: [{ id: "r", type: "group", label: "R", repeats: true, repeatLabel: "entry", minOccurs: 1001, blocks: [sq("x")] }] },
   "5,000-option dropdown": { title: "Big", blocks: [{ id: "dd", type: "dropdown", label: "Pick", required: false, options: Array.from({ length: 5000 }, (_, i) => ({ code: `o${i}`, label: `Option ${i}` })) }] },
   "labels with emoji, RTL and markup": { title: "<b>Ünïcode</b> 🎉", blocks: [sq("u", "مرحبا <script>alert(1)</script> 🎉")] },
   "pages, one of which holds only a heading": { title: "Pages", blocks: [

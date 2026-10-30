@@ -4,7 +4,7 @@ import { join } from "path";
 import { pathToFileURL } from "url";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
-import { buildArtifact } from "@formbuilder/form-schema";
+import { buildArtifact, REPEAT_DEFAULT_MAX } from "@formbuilder/form-schema";
 import { RendererCore, rendererCoreFile, type MountChecks } from "./renderer-core";
 
 const manifest = (app: string) => JSON.parse(readFileSync(join(__dirname, "../../..", app, "package.json"), "utf8"));
@@ -20,6 +20,11 @@ describe("the API's renderer is the web app's", () => {
   it("the installed /core is that version", () => {
     const pkg = JSON.parse(readFileSync(join(rendererCoreFile(), "../../../package.json"), "utf8"));
     expect(`file:../../vendor/zoworkhq-forms-${pkg.version}.tgz`).toBe(manifest("api").dependencies["@zoworkhq/forms"]);
+  });
+
+  it("the save rules use the renderer's default maximum number of entries", async () => {
+    const core = (await import(pathToFileURL(rendererCoreFile()).href)) as { DEFAULT_MAX_OCCURS: number };
+    expect(REPEAT_DEFAULT_MAX).toBe(core.DEFAULT_MAX_OCCURS);
   });
 });
 

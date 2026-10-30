@@ -4,7 +4,7 @@ summary: Show a question, group or page only when earlier answers meet its condi
 template: how-to
 badges: [Conditional logic]
 appliesTo: [builder, package]
-updated: 2026-10-27
+updated: 2026-10-30
 prev: /docs/build/structure/pages
 next: /docs/integrate/reference/form-renderer
 ---
@@ -71,7 +71,7 @@ The first page of a form can't have conditions: it is always shown.
 - **An item shows only when its own conditions pass and every group or page around it is showing.**
 - **A hidden source fails only its own condition.** With `1 OR 2`, a hidden source for condition 1 still lets condition 2 show the question.
 - **Every operator except is answered needs an answer.** Until the source is answered, is not Yes, is less than 18 and the rest are all false.
-- **Answers to hidden questions are kept while the form is being filled in.** If the respondent changes their mind and the question shows again, their answer is still there.
+- **Answers to hidden questions are kept while the form is being filled in.** If the respondent changes their mind and the question shows again, their answer is still there. With Save progress "Only while the form is open", a page refresh loses them. "On this device" and "On the app's server" keep them.
 - **They are never submitted and never checked.** A hidden required question doesn't stop the form being submitted, and the browser leaves its answer out of the payload.
 - **Your server drops them too.** `prepareSubmission` returns answers to visible questions only. An answer to a hidden question in the body is removed, never a reason to reject it.
 - **The downloaded file carries the logic as a tree**, so the renderer never reads your text. A single condition, or all AND, is just `enableWhen`. All OR adds `enableBehavior: "any"`. A mix adds `enableLogic`, the tree.
