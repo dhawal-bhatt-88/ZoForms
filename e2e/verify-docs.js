@@ -19,6 +19,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const DEVELOPER_PAGES = [
   ["overview", "/docs/integrate/overview"],
   ["quickstart", "/docs/integrate/quickstart"],
+  ["tutorial-nextjs", "/docs/integrate/tutorial-nextjs"],
   ["validate-and-store", "/docs/integrate/validate-and-store"],
   ["custom-validation", "/docs/integrate/custom-validation"],
   ["sign-in", "/docs/integrate/sign-in"],
@@ -52,6 +53,7 @@ const PAGES = [
   ["show-questions-conditionally", "/docs/build/show-questions-conditionally"],
   ...DEVELOPER_PAGES,
   ["follow-up-question", "/docs/examples/follow-up-question"],
+  ["own-validator", "/docs/examples/own-validator"],
 ];
 const urlOf = (name) => PAGES.find(([n]) => n === name)[1];
 const WIDTHS = [375, 1440];
@@ -127,6 +129,7 @@ const THEMES = ["light", "dark"];
       for (const [name, url, tabs] of [
         ["dropdown", urlOf("dropdown"), ["Preview", "Schema", "Payload", "Server output"]],
         ["follow-up-question", urlOf("follow-up-question"), ["Preview", "Schema", "React code", "Payload", "Server output"]],
+        ["own-validator", urlOf("own-validator"), ["Preview", "Schema", "React code", "Payload", "Server output"]],
         ["layout-blocks", urlOf("layout-blocks"), ["Preview", "Schema", "Payload", "Server output"]],
       ]) {
         await load(P, url);
@@ -408,6 +411,82 @@ const THEMES = ["light", "dark"];
       const card = await P.locator(".zf-grid-card").first().evaluate((el) => getComputedStyle(el).display);
       const label = await P.locator(".zf-grid-cell-label").first().evaluate((el) => getComputedStyle(el).display);
       check("grid: each row a card at 375px, with its column labels", card === "block" && label === "block", `${card}, ${label}`);
+      await ctx.close();
+    }
+
+    // ---------- "Your own validator": its Try this, in the live example ----------
+    {
+      const { ctx, P } = await open("light", 1440);
+      await load(P, urlOf("own-validator"));
+      const errorsOf = async () => (await P.locator(".zf-error-message").allTextContents()).map((t) => t.trim());
+      const summary = async () => (await P.locator(".zf-error-summary").textContent()) || "";
+      const submit = async () => {
+        await P.getByRole("button", { name: "Submit" }).click();
+        await P.waitForTimeout(300);
+      };
+      const id = "Enter the client ID as DEMO- and six digits, such as DEMO-123456.";
+      await P.getByLabel("Client ID", { exact: true }).fill("12345");
+      await P.getByLabel("Referral date", { exact: true }).fill("2026-01-05");
+      await P.getByLabel("First session date", { exact: true }).fill("2026-01-12");
+      await submit();
+      check("own-validator: the client ID's message, under it and in the summary after its label", (await errorsOf()).includes(id) && (await summary()).includes(`"Client ID": ${id}`), `${(await errorsOf()).join(" | ")} / ${await summary()}`);
+      await P.getByLabel("Client ID", { exact: true }).fill("DEMO-123456");
+      await P.getByLabel("First session date", { exact: true }).fill("2026-01-04");
+      await submit();
+      check("own-validator: a first session a day before the referral", JSON.stringify(await errorsOf()) === JSON.stringify(["The first session can't be before the referral date."]), (await errorsOf()).join(" | "));
+      await P.getByLabel("Referral date", { exact: true }).fill("");
+      await submit();
+      check("own-validator: with no referral date, only its required message", JSON.stringify(await errorsOf()) === JSON.stringify(['"Referral date" is required.']), (await errorsOf()).join(" | "));
+      await P.getByLabel("Referral date", { exact: true }).fill("2026-01-05");
+      await P.getByLabel("First session date", { exact: true }).fill("2026-01-05");
+      await submit();
+      await P.getByText("Form submitted successfully.").waitFor();
+      await P.getByRole("tab", { name: "Server output" }).click();
+      const server = (await P.getByRole("tabpanel").textContent()) || "";
+      check("own-validator: sent, and Server output ran the validators and says ok: true", server.includes("prepareSubmission(schema, body, { validators })") && server.includes('"ok": true'), server.slice(0, 200));
+      await P.getByRole("tab", { name: "React code" }).click();
+      const react = (await P.getByRole("tabpanel").textContent()) || "";
+      check("own-validator: React code imports the validators and passes them", react.includes("import { validators } from './validators.js';") && react.includes("validators={validators}"), react);
+      await ctx.close();
+    }
+
+    // ---------- the question pages' For developers sections ----------
+    {
+      const { ctx, P } = await open("light", 1440);
+      for (const name of ["dropdown", "short-answer", "grid"]) {
+        await load(P, urlOf(name));
+        const headings = await P.locator("h2").allTextContents();
+        const at = headings.indexOf("For developers");
+        check(`${name}: For developers comes after Accessibility and before Troubleshooting`, at > 0 && headings[at - 1] === "Accessibility" && headings[at + 1] === "Troubleshooting", headings.join(", "));
+        check(`${name}: For developers is in On this page`, (await P.getByRole("navigation", { name: "On this page" }).getByRole("link", { name: "For developers" }).count()) === 1);
+      }
+      await load(P, urlOf("dropdown"));
+      const titled = await P.getByText("validators.js", { exact: true }).count();
+      check("dropdown: the validator block is titled validators.js", titled === 1, `${titled}`);
+      await ctx.close();
+    }
+
+    // ---------- React: the docs' live examples run Next.js's own copy (the frameworks page) ----------
+    {
+      const ctx = await browser.newContext();
+      await ctx.addInitScript(() => {
+        window.__reactVersions = [];
+        window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {
+          supportsFiber: true,
+          renderers: new Map(),
+          inject: (renderer) => (window.__reactVersions.push(renderer.version), 1),
+          onCommitFiberRoot() {},
+          onCommitFiberUnmount() {},
+          onPostCommitFiberRoot() {},
+          checkDCE() {},
+        };
+      });
+      const P = await ctx.newPage();
+      await load(P, urlOf("dropdown"));
+      const running = await P.evaluate(() => window.__reactVersions);
+      await load(P, urlOf("frameworks"));
+      const says = ((await P.locator("main").textContent()) || "").includes("its own copy of React, 19.2, as do these docs' live examples");
+      check(`frameworks: the live examples run React 19.2 (${running.join(", ")}), as the page says`, says && running.length > 0 && running.every((v) => v.startsWith("19.2.")));
       await ctx.close();
     }
 

@@ -123,7 +123,9 @@ export function IntakeForm() {
 
 The server renders the empty form. A saved fill is read in the browser after hydration, so the two always match.
 
-A tutorial that builds a whole intake page this way is on its way. [TODO: link the Next.js tutorial, written at CP5]
+A form file the form refuses throws while your server renders the page, before the form can show its message. [Build an intake page in Next.js](/docs/integrate/tutorial-nextjs#5-put-the-form-in-a-client-component) says what that does to a static page and a dynamic one.
+
+[Build an intake page in Next.js](/docs/integrate/tutorial-nextjs) builds a whole signed-in intake page this way.
 
 ### CommonJS servers
 
@@ -153,7 +155,7 @@ export const schema = data as FormSchema;
 
 ### React 18 and 19
 
-The package's peers are `react` and `react-dom` `^18.0.0 || ^19.0.0`. These docs render their live examples with React 18.3, and the Quickstart is checked in a new Vite app, which brings React 19.
+The package's peers are `react` and `react-dom` `^18.0.0 || ^19.0.0`. The Quickstart is checked in a new Vite app, which brings React 19. The Next.js tutorial is checked with Next.js 15.5.28, whose App Router renders with its own copy of React, 19.2, as do these docs' live examples. The docs' tests render the pages' browser examples with React 18.3.
 
 ## What happens behind the scenes
 

@@ -9,6 +9,7 @@ import { Button, segmentClasses, segmentTrackClasses } from "@/components/ui";
 import { EXAMPLE_ENDPOINT_PREFIX, registerExampleEndpoint } from "@/lib/docs/example-fetch";
 import type { ExampleTab } from "@/lib/docs/templates";
 import { CodeBlock } from "./code-block";
+import { EXAMPLE_VALIDATORS } from "./example-validators";
 import { Tabs, type TabSpec } from "./tabs";
 
 /**
@@ -40,6 +41,7 @@ export function LiveExample({
   tabs,
   density: offerDensity,
   reactCode,
+  validators: validatorsName,
 }: {
   /** The form file's name, e.g. "follow-up-question". */
   name: string;
@@ -51,7 +53,11 @@ export function LiveExample({
   tabs: readonly ExampleTab[];
   density: boolean;
   reactCode?: string;
+  /** A name in EXAMPLE_VALIDATORS: run in the form, and passed to prepareSubmission. */
+  validators?: string;
 }) {
+  const validators = validatorsName === undefined ? undefined : EXAMPLE_VALIDATORS[validatorsName];
+  if (validatorsName !== undefined && !validators) throw new Error(`No example validators named "${validatorsName}"`);
   const endpoint = `${EXAMPLE_ENDPOINT_PREFIX}${name}/${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const [run, setRun] = useState(0);
   const [payload, setPayload] = useState<unknown>(null);
@@ -68,7 +74,7 @@ export function LiveExample({
         let result: unknown;
         let status: number;
         try {
-          const prepared = prepareSubmission(schema, sent);
+          const prepared = prepareSubmission(schema, sent, validators && { validators });
           result = prepared;
           status = prepared.ok ? 200 : 422;
         } catch (error) {
@@ -83,7 +89,7 @@ export function LiveExample({
           headers: { "Content-Type": "application/json" },
         });
       }),
-    [endpoint, schema],
+    [endpoint, schema, validators],
   );
 
   const json = JSON.stringify(schema, null, 2);
@@ -121,6 +127,7 @@ export function LiveExample({
                   schema={schema}
                   endpoint={endpoint}
                   drafts={{ mode: "off" }}
+                  validators={validators}
                   onRenderError={(error) => setRenderError(error instanceof Error ? error.message : String(error))}
                 />
               </div>,
@@ -195,7 +202,11 @@ export function LiveExample({
               <code className="font-mono">@zoworkhq/forms/core</code>, the same function your server runs on that body.
               Store <code className="font-mono">submission</code>, never the request body.
             </p>
-            <CodeBlock code={JSON.stringify(server, null, 2)} lang="json" title="prepareSubmission(schema, body)" />
+            <CodeBlock
+              code={JSON.stringify(server, null, 2)}
+              lang="json"
+              title={validators ? "prepareSubmission(schema, body, { validators })" : "prepareSubmission(schema, body)"}
+            />
           </>
         ),
     },

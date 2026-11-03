@@ -1,0 +1,27 @@
+{
+  "title": "Your own validator",
+  "formId": "2dcd2d3f-a763-4b66-bd61-303e3666bf71",
+  "formVersionId": "31608726-25f9-4968-8daa-b8556e0df7b2",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "client_id",
+      "type": "short",
+      "label": "Client ID",
+      "description": "From the referral letter, such as DEMO-123456.",
+      "required": true
+    },
+    {
+      "id": "referral_date",
+      "type": "date",
+      "label": "Referral date",
+      "required": true
+    },
+    {
+      "id": "first_session",
+      "type": "date",
+      "label": "First session date",
+      "required": true
+    }
+  ]
+}

@@ -49,6 +49,7 @@ Decide which faults are the request's and which are yours.
 ```
 
 - These errors don't reach an error boundary of yours. `onRenderError` is the way to hear about them.
+- The message and `onRenderError` are the browser's. Where your server renders the page, as Next.js does, a form file the form refuses throws there instead. [Build an intake page in Next.js](/docs/integrate/tutorial-nextjs#5-put-the-form-in-a-client-component) shows what that does to a page.
 - After a failure the form tries again when `schema` or `endpoint` changes. A form refused for its `validators`, which are often written inline and so new on every render, tries again when it gets a new React `key`.
 - A form that can't be shown is often a newer `schemaVersion` than your package supports. The reason then says so: `This form uses schemaVersion 3, which this version of @zoworkhq/forms does not support (it supports 1 and 2). Upgrade @zoworkhq/forms to render it.`
 

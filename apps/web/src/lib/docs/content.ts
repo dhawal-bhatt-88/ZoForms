@@ -3,6 +3,7 @@ import path from "node:path";
 import { parseFrontmatter, type DocsFrontmatter } from "./frontmatter";
 import { headingsOf, parseMdx, type Heading, type MdNode } from "./mdast";
 import { livePages } from "./nav";
+import { expandForDevelopers } from "./question-values";
 import type { CssReference, Reference, TypeReference } from "./reference";
 
 /*
@@ -55,7 +56,8 @@ export function getPage(slug: string): DocsPage | null {
   const full = path.join(CONTENT_DIR, file);
   if (!fs.existsSync(full)) return null;
   const { frontmatter, body } = parseFrontmatter(fs.readFileSync(full, "utf8"), file);
-  const tree = parseMdx(body);
+  // Generated sections are part of the page for everything that reads it: headings, search, the .md.
+  const tree = expandForDevelopers(parseMdx(body));
   return { slug, file, frontmatter, body, tree, headings: headingsOf(tree) };
 }
 

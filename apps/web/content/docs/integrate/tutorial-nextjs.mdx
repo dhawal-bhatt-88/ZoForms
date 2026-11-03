@@ -1,0 +1,229 @@
+---
+title: Build an intake page in Next.js
+summary: A signed-in intake page in a Next.js App Router app, and a route handler that checks each submission with prepareSubmission and stores it once.
+template: tutorial
+badges: []
+appliesTo: [package]
+updated: 2026-11-03
+prev: /docs/integrate/quickstart
+next: /docs/integrate/validate-and-store
+---
+
+## What you'll build
+
+An intake page at `/intake` in a Next.js app, for a client who is signed in, and a route handler that checks each submission and stores it.
+
+When you finish:
+
+- The page renders on your server, and the form runs in the browser.
+- The answers the form keeps while it's open belong to the signed-in client, so on a shared browser they never appear for someone else's sign-in.
+- Your route handler checks every submission with `prepareSubmission`, and stores a retried submission once.
+- When the form can't be shown, your code hears why.
+
+## Before you start
+
+- **Node 20 or later.**
+- **A Next.js app that uses the App Router and TypeScript,** with its `app` folder at the project's top. These steps were tested with Next.js 15.5.28. That version renders App Router pages with its own copy of React, 19.2, whichever React your app installs.
+- **Your app's sign-in.** This tutorial puts a stand-in function where your sign-in goes.
+- **A form file.** The form's author can send you one, or select **Download** in the editor.
+
+## Steps
+
+### 1. Install the package
+
+```sh
+npm install @zoworkhq/forms
+```
+
+### 2. Put the form file in your app
+
+Copy the file to `app/intake/intake-form.json`. The code below uses that name.
+
+### 3. Load the stylesheet
+
+Import it once, in the root layout, `app/layout.tsx`. A layout with nothing else in it:
+
+```tsx file=app/layout.tsx check=browser
+import type { ReactNode } from 'react';
+import '@zoworkhq/forms/styles.css';
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}
+```
+
+Keep your own CSS imports. If a CSS reset of yours takes the borders off the form's fields, see [Make a CSS reset and the form agree](/docs/integrate/styling#7-make-a-css-reset-and-the-form-agree).
+
+### 4. Get the signed-in user
+
+Create `lib/session.ts`. This function stands in for your sign-in: replace its body with your sign-in's own way of reading the user on the server.
+
+```ts file=lib/session.ts check=browser
+export type User = { id: string };
+
+// Stands in for your app's sign-in: return the signed-in user, or null.
+export async function getSignedInUser(): Promise<User | null> {
+  return { id: 'user-demo-1' };
+}
+```
+
+### 5. Put the form in a client component
+
+`FormRenderer` takes functions, such as `onSuccess` and `onRenderError`, and a server component can't pass functions to a client component. So the form goes in a file of its own that starts with `'use client'`. Create `app/intake/intake-form.tsx`:
+
+```tsx file=app/intake/intake-form.tsx check=browser
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { FormRenderer } from '@zoworkhq/forms/react';
+import type { FormSchema } from '@zoworkhq/forms/core';
+import schema from './intake-form.json';
+
+export function IntakeForm({ userId }: { userId: string }) {
+  const router = useRouter();
+  return (
+    <FormRenderer
+      schema={schema as FormSchema}
+      endpoint="/api/submit"
+      drafts={{ scope: userId }}
+      onSuccess={() => router.push('/intake/thank-you')}
+      onRenderError={(error, { componentStack }) => {
+        // Send it to your error tracker. The respondent sees the form's own message.
+        console.error('The intake form could not be shown', error, componentStack);
+      }}
+    />
+  );
+}
+```
+
+- **`drafts={{ scope: userId }}`** keys what the form keeps to this user. The form file's Save progress setting still decides where it's kept. With "Only while the form is open", the form keeps the answers in the tab, under a key made from a SHA-256 hash of the scope, so a different user in the same tab never gets them. The form reads the scope once, when it mounts. [What is stored in the browser](/docs/integrate/concepts/browser-storage) has the keys.
+- **`onSuccess`** runs once your endpoint answers with a 2xx status. Here it moves to a thank-you page.
+- **`onRenderError`** runs in the browser when the form can't be shown. The respondent sees "This form can't be shown right now. Please try again later." in its place. The form's errors don't reach your error boundaries, so this is how you hear about them.
+
+**On your server, a form file the form refuses throws** while the page renders. The form's message and `onRenderError` come only in the browser. What happens depends on how Next.js renders the page, which `next build` lists as ○ (Static) or ƒ (Dynamic). With Next.js 15.5.28:
+
+- **Static,** as this page is with the stand-in sign-in: `next build` fails, and prints the reason.
+- **Dynamic:** the response is a 500 without your page, and your server logs the reason. The browser then renders the page itself, shows the form's message and calls `onRenderError`.
+- **Dynamic, with the form inside `<Suspense>`:** the response is a 200 with the rest of your page. The browser shows the form's message and calls `onRenderError`.
+
+### 6. Create the page
+
+Create `app/intake/page.tsx`. It's a server component: it reads the user on your server, and sends anyone not signed in to your sign-in page. `FormRenderer` shows the form's questions, not its title, so the page shows the title and the description, and owns the `h1`.
+
+```tsx file=app/intake/page.tsx check=browser
+import { redirect } from 'next/navigation';
+import { getSignedInUser } from '../../lib/session';
+import { IntakeForm } from './intake-form';
+import schema from './intake-form.json';
+
+export default async function IntakePage() {
+  const user = await getSignedInUser();
+  if (!user) redirect('/sign-in');
+
+  return (
+    <main>
+      <h1>{schema.title}</h1>
+      {schema.description && <p>{schema.description}</p>}
+      <IntakeForm userId={user.id} />
+    </main>
+  );
+}
+```
+
+The server renders the empty form. Answers the form kept are read in the browser after it hydrates, so the server's page and the browser's first render always match.
+
+Create the thank-you page, `app/intake/thank-you/page.tsx`:
+
+```tsx file=app/intake/thank-you/page.tsx check=browser
+export default function ThankYouPage() {
+  return (
+    <main>
+      <h1>Thank you</h1>
+      <p>We have your answers.</p>
+    </main>
+  );
+}
+```
+
+### 7. Write the route handler
+
+Create `lib/store.ts`. These two functions stand in for your own storage, and they lose everything when the server stops. Replace them when you're ready.
+
+```ts file=lib/store.ts check=browser stub=store
+import type { StoredSubmission } from '@zoworkhq/forms/core';
+
+const submissions = new Map<string, { submission: StoredSubmission; userId: string }>();
+
+export async function alreadyStored(key: string) {
+  return submissions.has(key);
+}
+
+export async function store(submission: StoredSubmission, userId: string) {
+  submissions.set(submission.idempotencyKey, { submission, userId });
+  // Log ids, never answers.
+  console.log('Stored', submission.idempotencyKey);
+}
+```
+
+Create `app/api/submit/route.ts`. The form posts to `/api/submit` on the page's own origin, so the browser sends your app's cookies with it, and the handler can read the user the same way the page does.
+
+```ts file=app/api/submit/route.ts check=browser run=handler route=/api/submit
+import { prepareSubmission } from '@zoworkhq/forms/core';
+import type { FormSchema } from '@zoworkhq/forms/core';
+import schema from '../../intake/intake-form.json';
+import { getSignedInUser } from '../../../lib/session';
+import { alreadyStored, store } from '../../../lib/store';
+
+export async function POST(request: Request) {
+  const user = await getSignedInUser();
+  if (!user) return Response.json({ error: 'Sign in first.' }, { status: 401 });
+
+  const result = prepareSubmission(schema as FormSchema, await request.json().catch(() => null));
+  if (result.ok === false) return Response.json({ errors: result.errors }, { status: 422 });
+
+  // A retry carries the same key: store each submission once.
+  const { submission } = result;
+  if (!(await alreadyStored(submission.idempotencyKey))) await store(submission, user.id);
+  return Response.json({ ok: true });
+}
+```
+
+Pass `prepareSubmission` the same form file the page renders. Store `result.submission`, and anything of yours that belongs beside it, such as the user's id, never the request's body.
+
+### 8. Run it
+
+```sh
+npm run dev
+```
+
+Open `http://localhost:3000/intake`, or the address Next.js prints.
+
+## Check it works
+
+1. Select **Submit** without answering. The form shows "There is a problem" with a link to each question, and sends nothing.
+2. Answer the required questions, then refresh the page. Your answers are still there.
+3. Select **Submit**. The browser moves to the thank-you page, and the terminal running Next.js prints `Stored`, followed by the submission's key.
+
+## Troubleshooting
+
+**Next.js says functions can't be passed to client components.** The form is in a server component. Keep it in `app/intake/intake-form.tsx`, with `'use client'` as its first line.
+
+**"This form can't be shown right now. Please try again later."** The form refused the file. Your `onRenderError` gets the reason, in the browser's console here. In a development build it also shows under the message. Often the file isn't a download from the builder, or was edited by hand.
+
+**`next build` fails, or the page answers with a 500, and the reason names the form.** The form refused the file while your server rendered the page. See step 5.
+
+**"Submission failed. Your answers have been kept — please try again."** The browser got no 2xx from your route handler. Check the terminal running Next.js. A 401 means `getSignedInUser` found no user.
+
+**Answers kept in one tab don't come back after a new sign-in.** By design: the scope is the user's id, so another user's sign-in never gets them.
+
+## Next steps
+
+- [Save progress (drafts)](/docs/integrate/drafts): keep answers on the device or on your server, with a `scope` and an `owner`, and clear them at sign-out.
+- [Validate and store submissions](/docs/integrate/validate-and-store): dedupe, body sizes, other form versions and CommonJS.
+- [Handle errors](/docs/integrate/handle-errors): what respondents and your code see when something fails.
+- [Content Security Policy](/docs/integrate/content-security-policy): a policy for the form, and the note on Next.js's own scripts.
+- [Use it with your framework](/docs/integrate/frameworks): TypeScript, CommonJS servers, and React 18 and 19.

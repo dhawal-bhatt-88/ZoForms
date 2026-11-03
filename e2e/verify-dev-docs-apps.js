@@ -5,7 +5,8 @@
 //
 // It uses the network for Vite and React only, as npm create vite and npm install
 // fetch them. Everything else is local: the vendored tarball stands in for
-// `npm install @zoworkhq/forms` until the package is on npm, and Express is
+// `npm install @zoworkhq/forms` until the package is on npm, and Express,
+// Tailwind, and for the Next.js tutorial Next.js, React and TypeScript, are
 // linked from apps/web.
 //
 // Two changes to what the page says, both to avoid a clash on this machine: the
@@ -537,6 +538,264 @@ createRoot(document.getElementById('root')).render(
   }
 }
 
+/** Is anything listening on the port? */
+const listening = (port) =>
+  new Promise((resolve) => {
+    const socket = net.connect(port, "127.0.0.1", () => (socket.destroy(), resolve(true)));
+    socket.on("error", () => resolve(false));
+  });
+
+/**
+ * "Build an intake page in Next.js", word for word, in a new Next.js app.
+ * Next.js, React and TypeScript are linked from apps/web, so no network is
+ * used, and the tarball is installed offline. Three changes, for this script
+ * only: a tsconfig.json like a new app's; the app is built and started (next
+ * build, next start) on a free port rather than run with npm run dev, whose
+ * server is a second process this script wouldn't hold; and a copy of
+ * app/intake at app/broken, with a form file the form refuses, to see
+ * onRenderError. The app sits under OUT, not the system's temp folder:
+ * Next.js finds its own files by a relative path, so it must be on the same
+ * drive as the workspace.
+ */
+async function nextjs(browser) {
+  const tmp = fs.mkdtempSync(path.join(OUT, "next-app-"));
+  try {
+    await nextjsIn(tmp, browser);
+  } finally {
+    await new Promise((r) => setTimeout(r, 1000));
+    fs.rmSync(tmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
+  }
+}
+
+async function nextjsIn(tmp, browser) {
+  const page = fs.readFileSync(path.join(DOCS, "integrate/tutorial-nextjs.mdx"), "utf8");
+  const files = fencesOf("integrate/tutorial-nextjs");
+  const names = ["app/layout.tsx", "lib/session.ts", "app/intake/intake-form.tsx", "app/intake/page.tsx", "app/intake/thank-you/page.tsx", "lib/store.ts", "app/api/submit/route.ts"];
+  const app = path.join(tmp, "intake-next");
+  fs.mkdirSync(path.join(app, "node_modules/@types"), { recursive: true });
+  fs.writeFileSync(path.join(app, "package.json"), JSON.stringify({ name: "intake-next", private: true, scripts: { dev: "next dev", build: "next build", start: "next start" } }, null, 2));
+
+  // Step 1, then the rest of the app linked from the workspace.
+  run(`npm install --offline --legacy-peer-deps --no-audit --no-fund "${path.join(ROOT, "vendor/zoworkhq-forms-0.28.0.tgz")}"`, app);
+  for (const name of ["next", "react", "react-dom", "typescript", "@types/react", "@types/react-dom", "@types/node"]) {
+    fs.symlinkSync(fs.realpathSync(path.join(WEB, "node_modules", name)), path.join(app, "node_modules", name), "junction");
+  }
+  const version = (name) => JSON.parse(fs.readFileSync(path.join(app, "node_modules", name, "package.json"), "utf8")).version;
+  const tested = /tested with Next\.js (\d+\.\d+\.\d+)/.exec(page)?.[1];
+  check(`nextjs: the page's tested version is the one used (${version("next")})`, tested === version("next"), `page says ${tested}`);
+  fs.writeFileSync(
+    path.join(app, "tsconfig.json"),
+    JSON.stringify(
+      {
+        compilerOptions: {
+          target: "ES2017",
+          lib: ["dom", "dom.iterable", "esnext"],
+          allowJs: true,
+          skipLibCheck: true,
+          strict: true,
+          noEmit: true,
+          esModuleInterop: true,
+          module: "esnext",
+          moduleResolution: "bundler",
+          resolveJsonModule: true,
+          isolatedModules: true,
+          jsx: "preserve",
+          incremental: true,
+          plugins: [{ name: "next" }],
+        },
+        include: ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+        exclude: ["node_modules"],
+      },
+      null,
+      2,
+    ),
+  );
+
+  // Steps 2 to 7, word for word.
+  fs.mkdirSync(path.join(app, "app/intake"), { recursive: true });
+  fs.copyFileSync(path.join(DOCS, "integrate/intake-form.form.json"), path.join(app, "app/intake/intake-form.json"));
+  for (const name of names) {
+    if (!files.has(name)) throw new Error(`the tutorial has no block for ${name}`);
+    fs.mkdirSync(path.dirname(path.join(app, name)), { recursive: true });
+    fs.writeFileSync(path.join(app, name), files.get(name));
+  }
+  const form = JSON.parse(fs.readFileSync(path.join(app, "app/intake/intake-form.json"), "utf8"));
+  const build = () => {
+    const result = spawnSync(process.execPath, ["node_modules/next/dist/bin/next", "build"], { cwd: app, encoding: "utf8", env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" }, timeout: 300000 });
+    return { ok: result.status === 0, log: `${result.stdout}\n${result.stderr}` };
+  };
+
+  // Step 5's note on the server, 1: a static page with a form file the form refuses fails the build.
+  const copy = (route, change = (s) => s) => {
+    fs.mkdirSync(path.join(app, "app", route));
+    fs.copyFileSync(path.join(app, "app/intake/intake-form.tsx"), path.join(app, "app", route, "intake-form.tsx"));
+    fs.writeFileSync(path.join(app, "app", route, "page.tsx"), change(fs.readFileSync(path.join(app, "app/intake/page.tsx"), "utf8")));
+    fs.writeFileSync(path.join(app, "app", route, "intake-form.json"), JSON.stringify({ ...form, schemaVersion: 3 }, null, 2));
+  };
+  copy("broken");
+  const refused = build();
+  check(
+    "nextjs: a static page whose form file is refused fails next build, which prints the reason",
+    !refused.ok && refused.log.includes("Upgrade @zoworkhq/forms to render it.") && refused.log.includes("/broken"),
+    refused.log.slice(-800),
+  );
+
+  // 2 and 3: the same page rendered for each request, and then with the form inside <Suspense>.
+  const dynamic = (s) => `export const dynamic = 'force-dynamic';\n${s}`;
+  fs.rmSync(path.join(app, "app/broken"), { recursive: true });
+  copy("broken", dynamic);
+  copy("broken-suspense", (s) => `import { Suspense } from 'react';\n${dynamic(s).replace("<IntakeForm userId={user.id} />", "<Suspense><IntakeForm userId={user.id} /></Suspense>")}`);
+  const built = build();
+  if (!built.ok) throw new Error(`next build failed: ${built.log.slice(-1500)}`);
+  check("nextjs: next build compiles the tutorial's files, strict TypeScript included, and lists /intake as static", /○ \/intake\s/.test(built.log) && /ƒ \/broken\s/.test(built.log), built.log.slice(-1500));
+
+  const port = await freePort();
+  const server = start([path.join("node_modules/next/dist/bin/next"), "start", "-p", String(port)], app);
+  const base = `http://localhost:${port}`;
+  try {
+    await waitForUrl(`${base}/intake`);
+    const open = async (route) => {
+      const context = await browser.newContext({ viewport: { width: 1000, height: 900 } });
+      // React tells a devtools hook its version as it starts: the React that really runs.
+      await context.addInitScript(() => {
+        window.__reactVersions = [];
+        window.__REACT_DEVTOOLS_GLOBAL_HOOK__ = {
+          supportsFiber: true,
+          renderers: new Map(),
+          inject: (renderer) => (window.__reactVersions.push(renderer.version), 1),
+          onCommitFiberRoot() {},
+          onCommitFiberUnmount() {},
+          onPostCommitFiberRoot() {},
+          checkDCE() {},
+        };
+      });
+      const P = await context.newPage();
+      const problems = [];
+      const posted = [];
+      P.on("pageerror", (e) => problems.push(e.message));
+      // Failed requests are listed by address below, not by the console's line for them.
+      P.on("console", (m) => {
+        if (m.text().startsWith("Failed to load resource")) return;
+        if (m.type() === "error" || (m.type() === "warning" && m.text().includes("@zoworkhq/forms"))) problems.push(m.text());
+      });
+      // A new app has a favicon; this one, made by hand, doesn't.
+      P.on("response", (r) => r.status() >= 400 && !r.url().endsWith("/favicon.ico") && problems.push(`${r.status()} ${r.url()}`));
+      P.on("request", (r) => {
+        if (r.url().endsWith("/api/submit")) posted.push(JSON.parse(r.postData()));
+      });
+      await P.goto(`${base}${route}`);
+      return { context, P, problems, posted };
+    };
+    const fill = async (P) => {
+      await P.getByLabel("Preferred name", { exact: true }).fill("Demo Client");
+      await P.getByLabel("Email address", { exact: true }).fill("client@example.org");
+      await P.getByRole("radio", { name: "Video" }).check();
+      await P.getByRole("radio", { name: "No", exact: true }).check();
+    };
+    const tabKey = (scope) => `@zoworkhq/forms:${form.formId}:${form.formVersionId}:${sha256(scope)}`;
+
+    {
+      const { context, P, problems, posted } = await open("/intake");
+      await P.locator(".zf-form").waitFor({ timeout: 30000 });
+      check("nextjs: the server page shows the form's title as its h1, and its description", (await P.locator("h1").textContent()) === form.title && (await P.getByText(form.description).count()) === 1);
+      const look = await P.evaluate(() => ({
+        border: getComputedStyle(document.querySelector(".zf-input")).borderTopStyle,
+        background: getComputedStyle(document.querySelector(".zf-submit")).backgroundColor,
+      }));
+      check("nextjs: the layout's stylesheet applies", look.border !== "none" && look.background !== "rgba(0, 0, 0, 0)", JSON.stringify(look));
+      const running = await P.evaluate(() => window.__reactVersions);
+      check(
+        `nextjs: the page runs Next.js's own React 19.2 (${running.join(", ")}), with React ${version("react")} installed`,
+        running.length > 0 && running.every((v) => v.startsWith("19.2.")) && version("react").startsWith("18.") && page.includes("its own copy of React, 19.2, whichever React your app installs"),
+      );
+      await P.screenshot({ path: path.join(DIR, "nextjs-form.png"), fullPage: true });
+
+      // Check it works, 1.
+      await P.getByRole("button", { name: "Submit" }).click();
+      await P.locator(".zf-error-summary").waitFor();
+      check('nextjs: Submit with nothing answered shows "There is a problem", and sends nothing', ((await P.locator(".zf-error-summary").textContent()) || "").includes("There is a problem") && posted.length === 0);
+
+      // Check it works, 2, and the scope.
+      await fill(P);
+      await P.reload();
+      await P.locator(".zf-form").waitFor();
+      check("nextjs: a refresh keeps the answers", (await P.getByLabel("Preferred name", { exact: true }).inputValue()) === "Demo Client");
+      const keys = await P.evaluate(() => Object.keys(sessionStorage));
+      check("nextjs: the tab's copy is keyed by the signed-in user's scope", keys.includes(tabKey("user-demo-1")), keys.join(", "));
+
+      // Check it works, 3.
+      await P.getByRole("button", { name: "Submit" }).click();
+      await P.waitForURL(`${base}/intake/thank-you`);
+      check("nextjs: after the submit, onSuccess moves to the thank-you page", (await P.locator("h1").textContent()) === "Thank you");
+      const [body] = posted;
+      await new Promise((r) => setTimeout(r, 300));
+      check("nextjs: the form posts once, and the terminal prints Stored and the key", posted.length === 1 && server.log.includes(`Stored ${body?.idempotencyKey}`), server.log);
+      check("nextjs: no errors in the browser, hydration included", problems.length === 0, problems.join(" | "));
+      await context.close();
+    }
+
+    // A different user in the same tab never gets the copy: the same copy, under another user's scope, isn't restored.
+    {
+      const { context, P } = await open("/intake");
+      await P.locator(".zf-form").waitFor();
+      await fill(P);
+      await P.waitForFunction((key) => sessionStorage.getItem(key) !== null, tabKey("user-demo-1"));
+      await P.evaluate(([mine, theirs]) => {
+        sessionStorage.setItem(theirs, sessionStorage.getItem(mine));
+        sessionStorage.removeItem(mine);
+      }, [tabKey("user-demo-1"), tabKey("user-demo-2")]);
+      await P.reload();
+      await P.locator(".zf-form").waitFor();
+      check("nextjs: another user's copy in the same tab isn't restored", (await P.getByLabel("Preferred name", { exact: true }).inputValue()) === "");
+      await context.close();
+    }
+
+    // "Stores a retried submission once": the first response is lost on its way back.
+    {
+      const { context, P, posted } = await open("/intake");
+      await P.locator(".zf-form").waitFor();
+      await fill(P);
+      await P.route("**/api/submit", async (route) => {
+        await route.fetch();
+        await route.abort();
+      });
+      await P.getByRole("button", { name: "Submit" }).click();
+      await P.getByText("Submission failed. Your answers have been kept — please try again.").waitFor();
+      await P.unroute("**/api/submit");
+      await P.getByRole("button", { name: "Submit" }).click();
+      await P.waitForURL(`${base}/intake/thank-you`);
+      await new Promise((r) => setTimeout(r, 300));
+      const [first, second] = posted;
+      const times = server.log.split(first?.idempotencyKey ?? "?").length - 1;
+      check("nextjs: a retry carries the same key, and is stored once", posted.length === 2 && first.idempotencyKey === second.idempotencyKey && times === 1, `${times} times`);
+      await context.close();
+    }
+
+    // onRenderError, on the same page and component with a form file the form refuses, rendered for each request.
+    for (const [route, status, withPage] of [
+      ["/broken", 500, false],
+      ["/broken-suspense", 200, true],
+    ]) {
+      const response = await fetch(`${base}${route}`);
+      const html = await response.text();
+      check(`nextjs: ${route} answers ${status}, ${withPage ? "with" : "without"} the page`, response.status === status && html.includes(`<h1>${form.title}</h1>`) === withPage, `${response.status}`);
+      const { context, P, problems } = await open(route);
+      await P.getByText("This form can't be shown right now. Please try again later.").waitFor({ timeout: 30000 });
+      check(
+        `nextjs: in the browser, ${route} shows the page and the form's message, and onRenderError logs the reason`,
+        (await P.locator("h1").textContent()) === form.title && problems.some((p) => p.includes("The intake form could not be shown") && p.includes("schemaVersion 3")),
+        problems.join(" | "),
+      );
+      await context.close();
+    }
+    check("nextjs: the server logged the reason", server.log.includes("Upgrade @zoworkhq/forms to render it."));
+  } finally {
+    server.child.kill();
+  }
+  await new Promise((r) => setTimeout(r, 1000));
+  check("nextjs: stopping next start's one process frees its port", !(await listening(port)));
+}
+
 (async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "zowork-dev-docs-"));
   let browser;
@@ -545,6 +804,7 @@ createRoot(document.getElementById('root')).render(
     const app = await quickstart(tmp, browser);
     await drafts(app, browser);
     await styling(app, browser);
+    await nextjs(browser);
   } catch (e) {
     check("ran to the end", false, e.stack || String(e));
   } finally {

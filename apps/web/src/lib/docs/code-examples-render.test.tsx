@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import path from "node:path";
-import { createElement, type ComponentType } from "react";
+import { createElement, version, type ComponentType } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, render, waitFor } from "@testing-library/react";
 import { CHECK_DIR, examplesOf, isDeveloperPage, pageFolder, writeProject } from "./code-examples";
-import { getLivePages } from "./content";
+import { getLivePages, getPage } from "./content";
 
 /*
  * The browser examples on the developer pages, rendered with the real
@@ -37,6 +37,11 @@ describe("the developer pages' browser examples", () => {
   it("has some", () => {
     expect(rendered.length).toBeGreaterThan(10);
     expect(statements.length).toBeGreaterThan(0);
+  });
+
+  it("renders them with React 18.3, as the frameworks page says", () => {
+    expect(version).toMatch(/^18\.3\./);
+    expect(getPage("integrate/frameworks")!.body).toContain("render the pages' browser examples with React 18.3");
   });
 
   it.each(rendered.map(named))("%s renders the form", { timeout: 30_000 }, async (_, example) => {

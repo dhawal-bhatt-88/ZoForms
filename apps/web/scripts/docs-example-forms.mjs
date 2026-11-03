@@ -60,6 +60,21 @@ const FORMS = [
     ],
   },
   {
+    file: "examples/own-validator.form.json",
+    title: "Your own validator",
+    blocks: [
+      {
+        id: "client_id",
+        type: "short",
+        label: "Client ID",
+        description: "From the referral letter, such as DEMO-123456.",
+        required: true,
+      },
+      { id: "referral_date", type: "date", label: "Referral date", required: true },
+      { id: "first_session", type: "date", label: "First session date", required: true },
+    ],
+  },
+  {
     file: "examples/follow-up-question.form.json",
     title: "Follow-up question",
     blocks: [

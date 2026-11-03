@@ -1,0 +1,272 @@
+{
+  "short": {
+    "page": "short-answer",
+    "name": "a short answer",
+    "field": "preferred_name",
+    "sends": "the text exactly as typed",
+    "unanswered": "With nothing typed",
+    "example": "Demo Client",
+    "stored": "Demo Client",
+    "storedNote": "Text isn't trimmed: `\" Demo \"` is stored as `\" Demo \"`.",
+    "conditionAnswer": "The condition's `answer` is text, matched exactly: case and spaces count.",
+    "scoring": null,
+    "validator": null
+  },
+  "long": {
+    "page": "long-answer",
+    "name": "a long answer",
+    "field": "reason_for_visit",
+    "sends": "the text exactly as typed, line breaks included",
+    "unanswered": "With nothing typed",
+    "example": "Line one\nLine two",
+    "stored": "Line one\nLine two",
+    "storedNote": "Text isn't trimmed, and it's at most 20,000 characters.",
+    "conditionAnswer": null,
+    "scoring": null,
+    "validator": null
+  },
+  "email": {
+    "page": "email",
+    "name": "an email question",
+    "field": "email",
+    "sends": "the text exactly as typed",
+    "unanswered": "With nothing typed",
+    "example": "client@example.org",
+    "stored": "client@example.org",
+    "storedNote": "The address's form is checked on the trimmed text, and the stored text keeps its spaces.",
+    "conditionAnswer": "The condition's `answer` is text, matched exactly: case and spaces count.",
+    "scoring": null,
+    "validator": {
+      "intro": "This one refuses the clinic's own addresses:",
+      "code": "// The clinic's own domain. Staff addresses don't belong on a client's form.\nconst CLINIC_DOMAIN = '@demo-clinic.example';\n\nexport const validators = [\n  {\n    field: 'email',\n    validate: ({ value }) =>\n      typeof value === 'string' && value.trim().toLowerCase().endsWith(CLINIC_DOMAIN)\n        ? \"Enter your own email address, not the clinic's.\"\n        : null,\n  },\n];\n",
+      "fails": "Front.Desk@demo-clinic.example",
+      "message": "Enter your own email address, not the clinic's.",
+      "passes": "client@example.org"
+    }
+  },
+  "phone": {
+    "page": "phone-number",
+    "name": "a phone number question",
+    "field": "phone",
+    "sends": "the text exactly as typed",
+    "unanswered": "With nothing typed",
+    "example": "555 0100",
+    "stored": "555 0100",
+    "storedNote": "The number's form is checked on the trimmed text, and the stored text keeps its spaces.",
+    "conditionAnswer": "The condition's `answer` is text, matched exactly: case and spaces count.",
+    "scoring": null,
+    "validator": null
+  },
+  "link": {
+    "page": "link",
+    "name": "a link question",
+    "field": "referring_website",
+    "sends": "the text exactly as typed",
+    "unanswered": "With nothing typed",
+    "example": "https://example.org",
+    "stored": "https://example.org",
+    "storedNote": "The address's form is checked on the trimmed text, and the stored text keeps its spaces.",
+    "conditionAnswer": "The condition's `answer` is text, matched exactly: case and spaces count.",
+    "scoring": null,
+    "validator": null
+  },
+  "number": {
+    "page": "number",
+    "name": "a number question",
+    "field": "therapy_visits",
+    "sends": "a number",
+    "unanswered": "With nothing typed",
+    "example": 3,
+    "stored": 3,
+    "storedNote": "A plain decimal string, such as `\"3\"`, is also accepted, and stored as the number `3`.",
+    "conditionAnswer": "The condition's `answer` is a number.",
+    "scoring": "answer",
+    "validator": {
+      "intro": "The builder's Minimum and Maximum already check the range. This one asks for a whole number:",
+      "code": "export const validators = [\n  {\n    field: 'therapy_visits',\n    validate: ({ value }) => (typeof value === 'number' && !Number.isInteger(value) ? 'Enter a whole number.' : null),\n  },\n];\n",
+      "fails": 2.5,
+      "message": "Enter a whole number.",
+      "passes": 3
+    }
+  },
+  "date": {
+    "page": "date",
+    "name": "a date question",
+    "field": "date_of_birth",
+    "sends": "the date as `YYYY-MM-DD`",
+    "unanswered": "With no date given",
+    "example": "2026-01-15",
+    "stored": "2026-01-15",
+    "storedNote": "It must be a real calendar date: `2026-02-30` is refused.",
+    "conditionAnswer": "The condition's `answer` is a date, `YYYY-MM-DD`, matched exactly.",
+    "scoring": null,
+    "validator": {
+      "intro": "This one refuses a date of birth after today:",
+      "code": "export const validators = [\n  {\n    field: 'date_of_birth',\n    // Dates are YYYY-MM-DD text, so they compare as text. Today is in UTC.\n    validate: ({ value }) =>\n      typeof value === 'string' && value > new Date().toISOString().slice(0, 10) ? \"Date of birth can't be in the future.\" : null,\n  },\n];\n",
+      "fails": "2999-01-01",
+      "message": "Date of birth can't be in the future.",
+      "passes": "1990-04-01"
+    }
+  },
+  "time": {
+    "page": "time",
+    "name": "a time question",
+    "field": "preferred_time",
+    "sends": "the time as `HH:MM`",
+    "unanswered": "With no time given",
+    "example": "09:30",
+    "stored": "09:30",
+    "storedNote": "Your server also accepts `HH:MM:SS`, from `00:00` to `23:59`, and stores it as sent.",
+    "conditionAnswer": "The condition's `answer` is a time, matched exactly as text, so `09:30` doesn't match `09:30:00`.",
+    "scoring": null,
+    "validator": {
+      "intro": "This one keeps the time within the clinic's opening hours:",
+      "code": "// Times are HH:MM text, so they compare as text.\nconst OPENS = '08:00';\nconst CLOSES = '18:00';\n\nexport const validators = [\n  {\n    field: 'preferred_time',\n    validate: ({ value }) =>\n      typeof value === 'string' && (value < OPENS || value > CLOSES) ? 'Choose a time between 08:00 and 18:00.' : null,\n  },\n];\n",
+      "fails": "19:30",
+      "message": "Choose a time between 08:00 and 18:00.",
+      "passes": "09:30"
+    }
+  },
+  "scale": {
+    "page": "linear-scale",
+    "name": "a linear scale",
+    "field": "booking_ease",
+    "sends": "the chosen point, as a number",
+    "unanswered": "With no point chosen",
+    "example": 4,
+    "stored": 4,
+    "storedNote": "A plain decimal string, such as `\"4\"`, is also accepted, and stored as the number `4`.",
+    "conditionAnswer": "The condition's `answer` is a number.",
+    "scoring": "answer",
+    "validator": null
+  },
+  "rating": {
+    "page": "rating",
+    "name": "a rating",
+    "field": "checkin_rating",
+    "sends": "the number of stars chosen",
+    "unanswered": "With no star chosen",
+    "example": 5,
+    "stored": 5,
+    "storedNote": "A plain decimal string, such as `\"5\"`, is also accepted, and stored as the number `5`.",
+    "conditionAnswer": "The condition's `answer` is a number.",
+    "scoring": "answer",
+    "validator": null
+  },
+  "country": {
+    "page": "respondents-country",
+    "name": "a Respondent's country question",
+    "field": "country",
+    "sends": "the country's name",
+    "unanswered": "With no country chosen",
+    "example": "Canada",
+    "stored": "Canada",
+    "storedNote": "The name must be one of `COUNTRIES`, exported from `@zoworkhq/forms/core`.",
+    "conditionAnswer": "The condition's `answer` is a country's name, exactly as in `COUNTRIES`.",
+    "scoring": null,
+    "validator": null
+  },
+  "choice": {
+    "page": "multiple-choice",
+    "name": "a multiple choice question",
+    "field": "attend_format",
+    "sends": "the chosen option's code",
+    "unanswered": "With nothing chosen",
+    "example": "video",
+    "stored": { "code": "video", "label": "Video" },
+    "conditionAnswer": "The condition's `answer` is an option's code.",
+    "scoring": "option",
+    "validator": null
+  },
+  "dropdown": {
+    "page": "dropdown",
+    "name": "a dropdown",
+    "field": "referral_source",
+    "sends": "the chosen option's code",
+    "unanswered": "With nothing chosen",
+    "example": "self",
+    "stored": { "code": "self", "label": "Self" },
+    "conditionAnswer": "The condition's `answer` is an option's code.",
+    "scoring": "option",
+    "validator": {
+      "intro": "This one takes only the referrals the clinic books online:",
+      "code": "// The referrals this clinic books online. It books the others by phone.\nconst BOOKED_ONLINE = ['self', 'family_member', 'primary_care_provider', 'therapist_or_counselor'];\n\nexport const validators = [\n  {\n    field: 'referral_source',\n    validate: ({ value }) =>\n      typeof value === 'string' && !BOOKED_ONLINE.includes(value) ? 'Call the front desk to book this referral.' : null,\n  },\n];\n",
+      "fails": "insurance_company",
+      "message": "Call the front desk to book this referral.",
+      "passes": "self"
+    }
+  },
+  "checkbox": {
+    "page": "checkboxes",
+    "name": "a checkboxes question",
+    "field": "available_days",
+    "sends": "the ticked options' codes, in the order chosen",
+    "unanswered": "With nothing ticked",
+    "example": ["monday", "friday"],
+    "stored": [
+      { "code": "monday", "label": "Monday" },
+      { "code": "friday", "label": "Friday" }
+    ],
+    "storedNote": "The options keep the order they were sent in.",
+    "conditionAnswer": "The condition's `answer` is an option's code, and it passes when that option is among those ticked.",
+    "scoring": "options",
+    "validator": {
+      "intro": "This one asks for at least two days:",
+      "code": "export const validators = [\n  {\n    field: 'available_days',\n    validate: ({ value }) => (Array.isArray(value) && value.length < 2 ? 'Choose at least two days.' : null),\n  },\n];\n",
+      "fails": ["monday"],
+      "message": "Choose at least two days.",
+      "passes": ["monday", "friday"]
+    }
+  },
+  "ranking": {
+    "page": "ranking",
+    "name": "a ranking",
+    "field": "therapist_priorities",
+    "sends": "the ranked options' codes, in ranked order",
+    "unanswered": "With nothing ranked",
+    "example": ["cost", "distance_from_home", "appointment_availability", "therapists_specialty"],
+    "stored": [
+      { "code": "cost", "label": "Cost" },
+      { "code": "distance_from_home", "label": "Distance from home" },
+      { "code": "appointment_availability", "label": "Appointment availability" },
+      { "code": "therapists_specialty", "label": "Therapist's specialty" }
+    ],
+    "storedNote": "The options keep the order they were sent in, so the first is ranked 1.",
+    "conditionAnswer": "The condition's `answer` is an option's code, and it passes when that option is ranked, in any place.",
+    "scoring": null,
+    "validator": null
+  },
+  "matrix": {
+    "page": "matrix",
+    "name": "a matrix",
+    "field": "visit_satisfaction",
+    "sends": "each answered row's code, with its chosen column's code",
+    "unanswered": "With no row answered",
+    "example": { "booking": "satisfied" },
+    "stored": [
+      { "row": { "code": "booking", "label": "Booking" }, "column": { "code": "satisfied", "label": "Satisfied" } }
+    ],
+    "storedNote": "Only answered rows are listed, in the form's order.",
+    "conditionAnswer": null,
+    "scoring": "columns",
+    "validator": null
+  },
+  "grid": {
+    "page": "grid",
+    "name": "a grid",
+    "field": "weekly_availability",
+    "sends": "each answered row's code, with its answered cells by column code",
+    "unanswered": "With no cell answered",
+    "example": { "monday": { "available": "yes" } },
+    "stored": [
+      {
+        "row": { "code": "monday", "label": "Monday" },
+        "cells": [{ "column": { "code": "available", "label": "Available" }, "value": { "code": "yes", "label": "Yes" } }]
+      }
+    ],
+    "storedNote": "Only answered rows and cells are listed, in the form's order. A choice cell is stored with its option's label, and a text cell as its text.",
+    "conditionAnswer": null,
+    "scoring": null,
+    "validator": null
+  }
+}

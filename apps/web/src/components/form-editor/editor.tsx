@@ -204,6 +204,7 @@ import { canEditAs, useMe } from "@/lib/use-can-edit";
 import { SETTINGS_PANE_HEADING_ID, SETTINGS_PANE_ID, SettingsPaneHandle, useSettingsPane } from "./settings-pane";
 import { SaveStatus, useSaveAnnouncement } from "./save-status";
 import { LeaveLink } from "./leave-link";
+import { OPERATOR_TEXT } from "./operator-text";
 import { StaleSaveDialog } from "./stale-save-dialog";
 import { BlockChips, BlockIcon, BlockPreview, DropLine, GroupBox, PAGE_BOX, PAGE_HEADER, PageLabel, RequiredMark } from "./canvas-preview";
 import {
@@ -1157,17 +1158,6 @@ function PositionPanel({
 }
 
 /* ---------- conditional logic panel ---------- */
-
-const OPERATOR_TEXT: Record<ConditionOperator, string> = {
-  exists: "is answered",
-  "=": "is",
-  "!=": "is not",
-  contains: "includes",
-  ">": "is greater than",
-  "<": "is less than",
-  ">=": "is at least",
-  "<=": "is at most",
-};
 
 /** A starting answer that satisfies the rules for `source`. */
 function defaultAnswer(source: Block): string | number {

@@ -60,8 +60,8 @@ export type CodeExample = {
   file: string;
 };
 
-/** The fences the test reads: those of every developer page. */
-export const isDeveloperPage = (slug: string) => /^(integrate|compliance)\//.test(slug);
+/** The fences the test reads: those of every developer page, and of the integration examples. */
+export const isDeveloperPage = (slug: string) => /^(integrate|compliance|examples)\//.test(slug);
 
 /** Where the extracted files go. Git ignores it, and tsconfig's globs skip a folder starting with a dot. */
 export const CHECK_DIR = path.join(process.cwd(), ".docs-check");

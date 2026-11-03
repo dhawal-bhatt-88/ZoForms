@@ -4,7 +4,7 @@ summary: One answer from a list of options, shown as a select menu.
 template: question-type
 badges: [Coded options]
 appliesTo: [builder, package]
-updated: 2026-10-28
+updated: 2026-11-03
 prev: /docs
 next: /docs/build/question-types/short-answer
 ---
@@ -90,36 +90,7 @@ What the rendered form exposes to assistive technology:
 
 ## For developers
 
-**Payload.** The browser sends the chosen option's code:
-
-```json
-{ "referral_source": { "state": "answered", "value": "primary_care_provider" } }
-```
-
-With nothing chosen, it sends `{ "state": "empty" }`. A dropdown that is hidden by its conditions isn't in the payload at all.
-
-**`prepareSubmission`.** On your server the answer comes back with its label, looked up from the schema you pass, never from the request:
-
-```json
-{ "referral_source": { "state": "answered", "value": { "code": "primary_care_provider", "label": "Primary care provider" } } }
-```
-
-**Conditions.** As the source of a condition, a dropdown offers is answered, is and is not. The condition stores the option's code.
-
-**Scoring.** Inside a group with a score, give each option a Score. In the group's formula, the dropdown counts as the chosen option's score. Every option needs one.
-
-**Validators.** A validator receives the code as `value`. This one asks who referred the client when the answer is Other:
-
-```js
-export const validators = [
-  {
-    field: 'referral_source',
-    // referral_other: a Short answer question in the same form, for the referral when it's Other.
-    validate: ({ value, answers }) =>
-      value === 'other' && !answers.referral_other ? 'Say who referred the client.' : null,
-  },
-];
-```
+<ForDevelopers type="dropdown" />
 
 ## Troubleshooting
 

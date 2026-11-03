@@ -1,0 +1,59 @@
+---
+title: Your own validator
+summary: A client ID in your clinic's own format, and a date that can't come before another, checked by your code in the browser and on your server.
+template: example
+badges: [Validation]
+appliesTo: [package]
+updated: 2026-11-03
+prev: /docs/examples/follow-up-question
+next: /docs/compliance/data-flow
+---
+
+<LiveExample form="own-validator" validators="own-validator" />
+
+## Try this
+
+<TryThis>
+
+- Type `12345` in **Client ID**, give both dates, and select **Submit**. Under Client ID: "Enter the client ID as DEMO- and six digits, such as DEMO-123456." The summary at the top lists it as "Client ID": Enter the client ID as DEMO- and six digits, such as DEMO-123456.
+- Change it to `DEMO-123456`, make **First session date** a day before **Referral date**, and select **Submit**. Under First session date: "The first session can't be before the referral date."
+- Clear **Referral date** and select **Submit**. Only "Referral date" is required shows: with no referral date to compare with, the first-session rule passes.
+- Give a first session on or after the referral date, and select **Submit**. The form is sent. On **Server output**, `prepareSubmission` ran the same validators on the body and returned `ok: true`.
+
+</TryThis>
+
+## How it works
+
+The validators are a module in your app. Nothing about them is in the form file:
+
+```js file=validators.js check=browser
+// The clinic's client IDs: DEMO- and six digits.
+const CLIENT_ID = /^DEMO-\d{6}$/;
+
+export const validators = [
+  {
+    field: 'client_id',
+    validate: ({ value }) =>
+      typeof value === 'string' && !CLIENT_ID.test(value.trim())
+        ? 'Enter the client ID as DEMO- and six digits, such as DEMO-123456.'
+        : null,
+  },
+  {
+    field: 'first_session',
+    // answers holds the questions that are answered and pass their own checks.
+    validate: ({ value, answers }) =>
+      typeof value === 'string' && typeof answers.referral_date === 'string' && value < answers.referral_date
+        ? "The first session can't be before the referral date."
+        : null,
+  },
+];
+```
+
+- Each entry names a question by its block id, in `field`, and returns a message, or `null` when the answer is fine.
+- `value` is the answer as the browser sends it: text here, with each date as `YYYY-MM-DD`, so dates compare as text. Checking its type first lets the code pass a strict type-check too.
+- A validator runs only when its question shows, is answered and passes the form's own checks. An empty Client ID gets the form's "is required" message, never this one.
+- `answers` holds the questions that are answered and pass their own checks. Until Referral date has an answer, the first-session rule has nothing to compare with.
+- In the summary, the form puts the question's label in front of your message, as it does for its own.
+- The page passes the array to `FormRenderer`, as the **React code** tab shows, and your server passes the same array to `prepareSubmission(schema, body, { validators })`. Anyone can post straight to your endpoint, so the server's check is the one that holds. **Server output** runs it here, in your browser.
+
+[Add your own validation](/docs/integrate/custom-validation) covers the server, TypeScript and what happens when a validator throws.

@@ -70,13 +70,13 @@ export const MARKDOWN_COMPONENTS: Record<string, Convert> = {
   Tip: callout("Tip"),
   Warning: callout("Warning"),
 
-  LiveExample: (_, { form }, __, ctx) => {
+  LiveExample: (_, { form, validators }, __, ctx) => {
     const tabs = TEMPLATES[ctx.page.frontmatter.template].example?.tabs ?? [];
     const url = ctx.origin + docsHref(ctx.page.slug);
     return [
       p(strong("Live example."), text(" Try it on the web page: "), link(url, url), text(". The form file:")),
       code("json", JSON.stringify(ctx.exampleForm(form), null, 2)),
-      ...(tabs.includes("react") ? [p(text("Rendered in React:")), code("jsx", exampleReactCode(form))] : []),
+      ...(tabs.includes("react") ? [p(text("Rendered in React:")), code("jsx", exampleReactCode(form, validators !== undefined))] : []),
     ];
   },
 

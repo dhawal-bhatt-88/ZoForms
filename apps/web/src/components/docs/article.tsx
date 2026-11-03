@@ -11,6 +11,7 @@ import { exampleReactCode, formExcerpt } from "@/lib/docs/example-code";
 import type { MARKDOWN_COMPONENTS } from "@/lib/docs/markdown";
 import { remarkCodeTitles, remarkHeadingIds } from "@/lib/docs/mdast";
 import { markdownFor } from "@/lib/docs/page-markdown";
+import { remarkForDevelopers } from "@/lib/docs/question-values";
 import { rendererStyles, rendererVersion } from "@/lib/docs/renderer";
 import { TEMPLATES } from "@/lib/docs/templates";
 import { Note, Tip, Warning } from "./callouts";
@@ -124,7 +125,7 @@ function components(page: DocsPage) {
     Doors,
     Door,
     Architecture,
-    LiveExample: ({ form }: { form: string }) => {
+    LiveExample: ({ form, validators }: { form: string; validators?: string }) => {
       if (!template.example) throw new Error(`${page.file}: the ${page.frontmatter.template} template has no live example`);
       return (
         <LiveExample
@@ -134,7 +135,8 @@ function components(page: DocsPage) {
           css={rendererStyles()}
           tabs={template.example.tabs}
           density={template.example.density}
-          reactCode={template.example.tabs.includes("react") ? exampleReactCode(form) : undefined}
+          reactCode={template.example.tabs.includes("react") ? exampleReactCode(form, validators !== undefined) : undefined}
+          validators={validators}
         />
       );
     },
@@ -148,7 +150,8 @@ export async function DocsArticle({ page }: { page: DocsPage }) {
   const { default: Content } = await evaluate(page.body, {
     ...runtime,
     development: false,
-    remarkPlugins: [remarkGfm, remarkHeadingIds as never, remarkCodeTitles as never],
+    // remarkForDevelopers first: the sections it adds have code titles of their own.
+    remarkPlugins: [remarkGfm, remarkForDevelopers as never, remarkHeadingIds as never, remarkCodeTitles as never],
   });
 
   return (

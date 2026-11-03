@@ -24,17 +24,21 @@ export function formExcerpt(schema: Record<string, unknown>, blockId: string, fi
  * The "React code" tab: what a host writes to render this example. The docs
  * page itself adds two things a host doesn't need, a shadow root that keeps
  * the builder's own CSS off the form and a stand-in endpoint, so the tab says
- * so rather than showing them.
+ * so rather than showing them. An example with validators imports them from
+ * the validators.js its page shows.
  */
-export function exampleReactCode(name: string): string {
+export function exampleReactCode(name: string, withValidators = false): string {
   const component = name.replace(/(^|-)(\w)/g, (_, __, c: string) => c.toUpperCase());
   return [
     "import { FormRenderer } from '@zoworkhq/forms/react';",
     "import '@zoworkhq/forms/styles.css';",
     `import schema from './${name}.json';`,
+    ...(withValidators ? ["import { validators } from './validators.js';"] : []),
     "",
     `export function ${component}() {`,
-    "  return <FormRenderer schema={schema} endpoint=\"/api/submissions\" />;",
+    withValidators
+      ? '  return <FormRenderer schema={schema} endpoint="/api/submissions" validators={validators} />;'
+      : '  return <FormRenderer schema={schema} endpoint="/api/submissions" />;',
     "}",
     "",
   ].join("\n");

@@ -1,9 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { isAnswerable, prepareSubmission, type Block, type FormSchema } from "@zoworkhq/forms/core";
+import { prepareSubmission } from "@zoworkhq/forms/core";
 import { CONTENT_DIR, getPage } from "./content";
 import { textOf, walk, type MdNode } from "./mdast";
+import { firstQuestion, looseForm as formFor, stores } from "./question-forms";
+import { questionValues } from "./question-values";
 
 /*
  * "Answers and their states" (docs brief, CP3): every row of its value table,
@@ -12,43 +14,6 @@ import { textOf, walk, type MdNode } from "./mdast";
  */
 
 const page = getPage("integrate/concepts/answers")!;
-
-/** The form a row's question page renders, with nothing required, so one answer is a whole body. */
-function formFor(slug: string): FormSchema {
-  const schema = JSON.parse(fs.readFileSync(path.join(CONTENT_DIR, `${slug}.form.json`), "utf8")) as FormSchema;
-  // Required and complete-answer checks don't change what an answer is stored as.
-  const loosen = (blocks: Block[]): Block[] =>
-    blocks.map((block) => {
-      const b = { ...block } as Record<string, unknown>;
-      delete b.required;
-      delete b.completeRequired;
-      if (Array.isArray(b.columns)) b.columns = (b.columns as Record<string, unknown>[]).map(({ required: _, ...column }) => column);
-      if (Array.isArray(b.blocks)) b.blocks = loosen(b.blocks as Block[]);
-      return b as unknown as Block;
-    });
-  return { ...schema, blocks: loosen(schema.blocks) };
-}
-
-const firstQuestion = (blocks: readonly Block[]): Block | undefined => {
-  for (const block of blocks) {
-    if (isAnswerable(block)) return block;
-    const inner = "blocks" in block && Array.isArray(block.blocks) ? firstQuestion(block.blocks as Block[]) : undefined;
-    if (inner) return inner;
-  }
-  return undefined;
-};
-
-/** What prepareSubmission stores for one answer to a form's first question. */
-function stores(schema: FormSchema, value: unknown) {
-  const id = firstQuestion(schema.blocks)!.id;
-  const result = prepareSubmission(schema, {
-    idempotencyKey: "demo-key-1",
-    submittedAt: "2026-10-30T09:15:00.000Z",
-    answers: { [id]: { state: "answered", value } },
-  });
-  if (result.ok === false) return { errors: result.errors.map((e) => e.message) };
-  return result.submission.answers[id];
-}
 
 const rows = (() => {
   const found = [...walk(page.tree)].find((n) => n.type === "table" && textOf(n.children![0].children![0]) === "Question type");
@@ -67,6 +32,13 @@ describe("the value formats on the answers page", () => {
 
   it.each(rows.map((r) => [r.type, r] as const))("%s: what the body sends is stored as the page says", (_, row) => {
     expect(stores(formFor(row.slug), row.sent)).toEqual({ state: "answered", value: row.stored });
+  });
+
+  it("say what each question page's For developers section says", () => {
+    const sections = Object.values(questionValues()).map((v) => ({ slug: `build/question-types/${v.page}`, sent: v.example, stored: v.stored }));
+    expect(rows.map(({ slug, sent, stored }) => ({ slug, sent, stored })).sort((a, b) => a.slug.localeCompare(b.slug))).toEqual(
+      sections.sort((a, b) => a.slug.localeCompare(b.slug)),
+    );
   });
 });
 

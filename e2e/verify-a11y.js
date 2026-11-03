@@ -106,6 +106,7 @@ const DOCS_PAGES = [
   ["Show a question only when it applies", "/docs/build/show-questions-conditionally"],
   ["How Zowork Forms fits your app", "/docs/integrate/overview"],
   ["Quickstart", "/docs/integrate/quickstart"],
+  ["Build an intake page in Next.js", "/docs/integrate/tutorial-nextjs"],
   ["Validate and store submissions", "/docs/integrate/validate-and-store"],
   ["Add your own validation", "/docs/integrate/custom-validation"],
   ["Send the submission with your app's sign-in", "/docs/integrate/sign-in"],
@@ -128,6 +129,7 @@ const DOCS_PAGES = [
   ["Answers and their states", "/docs/integrate/concepts/answers"],
   ["What is stored in the browser", "/docs/integrate/concepts/browser-storage"],
   ["Follow-up question", "/docs/examples/follow-up-question"],
+  ["Your own validator", "/docs/examples/own-validator"],
   ["Where respondents' data goes", "/docs/compliance/data-flow"],
 ];
 
@@ -354,6 +356,12 @@ const structure = [];
       await P.getByText("Form submitted successfully.").waitFor();
       await P.getByRole("tab", { name: "Server output" }).click();
       await audit(P, "Docs", "Follow-up question: submitted, Server output tab", theme, { nav: true });
+
+      await go("/docs/examples/own-validator");
+      await P.getByLabel("Client ID", { exact: true }).fill("12345");
+      await P.getByRole("button", { name: "Submit" }).click();
+      await P.locator(".zf-error-summary").waitFor();
+      await audit(P, "Docs", "Your own validator: the validator's error shown", theme, { nav: true });
 
       await go("/docs");
       await P.getByRole("searchbox", { name: "Search the docs" }).fill("condition");

@@ -194,8 +194,17 @@ describe("the messages the developer pages quote", () => {
     expect(pages.flatMap(quotedIn).length).toBeGreaterThan(20);
   });
 
+  /** What an example page may also quote: its form file's labels, and its own validators' messages. */
+  const ownWords = (page: DocsPage) => {
+    if (!page.slug.startsWith("examples/")) return "";
+    const dir = path.join(CONTENT_DIR, "examples");
+    const name = page.slug.split("/")[1];
+    return [`${name}.form.json`, `${name}.validators.js`].filter((f) => fs.existsSync(path.join(dir, f))).map((f) => read(path.join(dir, f))).join("\n");
+  };
+
   it.each(pages.map((p) => [p.slug, p] as const))("%s quotes only real messages", (_, page) => {
-    expect(quotedIn(page).filter((m) => !inCorpus(m))).toEqual([]);
+    const own = ownWords(page);
+    expect(quotedIn(page).filter((m) => !inCorpus(m) && !own.includes(m))).toEqual([]);
   });
 
   it("fails on a message the package doesn't have", () => {

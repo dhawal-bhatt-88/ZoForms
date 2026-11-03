@@ -80,12 +80,7 @@ export const DOCS_NAV: DocsNavSection[] = [
     items: [
       { title: "How Zowork Forms fits your app", slug: "integrate/overview", status: "live" },
       { title: "Quickstart", slug: "integrate/quickstart", status: "live" },
-      {
-        title: "Build an intake page in Next.js",
-        slug: "integrate/tutorial-nextjs",
-        status: "planned",
-        notes: "Developer docs brief, CP5: App Router, 'use client', a route handler with prepareSubmission, deduping on idempotencyKey, onRenderError, a signed-in scope.",
-      },
+      { title: "Build an intake page in Next.js", slug: "integrate/tutorial-nextjs", status: "live" },
       {
         title: "How-to guides",
         pages: [
@@ -126,7 +121,10 @@ export const DOCS_NAV: DocsNavSection[] = [
   },
   {
     title: "Examples",
-    items: [{ title: "Follow-up question", slug: "examples/follow-up-question", status: "live" }],
+    items: [
+      { title: "Follow-up question", slug: "examples/follow-up-question", status: "live" },
+      { title: "Your own validator", slug: "examples/own-validator", status: "live" },
+    ],
   },
   {
     title: "Compliance and security",
