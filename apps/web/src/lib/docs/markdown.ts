@@ -5,7 +5,8 @@ import type { DocsPage } from "./content";
 import { exampleReactCode, formExcerpt } from "./example-code";
 import { attributesOf, type MdNode } from "./mdast";
 import { docsHref, sectionPages } from "./nav";
-import type { Reference, ReferenceType, TypeReference } from "./reference";
+import { cssTable, richParts, type CssCell, type CssTableName } from "./css-table";
+import type { CssReference, Reference, ReferenceType, TypeReference } from "./reference";
 import { TEMPLATES } from "./templates";
 
 /*
@@ -27,6 +28,8 @@ export type MarkdownContext = {
   reference?: Reference | null;
   /** The page's other generated tables, when it has any. */
   types?: TypeReference | null;
+  /** The CSS reference page's classes and custom properties. */
+  css?: CssReference | null;
 };
 
 function referenceOf(ctx: MarkdownContext): Reference {
@@ -151,6 +154,22 @@ export const MARKDOWN_COMPONENTS: Record<string, Convert> = {
             };
           }),
         ],
+      } as MdNode,
+    ];
+  },
+
+  CssTable: (_, { of }, __, ctx) => {
+    if (!ctx.css) throw new Error(`${ctx.page.file}: no ${ctx.page.slug}.css.json beside it`);
+    const { headers, rows } = cssTable(ctx.css, of as CssTableName);
+    const cell = (c: CssCell): MdNode => ({
+      type: "tableCell",
+      children: c.kind === "rich" ? richParts(c.value).map((part) => (part.code ? { type: "inlineCode", value: part.value } : text(part.value))) : [c.kind === "code" ? { type: "inlineCode", value: c.value } : text(c.value)],
+    });
+    return [
+      {
+        type: "table",
+        align: [],
+        children: [{ type: "tableRow", children: headers.map((h) => cell({ kind: "text", value: h })) }, ...rows.map((row) => ({ type: "tableRow", children: row.map(cell) }))],
       } as MdNode,
     ];
   },

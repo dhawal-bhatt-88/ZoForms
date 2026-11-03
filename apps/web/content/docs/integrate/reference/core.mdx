@@ -1,0 +1,179 @@
+---
+title: Other /core exports
+summary: The rest of @zoworkhq/forms/core that a host might use. Checking a form file, walking its blocks, visibility, the answers a submission may carry, and the package's limits.
+template: data-reference
+badges: [Server]
+appliesTo: [package]
+updated: 2026-11-03
+prev: /docs/integrate/reference/css
+next: /docs/integrate/concepts/answers
+---
+
+## At a glance
+
+```js check=esm
+import { assertSchemaIntegrity, getSubmittableAnswers, walkBlocks, MAX_FREE_TEXT_LENGTH } from '@zoworkhq/forms/core';
+```
+
+- **Most hosts need only `prepareSubmission`.** It already calls everything on this page that it needs. These are for when you want one piece on its own.
+- **They run anywhere,** in Node 20 or later or in a browser, with no React. `/core` has ES module and CommonJS builds.
+- **Every function that reads the form's blocks checks the file first,** with `assertSchemaIntegrity`, and throws for a file it refuses. The result is cached per form object, so repeated calls are cheap.
+- **Visibility is root-level only** in `getVisibleBlockIds` and `getDisplayedBlockIds`. Questions inside a repeating group are judged entry by entry, so they aren't in those sets. `getSubmittableAnswers`, `validateSubmission` and `prepareSubmission` handle each entry.
+
+[`prepareSubmission` and `validateSubmission`](/docs/integrate/reference/prepare-submission) and [Read scores](/docs/integrate/scores) cover the main functions. The types `FormRendererProps` and `DraftsOptions` come from `@zoworkhq/forms/react`: see [`FormRenderer`](/docs/integrate/reference/form-renderer).
+
+## Checking a form file
+
+<Signature of="assertSchemaIntegrity" />
+
+Throws an `Error` naming the problem when the file is one the builder would never produce: an unknown type, a bad condition, an unsupported `schemaVersion` and the like. It returns nothing otherwise.
+
+<Signature of="getSchemaWarnings" />
+
+Problems that don't stop the form showing, but that its author should know about: image, video and audio blocks whose source isn't valid or recognised, and so never show, and video captions that aren't recognised or are ignored. It logs nothing. A development build of the form reports them in the console.
+
+```js file=check-form.js check=esm run=node
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { assertSchemaIntegrity, getSchemaWarnings } from '@zoworkhq/forms/core';
+
+const schema = JSON.parse(readFileSync('./intake-form.json', 'utf8'));
+
+assertSchemaIntegrity(schema);
+assert.deepEqual(getSchemaWarnings(schema), []);
+
+const broken = { ...schema, blocks: [{ id: 'x', type: 'nope', label: 'X' }] };
+assert.throws(() => assertSchemaIntegrity(broken), { message: 'Block "x" has unknown type "nope".' });
+```
+
+## Walking the blocks
+
+<Signature of="walkBlocks" />
+
+<FieldList of="TreeEntry">
+<Field name="block">
+The block.
+</Field>
+<Field name="ancestors">
+The pages and groups around it, outermost first. Empty at the top level.
+</Field>
+<Field name="depth">
+How many pages and groups it's inside: 0 at the top level.
+</Field>
+<Field name="repeats">
+The repeating groups around it, outermost first. A repeating group's own entry doesn't include itself.
+</Field>
+</FieldList>
+
+Depth first, and a page or group comes before what's inside it. A repeating group's questions are visited once, as the template for one entry. This is the order the form reads in, and the order its errors are listed in.
+
+<Signature of="isAnswerable" />
+
+<Signature of="isGroup" />
+
+<Signature of="isPage" />
+
+<Signature of="isContainer" />
+
+<Signature of="isRepeating" />
+
+<Signature of="isPaged" />
+
+A block's `type` alone doesn't narrow `Block` in TypeScript, so use these. `isAnswerable` is true for the types in `ANSWERABLE_TYPES`. `isPaged` is true when the form's top level holds pages.
+
+```js file=list-questions.js check=esm run=node
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { isAnswerable, isPaged, walkBlocks } from '@zoworkhq/forms/core';
+
+const schema = JSON.parse(readFileSync('./intake-form.json', 'utf8'));
+
+const questions = [...walkBlocks(schema.blocks)].filter(({ block }) => isAnswerable(block)).map(({ block }) => block.id);
+assert.deepEqual(questions, ['preferred_name', 'contact_email', 'attend_format', 'sees_therapist', 'therapist_name', 'reason_for_visit']);
+assert.equal(isPaged(schema), false);
+```
+
+## Visibility and pages
+
+<Signature of="getVisibleBlockIds" />
+
+The ids of every top-level block whose conditions pass and whose pages and groups are visible: questions, display blocks, groups and pages alike.
+
+<Signature of="getDisplayedBlockIds" />
+
+The visible blocks minus those that show nothing: a page or group with nothing to show inside it, a blank text block, an image without a valid source, and `hidden` blocks. It's about what a person sees, and never decides what's checked or sent.
+
+<Signature of="getDisplayedPageIds" />
+
+The pages a person steps through, in order. A hidden page and one with nothing to show are skipped. Empty for a form without pages.
+
+<Signature of="getCompletedPageIds" />
+
+The displayed pages that have been visited and pass their checks right now. It's worked out from the answers every time, so a page stops being complete as soon as an earlier answer shows a required question on it. Pass the same `validators` as the form, so a page with one of their errors isn't complete either.
+
+## The answers a submission may carry
+
+<Signature of="getSubmittableAnswers" />
+
+What the browser sends, from a set of answers: visible questions only. It drops answers to hidden questions, and anything keyed by an unknown id, a group or a display block. Text that is only spaces becomes `{ state: 'empty' }`, and any other text is kept exactly as typed. It's the same filter the form applies, so your server can apply it too. `prepareSubmission` does more: it also checks each answer and adds labels.
+
+```js file=filter-answers.js check=esm run=node
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { getSubmittableAnswers, getVisibleBlockIds } from '@zoworkhq/forms/core';
+
+const schema = JSON.parse(readFileSync('./intake-form.json', 'utf8'));
+/** @type {import('@zoworkhq/forms/core').Answers} */
+const answers = {
+  preferred_name: { state: 'answered', value: '  ' },
+  sees_therapist: { state: 'answered', value: 'no' },
+  therapist_name: { state: 'answered', value: 'Dr. Demo' },
+};
+
+// "Therapist's name" shows only when the client sees a therapist.
+assert.equal(getVisibleBlockIds(schema, answers).has('therapist_name'), false);
+assert.deepEqual(getSubmittableAnswers(schema, answers), {
+  preferred_name: { state: 'empty' },
+  sees_therapist: { state: 'answered', value: 'no' },
+});
+```
+
+## The stored answers' types
+
+What `prepareSubmission` returns in `submission.answers`: the same shape as `Answers`, with coded answers labelled. See [Answers and their states](/docs/integrate/concepts/answers).
+
+<Signature of="PreparedAnswers" />
+
+<Signature of="PreparedAnswerValue" />
+
+<Signature of="PreparedValue" />
+
+<Signature of="MatrixSelection" />
+
+<Signature of="GridRowAnswer" />
+
+## Limits and lists
+
+| Export | Value | What it is |
+|---|---|---|
+| `MAX_FREE_TEXT_LENGTH` | `20000` | The longest answer any free-text question accepts, in characters as JavaScript counts them. A ceiling against hand-made bodies. |
+| `DEFAULT_MAX_OCCURS` | `1000` | The most entries a repeating group may have when the author set no maximum. |
+| `ANSWERABLE_TYPES` | A `Set` of 18 types | The block types that take an answer. Only these are checked and sent. |
+| `COUNTRIES` | A list of 16 names | The choices of a Respondent's country question, which is also what it accepts. |
+
+```js file=limits.js check=esm run=node
+import assert from 'node:assert/strict';
+import { ANSWERABLE_TYPES, COUNTRIES, DEFAULT_MAX_OCCURS, MAX_FREE_TEXT_LENGTH } from '@zoworkhq/forms/core';
+
+assert.equal(MAX_FREE_TEXT_LENGTH, 20000);
+assert.equal(DEFAULT_MAX_OCCURS, 1000);
+assert.equal(ANSWERABLE_TYPES.size, 18);
+assert.equal(COUNTRIES.length, 16);
+assert.ok(COUNTRIES.includes('Canada'));
+```
+
+## Related
+
+- [`prepareSubmission` and `validateSubmission`](/docs/integrate/reference/prepare-submission): the main server functions.
+- [The form file](/docs/integrate/reference/form-file): the types these functions read.
+- [Read scores](/docs/integrate/scores): `calculateScores`.

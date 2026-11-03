@@ -121,3 +121,18 @@ describe("a viewer", () => {
     expect(cancel.getAttribute("aria-describedby")).toBe(save.getAttribute("aria-describedby"));
   });
 });
+
+describe("Save progress", () => {
+  it("links 'On the app's server' to its setup guide, in a new tab, named for where it goes", async () => {
+    const { pane } = await open();
+    await userEvent.click(screen.getAllByRole("button", { name: "Form settings" })[0]);
+    const link = pane().getByRole("link", { name: "Developer setup guide: Save progress (drafts) (opens in a new tab)" });
+    expect(link.getAttribute("href")).toBe("/docs/integrate/drafts");
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+    // Outside the option's label, so the radio keeps its own name; still usable while the option is unavailable.
+    const radio = pane().getByRole("radio", { name: /^On the app's server/ });
+    expect(radio.closest("label")?.contains(link)).toBe(false);
+    expect((radio as HTMLInputElement).disabled).toBe(true);
+  });
+});

@@ -1,0 +1,808 @@
+{
+  "package": "@zoworkhq/forms 0.28.0",
+  "source": "dist/react/index.d.ts (classNames), dist/styles.css (defaults and hooks), README.md (each property's table and use)",
+  "classes": [
+    {
+      "key": "form",
+      "name": "zf-form",
+      "doc": "The `<form>` — and, in device and server modes, the `<div>` the draft loading line and restore prompt stand in until the form shows, so `.zf-form` rules (width, centring) place them exactly where the form will be."
+    },
+    {
+      "key": "formSubmitting",
+      "name": "zf-form--submitting",
+      "doc": "On the form while a submission is in flight."
+    },
+    {
+      "key": "formFailed",
+      "name": "zf-form--failed",
+      "doc": "On the form after a submission failed."
+    },
+    {
+      "key": "block",
+      "name": "zf-block",
+      "doc": "Root element of every block."
+    },
+    {
+      "key": "blockRequired",
+      "name": "zf-block--required",
+      "doc": "Root element of a block that is required."
+    },
+    {
+      "key": "blockInvalid",
+      "name": "zf-block--invalid",
+      "doc": "Root element of a block with validation errors."
+    },
+    {
+      "key": "label",
+      "name": "zf-label",
+      "doc": "A block's `<label>` or `<legend>` — the question's label."
+    },
+    {
+      "key": "required",
+      "name": "zf-required",
+      "doc": "The required marker: an empty `aria-hidden` `<span>` at the end of a required question's label or legend, and of a required grid column's header and card labels. The stylesheet draws its \" *\" with `::after`, so it is never part of an accessible name."
+    },
+    {
+      "key": "help",
+      "name": "zf-help",
+      "doc": "A question's help text (its `description`): a `<div id=\"<block id>__help\">` under the label, before the control. The control's `aria-describedby` lists it before any error. Presentational blocks never show help."
+    },
+    {
+      "key": "input",
+      "name": "zf-input",
+      "doc": "Text-like `<input>`s: short, email, phone, link, number, date, time."
+    },
+    {
+      "key": "textarea",
+      "name": "zf-textarea",
+      "doc": "The `<textarea>`: long."
+    },
+    {
+      "key": "select",
+      "name": "zf-select",
+      "doc": "`<select>`: dropdown, country."
+    },
+    {
+      "key": "option",
+      "name": "zf-option",
+      "doc": "Each option's wrapping `<label>`: choice, checkbox, multiselect, scale."
+    },
+    {
+      "key": "optionInput",
+      "name": "zf-option-input",
+      "doc": "The radio or checkbox inside an option."
+    },
+    {
+      "key": "clearSelection",
+      "name": "zf-clear-selection",
+      "doc": "The button that clears an optional question's answer, shown only while it has one: \"Clear selection\" after a choice's options or a matrix's table, \"Clear\" in a grid radio cell of an optional column."
+    },
+    {
+      "key": "error",
+      "name": "zf-error",
+      "doc": "The container holding a block's validation errors."
+    },
+    {
+      "key": "errorMessage",
+      "name": "zf-error-message",
+      "doc": "One individual error message."
+    },
+    {
+      "key": "errorSummary",
+      "name": "zf-error-summary",
+      "doc": "The summary of errors shown at the top of the form, or of the current page."
+    },
+    {
+      "key": "errorSummaryTitle",
+      "name": "zf-error-summary-title",
+      "doc": "The summary's heading, \"There is a problem\"."
+    },
+    {
+      "key": "errorSummaryList",
+      "name": "zf-error-summary-list",
+      "doc": "The summary's list of links, one per error."
+    },
+    {
+      "key": "matrix",
+      "name": "zf-matrix",
+      "doc": "The matrix `<table>`."
+    },
+    {
+      "key": "matrixRow",
+      "name": "zf-matrix-row",
+      "doc": "A matrix `<tr>`, header row included."
+    },
+    {
+      "key": "matrixCell",
+      "name": "zf-matrix-cell",
+      "doc": "A matrix `<td>`: the row label and each radio cell."
+    },
+    {
+      "key": "grid",
+      "name": "zf-grid",
+      "doc": "The grid `<table>` (contract section 14), with explicit table roles so it stays a table to assistive technology when the stylesheet lays its rows out as cards."
+    },
+    {
+      "key": "gridScroll",
+      "name": "zf-grid-scroll",
+      "doc": "The grid's own box around the table (contract 14.5): a keyboard-scrollable region named by the grid's label. The card layout switches on its width (a container query), never the viewport's; above that, a table still too wide scrolls inside it."
+    },
+    {
+      "key": "gridRow",
+      "name": "zf-grid-row",
+      "doc": "A grid `<tr>`, the header row included."
+    },
+    {
+      "key": "gridCard",
+      "name": "zf-grid-card",
+      "doc": "A body row of the grid (alongside `zf-grid-row`): a card when the grid's own width is below the narrow breakpoint."
+    },
+    {
+      "key": "gridCell",
+      "name": "zf-grid-cell",
+      "doc": "A grid answer `<td>`: one radio group, `<select>` or `<input>`."
+    },
+    {
+      "key": "gridCellLabel",
+      "name": "zf-grid-cell-label",
+      "doc": "The column's label inside each cell, `aria-hidden`: shown only in the narrow card layout, where the column headers are visually hidden. The control's own name says it."
+    },
+    {
+      "key": "gridCellInvalid",
+      "name": "zf-grid-cell--invalid",
+      "doc": "A grid cell with an error (\"Required.\" or another problem with that cell)."
+    },
+    {
+      "key": "gridColumnRequired",
+      "name": "zf-grid-column--required",
+      "doc": "A required column's header `<th>` and each of its cells: where the required marker shows."
+    },
+    {
+      "key": "ratingStar",
+      "name": "zf-rating-star",
+      "doc": "One rating button."
+    },
+    {
+      "key": "ratingStarSelected",
+      "name": "zf-rating-star--selected",
+      "doc": "A rating button at or below the chosen rating, i.e. a filled star."
+    },
+    {
+      "key": "rankingItem",
+      "name": "zf-ranking-item",
+      "doc": "One ranking button."
+    },
+    {
+      "key": "rankingItemRanked",
+      "name": "zf-ranking-item--ranked",
+      "doc": "A ranking button that currently holds a rank."
+    },
+    {
+      "key": "rankingPosition",
+      "name": "zf-ranking-position",
+      "doc": "The rank number inside a ranking button."
+    },
+    {
+      "key": "rankingStatus",
+      "name": "zf-ranking-status",
+      "doc": "A polite `role=\"status\"` line in each ranking question, one per repeat instance: announces each change (\"Speed ranked 2 of 3.\"). Visually hidden by the stylesheet; empty until needed."
+    },
+    {
+      "key": "heading",
+      "name": "zf-heading",
+      "doc": "The heading block's heading element."
+    },
+    {
+      "key": "title",
+      "name": "zf-title",
+      "doc": "The title block's heading element."
+    },
+    {
+      "key": "displayText",
+      "name": "zf-display-text",
+      "doc": "The label block's content. Deliberately not `zf-label`, which is a question's label."
+    },
+    {
+      "key": "divider",
+      "name": "zf-divider",
+      "doc": "The divider block's `<hr>`."
+    },
+    {
+      "key": "text",
+      "name": "zf-text",
+      "doc": "The text block's `<p>`: the author's plain text, line breaks kept."
+    },
+    {
+      "key": "image",
+      "name": "zf-image",
+      "doc": "The image block's `<img>`."
+    },
+    {
+      "key": "video",
+      "name": "zf-video",
+      "doc": "The video block's root: the player frame, or the native `<video>`."
+    },
+    {
+      "key": "videoEmbed",
+      "name": "zf-video--embed",
+      "doc": "On a YouTube or Vimeo video: a `<div>` holding the player's `<iframe>` at 16:9."
+    },
+    {
+      "key": "videoFile",
+      "name": "zf-video--file",
+      "doc": "On a video file: the native `<video>` itself."
+    },
+    {
+      "key": "audio",
+      "name": "zf-audio",
+      "doc": "The audio block's native `<audio>`: full width, up to the form's width."
+    },
+    {
+      "key": "group",
+      "name": "zf-group",
+      "doc": "A group's `<fieldset>`. Deliberately not `zf-block`: a group is not a question."
+    },
+    {
+      "key": "groupRoot",
+      "name": "zf-group--root",
+      "doc": "On a group at the form's root, i.e. not inside another group."
+    },
+    {
+      "key": "groupLegend",
+      "name": "zf-group-legend",
+      "doc": "A group's `<legend>`, which holds the group label as a heading (h2–h6 by depth)."
+    },
+    {
+      "key": "repeat",
+      "name": "zf-repeat",
+      "doc": "On a repeating group's `<fieldset>`, alongside `zf-group` (and `zf-group--root` at the root): a repeating group is a group, so group rules apply to it too."
+    },
+    {
+      "key": "repeatInstance",
+      "name": "zf-repeat-instance",
+      "doc": "One instance of a repeating group: a `<fieldset>` nested in the group's."
+    },
+    {
+      "key": "repeatLegend",
+      "name": "zf-repeat-legend",
+      "doc": "A repeating group's `<legend>` (alongside `zf-group-legend`), and each instance's `<legend>`, which holds \"{RepeatLabel} {n}\" one heading level below the group's."
+    },
+    {
+      "key": "repeatAdd",
+      "name": "zf-repeat-add",
+      "doc": "The Add button at the end of a repeating group: \"Add {label}\" or \"Add another {label}\"."
+    },
+    {
+      "key": "repeatRemove",
+      "name": "zf-repeat-remove",
+      "doc": "An instance's Remove button; its accessible name says which instance."
+    },
+    {
+      "key": "repeatLimit",
+      "name": "zf-repeat-limit",
+      "doc": "\"You can add up to {n}.\", shown under Add once the limit is reached."
+    },
+    {
+      "key": "repeatStatus",
+      "name": "zf-repeat-status",
+      "doc": "A polite `role=\"status\"` line in each repeating group: announces a removal, and the limit when an Add reaches it. Visually hidden by the stylesheet; empty until needed."
+    },
+    {
+      "key": "page",
+      "name": "zf-page",
+      "doc": "The current page of a paged form: a `<section>`."
+    },
+    {
+      "key": "pageTitle",
+      "name": "zf-page-title",
+      "doc": "The page's title, an `<h2>` that receives focus on every page change."
+    },
+    {
+      "key": "nav",
+      "name": "zf-nav",
+      "doc": "In a paged form, the container around Back and Next (or Submit)."
+    },
+    {
+      "key": "next",
+      "name": "zf-next",
+      "doc": "The Next button."
+    },
+    {
+      "key": "back",
+      "name": "zf-back",
+      "doc": "The Back button. Carries `hidden` on the first displayed page."
+    },
+    {
+      "key": "progress",
+      "name": "zf-progress",
+      "doc": "\"Step x of y\": a `<span>` inside the page's (or review step's) `<h2>`, before the title."
+    },
+    {
+      "key": "progressBar",
+      "name": "zf-progress-bar",
+      "doc": "The segmented progress bar: an `<ol aria-hidden=\"true\" style=\"display: none\">`, shown by the stylesheet when the schema asks for it (see below) or a host's `data-zf-progress-style=\"bar\"` does, and never under `data-zf-progress-style=\"caption\"`."
+    },
+    {
+      "key": "progressBarSchema",
+      "name": "zf-progress-bar--schema",
+      "doc": "On the bar when the schema's `progressStyle` is \"bar\": shown unless a host says \"caption\"."
+    },
+    {
+      "key": "progressSegment",
+      "name": "zf-progress-segment",
+      "doc": "One step's segment of the bar: an `<li>`. Pending when it has no modifier."
+    },
+    {
+      "key": "progressSegmentComplete",
+      "name": "zf-progress-segment--complete",
+      "doc": "A completed step's segment: visited and currently passing validation."
+    },
+    {
+      "key": "progressSegmentCurrent",
+      "name": "zf-progress-segment--current",
+      "doc": "The current step's segment."
+    },
+    {
+      "key": "visuallyHidden",
+      "name": "zf-visually-hidden",
+      "doc": "Text for screen readers only, e.g. the page title after a review step's Change."
+    },
+    {
+      "key": "review",
+      "name": "zf-review",
+      "doc": "The review step: a `<section>` listing every displayed page's answers."
+    },
+    {
+      "key": "reviewTitle",
+      "name": "zf-review-title",
+      "doc": "The review step's title, \"Review your answers\": an `<h2>` focused on arrival."
+    },
+    {
+      "key": "reviewSection",
+      "name": "zf-review-section",
+      "doc": "One page's answers on the review step: a `<section>` titled by the page."
+    },
+    {
+      "key": "reviewQuestion",
+      "name": "zf-review-question",
+      "doc": "One question and its answer: a `<div>` holding a `<dt>` and `<dd>`."
+    },
+    {
+      "key": "reviewAnswer",
+      "name": "zf-review-answer",
+      "doc": "The answer `<dd>` — the formatted answer, or \"Not answered\" — and the `<p>` saying \"None added\" under a repeating group with no instances."
+    },
+    {
+      "key": "reviewAnswerMultiline",
+      "name": "zf-review-answer--multiline",
+      "doc": "On an answer whose line breaks are part of it, e.g. a long answer's paragraphs."
+    },
+    {
+      "key": "reviewGroup",
+      "name": "zf-review-group",
+      "doc": "A group on the review step: a `role=\"group\"` container holding its subheading and its entries, nested as in the schema."
+    },
+    {
+      "key": "reviewChange",
+      "name": "zf-review-change",
+      "doc": "The Change button that opens a page from the review step."
+    },
+    {
+      "key": "actions",
+      "name": "zf-actions",
+      "doc": "The container around the submit and clear buttons."
+    },
+    {
+      "key": "submit",
+      "name": "zf-submit",
+      "doc": "The submit button."
+    },
+    {
+      "key": "clear",
+      "name": "zf-clear",
+      "doc": "The clear button."
+    },
+    {
+      "key": "status",
+      "name": "zf-status",
+      "doc": "The submission failure message. It takes focus when a submission fails."
+    },
+    {
+      "key": "sending",
+      "name": "zf-sending",
+      "doc": "A polite `role=\"status\"` line before the actions: \"Sending…\" while a submission is in flight, empty otherwise. Always present, so the change is announced."
+    },
+    {
+      "key": "fields",
+      "name": "zf-fields",
+      "doc": "The `<fieldset>` around the questions (and the review step), `disabled` while a submission is in flight so no answer can change after Submit. The stylesheet removes its border, margin and padding and lays it out like the form."
+    },
+    {
+      "key": "unavailable",
+      "name": "zf-unavailable",
+      "doc": "Shown in place of the form, with `role=\"alert\"`, when the renderer refuses the schema or its configuration (contract section 7): \"This form can't be shown right now. Please try again later.\""
+    },
+    {
+      "key": "unavailableDetail",
+      "name": "zf-unavailable-detail",
+      "doc": "Development builds only: the refusal's own text, inside `zf-unavailable`."
+    },
+    {
+      "key": "success",
+      "name": "zf-success",
+      "doc": "The submission success message. It takes focus after a successful submit."
+    },
+    {
+      "key": "scores",
+      "name": "zf-scores",
+      "doc": "The scores shown after a successful submit (contract 17.5): a `<ul>` right after the success message, one plain-text `<li>` per score. Absent when no score is shown."
+    },
+    {
+      "key": "draftLoading",
+      "name": "zf-draft-loading",
+      "doc": "Device and server drafts: shown in place of the form while the draft lookup runs; holds a `role=\"status\"` line."
+    },
+    {
+      "key": "draftPrompt",
+      "name": "zf-draft-prompt",
+      "doc": "The restore prompt, shown in place of the form when a draft is found."
+    },
+    {
+      "key": "draftPromptTitle",
+      "name": "zf-draft-prompt-title",
+      "doc": "The restore prompt's `<h2>`."
+    },
+    {
+      "key": "draftContinue",
+      "name": "zf-draft-continue",
+      "doc": "The prompt's Continue button: restores the draft."
+    },
+    {
+      "key": "draftStartOver",
+      "name": "zf-draft-start-over",
+      "doc": "The prompt's Start over button: deletes the draft and starts a new fill."
+    },
+    {
+      "key": "draftNotice",
+      "name": "zf-draft-notice",
+      "doc": "A drafts notice at the top of the form (`role=\"status\"`): a draft that could not be opened or kept, progress that cannot be saved on this visit, or a failed save. The failed-save one is always present while drafts are saved, empty until needed."
+    }
+  ],
+  "properties": [
+    {
+      "name": "--zf-surface",
+      "group": "Colours",
+      "usedFor": "Control and tile backgrounds",
+      "light": "#FFFFFF",
+      "dark": "#151A1E",
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-surface-sunk",
+      "group": "Colours",
+      "usedFor": "Hover, notices",
+      "light": "#F4F4F2",
+      "dark": "#1B2126",
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-text-color",
+      "group": "Colours",
+      "usedFor": "Text",
+      "light": "#14181B",
+      "dark": "#E8EAEC",
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-muted-color",
+      "group": "Colours",
+      "usedFor": "Help, table headers, captions",
+      "light": "#4A5157",
+      "dark": "#A6AEB5",
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-text-subtle",
+      "group": "Colours",
+      "usedFor": "Unselected rating stars",
+      "light": "#767D84",
+      "dark": "#7C858D",
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-border",
+      "group": "Colours",
+      "usedFor": "Dividers, table rules",
+      "light": "#E2E2DE",
+      "dark": "#262D33",
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-control-border",
+      "group": "Colours",
+      "usedFor": "Control edges",
+      "light": "#6B7278",
+      "dark": "#6E7880",
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-primary",
+      "group": "Colours",
+      "usedFor": "Primary buttons, selected options, the success message",
+      "light": "#0F5C4A",
+      "dark": "#5DBFA5",
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-primary-soft",
+      "group": "Colours",
+      "usedFor": "Selected option and success backgrounds",
+      "light": "#E6F0ED",
+      "dark": "#12241F",
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-on-primary",
+      "group": "Colours",
+      "usedFor": "Text on primary buttons",
+      "light": "#FFFFFF",
+      "dark": "#0D1114",
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-error",
+      "group": "Colours",
+      "usedFor": "Errors, the required `*`",
+      "light": "#9E1B12",
+      "dark": "#FF8D80",
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-error-soft",
+      "group": "Colours",
+      "usedFor": "Error summary and failure backgrounds",
+      "light": "#FBEAE8",
+      "dark": "#2B100D",
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-focus-ring",
+      "group": "Colours",
+      "usedFor": "Focus outline",
+      "light": "#0F5C4A",
+      "dark": "#5DBFA5",
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-group-rule",
+      "group": "Derived",
+      "usedFor": "The rule down a group's leading edge",
+      "light": "color-mix(in srgb, var(--zf-control-border) 45%, var(--zf-surface))",
+      "dark": null,
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-group-box-border",
+      "group": "Derived",
+      "usedFor": "Boxed groups, repeat instances, grid cards",
+      "light": "var(--zf-border)",
+      "dark": null,
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-group-box-radius",
+      "group": "Derived",
+      "usedFor": "Boxed groups, repeat instances",
+      "light": "var(--zf-radius)",
+      "dark": null,
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-group-box-bg",
+      "group": "Derived",
+      "usedFor": "Boxed groups, repeat instances",
+      "light": "color-mix(in srgb, var(--zf-surface-sunk) 60%, var(--zf-surface))",
+      "dark": null,
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-group-box-padding",
+      "group": "Derived",
+      "usedFor": "Boxed groups, repeat instances",
+      "light": "max(1.5rem, var(--zf-spacing))",
+      "dark": null,
+      "density": null,
+      "media": {
+        "query": "(max-width: 40rem)",
+        "value": "1.25rem"
+      }
+    },
+    {
+      "name": "--zf-progress-current",
+      "group": "Derived",
+      "usedFor": "The current step of the progress bar",
+      "light": "var(--zf-primary)",
+      "dark": null,
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-progress-complete",
+      "group": "Derived",
+      "usedFor": "Completed steps",
+      "light": "color-mix(in srgb, var(--zf-primary) 65%, var(--zf-surface))",
+      "dark": null,
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-progress-pending",
+      "group": "Derived",
+      "usedFor": "Steps to come",
+      "light": "var(--zf-control-border)",
+      "dark": null,
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-radius",
+      "group": "Shape and type",
+      "usedFor": "Controls, tiles, buttons, messages",
+      "light": "6px",
+      "dark": null,
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-radius-sm",
+      "group": "Shape and type",
+      "usedFor": "Rating stars, progress segments",
+      "light": "3px",
+      "dark": null,
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-max-width",
+      "group": "Shape and type",
+      "usedFor": "The form's, success message's and scores list's widest",
+      "light": "40rem",
+      "dark": null,
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-font-family",
+      "group": "Shape and type",
+      "usedFor": "The form's font",
+      "light": null,
+      "dark": null,
+      "density": null,
+      "media": null
+    },
+    {
+      "name": "--zf-control-height",
+      "group": "Density",
+      "usedFor": "Controls, tiles and buttons (minimum)",
+      "light": "44px",
+      "dark": null,
+      "density": {
+        "patient": "52px",
+        "standard": "44px",
+        "dense": "34px"
+      },
+      "media": null
+    },
+    {
+      "name": "--zf-spacing",
+      "group": "Density",
+      "usedFor": "Space between blocks",
+      "light": "1.75rem",
+      "dark": null,
+      "density": {
+        "patient": "2.25rem",
+        "standard": "1.75rem",
+        "dense": "1.125rem"
+      },
+      "media": null
+    },
+    {
+      "name": "--zf-font-size",
+      "group": "Density",
+      "usedFor": "Text",
+      "light": "1rem",
+      "dark": null,
+      "density": {
+        "patient": "1.125rem",
+        "standard": "1rem",
+        "dense": "0.875rem"
+      },
+      "media": null
+    },
+    {
+      "name": "--zf-font-size-small",
+      "group": "Density",
+      "usedFor": "Help, captions, error messages",
+      "light": "0.875rem",
+      "dark": null,
+      "density": {
+        "patient": "1rem",
+        "standard": "0.875rem",
+        "dense": "0.8125rem"
+      },
+      "media": null
+    },
+    {
+      "name": "--zf-tile-pad",
+      "group": "Density",
+      "usedFor": "Option tiles, ranking items",
+      "light": "0.75rem 1rem",
+      "dark": null,
+      "density": {
+        "patient": "1rem 1.25rem",
+        "standard": "0.75rem 1rem",
+        "dense": "0.5rem 0.75rem"
+      },
+      "media": null
+    },
+    {
+      "name": "--zf-form-end-space",
+      "group": "Density",
+      "usedFor": "Space after the buttons, inside the form",
+      "light": "1.5rem",
+      "dark": null,
+      "density": {
+        "patient": "2rem",
+        "standard": "1.5rem",
+        "dense": "1rem"
+      },
+      "media": null
+    }
+  ],
+  "hooks": [
+    {
+      "attribute": "data-zf-density",
+      "values": [
+        "patient",
+        "standard",
+        "dense"
+      ]
+    },
+    {
+      "attribute": "data-zf-theme",
+      "values": [
+        "dark"
+      ]
+    },
+    {
+      "attribute": "data-zf-progress-style",
+      "values": [
+        "bar",
+        "caption"
+      ]
+    },
+    {
+      "attribute": "data-zf-group-style",
+      "values": [
+        "box"
+      ]
+    }
+  ]
+}

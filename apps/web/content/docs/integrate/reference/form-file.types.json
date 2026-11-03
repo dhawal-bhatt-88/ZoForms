@@ -1,0 +1,460 @@
+{
+  "package": "@zoworkhq/forms 0.28.0",
+  "types": [
+    {
+      "name": "Block",
+      "file": "types.d.ts",
+      "text": "type Block = LeafBlock | GridBlock | ContainerBlock;",
+      "doc": "One entry in schema.blocks or in a container's blocks. Because LeafBlock's `type` is a plain string that could also read \"group\" or \"page\", comparing `type` does not narrow this union — use isGroup(), isPage() or isContainer() from core/tree.",
+      "members": []
+    },
+    {
+      "name": "ContainerBlock",
+      "file": "types.d.ts",
+      "text": "type ContainerBlock = GroupBlock | PageBlock;",
+      "doc": "A block that holds other blocks.",
+      "members": []
+    },
+    {
+      "name": "EnableWhenCondition",
+      "file": "types.d.ts",
+      "text": "interface EnableWhenCondition {\n    id: string;\n    question: string;\n    operator: 'exists' | '=' | '!=' | '>' | '<' | '>=' | '<=' | 'contains';\n    answer?: string | number;\n}",
+      "doc": "One visibility rule: \"show my block when <question> <operator> <answer>\". question is the block id of the condition source. matrix is not supported as a source in v1 — its Record<row, column> value has no single scalar this flat shape could reference. A matrix block can still be the target of someone else's condition. `id` is unique within the item's enableWhen and follows the code pattern (contract 15.1); enableLogic refers to conditions by it. The list's order is the condition numbering the author sees in the builder.",
+      "members": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "question",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "operator",
+          "type": "'exists' | '=' | '!=' | '>' | '<' | '>=' | '<=' | 'contains'",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "answer",
+          "type": "string | number",
+          "required": false,
+          "doc": null
+        }
+      ]
+    },
+    {
+      "name": "FormSchema",
+      "file": "types.d.ts",
+      "text": "interface FormSchema {\n    formId: string;\n    formVersionId: string;\n    title: string;\n    description?: string;\n    blocks: Block[];\n    schemaVersion?: number;\n    navigation?: NavigationSettings;\n    drafts?: DraftsSettings;\n}",
+      "doc": "Root shape of a published form schema. schemaVersion 1 and 2 are accepted (an absent version is 1); v1 is v2 without groups or pages. Any other version fails the integrity check. A form is paged if and only if its root holds pages; there is no mode flag.",
+      "members": [
+        {
+          "name": "formId",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "formVersionId",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true,
+          "doc": "The form's title and, when the author wrote one, its description: plain text. The renderer never shows either; the host does, and owns the page's h1 (contract section 7)."
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "blocks",
+          "type": "Block[]",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "schemaVersion",
+          "type": "number",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "navigation",
+          "type": "NavigationSettings",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "drafts",
+          "type": "DraftsSettings",
+          "required": false,
+          "doc": "Where in-progress answers are kept (drafts contract section 2). Absent means \"session\"."
+        }
+      ]
+    },
+    {
+      "name": "GridBlock",
+      "file": "types.d.ts",
+      "text": "interface GridBlock extends LeafBlock {\n    type: 'grid';\n    rows: Option[];\n    columns: GridColumn[];\n}",
+      "doc": "A table of fixed rows and typed columns, where every cell is its own input (contract section 14). Rows are a coded list. Required is per column: the grid's own `required` and `completeRequired` are ignored. Never a condition source. Its answer is codes only, `Record<rowCode, Record<columnCode, string>>`: a choice cell holds an option code of its column, a text cell the text. An empty cell, and a row with no answered cell, are absent.",
+      "members": [
+        {
+          "name": "type",
+          "type": "'grid'",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "rows",
+          "type": "Option[]",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "columns",
+          "type": "GridColumn[]",
+          "required": true,
+          "doc": null
+        }
+      ]
+    },
+    {
+      "name": "GridColumn",
+      "file": "types.d.ts",
+      "text": "type GridColumn = {\n    code: string;\n    label: string;\n    type: 'radio';\n    options: Option[];\n    required?: boolean;\n} | {\n    code: string;\n    label: string;\n    type: 'dropdown';\n    options: Option[];\n    required?: boolean;\n} | {\n    code: string;\n    label: string;\n    type: 'text';\n    required?: boolean;\n};",
+      "doc": "One column of a grid (contract section 14.1). Its `code` and `label` follow the coded-option rules (contract 13.2) and are unique among the grid's columns. A `radio` or `dropdown` column's `options` are its own coded list. Only `required: true` makes the column required: answered in every row.",
+      "members": []
+    },
+    {
+      "name": "GroupBlock",
+      "file": "types.d.ts",
+      "text": "interface GroupBlock {\n    id: string;\n    type: 'group';\n    label: string;\n    enableWhen?: EnableWhenCondition[];\n    enableBehavior?: 'all' | 'any';\n    enableLogic?: LogicNode;\n    repeats?: boolean;\n    repeatLabel?: string;\n    minOccurs?: number;\n    maxOccurs?: number;\n    scores?: Score[];\n    blocks: Block[];\n}",
+      "doc": "A container of blocks, nestable to any depth. It has no value and is never required: its only effect is structural, and through enableWhen, hiding everything inside it. With `repeats: true` it is a repeating group (contract section 12): its `blocks` are the template for one instance, and the respondent fills it any number of times between `minOccurs` and `maxOccurs`. `repeatLabel`, `minOccurs` and `maxOccurs` are ignored on a group that does not repeat.",
+      "members": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "type",
+          "type": "'group'",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "enableWhen",
+          "type": "EnableWhenCondition[]",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "enableBehavior",
+          "type": "'all' | 'any'",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "enableLogic",
+          "type": "LogicNode",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "repeats",
+          "type": "boolean",
+          "required": false,
+          "doc": "Only `true` makes the group repeat."
+        },
+        {
+          "name": "repeatLabel",
+          "type": "string",
+          "required": false,
+          "doc": "Singular noun for one instance, as it reads mid-sentence, e.g. \"patient\"."
+        },
+        {
+          "name": "minOccurs",
+          "type": "number",
+          "required": false,
+          "doc": "Whole number ≥ 0. Default 1."
+        },
+        {
+          "name": "maxOccurs",
+          "type": "number",
+          "required": false,
+          "doc": "Whole number ≥ 1 and ≥ minOccurs. Absent means no limit."
+        },
+        {
+          "name": "scores",
+          "type": "Score[]",
+          "required": false,
+          "doc": "Calculated from the group's questions (contract section 17). Never on a page."
+        },
+        {
+          "name": "blocks",
+          "type": "Block[]",
+          "required": true,
+          "doc": null
+        }
+      ]
+    },
+    {
+      "name": "LeafBlock",
+      "file": "types.d.ts",
+      "text": "interface LeafBlock {\n    id: string;\n    type: string;\n    label: string;\n    description?: string;\n    content?: string;\n    captions?: string;\n    required?: boolean;\n    completeRequired?: boolean;\n    placeholder?: string;\n    min?: number;\n    max?: number;\n    level?: number;\n    options?: Option[];\n    columns?: Option[];\n    enableWhen?: EnableWhenCondition[];\n    enableBehavior?: 'all' | 'any';\n    enableLogic?: LogicNode;\n}",
+      "doc": "Anything in the tree that is not a container: every question and every presentational block. `type` is a plain string — the registry (not this type) determines whether a given type is actually renderable; an unknown type is a runtime concern (FormRenderer throws), not something enforced at the type level.",
+      "members": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "type",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "description",
+          "type": "string",
+          "required": false,
+          "doc": "Help text, shown on answerable questions only, under the label and before the control; line breaks are kept. Blank (\"\" is how the builder exports cleared help) shows nothing."
+        },
+        {
+          "name": "content",
+          "type": "string",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "captions",
+          "type": "string",
+          "required": false,
+          "doc": "video, file kind only: a .vtt captions file (contract section 10). Ignored on YouTube and Vimeo."
+        },
+        {
+          "name": "required",
+          "type": "boolean",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "completeRequired",
+          "type": "boolean",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "placeholder",
+          "type": "string",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "min",
+          "type": "number",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "max",
+          "type": "number",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "level",
+          "type": "number",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "options",
+          "type": "Option[]",
+          "required": false,
+          "doc": "choice, checkbox, multiselect, dropdown and ranking: the options; matrix: its rows (contract section 13). Answers and conditions use the codes."
+        },
+        {
+          "name": "columns",
+          "type": "Option[]",
+          "required": false,
+          "doc": "matrix: its columns."
+        },
+        {
+          "name": "enableWhen",
+          "type": "EnableWhenCondition[]",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "enableBehavior",
+          "type": "'all' | 'any'",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "enableLogic",
+          "type": "LogicNode",
+          "required": false,
+          "doc": "Custom logic over enableWhen's ids (contract section 15). Never together with enableBehavior."
+        }
+      ]
+    },
+    {
+      "name": "LogicItem",
+      "file": "types.d.ts",
+      "text": "type LogicItem = string | LogicNode;",
+      "doc": "A condition id of the item, or a nested node.",
+      "members": []
+    },
+    {
+      "name": "LogicNode",
+      "file": "types.d.ts",
+      "text": "type LogicNode = {\n    all: LogicItem[];\n} | {\n    any: LogicItem[];\n};",
+      "doc": "How an item's conditions combine (contract 15.1): `all` is true if and only if every item is, `any` if and only if at least one is. Exactly one key per node, holding a non-empty list; nesting depth is unlimited.",
+      "members": []
+    },
+    {
+      "name": "NavigationSettings",
+      "file": "types.d.ts",
+      "text": "interface NavigationSettings {\n    showProgress?: boolean;\n    progressStyle?: ProgressStyle;\n    reviewPage?: boolean;\n}",
+      "doc": null,
+      "members": [
+        {
+          "name": "showProgress",
+          "type": "boolean",
+          "required": false,
+          "doc": "\"Step x of y\" above each page title. Default true."
+        },
+        {
+          "name": "progressStyle",
+          "type": "ProgressStyle",
+          "required": false,
+          "doc": "Default \"caption\". \"bar\" adds a display-only segmented bar above the caption. Used only when showProgress is on. A host's `data-zf-progress-style` on any wrapper overrides it either way."
+        },
+        {
+          "name": "reviewPage",
+          "type": "boolean",
+          "required": false,
+          "doc": "A review step after the last page, where the form is submitted. Default false."
+        }
+      ]
+    },
+    {
+      "name": "Option",
+      "file": "types.d.ts",
+      "text": "interface Option {\n    code: string;\n    label: string;\n    score?: number;\n}",
+      "doc": "One option of a coded list (contract section 13): a stable code, which answers and conditions use, and the label respondents see. The label is always plain text.",
+      "members": [
+        {
+          "name": "code",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "score",
+          "type": "number",
+          "required": false,
+          "doc": "A finite number, used by score formulas (contract section 17) on the options of choice, dropdown, checkbox and multiselect, and on matrix columns. Ignored anywhere else."
+        }
+      ]
+    },
+    {
+      "name": "PageBlock",
+      "file": "types.d.ts",
+      "text": "interface PageBlock {\n    id: string;\n    type: 'page';\n    title: string;\n    enableWhen?: EnableWhenCondition[];\n    enableBehavior?: 'all' | 'any';\n    enableLogic?: LogicNode;\n    blocks: Block[];\n}",
+      "doc": "One step of a paged form. Root level only, and if any root item is a page, every root item is. Like a group it has no value; its `title` is the step name.",
+      "members": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "type",
+          "type": "'page'",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "title",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "enableWhen",
+          "type": "EnableWhenCondition[]",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "enableBehavior",
+          "type": "'all' | 'any'",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "enableLogic",
+          "type": "LogicNode",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "blocks",
+          "type": "Block[]",
+          "required": true,
+          "doc": null
+        }
+      ]
+    },
+    {
+      "name": "ProgressStyle",
+      "file": "types.d.ts",
+      "text": "type ProgressStyle = 'caption' | 'bar';",
+      "doc": "How progress is shown: the caption alone, or the caption with a segmented bar above it.",
+      "members": []
+    },
+    {
+      "name": "RepeatingGroup",
+      "file": "core/index.d.ts",
+      "text": "type RepeatingGroup = GroupBlock & {\n    repeats: true;\n};",
+      "doc": "A group with `repeats: true` (contract section 12).",
+      "members": []
+    }
+  ]
+}

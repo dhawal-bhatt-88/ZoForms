@@ -25,6 +25,7 @@ import {
   ChevronRight,
   CircleAlert,
   Download,
+  ExternalLink,
   FileText,
   GripVertical,
   LayoutTemplate,
@@ -165,6 +166,7 @@ import {
   type FlatItem,
   type MoveTarget,
 } from "@/lib/tree-dnd";
+import { DOCS_LINKS } from "@/lib/docs-links";
 import { inspectorHeading, logicNoun, TEXT_ONLY_TYPES, textFieldEdit } from "@/lib/inspector";
 import { CATALOG_BLOCK_COUNT, catalogLabel, matchCatalog, type CatalogItem } from "@/lib/block-catalog";
 import { parseCount, repeatBadgeText, repeatPreviewText } from "@/lib/repeat-settings";
@@ -3856,30 +3858,46 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                     [
                       "server",
                       "On the app's server",
-                      "Answers are saved by the app the form is used in, at each page change. Needs setup by that app's developer. Visit this page for documentation on set up.",
+                      "Answers are saved by the app the form is used in, at each page change. Needs setup by that app's developer.",
+                      { href: DOCS_LINKS.drafts, text: "Developer setup guide: Save progress (drafts)" },
                     ],
                   ] as const
-                ).map(([mode, label, help]) => {
+                ).map(([mode, label, help, guide]: readonly [DraftMode, string, string, { href: string; text: string }?]) => {
                   const available = draftModeAvailable(mode, schema.blocks);
                   return (
-                    <label key={mode} className="mt-2 flex items-start gap-2.5">
-                      <input
-                        type="radio"
-                        name="draft-mode"
-                        value={mode}
-                        checked={(schema.drafts?.mode ?? DEFAULT_DRAFT_MODE) === mode}
-                        disabled={!available}
-                        onChange={() => updateDrafts(mode)}
-                        className="mt-0.5 h-4 w-4 flex-none accent-brand-deep disabled:cursor-not-allowed"
-                      />
-                      <span>
-                        <span className={cn("block text-[0.8125rem] font-medium", available ? "text-ink" : "text-graphite-soft")}>{label}</span>
-                        <span className={cn("block text-[0.75rem]", available ? "text-graphite" : "text-graphite-soft")}>{help}</span>
-                        {!available && (
-                          <span className="mt-0.5 block text-[0.75rem] font-medium text-ink">Available for forms with pages</span>
-                        )}
-                      </span>
-                    </label>
+                    <div key={mode}>
+                      <label className="mt-2 flex items-start gap-2.5">
+                        <input
+                          type="radio"
+                          name="draft-mode"
+                          value={mode}
+                          checked={(schema.drafts?.mode ?? DEFAULT_DRAFT_MODE) === mode}
+                          disabled={!available}
+                          onChange={() => updateDrafts(mode)}
+                          className="mt-0.5 h-4 w-4 flex-none accent-brand-deep disabled:cursor-not-allowed"
+                        />
+                        <span>
+                          <span className={cn("block text-[0.8125rem] font-medium", available ? "text-ink" : "text-graphite-soft")}>{label}</span>
+                          <span className={cn("block text-[0.75rem]", available ? "text-graphite" : "text-graphite-soft")}>{help}</span>
+                          {!available && (
+                            <span className="mt-0.5 block text-[0.75rem] font-medium text-ink">Available for forms with pages</span>
+                          )}
+                        </span>
+                      </label>
+                      {/* Outside the label, so the radio's name stays the option's own words. Usable when the option isn't. */}
+                      {guide && (
+                        <a
+                          href={guide.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-[1.625rem] mt-0.5 inline-flex items-center gap-1 text-[0.75rem] font-medium text-ink underline underline-offset-2 hover:text-brand-deep"
+                        >
+                          {guide.text}
+                          <ExternalLink aria-hidden="true" className="h-3 w-3" />
+                          <span className="sr-only"> (opens in a new tab)</span>
+                        </a>
+                      )}
+                    </div>
                   );
                 })}
                 <p className="mt-2.5 text-[0.75rem] text-graphite">

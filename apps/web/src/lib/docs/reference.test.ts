@@ -5,10 +5,10 @@ import ts from "typescript";
 import * as core from "@zoworkhq/forms/core";
 import * as react from "@zoworkhq/forms/react";
 import { prepareSubmission, type FormSchema } from "@zoworkhq/forms/core";
-import { CONTENT_DIR, getLivePages, getPage, readReference, readTypes } from "./content";
-import { attributesOf, walk } from "./mdast";
+import { CONTENT_DIR, getLivePages, getPage, readCss, readReference, readTypes } from "./content";
+import { attributesOf, textOf, walk } from "./mdast";
 import { livePages } from "./nav";
-import { formRendererReference, typeReference } from "./reference";
+import { cssReference, formRendererReference, typeReference } from "./reference";
 
 /*
  * The drift tests for the reference pages (docs brief, "Accuracy rules"). The
@@ -242,5 +242,36 @@ describe("the errors on the prepareSubmission page", () => {
     const result = prepareSubmission(form2, { ...when, formId: "f", formVersionId: "old", answers: complete });
     expect(result).toMatchObject({ ok: true, versionMismatch: true, submission: { formVersionId: "new" } });
     expect(prepareSubmission(form, { ...when, answers: complete })).toMatchObject({ ok: true, versionMismatch: true });
+  });
+});
+
+describe("the CSS reference", () => {
+  const SLUG = "integrate/reference/css";
+  const fresh = cssReference();
+  if (process.env.DOCS_WRITE_REFERENCE) fs.writeFileSync(path.join(CONTENT_DIR, `${SLUG}.css.json`), `${JSON.stringify(fresh, null, 2)}\n`);
+
+  it("matches the installed package's classNames, stylesheet and README", () => {
+    expect(readCss(SLUG)).toEqual(fresh);
+  });
+
+  it("has every class classNames has, each with the package's description", () => {
+    expect(fresh.classes.map((c) => [c.key, c.name])).toEqual(Object.entries(react.classNames));
+    expect(fresh.classes.filter((c) => !c.doc).map((c) => c.key)).toEqual([]);
+  });
+
+  it("has every public custom property the stylesheet reads, and only those", () => {
+    const css = fs.readFileSync(path.join(process.cwd(), "node_modules", "@zoworkhq", "forms", "dist", "styles.css"), "utf8");
+    const used = [...new Set([...css.matchAll(/var\((--zf-[\w-]+)/g)].map((m) => m[1]))].sort();
+    expect(fresh.properties.map((p) => p.name).sort()).toEqual(used);
+  });
+
+  it("lists the data attributes the stylesheet answers to, with their values", () => {
+    const table = [...walk(getPage(SLUG)!.tree)].find((n) => n.type === "table" && textOf(n.children![0].children![0]) === "Attribute")!;
+    const rows = (table.children ?? []).slice(1).map((row) => {
+      const [attribute, values] = (row.children ?? []).map(textOf);
+      return { attribute, values: [...values.matchAll(/"([\w-]+)"/g)].map((m) => m[1]).sort() };
+    });
+    const byAttribute = (a: { attribute: string }, b: { attribute: string }) => a.attribute.localeCompare(b.attribute);
+    expect(rows.sort(byAttribute)).toEqual(fresh.hooks.map((h) => ({ attribute: h.attribute, values: [...h.values].sort() })).sort(byAttribute));
   });
 });

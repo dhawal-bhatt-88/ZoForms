@@ -1,0 +1,25 @@
+{
+  "about": "Every MDN page the docs cite, opened and read against the sentence that cites it (developer docs brief, CP4). Re-check a link, and update its date, whenever its sentence changes. A new MDN link needs an entry here first: src/lib/docs/mdn-links.test.ts.",
+  "links": {
+    "https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS": {
+      "checked": "2026-11-03",
+      "supports": "sign-in: a JSON POST is preflighted with OPTIONS; the endpoint must allow the origin and headers; with credentials, Access-Control-Allow-Credentials and a named origin, never *."
+    },
+    "https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage": {
+      "checked": "2026-11-03",
+      "supports": "shared-devices, browser-storage: ends when the tab is closed; survives reloads and restores; a page with an opener starts with a copy of the opener's sessionStorage."
+    },
+    "https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/autocomplete": {
+      "checked": "2026-11-03",
+      "supports": "shared-devices: the source of suggested values is up to the browser, typically past values the user entered."
+    },
+    "https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/importKey": {
+      "checked": "2026-11-03",
+      "supports": "drafts: importKey('raw', bytes, 'AES-GCM', extractable, ['encrypt', 'decrypt'])."
+    },
+    "https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria": {
+      "checked": "2026-11-03",
+      "supports": "browser-storage: data is deleted when the user deletes it in the browser's settings, and, under storage pressure, the least recently used origin's data is evicted."
+    }
+  }
+}

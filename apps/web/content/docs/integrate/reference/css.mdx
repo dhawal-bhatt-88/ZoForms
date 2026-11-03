@@ -1,0 +1,79 @@
+---
+title: CSS classes and custom properties
+summary: Every class the form uses, every --zf- custom property with its defaults, and the data attributes your page can set around the form.
+template: data-reference
+badges: [CSS]
+appliesTo: [package]
+updated: 2026-11-03
+prev: /docs/integrate/reference/form-file
+next: /docs/integrate/reference/core
+---
+
+## At a glance
+
+```js check=browser
+import '@zoworkhq/forms/styles.css';
+```
+
+- **The stylesheet is optional.** Import it once, from your app's code. Without it the form is plain HTML with these classes.
+- **Every public class, data attribute and custom property starts with `zf-`.** Properties that start with `--_zf-` are the stylesheet's own and not for you to set.
+- **Every rule is wrapped in `:where()`,** so it has no specificity, and any plain rule of yours wins without `!important`.
+- **`classNames`,** exported from `@zoworkhq/forms/react`, lists every class below.
+
+[Style the form](/docs/integrate/styling) shows how to use them.
+
+## Data attributes for your page
+
+Put these on an element around the form, such as the wrapper you render it in, not on the form itself. After a submit, the form is replaced by the success message and scores, and attributes on the form don't carry over to them.
+
+| Attribute | Values | Effect |
+|---|---|---|
+| `data-zf-theme` | `"dark"` | The dark theme. Opt-in only: it never follows the operating system's setting. |
+| `data-zf-density` | `"patient"`, `"standard"` (default), `"dense"` | Control height, spacing and type size. The nearest ancestor with the attribute wins. |
+| `data-zf-group-style` | `"box"` | Root-level groups in a light box, instead of the rule down their leading edge. |
+| `data-zf-progress-style` | `"bar"`, `"caption"` | Overrides the author's progress style in a form with pages, either way. `"bar"` adds a segmented bar above "Step x of y". The caption always stays. |
+
+The progress bar and boxed groups exist only in the stylesheet. Without it, those two attributes do nothing.
+
+## Custom properties
+
+Set them on the form or on any element around it, such as `:root` or a wrapper. They reach the form, and the success message and scores list shown after a submit. A value nearer the form wins. A value you set applies in both themes and every density.
+
+Set them on the form or around it, never on an element inside it: the stylesheet reads them on the form, the success message and the scores list only.
+
+An invalid value doesn't fall back to the default. The property is set, so the declarations that use it are invalid, and the browser uses their inherited or initial value instead: a Submit button with no background, for instance.
+
+### Colours
+
+The dark column is the default under `data-zf-theme="dark"`.
+
+<CssTable of="Colours" />
+
+### Derived
+
+Each follows the properties it's made from, in both themes, including values you set for those.
+
+<CssTable of="Derived" />
+
+### Shape and type
+
+The same in both themes.
+
+<CssTable of="Shape and type" />
+
+### Density
+
+The same in both themes. A value you set replaces every density's.
+
+<CssTable of="Density" />
+
+## Classes
+
+Each key is a property of `classNames`, and the class is its value. The descriptions are the package's own. In TypeScript, `ClassNames` is the type of `classNames`, and `ClassName` is any one of its classes.
+
+<CssTable of="classes" />
+
+## Related
+
+- [Style the form](/docs/integrate/styling): branding, dark mode, density and CSS resets.
+- [`FormRenderer`](/docs/integrate/reference/form-renderer): the props.

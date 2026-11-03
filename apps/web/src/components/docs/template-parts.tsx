@@ -3,6 +3,7 @@ import { ArrowRight, Film } from "lucide-react";
 import { cn } from "@formbuilder/ui";
 import { Callout, StatusChip } from "@/components/ui";
 import { docsHref, sectionPages } from "@/lib/docs/nav";
+import { richParts, type CssCell, type CssTable as CssTableData } from "@/lib/docs/css-table";
 import type { ReferenceProp, ReferenceType } from "@/lib/docs/reference";
 
 /*
@@ -151,6 +152,56 @@ export function FieldList({ children }: Children) {
           </tr>
         </thead>
         <tbody>{children}</tbody>
+      </table>
+    </div>
+  );
+}
+
+/** One of the CSS reference's tables, built from the page's generated `<page>.css.json` (lib/docs/css-table.ts). */
+export function CssTable({ table }: { table: CssTableData }) {
+  const cell = (c: CssCell) =>
+    c.kind === "text" ? (
+      c.value
+    ) : c.kind === "code" ? (
+      <code className="font-mono text-[0.75rem] text-ink">{c.value}</code>
+    ) : (
+      richParts(c.value).map((part, i) =>
+        part.code ? (
+          <code key={i} className="font-mono text-[0.75rem] text-ink">
+            {part.value}
+          </code>
+        ) : (
+          part.value
+        ),
+      )
+    );
+  return (
+    <div className="surface scroll-x relative my-5 overflow-x-auto">
+      <table className="w-full border-collapse text-[0.8125rem]">
+        <thead>
+          <tr>
+            {table.headers.map((h) => (
+              <th
+                key={h}
+                scope="col"
+                className="whitespace-nowrap border-b border-rule bg-paper-sunk px-4 py-2.5 text-left font-mono text-[0.625rem] font-medium uppercase tracking-[0.11em] text-graphite-soft"
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {table.rows.map((row, r) => (
+            <tr key={r} className="border-b border-rule last:border-b-0">
+              {row.map((c, i) => (
+                <td key={i} className={cn("px-4 py-2.5 align-top text-ink", i === 0 && "whitespace-nowrap")}>
+                  {cell(c)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
       </table>
     </div>
   );

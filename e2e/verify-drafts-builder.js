@@ -103,6 +103,11 @@ const NOTE = "Saving progress on the server needs pages, so it's been switched t
     check("editor: Save progress section with three choices", await section().isVisible() && await opt(SESSION).isVisible() && await opt(DEVICE).isVisible() && await opt(SERVER).isVisible());
     check("editor: each choice has its help text, and the fallback line is shown",
       await section().getByText(SESSION_HELP).isVisible() && await section().getByText(DEVICE_HELP).isVisible() && await section().getByText(SERVER_HELP).isVisible() && await section().getByText(FALLBACK).isVisible());
+    {
+      const guide = section().getByRole("link", { name: "Developer setup guide: Save progress (drafts) (opens in a new tab)" });
+      check('editor: "On the app\'s server" links to the drafts guide, in a new tab',
+        (await guide.isVisible()) && (await guide.getAttribute("href")) === "/docs/integrate/drafts" && (await guide.getAttribute("target")) === "_blank");
+    }
     check('editor: default is "Only while the form is open"', await opt(SESSION).isChecked());
     check("editor: without pages, server is disabled with the reason shown",
       await opt(SERVER).isDisabled() && await section().getByText("Available for forms with pages").isVisible() && await opt(DEVICE).isEnabled());

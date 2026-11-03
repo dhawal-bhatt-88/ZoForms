@@ -1,0 +1,328 @@
+---
+title: The form file
+summary: What the builder's Download gives you, from its ids and schemaVersion to its blocks, with the type for each part.
+template: data-reference
+badges: [JSON]
+appliesTo: [package]
+updated: 2026-11-03
+prev: /docs/integrate/reference/posted-body
+next: /docs/integrate/reference/css
+---
+
+## At a glance
+
+- **Download in the builder gives one JSON file** for the form's latest saved version, named from its title and version number, such as `client-intake-v3.json`.
+- **You pass it to both sides:** to `FormRenderer` as `schema`, and to `prepareSubmission` on your server.
+- **Its type is `FormSchema`,** from `@zoworkhq/forms/core`. A file imported from JSON needs a cast in TypeScript: see [Use it with your framework](/docs/integrate/frameworks).
+- **The form checks the file when it mounts,** and `prepareSubmission` checks it too. The builder won't download a version the form would refuse.
+
+## An example
+
+This is a real download, the two-page intake the [Save progress](/docs/integrate/drafts) guide uses:
+
+```json
+{
+  "title": "Client intake",
+  "formId": "cdc4f6aa-58db-4b5c-91d6-722c6b7c7b39",
+  "formVersionId": "20cc1836-1521-43a3-bc3d-0337e9e5b121",
+  "schemaVersion": 2,
+  "description": "We use this to prepare for the first visit.",
+  "blocks": [
+    {
+      "id": "page_about",
+      "type": "page",
+      "title": "About you",
+      "blocks": [
+        { "id": "preferred_name", "type": "short", "label": "Preferred name", "required": true },
+        { "id": "contact_email", "type": "email", "label": "Email address", "required": true }
+      ]
+    },
+    {
+      "id": "page_visit",
+      "type": "page",
+      "title": "Your visit",
+      "blocks": [
+        {
+          "id": "attend_format",
+          "type": "choice",
+          "label": "How would you like to attend sessions?",
+          "required": true,
+          "options": [
+            { "code": "in_person", "label": "In person" },
+            { "code": "video", "label": "Video" },
+            { "code": "phone", "label": "Phone" }
+          ]
+        },
+        {
+          "id": "sees_therapist",
+          "type": "choice",
+          "label": "Do you currently see a therapist?",
+          "required": true,
+          "options": [{ "code": "yes", "label": "Yes" }, { "code": "no", "label": "No" }]
+        },
+        {
+          "id": "therapist_name",
+          "type": "short",
+          "label": "Therapist's name",
+          "required": true,
+          "enableWhen": [{ "id": "c_11aezra7", "question": "sees_therapist", "operator": "=", "answer": "yes" }]
+        },
+        { "id": "reason_for_visit", "type": "long", "label": "What brings you in today?", "required": false }
+      ]
+    }
+  ],
+  "navigation": { "showProgress": true, "progressStyle": "caption", "reviewPage": false },
+  "drafts": { "mode": "server" }
+}
+```
+
+## The top level
+
+<FieldList of="FormSchema">
+<Field name="formId">
+The form's id in the builder. It stays the same for every version of the form.
+</Field>
+<Field name="formVersionId">
+The saved version's id. Every save in the builder makes a new one, and the posted body carries it, so you can tell which version was filled in.
+</Field>
+<Field name="title">
+The form's title, plain text. The form doesn't show it: your page does, as its `h1`.
+</Field>
+<Field name="description">
+The author's description, plain text, when they wrote one. Your page shows it, if you want it.
+</Field>
+<Field name="blocks">
+The form's questions, display blocks, groups and pages, in order. See below.
+</Field>
+<Field name="schemaVersion">
+The file's format. The builder always writes `2`. The package reads `1` and `2`, and reads a file without one as `1`.
+</Field>
+<Field name="navigation">
+Only on a form with pages: how it moves between them. The builder writes all three settings.
+</Field>
+<Field name="drafts">
+Only when the author chose to keep progress on the device or on your server. With no `drafts`, progress is kept in the tab. See [Save progress (drafts)](/docs/integrate/drafts).
+</Field>
+</FieldList>
+
+<FieldList of="NavigationSettings">
+<Field name="showProgress">
+"Step x of y" above each page's title.
+</Field>
+<Field name="progressStyle">
+`"caption"` alone, or `"bar"` for a segmented bar above it. Your page's `data-zf-progress-style` overrides it.
+</Field>
+<Field name="reviewPage">
+A review step after the last page, where the form is submitted.
+</Field>
+</FieldList>
+
+<Signature of="ProgressStyle" />
+
+## Blocks
+
+Every entry in `blocks`, and in a group's or page's `blocks`, is a `Block`:
+
+<Signature of="Block" />
+
+<Signature of="ContainerBlock" />
+
+A form has pages when its top level holds pages, and then every top-level block is a page. There is no other setting for it. Each block's `type` says what it is:
+
+| `type` | What it is | Page |
+|---|---|---|
+| `short` | Short answer | [Short answer](/docs/build/question-types/short-answer) |
+| `long` | Long answer | [Long answer](/docs/build/question-types/long-answer) |
+| `email` | Email | [Email](/docs/build/question-types/email) |
+| `phone` | Phone number | [Phone number](/docs/build/question-types/phone-number) |
+| `link` | Link | [Link](/docs/build/question-types/link) |
+| `number` | Number | [Number](/docs/build/question-types/number) |
+| `date` | Date | [Date](/docs/build/question-types/date) |
+| `time` | Time | [Time](/docs/build/question-types/time) |
+| `scale` | Linear scale | [Linear scale](/docs/build/question-types/linear-scale) |
+| `rating` | Rating | [Rating](/docs/build/question-types/rating) |
+| `ranking` | Ranking | [Ranking](/docs/build/question-types/ranking) |
+| `choice` | Multiple choice | [Multiple choice](/docs/build/question-types/multiple-choice) |
+| `checkbox` | Checkboxes | [Checkboxes](/docs/build/question-types/checkboxes) |
+| `multiselect` | Multi-select | [TODO: no page yet] |
+| `dropdown` | Dropdown | [Dropdown](/docs/build/question-types/dropdown) |
+| `country` | Respondent's country | [Respondent's country](/docs/build/question-types/respondents-country) |
+| `matrix` | Matrix | [Matrix](/docs/build/question-types/matrix) |
+| `grid` | Grid | [Grid](/docs/build/question-types/grid) |
+| `heading`, `title`, `label`, `divider`, `text` | Display blocks | [Layout blocks](/docs/build/layout-and-media/layout-blocks) |
+| `hidden` | A hidden field. The form neither shows it nor sends a value for it, and the builder doesn't offer it. | |
+| `image` | Image | [Image](/docs/build/layout-and-media/image) |
+| `video` | Video | [Video](/docs/build/layout-and-media/video) |
+| `audio` | Audio | [Audio](/docs/build/layout-and-media/audio) |
+| `group` | A group, which may repeat | [Groups](/docs/build/structure/groups), [Repeating groups](/docs/build/structure/repeating-groups) |
+| `page` | A page | [Pages, progress and review](/docs/build/structure/pages) |
+
+### Questions and display blocks
+
+<FieldList of="LeafBlock">
+<Field name="id">
+The block's id, unique in the form. Answers are keyed by it.
+</Field>
+<Field name="type">
+What it is: see the table above.
+</Field>
+<Field name="label">
+The question, or a display block's text. Plain text.
+</Field>
+<Field name="description">
+Help text under a question's label, plain text with its line breaks kept. A blank one shows nothing.
+</Field>
+<Field name="content">
+A text block's text, or an image's, video's or audio's source.
+</Field>
+<Field name="captions">
+A video file's `.vtt` captions. Ignored on YouTube and Vimeo.
+</Field>
+<Field name="required">
+The question must be answered.
+</Field>
+<Field name="completeRequired">
+A matrix or ranking must be answered in full: every row, or every option ranked.
+</Field>
+<Field name="placeholder">
+Text shown in an empty field.
+</Field>
+<Field name="min">
+The lowest number, or a scale's first point.
+</Field>
+<Field name="max">
+The highest number, or a scale's last point.
+</Field>
+<Field name="level">
+A heading's level.
+</Field>
+<Field name="options">
+The coded options of a multiple choice, checkboxes, multi-select, dropdown or ranking question, or a matrix's rows.
+</Field>
+<Field name="columns">
+A matrix's columns.
+</Field>
+<Field name="enableWhen">
+The conditions that show the block. Without them it always shows.
+</Field>
+<Field name="enableBehavior">
+Whether all the conditions must hold, or any one.
+</Field>
+<Field name="enableLogic">
+How the conditions combine, when the author wrote their own logic, such as "1 AND (2 OR 3)". Never together with `enableBehavior`.
+</Field>
+</FieldList>
+
+<FieldList of="Option">
+<Field name="code">
+The option's code. Answers and conditions use it, and it never changes when the label is edited.
+</Field>
+<Field name="label">
+What the respondent sees, plain text. `prepareSubmission` stores it beside the code.
+</Field>
+<Field name="score">
+The number a score formula uses for this option.
+</Field>
+</FieldList>
+
+A grid has its own rows and typed columns:
+
+<Signature of="GridBlock" />
+
+<Signature of="GridColumn" />
+
+### Groups and pages
+
+<FieldList of="GroupBlock">
+<Field name="id">
+The group's id. A repeating group's answer is keyed by it.
+</Field>
+<Field name="type">
+Always `"group"`.
+</Field>
+<Field name="label">
+The group's heading, plain text.
+</Field>
+<Field name="enableWhen">
+The conditions that show the group and everything in it.
+</Field>
+<Field name="enableBehavior">
+Whether all the conditions must hold, or any one.
+</Field>
+<Field name="enableLogic">
+How the conditions combine, when the author wrote their own logic.
+</Field>
+<Field name="repeats">
+Only `true` makes the group repeat: the respondent fills it in as many times as they need.
+</Field>
+<Field name="repeatLabel">
+The word for one entry, such as "medication".
+</Field>
+<Field name="minOccurs">
+The fewest entries. 1 when it's absent.
+</Field>
+<Field name="maxOccurs">
+The most entries. When it's absent, the package holds a repeating group to 1,000 (`DEFAULT_MAX_OCCURS`).
+</Field>
+<Field name="scores">
+Scores calculated from the group's questions. See [Read scores](/docs/integrate/scores).
+</Field>
+<Field name="blocks">
+What's inside it. For a repeating group, the questions of one entry.
+</Field>
+</FieldList>
+
+<Signature of="RepeatingGroup" />
+
+<FieldList of="PageBlock">
+<Field name="id">
+The page's id.
+</Field>
+<Field name="type">
+Always `"page"`.
+</Field>
+<Field name="title">
+The page's title, shown as its heading and in the progress caption.
+</Field>
+<Field name="enableWhen">
+The conditions that show the page. A page that isn't shown is skipped.
+</Field>
+<Field name="enableBehavior">
+Whether all the conditions must hold, or any one.
+</Field>
+<Field name="enableLogic">
+How the conditions combine, when the author wrote their own logic.
+</Field>
+<Field name="blocks">
+The page's questions, display blocks and groups.
+</Field>
+</FieldList>
+
+### Conditions
+
+<FieldList of="EnableWhenCondition">
+<Field name="id">
+The condition's id within its block, as `enableLogic` refers to it.
+</Field>
+<Field name="question">
+The id of the question it looks at.
+</Field>
+<Field name="operator">
+How it compares the answer.
+</Field>
+<Field name="answer">
+What it compares with: an option's code, a number or text. `exists` has none.
+</Field>
+</FieldList>
+
+<Signature of="LogicNode" />
+
+<Signature of="LogicItem" />
+
+[Show a question only when it applies](/docs/build/show-questions-conditionally) explains conditions as the author sets them.
+
+## Related
+
+- [Answers and their states](/docs/integrate/concepts/answers): what each type of question sends and stores.
+- [Update to a new form version](/docs/integrate/form-versions): replacing the file with a new download.
+- [Other `/core` exports](/docs/integrate/reference/core): functions that read a form file.

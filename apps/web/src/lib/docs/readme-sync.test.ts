@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { isDeveloperPage } from "./code-examples";
 import { CONTENT_DIR, getLivePages, getPage, readReference, type DocsPage } from "./content";
 import { textOf, walk, type MdNode } from "./mdast";
-import { typeReference } from "./reference";
+import { cssReference, typeReference } from "./reference";
 
 /*
  * Keeping the developer pages and the renderer's README in step (docs brief,
@@ -124,6 +124,38 @@ describe("the overview and the package", () => {
     expect(manifest.peerDependencies).toEqual({ react: "^18.0.0 || ^19.0.0", "react-dom": "^18.0.0 || ^19.0.0" });
     expect(readme).toContain("It needs `react` and `react-dom` 18 or 19. On a server, `/core` needs Node 20 or later.");
     expect(page.body).toContain("It needs `react` and `react-dom` 18 or 19, and on a server `/core` needs Node 20 or later.");
+  });
+});
+
+describe("the README's custom properties and the stylesheet", () => {
+  // The CSS reference shows the stylesheet's defaults and the README's "Used for"; here the README's own defaults must agree.
+  const properties = cssReference().properties;
+  const rowsOf = (bold: string) => {
+    const nodes = tree.children ?? [];
+    const at = nodes.findIndex((n) => n.type === "paragraph" && textOf(n).startsWith(`${bold}.`));
+    const table = nodes.slice(at).find((n) => n.type === "table");
+    if (at < 0 || !table) throw new Error(`The README has no table after "${bold}."`);
+    return (table.children ?? []).slice(1).map((row) => (row.children ?? []).map(textOf));
+  };
+  const byName = (name: string) => properties.find((p) => p.name === name)!;
+
+  it("give the same colours, light and dark", () => {
+    for (const [name, light, dark] of rowsOf("Colours")) expect([name, light.toLowerCase(), dark.toLowerCase()]).toEqual([name, byName(name).light?.toLowerCase(), byName(name).dark?.toLowerCase()]);
+  });
+
+  it("give the same density values", () => {
+    for (const [name, patient, standard, dense] of rowsOf("Density")) expect([name, patient, standard, dense]).toEqual([name, ...Object.values(byName(name).density!)]);
+  });
+
+  it("give the same shape and type defaults", () => {
+    for (const [name, fallback] of rowsOf("Shape and type")) expect([name, fallback.startsWith("none") ? null : fallback]).toEqual([name, byName(name).light]);
+  });
+
+  it("describe each derived default by the properties and percentage the stylesheet uses", () => {
+    for (const [name, fallback] of rowsOf("Derived")) {
+      const css = byName(name).light!;
+      for (const used of css.match(/--zf-[\w-]+|\d+(?:\.\d+)?(?:%|rem)/g) ?? []) expect(fallback, name).toContain(used);
+    }
   });
 });
 

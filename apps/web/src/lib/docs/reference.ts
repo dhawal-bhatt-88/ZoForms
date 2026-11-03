@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import postcss, { type AtRule } from "postcss";
 import ts from "typescript";
 
 /*
@@ -167,4 +168,115 @@ export function typeReference(names: readonly string[], dir = PACKAGE_DIR): Type
     throw new Error(`@zoworkhq/forms declares no "${name}"`);
   };
   return { package: packageName(dir), types: [...new Set(names)].sort().map(find) };
+}
+
+/* ---------- CSS: classes, custom properties and host hooks ---------- */
+
+export type CssClass = { key: string; name: string; doc: string | null };
+
+export type CssProperty = {
+  name: string;
+  /** The README's table it is in: "Colours", "Derived", "Shape and type" or "Density". */
+  group: string;
+  /** The README's "Used for". */
+  usedFor: string;
+  /** The stylesheet's default, as CSS, with its private --_zf- names written as the public ones; null when there is none. */
+  light: string | null;
+  /** The dark theme's default, when it has its own. */
+  dark: string | null;
+  /** Each density's default, for the properties that follow density. */
+  density: { patient: string; standard: string; dense: string } | null;
+  /** A default the stylesheet changes in a media query. */
+  media: { query: string; value: string } | null;
+};
+
+export type CssHook = { attribute: string; values: string[] };
+
+export type CssReference = { package: string; source: string; classes: CssClass[]; properties: CssProperty[]; hooks: CssHook[] };
+
+/** The README's tables after "Custom properties", each named by the bold word before it ("Colours."). */
+function readmePropertyTables(readme: string): Map<string, { group: string; usedFor: string }> {
+  const out = new Map<string, { group: string; usedFor: string }>();
+  const lines = readme.replace(/\r\n/g, "\n").split("\n");
+  let group = "";
+  for (const line of lines.slice(lines.indexOf("### Custom properties"))) {
+    if (line.startsWith("## ")) break;
+    const bold = /^\*\*([^*]+?)\.\*\*/.exec(line);
+    if (bold) group = bold[1];
+    const row = /^\| `(--zf-[\w-]+)` \|(.*)\|$/.exec(line);
+    if (row) out.set(row[1], { group, usedFor: row[2].split("|").pop()!.trim() });
+  }
+  return out;
+}
+
+export function cssReference(dir = PACKAGE_DIR): CssReference {
+  const dtsPath = path.join(dir, "dist", "react", "index.d.ts");
+  const text = fs.readFileSync(dtsPath, "utf8");
+  const file = ts.createSourceFile(dtsPath, text, ts.ScriptTarget.Latest, true);
+  const statement = file.statements.find((s): s is ts.VariableStatement => ts.isVariableStatement(s) && declaredName(s) === "classNames");
+  const literal = statement?.declarationList.declarations[0].type;
+  if (!literal || !ts.isTypeLiteralNode(literal)) throw new Error("dist/react/index.d.ts declares no classNames type literal");
+  const classes = literal.members.filter(ts.isPropertySignature).map((m) => ({
+    key: m.name.getText(file),
+    name: m.type!.getText(file).replace(/^"|"$/g, ""),
+    doc: docOf(m, text),
+  }));
+
+  const root = postcss.parse(fs.readFileSync(path.join(dir, "dist", "styles.css"), "utf8"));
+  const publicName = (css: string) => css.replace(/var\(--_zf-([\w-]+)\)/g, "var(--zf-$1)");
+  /** `--_zf-x: var(--zf-x, fallback)` → fallback, or null with none. */
+  const fallbackOf = (value: string, name: string) => {
+    const head = `var(${name}`;
+    const trimmed = value.trim();
+    if (!trimmed.startsWith(head) || !trimmed.endsWith(")")) return null;
+    const inner = trimmed.slice(head.length, -1).replace(/^\s*,/, "").trim();
+    return inner === "" ? null : inner;
+  };
+  const light = new Map<string, string | null>();
+  const dark = new Map<string, string>();
+  const media = new Map<string, { query: string; value: string }>();
+  const densities: Record<string, Map<string, string>> = { patient: new Map(), standard: new Map(), dense: new Map() };
+  const hooks = new Map<string, Set<string>>();
+  root.walkRules((rule) => {
+    for (const [, attribute, value] of rule.selector.matchAll(/\[(data-zf-[\w-]+)=([\w-]+)\]/g)) hooks.set(attribute, (hooks.get(attribute) ?? new Set()).add(value));
+    const density = /^:where\(\[data-zf-density=(\w+)\]\)$/.exec(rule.selector)?.[1];
+    const parent = rule.parent as AtRule | undefined;
+    const inMedia = parent?.type === "atrule" && parent.name === "media" ? parent.params : null;
+    rule.walkDecls(/^--_zf-/, (decl) => {
+      const name = decl.prop.replace("--_zf-", "--zf-");
+      if (density) return void densities[density].set(decl.prop, decl.value.trim());
+      if (!decl.value.includes(`var(${name}`)) return;
+      const fallback = fallbackOf(decl.value, name);
+      if (inMedia) media.set(name, { query: inMedia, value: publicName(fallback ?? "") });
+      else if (rule.selector.includes("[data-zf-theme=dark]")) dark.set(name, publicName(fallback ?? ""));
+      else if (!light.has(name)) light.set(name, fallback);
+    });
+  });
+
+  const readme = readmePropertyTables(fs.readFileSync(path.join(dir, "README.md"), "utf8"));
+  const properties = [...light.entries()].map(([name, fallback]): CssProperty => {
+    const fromReadme = readme.get(name);
+    if (!fromReadme) throw new Error(`The README's custom property tables have no ${name}`);
+    const viaDensity = fallback ? /^var\((--_zf-density-[\w-]+),\s*(.+)\)$/.exec(fallback) : null;
+    return {
+      name,
+      ...fromReadme,
+      light: viaDensity ? viaDensity[2] : fallback === null ? null : publicName(fallback),
+      dark: dark.get(name) ?? null,
+      density: viaDensity
+        ? { patient: densities.patient.get(viaDensity[1])!, standard: densities.standard.get(viaDensity[1])!, dense: densities.dense.get(viaDensity[1])! }
+        : null,
+      media: media.get(name) ?? null,
+    };
+  });
+  const order = ["Colours", "Derived", "Shape and type", "Density"];
+  properties.sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group) || [...readme.keys()].indexOf(a.name) - [...readme.keys()].indexOf(b.name));
+
+  return {
+    package: packageName(dir),
+    source: "dist/react/index.d.ts (classNames), dist/styles.css (defaults and hooks), README.md (each property's table and use)",
+    classes,
+    properties,
+    hooks: [...hooks.entries()].map(([attribute, values]) => ({ attribute, values: [...values] })),
+  };
 }

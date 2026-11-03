@@ -339,6 +339,9 @@ createRoot(document.getElementById('root')).render(<StrictMode>{(pages[location.
       await prompt.waitFor({ timeout: 30000 });
       check('a new tab asks first: "You have a saved draft from {date, time} for Demo Client."', (await P2.getByRole("heading", { name: "Continue where you left off?" }).count()) === 1);
       await P2.screenshot({ path: path.join(DIR, "drafts-device-prompt.png"), fullPage: true });
+      // The first tab saves as it closes ("last save wins" between two tabs), so close it before this tab submits.
+      await P.close();
+      await P2.waitForTimeout(500);
       await P2.getByRole("button", { name: "Continue" }).click();
       await P2.getByLabel("Preferred name", { exact: true }).waitFor();
       await P2.getByRole("radio", { name: "Yes", exact: true }).check();
@@ -353,7 +356,6 @@ createRoot(document.getElementById('root')).render(<StrictMode>{(pages[location.
       await P2.getByText("Form submitted successfully.").waitFor();
       await P2.waitForTimeout(500);
       check("a submit deletes the device draft and the tab's copy", (await database(P2)).records.length === 0 && Object.keys(await tabEntries(P2)).length === 0);
-      await P.close();
       await P2.close();
 
       // Signing out, after leaving the form.
@@ -411,6 +413,130 @@ createRoot(document.getElementById('root')).render(<StrictMode>{(pages[location.
   }
 }
 
+/** Every fence on a page, in order: { lang, file, code }. */
+function allFencesOf(slug) {
+  const mdx = fs.readFileSync(path.join(DOCS, `${slug}.mdx`), "utf8").replace(/\r\n/g, "\n");
+  return [...mdx.matchAll(/^```(\w+)([^\n]*)\n([\s\S]*?)^```$/gm)].map(([, lang, words, code]) => ({ lang, file: /\bfile=(\S+)/.exec(words)?.[1], code }));
+}
+
+/**
+ * "Style the form", in the same app: the page's CSS, word for word, on the
+ * two-page intake. Its brand and dark-theme properties, the heading clash and
+ * both fixes, and Tailwind 3's reset with and without the page's layer.
+ * Tailwind is linked from apps/web, so no network is used. For this script
+ * only: main.jsx shows the form at its own paths, and the page's CSS is added
+ * to the page rather than written into the app's files, apart from
+ * src/index.css, which Tailwind must compile.
+ */
+async function styling(app, browser) {
+  const css = allFencesOf("integrate/styling").filter((f) => f.lang === "css");
+  const byFile = (name) => css.find((f) => f.file === name).code;
+  const [inheritFix, scopeFix] = css.filter((f) => !f.file && /\bh1, h2\b|\(h1, h2\)/.test(f.code)).map((f) => f.code);
+  if (!inheritFix || !scopeFix) throw new Error("the styling page has lost one of its heading fixes");
+
+  fs.symlinkSync(fs.realpathSync(path.join(WEB, "node_modules/tailwindcss")), path.join(app, "node_modules/tailwindcss"), "junction");
+  fs.writeFileSync(path.join(app, "tailwind.config.js"), "export default { content: ['./index.html', './src/**/*.{js,jsx}'] };\n");
+  fs.writeFileSync(path.join(app, "postcss.config.js"), "export default { plugins: { tailwindcss: {} } };\n");
+  const unlayered = "@tailwind base;\n@tailwind components;\n@tailwind utilities;\n";
+  fs.writeFileSync(path.join(app, "src/index.css"), "/* no Tailwind yet */\n");
+  fs.writeFileSync(
+    path.join(app, "src/main.jsx"),
+    `import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { FormRenderer } from '@zoworkhq/forms/react';
+import '@zoworkhq/forms/styles.css';
+import './index.css';
+import schema from './intake-server.json';
+
+const dark = location.pathname === '/dark';
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
+    <h1>{schema.title}</h1>
+    <div data-zf-theme={dark ? 'dark' : undefined}>
+      <FormRenderer schema={schema} endpoint="/api/submit" drafts={{ mode: 'off' }} />
+    </div>
+  </StrictMode>,
+);
+`,
+  );
+
+  const vitePort = await freePort();
+  const vite = start([path.join("node_modules/vite/bin/vite.js"), "--port", String(vitePort), "--strictPort"], app);
+  const base = `http://localhost:${vitePort}`;
+  const rgb = (hex) => `rgb(${hex.match(/[0-9a-f]{2}/gi).map((h) => parseInt(h, 16)).join(", ")})`;
+  try {
+    await waitForUrl(`${base}/`);
+    const open = async (route, ...styles) => {
+      // Reduced motion: the stylesheet animates colour changes, which would be read half-way.
+      const context = await browser.newContext({ viewport: { width: 1000, height: 900 }, reducedMotion: "reduce" });
+      const P = await context.newPage();
+      const warnings = [];
+      P.on("console", (m) => m.type() === "warning" && warnings.push(m.text()));
+      await P.goto(`${base}${route}`);
+      await P.locator(".zf-next").waitFor({ timeout: 30000 });
+      for (const content of styles) await P.addStyleTag({ content });
+      return { context, P, warnings };
+    };
+    const look = (P) =>
+      P.evaluate(() => ({
+        next: getComputedStyle(document.querySelector(".zf-next")).backgroundColor,
+        title: getComputedStyle(document.querySelector(".zf-page-title")).color,
+        h1: getComputedStyle(document.querySelector("h1")).color,
+        border: getComputedStyle(document.querySelector(".zf-input")).borderTopWidth,
+      }));
+
+    {
+      const { context, P } = await open("/", byFile("src/brand.css"));
+      check("styling: the brand's --zf-primary colours the buttons", (await look(P)).next === rgb("6b2fb3"), JSON.stringify(await look(P)));
+      await context.close();
+    }
+    {
+      const { context, P } = await open("/dark", byFile("src/brand.css"), byFile("src/brand-dark.css"));
+      check("styling: under data-zf-theme=\"dark\", the page's dark value wins", (await look(P)).next === rgb("b48cf2"), JSON.stringify(await look(P)));
+      await P.screenshot({ path: path.join(DIR, "styling-dark.png"), fullPage: true });
+      await context.close();
+    }
+    {
+      const { context, P } = await open("/dark", byFile("src/site.css"));
+      const before = await look(P);
+      check("styling: a page's h2 rule beats the form's heading colour in the dark theme", before.title === rgb("14181b"), JSON.stringify(before));
+      await P.addStyleTag({ content: inheritFix });
+      check("styling: fix 1, color: inherit, gives the heading the form's dark text colour", (await look(P)).title === rgb("E8EAEC"), JSON.stringify(await look(P)));
+      await context.close();
+    }
+    {
+      const { context, P } = await open("/dark", scopeFix);
+      const after = await look(P);
+      check("styling: fix 2 keeps the rule out of the form, and on the page's own h1", after.title === rgb("E8EAEC") && after.h1 === rgb("14181b"), JSON.stringify(after));
+      await context.close();
+    }
+
+    // Tailwind 3's preflight, outside a layer and then as the page says.
+    fs.writeFileSync(path.join(app, "src/index.css"), unlayered);
+    {
+      await new Promise((r) => setTimeout(r, 1500));
+      const { context, P, warnings } = await open("/");
+      await P.waitForTimeout(500);
+      const reset = await look(P);
+      check("styling: Tailwind 3's preflight outside a layer takes the fields' borders, and the form warns", reset.border === "0px" && warnings.some((w) => w.includes("this form's controls have no border")), `${JSON.stringify(reset)} ${warnings.join(" | ")}`);
+      await context.close();
+    }
+    fs.writeFileSync(path.join(app, "src/index.css"), byFile("src/index.css"));
+    {
+      await new Promise((r) => setTimeout(r, 1500));
+      const { context, P, warnings } = await open("/");
+      await P.waitForTimeout(500);
+      const layered = await look(P);
+      const served = await (await fetch(`${base}/src/index.css`)).text();
+      check("styling: with the page's @layer reset, Tailwind still runs and the fields keep their borders, with no warning", served.includes("@layer reset") && layered.border !== "0px" && !warnings.some((w) => w.includes("no border")), `${JSON.stringify(layered)} ${warnings.join(" | ")}`);
+      await P.screenshot({ path: path.join(DIR, "styling-tailwind-layer.png"), fullPage: true });
+      await context.close();
+    }
+  } finally {
+    vite.child.kill();
+  }
+}
+
 (async () => {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "zowork-dev-docs-"));
   let browser;
@@ -418,6 +544,7 @@ createRoot(document.getElementById('root')).render(<StrictMode>{(pages[location.
     browser = await launchBrowser();
     const app = await quickstart(tmp, browser);
     await drafts(app, browser);
+    await styling(app, browser);
   } catch (e) {
     check("ran to the end", false, e.stack || String(e));
   } finally {

@@ -1,0 +1,173 @@
+---
+title: Style the form
+summary: Your brand's colours and font, the dark theme, density, and how the form's stylesheet meets your page's CSS, including resets and your own heading styles.
+template: how-to
+badges: [CSS]
+appliesTo: [package]
+updated: 2026-11-03
+prev: /docs/integrate/shared-devices
+next: /docs/integrate/reference/form-renderer
+---
+
+## When you'd use this
+
+<UseCases>
+<UseCase title="Your brand">
+The form in your colours and font, in every part of your app or in one.
+</UseCase>
+<UseCase title="A dark page">
+The form's dark theme, to match a dark part of your app.
+</UseCase>
+<UseCase title="Your app's own CSS">
+A CSS reset such as Tailwind's, or heading styles of your own, without hiding parts of the form.
+</UseCase>
+</UseCases>
+
+## Before you start
+
+- A form rendered with `FormRenderer`, and the stylesheet imported once: `import '@zoworkhq/forms/styles.css'`. See the [Quickstart](/docs/integrate/quickstart). The stylesheet is optional: without it, the form is plain HTML.
+- Every class, data attribute and custom property is listed in [CSS classes and custom properties](/docs/integrate/reference/css).
+
+## Steps
+
+### 1. Know how your CSS and the form's meet
+
+Every rule in the stylesheet is wrapped in `:where()`, so it has no specificity. Any plain rule of yours wins, without `!important`:
+
+```css
+.zf-success { border-radius: 0; }
+```
+
+That's by design: your page decides. It also means a rule meant for the rest of your page can reach into the form. Steps 6 and 7 cover the two usual cases.
+
+### 2. Use your brand's colours and font
+
+Set the `--zf-` custom properties on the form or on anything around it. A value nearer the form wins, as in any cascade:
+
+```css file=src/brand.css
+/* Your brand, everywhere */
+:root {
+  --zf-primary: #6b2fb3;
+  --zf-primary-soft: #f1eafa;
+  --zf-focus-ring: #6b2fb3;
+  --zf-font-family: 'Inter', sans-serif;
+}
+
+/* One part of your app */
+.patient-portal { --zf-max-width: 48rem; }
+```
+
+- **Set them around the form, not inside it.** The stylesheet reads them on the form, the success message and the scores list, so a value on an element inside the form doesn't apply.
+- **Prefer a wrapper to the form itself.** After a submit, the form is replaced by the success message and the scores list. A value on `:root` or a wrapper reaches them. A value on `.zf-form` alone doesn't.
+- **A value you set applies in both themes and every density.**
+- **An invalid value doesn't fall back to the default.** `--zf-primary: banana` leaves Submit with no background.
+
+### 3. Turn on the dark theme
+
+The dark theme is opt-in: it never follows the operating system's setting. Put `data-zf-theme="dark"` on an element around the form:
+
+```jsx check=fragment
+<div data-zf-theme="dark">
+  <FormRenderer schema={schema} endpoint="/api/submit" />
+</div>
+```
+
+For your own value in the dark theme, set it under your own dark selector. It beats a light value set on `:root` or a wrapper further out:
+
+```css file=src/brand-dark.css
+[data-zf-theme="dark"] {
+  --zf-primary: #b48cf2;
+  --zf-primary-soft: #241a33;
+  --zf-focus-ring: #b48cf2;
+}
+```
+
+On the same element as the light value, put it after the light one.
+
+### 4. Choose density, boxed groups and the progress bar
+
+These go on the same wrapper:
+
+```jsx check=fragment
+<div data-zf-density="patient" data-zf-group-style="box" data-zf-progress-style="bar">
+  <FormRenderer schema={schema} endpoint="/api/submit" />
+</div>
+```
+
+- **`data-zf-density`:** `"patient"`, `"standard"` (the default) or `"dense"`. The nearest ancestor with the attribute wins.
+- **`data-zf-group-style="box"`:** top-level groups in a light box, instead of a rule down their leading edge.
+- **`data-zf-progress-style`:** `"bar"` or `"caption"`, whatever the author chose. `"bar"` adds a segmented bar above "Step x of y".
+
+The boxes and the bar exist only in the stylesheet. Without it, those two attributes do nothing.
+
+### 5. Change one part of the form
+
+Use the part's class, and set the CSS property itself:
+
+```css
+.zf-error-summary { border-left-color: #6b2fb3; }
+```
+
+A `--zf-` property set on `.zf-error-summary` would do nothing, because the stylesheet reads them on the form.
+
+### 6. Keep your page's heading styles out of the form
+
+The form's own headings start at `h2`: group labels in a form without pages, page titles in a form with pages. A rule for your page's headings reaches them too, and beats the stylesheet's colour. With the dark theme, that can hide them, dark text on a dark background:
+
+```css file=src/site.css
+h1, h2 { color: #14181b; }
+```
+
+Changing `--zf-text-color` doesn't help: your rule wins whatever value the stylesheet's rule reads. Use one of these fixes instead.
+
+**Give your headings a colour that works in both themes:** let them take the colour of what they're in. The form sets its own text colour, so its headings follow it:
+
+```css
+h1, h2 { color: inherit; }
+```
+
+**Or keep your rule out of the form:**
+
+```css
+:where(h1, h2):not(.zf-form *) { color: #14181b; }
+```
+
+### 7. Make a CSS reset and the form agree
+
+A reset that isn't in a CSS layer beats the stylesheet, because the stylesheet's rules have no specificity. Text fields lose their borders and buttons their backgrounds. A development build warns once per page when it sees this, in the console: `@zoworkhq/forms: this form's controls have no border, so a CSS reset is probably overriding the package's stylesheet. Tailwind's preflight is the usual cause: see "Styling with CSS resets" in the README. If the borderless look is intended, ignore this.`
+
+**Tailwind 3:** put its reset in a CSS layer, in the file with your `@tailwind` directives. Rules outside a layer beat rules inside one, so the stylesheet wins, and the reset still applies to the rest of your page:
+
+```css file=src/index.css
+@layer reset {
+  @tailwind base;
+}
+@tailwind components;
+@tailwind utilities;
+```
+
+Or turn the reset off with `corePlugins: { preflight: false }` in `tailwind.config.js`. Your own page then loses it too.
+
+**Tailwind 4** already puts its reset in a layer. It changes only the error summary's bullets.
+
+**Another reset:** load it inside `@layer`, or add your own rules for the `zf-` classes.
+
+## What happens behind the scenes
+
+- The stylesheet sets every `--zf-` property's default on the form, the success message and the scores list, through properties of its own that start with `--_zf-`. Those aren't for you to set.
+- The dark theme and each density change only the defaults. A value you set wins over all of them.
+- The development warning in step 7 checks one of the form's controls once per page, and only in a development build.
+
+## Troubleshooting
+
+**The form's headings are invisible in the dark theme.** A heading rule of your page's is reaching into the form. See step 6.
+
+**Text fields have no border, and buttons no background.** A CSS reset is beating the stylesheet. See step 7.
+
+**A custom property does nothing.** It's set on an element inside the form. Set it on the form or around it.
+
+**The page after a submit has the default colours.** The properties are set on `.zf-form` only. Set them on a wrapper or `:root`, or on `.zf-form, .zf-success, .zf-scores`.
+
+## More about integrating forms
+
+<Series group />

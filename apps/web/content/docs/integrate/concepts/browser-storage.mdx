@@ -60,7 +60,7 @@ Every mode but `off` keeps one, so a refresh never depends on the network or a k
 - [`clearDrafts`](/docs/integrate/reference/clear-drafts) is called: with no options, every copy the package wrote in this tab; with `{ scope }` or `{ owner }`, the matching ones;
 - the browser ends the tab's session.
 
-**How long it lasts.** As long as the tab's [`sessionStorage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage): it survives a refresh, and the browser ends it when the tab is closed. Browsers may write it to disk to restore tabs after a crash or a restart, and duplicating a tab copies it into the new one.
+**How long it lasts.** As long as the tab's [`sessionStorage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage): it survives a refresh, and the browser ends it when the tab is closed. Browsers may write it to disk to restore tabs after a crash or a restart, and a page opened from the tab, with the tab as its opener, starts with a copy.
 
 ## The device draft
 
@@ -94,7 +94,7 @@ Device mode only.
 - it has expired: a device-mode form, when it starts, deletes every expired draft on the device;
 - `clearDrafts` is called: `{ owner }` and `{ scope }` delete the matching drafts, and no options deletes the whole database.
 
-The browser can delete it too, for example when someone clears the site's data. See MDN on [storage eviction](https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria).
+The browser can delete it too: when someone deletes the site's data in the browser's settings, or when the device runs low on space and this site's data is the least recently used. See MDN on [storage eviction](https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria).
 
 ## Encryption and hashes
 

@@ -100,18 +100,7 @@ export const DOCS_NAV: DocsNavSection[] = [
           { title: "Read scores", slug: "integrate/scores", status: "live" },
           { title: "Save progress (drafts)", slug: "integrate/drafts", status: "live" },
           { title: "Shared devices and kiosks", slug: "integrate/shared-devices", status: "live" },
-          {
-            title: "Style the form",
-            slug: "integrate/styling",
-            status: "planned",
-            notes: [
-              "The renderer's default stylesheet has zero specificity by design (every rule in :where()), so a host page's own element rules win.",
-              "Found on 23 Oct 2026: the external test app's `h1, h2` colour rule hid the form's group headings in dark mode.",
-              "Changing --zf-* properties does not help, because the host's rule beats the renderer's rule whatever value it reads.",
-              "Show the two real fixes: give the host's headings a colour that works in both themes, or scope the host rule so it doesn't reach inside .zf-form.",
-              "Check the class names against the renderer's README before writing.",
-            ].join(" "),
-          },
+          { title: "Style the form", slug: "integrate/styling", status: "live" },
         ],
       },
       {
@@ -121,9 +110,9 @@ export const DOCS_NAV: DocsNavSection[] = [
           { title: "prepareSubmission", slug: "integrate/reference/prepare-submission", status: "live" },
           { title: "clearDrafts", slug: "integrate/reference/clear-drafts", status: "live" },
           { title: "The posted body", slug: "integrate/reference/posted-body", status: "live" },
-          { title: "The form file", slug: "integrate/reference/form-file", status: "planned", notes: "Developer docs brief, CP4." },
-          { title: "CSS classes and custom properties", slug: "integrate/reference/css", status: "planned", notes: "Developer docs brief, CP4." },
-          { title: "Other /core exports", slug: "integrate/reference/core", status: "planned", notes: "Developer docs brief, CP4. The list is in reference/core-exports.json." },
+          { title: "The form file", slug: "integrate/reference/form-file", status: "live" },
+          { title: "CSS classes and custom properties", slug: "integrate/reference/css", status: "live" },
+          { title: "Other /core exports", slug: "integrate/reference/core", status: "live" },
         ],
       },
       {

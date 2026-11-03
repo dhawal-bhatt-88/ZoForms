@@ -4,7 +4,8 @@ import { evaluate } from "@mdx-js/mdx";
 import * as runtime from "react/jsx-runtime";
 import remarkGfm from "remark-gfm";
 import type { FormSchema } from "@zoworkhq/forms/core";
-import { readExampleForm, readReference, readTypes, type DocsPage } from "@/lib/docs/content";
+import { readCss, readExampleForm, readReference, readTypes, type DocsPage } from "@/lib/docs/content";
+import { cssTable, type CssTableName } from "@/lib/docs/css-table";
 import type { Reference, ReferenceType } from "@/lib/docs/reference";
 import { exampleReactCode, formExcerpt } from "@/lib/docs/example-code";
 import type { MARKDOWN_COMPONENTS } from "@/lib/docs/markdown";
@@ -16,7 +17,7 @@ import { Note, Tip, Warning } from "./callouts";
 import { CodeBlock, MdxPre } from "./code-block";
 import { LiveExample } from "./live-example";
 import { OnThisPage, PageEnd, PageHeader } from "./page-frame";
-import { Architecture, Door, Doors, Field, FieldList, Gif, Prop, PropsAtAGlance, Rules, Series, TryThis, UseCase, UseCases } from "./template-parts";
+import { Architecture, CssTable, Door, Doors, Field, FieldList, Gif, Prop, PropsAtAGlance, Rules, Series, TryThis, UseCase, UseCases } from "./template-parts";
 
 /** The page's generated reference table (`<page>.props.json`); a page using Prop must have one. */
 function referenceOf(page: DocsPage): Reference {
@@ -113,6 +114,11 @@ function components(page: DocsPage) {
       const member = owner?.members.find((m) => m.name === name);
       if (!member) throw new Error(`${page.file}: <Field name="${name}"> isn't a member of its <FieldList>`);
       return <Field member={member}>{children}</Field>;
+    },
+    CssTable: ({ of }: { of: string }) => {
+      const css = readCss(page.slug);
+      if (!css) throw new Error(`${page.file}: no ${page.slug}.css.json beside it`);
+      return <CssTable table={cssTable(css, of as CssTableName)} />;
     },
     TryThis,
     Doors,

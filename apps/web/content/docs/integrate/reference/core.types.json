@@ -1,0 +1,196 @@
+{
+  "package": "@zoworkhq/forms 0.28.0",
+  "types": [
+    {
+      "name": "GridRowAnswer",
+      "file": "types.d.ts",
+      "text": "interface GridRowAnswer {\n    row: Option;\n    cells: {\n        column: Option;\n        value: Option | string;\n    }[];\n}",
+      "doc": "One answered grid row as prepareSubmission returns it (contract 14.2): its answered cells in column order, a choice cell with its option's label from the schema, a text cell with its text.",
+      "members": [
+        {
+          "name": "row",
+          "type": "Option",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "cells",
+          "type": "{ column: Option; value: Option | string; }[]",
+          "required": true,
+          "doc": null
+        }
+      ]
+    },
+    {
+      "name": "MatrixSelection",
+      "file": "types.d.ts",
+      "text": "interface MatrixSelection {\n    row: Option;\n    column: Option;\n}",
+      "doc": "One answered matrix row as prepareSubmission returns it (contract 13.5).",
+      "members": [
+        {
+          "name": "row",
+          "type": "Option",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "column",
+          "type": "Option",
+          "required": true,
+          "doc": null
+        }
+      ]
+    },
+    {
+      "name": "PreparedAnswerValue",
+      "file": "types.d.ts",
+      "text": "type PreparedAnswerValue = BlockValue<PreparedValue> | PreparedAnswers[];",
+      "doc": null,
+      "members": []
+    },
+    {
+      "name": "PreparedAnswers",
+      "file": "types.d.ts",
+      "text": "interface PreparedAnswers {\n    [blockId: string]: PreparedAnswerValue;\n}",
+      "doc": "The answers prepareSubmission returns: Answers, with coded values labelled.",
+      "members": []
+    },
+    {
+      "name": "PreparedValue",
+      "file": "types.d.ts",
+      "text": "type PreparedValue = string | number | Option | Option[] | MatrixSelection[] | GridRowAnswer[];",
+      "doc": "A question's value as prepareSubmission returns it (contract 13.5): coded types carry their labels, looked up from the schema — an Option for choice and dropdown, Options for checkbox, multiselect and ranking, and MatrixSelections for matrix, and GridRowAnswers for grid (contract 14.2). Every other type is unchanged.",
+      "members": []
+    },
+    {
+      "name": "TreeEntry",
+      "file": "core/index.d.ts",
+      "text": "interface TreeEntry {\n    block: Block;\n    ancestors: readonly ContainerBlock[];\n    depth: number;\n    repeats: readonly RepeatingGroup[];\n}",
+      "doc": null,
+      "members": [
+        {
+          "name": "block",
+          "type": "Block",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "ancestors",
+          "type": "readonly ContainerBlock[]",
+          "required": true,
+          "doc": "Enclosing containers (a page, then groups), outermost first. Empty at the root."
+        },
+        {
+          "name": "depth",
+          "type": "number",
+          "required": true,
+          "doc": "Number of enclosing containers: 0 at the root."
+        },
+        {
+          "name": "repeats",
+          "type": "readonly RepeatingGroup[]",
+          "required": true,
+          "doc": "The repeating groups among the ancestors, outermost first (contract section 12.3). A repeating group's own entry does not include itself."
+        }
+      ]
+    },
+    {
+      "name": "assertSchemaIntegrity",
+      "file": "core/index.d.ts",
+      "text": "function assertSchemaIntegrity(schema: FormSchema): void;",
+      "doc": "Rejects schemas the builder should never have produced (contract section 6), so a hand-edited schema fails loudly instead of misbehaving. Applies to v1 schemas too. Called by every /core entry point that reads the tree, not only at mount: single-pass visibility is only correct when the ordering rule holds, and a backend may call validation or the payload filter directly. The result is cached per schema object, so the repeated calls are cheap. There is no cycle check: the ordering rule makes cycles impossible, since two blocks cannot each come before the other.",
+      "members": []
+    },
+    {
+      "name": "getCompletedPageIds",
+      "file": "core/index.d.ts",
+      "text": "function getCompletedPageIds(schema: FormSchema, answers: Answers, visitedPageIds: Iterable<string>, options?: ValidationOptions): string[];",
+      "doc": "The displayed pages that are completed: visited, and passing validation right now (contract section 8). Computed from the answers every time and never stored, so a page stops being completed the moment an earlier answer reveals a required question on it. A page with a host validator's error (contract section 16) is not completed either, so pass the same validators.",
+      "members": []
+    },
+    {
+      "name": "getDisplayedBlockIds",
+      "file": "core/index.d.ts",
+      "text": "function getDisplayedBlockIds(schema: FormSchema, answers: Answers): Set<string>;",
+      "doc": "Ids of every block to render in the root scope: the visible ones, minus any container — group or page — that is effectively empty (contract 2.7), and minus leaves that render nothing: `hidden` blocks, blank `text` and `image` blocks without a valid source (core/display's isDisplayable). A container is effectively empty when no descendant is displayable, i.e. every descendant is hidden by its conditions or renders nothing. A repeating group is judged on its template, so it is displayed even with no instances. A nested container counts only through its own contents, so a chain of containers that all end in nothing is empty all the way up. Root level only: blocks inside a repeating group are judged per instance, so they are not in this set. Deliberately a separate set rather than folded into getVisibleBlockIds: emptiness is about what a person sees, and must never decide what is validated or submitted. Once `hidden` blocks carry injected values, one can sit alone in a container that renders nothing while its value is still submitted.",
+      "members": []
+    },
+    {
+      "name": "getDisplayedPageIds",
+      "file": "core/index.d.ts",
+      "text": "function getDisplayedPageIds(schema: FormSchema, answers: Answers): string[];",
+      "doc": "Ids of the pages a person steps through, in order: every root page that is displayed. A hidden page and an effectively empty one (contract 2.7) are both skipped. Empty for a form that is not paged, and also for a paged form with nothing displayable on any page. Pages only sit at the root, so a flat loop over the root array finds them all — no second walk of the tree.",
+      "members": []
+    },
+    {
+      "name": "getSchemaWarnings",
+      "file": "core/index.d.ts",
+      "text": "function getSchemaWarnings(schema: FormSchema): string[];",
+      "doc": "Problems in a schema that do not stop it rendering but that its author should know about: today, image, video and audio blocks whose source is not valid or not recognised, and so are never shown, and video captions that are not recognised or are ignored (contract 10). Pure — it logs nothing; the renderer reports these in development builds. Expects a schema that passed the integrity check.",
+      "members": []
+    },
+    {
+      "name": "getSubmittableAnswers",
+      "file": "core/index.d.ts",
+      "text": "function getSubmittableAnswers(schema: FormSchema, answers: Answers): Answers;",
+      "doc": "The answers a submission may carry: visible answerable questions only. Hidden answers stay in the browser's state, and in device and server modes its storage, but never leave it. Answers keyed by anything else — an unknown id, a group, a presentational block — are dropped too, whatever put them there. Whitespace-only free text is sent as `{ state: 'empty' }`; any other text is sent exactly as typed. A question's value that is not `{ state: 'empty' }` or `{ state: 'answered', value }` is dropped. A visible repeating group sends an array under its own id (contract 12.4): one object per instance, in order, built by these same rules, with nested repeating groups as arrays inside it. It sends `[]` with no instances, and an instance with nothing to send is still `{}`. A hidden repeating group sends nothing. Instance ids never reach here. In /core so the backend can apply the same filter to an incoming payload rather than trusting the browser to have done it.",
+      "members": []
+    },
+    {
+      "name": "getVisibleBlockIds",
+      "file": "core/index.d.ts",
+      "text": "function getVisibleBlockIds(schema: FormSchema, answers: Answers): Set<string>;",
+      "doc": "Ids of every block in the root scope whose conditions pass and whose every ancestor is visible (contract 3.4): questions, presentational blocks and containers alike, repeating groups included. Root level only: blocks inside a repeating group are judged per instance, so they are not in this set.",
+      "members": []
+    },
+    {
+      "name": "isAnswerable",
+      "file": "core/index.d.ts",
+      "text": "function isAnswerable(block: Block): boolean;",
+      "doc": null,
+      "members": []
+    },
+    {
+      "name": "isContainer",
+      "file": "core/index.d.ts",
+      "text": "function isContainer(block: Block): block is ContainerBlock;",
+      "doc": null,
+      "members": []
+    },
+    {
+      "name": "isGroup",
+      "file": "core/index.d.ts",
+      "text": "function isGroup(block: Block): block is GroupBlock;",
+      "doc": null,
+      "members": []
+    },
+    {
+      "name": "isPage",
+      "file": "core/index.d.ts",
+      "text": "function isPage(block: Block): block is PageBlock;",
+      "doc": null,
+      "members": []
+    },
+    {
+      "name": "isPaged",
+      "file": "core/index.d.ts",
+      "text": "function isPaged(schema: FormSchema): boolean;",
+      "doc": "A form is paged if and only if its root holds pages (contract section 1).",
+      "members": []
+    },
+    {
+      "name": "isRepeating",
+      "file": "core/index.d.ts",
+      "text": "function isRepeating(block: Block): block is RepeatingGroup;",
+      "doc": "A group that repeats. Only `repeats: true` counts; pages never repeat.",
+      "members": []
+    },
+    {
+      "name": "walkBlocks",
+      "file": "core/index.d.ts",
+      "text": "function walkBlocks(blocks: readonly Block[]): Generator<TreeEntry>;",
+      "doc": "The only walk over the block tree. Everything that needs to visit blocks — visibility, integrity, validation, the payload filter, rendering — goes through this walk (or its per-instance form, used inside the package), so they all agree on one reading order. Depth-first, pre-order: a container is yielded before its children. The contract's ordering rule is defined against exactly this order. A repeating group's blocks are visited once, as the template. Iterative rather than recursive, because the contract sets no depth limit. A container whose `blocks` is not an array is yielded but not descended into; the integrity check is what rejects it.",
+      "members": []
+    }
+  ]
+}

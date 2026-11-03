@@ -4,7 +4,7 @@ import { getLivePages, pageFiles, readExampleForm } from "./content";
 import { MARKDOWN_COMPONENTS } from "./markdown";
 import { markdownFor } from "./page-markdown";
 import { attributesOf, fenceWords, lintMdx, walk } from "./mdast";
-import { DOCS_NAV, docsHref, isGroup, livePages } from "./nav";
+import { DOCS_NAV, docsHref, isGroup, livePages, type DocsNavSection } from "./nav";
 import { TEMPLATES, sectionsMatch } from "./templates";
 
 /*
@@ -22,9 +22,23 @@ describe("the docs content", () => {
   });
 
   it("keeps planned pages out of sight but on record", () => {
+    // A fixture, since the real navigation's planned pages go live one by one.
+    const fixture: DocsNavSection[] = [
+      {
+        title: "Section",
+        items: [
+          { title: "Written", slug: "integrate/overview", status: "live" },
+          { title: "Later", slug: "integrate/later", status: "planned", notes: "What it must say." },
+        ],
+      },
+    ];
+    expect(livePages(fixture).map((p) => p.slug)).not.toContain("integrate/later");
+    // Every planned page in the real navigation has no file yet, and says what it needs.
     const planned = DOCS_NAV.flatMap((s) => s.items.flatMap((i) => (isGroup(i) ? i.pages : [i]))).filter((p) => p.status === "planned");
-    expect(planned.map((p) => p.slug)).toContain("integrate/styling");
-    expect(pageFiles()).not.toContain("integrate/styling");
+    for (const page of planned) {
+      expect(pageFiles()).not.toContain(page.slug);
+      expect(page.notes, page.slug).toBeTruthy();
+    }
   });
 
   it.each(pages.map((p) => [p.file, p] as const))("%s has its template's sections, in order", (_, page) => {

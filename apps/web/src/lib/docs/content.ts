@@ -3,7 +3,7 @@ import path from "node:path";
 import { parseFrontmatter, type DocsFrontmatter } from "./frontmatter";
 import { headingsOf, parseMdx, type Heading, type MdNode } from "./mdast";
 import { livePages } from "./nav";
-import type { Reference, TypeReference } from "./reference";
+import type { CssReference, Reference, TypeReference } from "./reference";
 
 /*
  * Reading the docs' content files (apps/web/content/docs) on the server. Every
@@ -86,6 +86,15 @@ export function readReference(pageSlug: string): Reference | null {
 export function readTypes(pageSlug: string): TypeReference | null {
   const full = path.join(CONTENT_DIR, `${pageSlug}.types.json`);
   return fs.existsSync(full) ? (readJson(full) as TypeReference) : null;
+}
+
+/**
+ * The CSS reference's classes, custom properties and host hooks:
+ * `<page>.css.json`, generated like the others and checked by reference.test.ts.
+ */
+export function readCss(pageSlug: string): CssReference | null {
+  const full = path.join(CONTENT_DIR, `${pageSlug}.css.json`);
+  return fs.existsSync(full) ? (readJson(full) as CssReference) : null;
 }
 
 /**

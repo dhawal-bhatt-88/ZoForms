@@ -6,7 +6,7 @@ badges: [React]
 appliesTo: [package]
 updated: 2026-11-03
 prev: /docs/integrate/drafts
-next: /docs/integrate/reference/form-renderer
+next: /docs/integrate/styling
 ---
 
 ## When you'd use this
@@ -142,8 +142,8 @@ After a reload, if two different forms mount on one page, only the first comes b
 
 - **A form left on screen.** Its answers are in the page's memory until the form unmounts or the page goes away. Whoever uses the device next can see them. `clearDrafts` clears storage, not a form on screen.
 - **The page after a submit.** The form shows "Form submitted successfully." and any scores the author shows to respondents, until your app shows something else.
-- **The browser's own memory of what was typed.** The package sets no `autocomplete` attribute on its fields, so whether the browser offers earlier entries is up to the browser and its settings. See MDN on [`autocomplete`](https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/autocomplete).
-- **A duplicated tab.** Duplicating a tab copies its `sessionStorage` into the new tab, as MDN's [`sessionStorage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage) page describes.
+- **The browser's own memory of what was typed.** The package sets no `autocomplete` attribute on its fields, so whether the browser offers earlier entries is up to the browser and its settings. See MDN on [`autocomplete`](https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Attributes/autocomplete).
+- **A page opened from the form's tab.** A page with an opener, such as a window the form's page opens, starts with a copy of the opener's `sessionStorage`, as MDN's [`sessionStorage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage) page describes.
 
 ## What happens behind the scenes
 

@@ -1,4 +1,4 @@
-import { readExampleForm, readReference, readTypes, type DocsPage } from "./content";
+import { readCss, readExampleForm, readReference, readTypes, type DocsPage } from "./content";
 import { pageMarkdown } from "./markdown";
 import { rendererVersion } from "./renderer";
 import { siteOrigin } from "./site";
@@ -12,5 +12,6 @@ export function markdownFor(page: DocsPage, origin = siteOrigin()): string {
     exampleForm: (name) => readExampleForm(page.slug, name).schema,
     reference: readReference(page.slug),
     types: readTypes(page.slug),
+    css: readCss(page.slug),
   });
 }
