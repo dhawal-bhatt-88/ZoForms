@@ -1,0 +1,85 @@
+---
+title: Serve images, video and audio
+summary: Where image, video and audio blocks load from, how to serve your own files under a sub-path, and the headers captions and players need.
+template: how-to
+badges: [React]
+appliesTo: [package]
+updated: 2026-11-03
+prev: /docs/integrate/content-security-policy
+next: /docs/integrate/form-versions
+---
+
+## When you'd use this
+
+<UseCases>
+<UseCase title="Files on your own server">
+A form's map, welcome video or audio directions live in your app, at a path such as `/images/map.png`.
+</UseCase>
+<UseCase title="An app under a sub-path">
+Your app is served from `/clinic/`, so those paths need to load from under it.
+</UseCase>
+<UseCase title="Captions on another host">
+A video's captions file is on a CDN, and needs CORS.
+</UseCase>
+</UseCases>
+
+## Before you start
+
+- A form with image, video or audio blocks. The author sets each block's source in the builder; see [Image](/docs/build/layout-and-media/image), [Video](/docs/build/layout-and-media/video) and [Audio](/docs/build/layout-and-media/audio).
+
+## Steps
+
+### 1. Serve the files the form names
+
+A source is an `https://` URL, or a path on your own server starting with a single `/`, such as `/images/map.png`. Anything else isn't shown.
+
+| Block | Accepted |
+|---|---|
+| Image | Any such source |
+| Video | A YouTube or Vimeo link, shown in that service's player, or an `.mp4` or `.webm` file |
+| Video captions | A `.vtt` file, for a video file only |
+| Audio | An `.mp3`, `.m4a`, `.ogg` or `.wav` file |
+
+A source that isn't accepted, or a file that fails to load, shows nothing: never a broken image or an error.
+
+### 2. Pass `assetBase` if your app lives under a sub-path
+
+Paths starting with `/` load from your page's origin. If your app is served under a sub-path, pass it as `assetBase`, so `/images/map.png` loads from `/clinic/images/map.png`. With Vite, pass `import.meta.env.BASE_URL`.
+
+```jsx check=fragment
+<FormRenderer schema={schema} endpoint="/api/submit" assetBase="/clinic/" />
+```
+
+`https://` sources ignore it.
+
+### 3. Set CORS for captions on another host
+
+A captions file on a different origin from your page only loads with CORS, so the renderer then requests the video with CORS too. Serve both the captions file and the video file with `Access-Control-Allow-Origin`. If the video won't load that way, it's shown once more without captions, with a warning in development, rather than not at all.
+
+### 4. Keep your page's referrer policy strict
+
+The players are sent only your site's origin, never the page path, and images are requested with `referrerPolicy="no-referrer"`. A `<video>` or `<audio>` element has no referrer setting of its own, though, so a file on another host is requested with your page's referrer policy. Keep `Referrer-Policy: strict-origin-when-cross-origin`, the browser's default, or stricter, so the page path is never sent.
+
+### 5. Allow them in your Content Security Policy
+
+Allow the two players in `frame-src`, and wherever your video, audio and captions files live in `media-src`. See [Content Security Policy](/docs/integrate/content-security-policy).
+
+## What happens behind the scenes
+
+- Videos and audio never play by themselves. Audio never loops or starts muted.
+- Captions on a video file are off until the respondent turns them on in the player.
+- YouTube loads with `rel=0`, which only limits the suggestions at the end of a video to the same channel. It doesn't remove them.
+- Captions on YouTube and Vimeo are set on that service, by the author.
+- Recorded audio needs a text alternative to meet WCAG 2.1 AA (1.2.1). That's the author's to write, in a text block next to the clip.
+
+## Troubleshooting
+
+**An image or video shows nothing.** Its source isn't accepted, such as an `http://` URL, a relative path without the leading `/`, or a video on another service. Or the file failed to load: check the browser's network panel.
+
+**Files load from the wrong place under a sub-path.** Pass `assetBase`.
+
+**A video plays without its captions.** The captions file is on another origin without `Access-Control-Allow-Origin`, isn't a `.vtt` file, or failed to load.
+
+## More about integrating forms
+
+<Series group />

@@ -13,6 +13,8 @@ import { fenceWords, walk } from "./mdast";
  *
  *   file=     the reader's file name, shown on the block. Fences on one page
  *             share a folder, so they can import each other.
+ *   in=       a folder of its own for the file, so two versions of one file
+ *             (JavaScript and TypeScript) don't meet. Not shown.
  *   check=    esm        a complete Node module (ES modules)
  *             cjs        a complete Node module (CommonJS)
  *             browser    a complete module for a bundler
@@ -23,8 +25,15 @@ import { fenceWords, walk } from "./mdast";
  *             body       a JSON body prepareSubmission must accept
  *             stored     the JSON prepareSubmission stores for the body named by of=
  *   run=      server     started with real Node, and posted to at route=
+ *             handler    a route handler's POST, called with a real Request
  *             node       run with real Node, and must exit 0
  *             browser    rendered with the real FormRenderer
+ *   form=     the form file a server or body is for: intake (the default) or
+ *             visit-feedback
+ *   auth=     the token a server wants, as "Authorization: Bearer <token>"
+ *   limit=    the server's body-size limit: a bigger body must get a 413
+ *   rejects=  a question one of the page's validators refuses a long answer to
+ *   name=, of= a body's name, and the stored submission that answers it
  *   stub=     replaced by a recording stand-in when a server runs: what the
  *             reader swaps for their own storage.
  *
@@ -82,7 +91,7 @@ export function examplesOf(page: DocsPage): CodeExample[] {
       words,
       check,
       run: words.run,
-      file: words.file ?? defaultFile(lang, check, out.length),
+      file: path.posix.join(words.in ?? "", words.file ?? defaultFile(lang, check, out.length)),
     });
   }
   return out;
@@ -102,7 +111,7 @@ export function fenceProblem(example: CodeExample): string | null {
  */
 export const fragmentPrelude = `
 import { FormRenderer, clearDrafts, ClearDraftsError, type DraftsOptions } from '@zoworkhq/forms/react';
-import { prepareSubmission, validateSubmission, type FieldValidator, type FormSchema } from '@zoworkhq/forms/core';
+import { calculateScores, prepareSubmission, validateSubmission, type FieldValidator, type FormSchema } from '@zoworkhq/forms/core';
 import data from './intake-form.json';
 
 const schema = data as FormSchema;
@@ -118,7 +127,7 @@ const draftOptions: DraftsOptions = { mode: 'off' };
 const validators: FieldValidator[] = [];
 const reportError = (_error: unknown) => {};
 const report = (_error: unknown, _stack?: string) => {};
-void [FormRenderer, clearDrafts, ClearDraftsError, prepareSubmission, validateSubmission];
+void [FormRenderer, clearDrafts, ClearDraftsError, calculateScores, prepareSubmission, validateSubmission];
 void [schema, body, user, userId, patient, scope, router, getAccessToken, getDraftKey, draftOptions, validators, reportError, report];
 `;
 
@@ -134,6 +143,44 @@ function fileText(example: CodeExample): string {
 /** The form file a reader imports, as this repo's real download. */
 export const INTAKE_FORM = path.join(CONTENT_DIR, "integrate", "intake-form.form.json");
 
+/** Every form file the pages' code may load, by the name the code uses: real downloads. */
+export const FORM_FILES: Record<string, string> = {
+  "intake-form.json": INTAKE_FORM,
+  "visit-feedback.json": path.join(CONTENT_DIR, "integrate", "visit-feedback.form.json"),
+};
+
+const isWrapped = (e: CodeExample) => e.check === "fragment" || e.check === "statements";
+
+type FormTarget = { name: string; typedBy: boolean };
+
+/**
+ * Where a block loads a form file from: beside the page's top folder and src/,
+ * and any relative path it names. `typedBy` is true when a TypeScript block
+ * imports it, which must cast it; JavaScript gets it typed as a FormSchema.
+ */
+function formFileTargets(examples: readonly CodeExample[]): Map<string, FormTarget> {
+  const targets = new Map<string, FormTarget>();
+  const add = (target: string, name: string, typedBy = false) => {
+    // Never outside the page's folder.
+    if (target.startsWith("..")) return;
+    targets.set(target, { name, typedBy: typedBy || (targets.get(target)?.typedBy ?? false) });
+  };
+  for (const name of Object.keys(FORM_FILES)) {
+    add(name, name);
+    add(path.posix.join("src", name), name);
+  }
+  for (const example of examples) {
+    const typed = /\.tsx?$/.test(example.file) && !isWrapped(example);
+    for (const [, relative, name] of example.code.matchAll(/['"`](\.{1,2}\/(?:[^'"`]*\/)?([\w-]+\.json))['"`]/g)) {
+      if (!FORM_FILES[name]) continue;
+      // An import is relative to its file; readFileSync, to the folder the server starts in.
+      add(path.posix.normalize(path.posix.join(path.posix.dirname(example.file), relative)), name, typed);
+      add(path.posix.normalize(relative), name);
+    }
+  }
+  return targets;
+}
+
 /** JavaScript has no cast, so JS blocks see the form file as a FormSchema. TypeScript blocks import the real file and need theirs. */
 const FORM_FILE_TYPES = `import type { FormSchema } from '@zoworkhq/forms/core';\ndeclare const schema: FormSchema;\nexport default schema;\n`;
 
@@ -146,17 +193,17 @@ export function writeProject(slug: string, examples: readonly CodeExample[], roo
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(path.join(dir, "src"), { recursive: true });
   fs.writeFileSync(path.join(dir, "package.json"), '{ "type": "module" }\n');
-  for (const form of ["intake-form.json", path.join("src", "intake-form.json")]) fs.copyFileSync(INTAKE_FORM, path.join(dir, form));
+  const forms = formFileTargets(examples.filter((e) => COMPILED_LANGS.includes(e.lang)));
+  for (const [target, { name, typedBy }] of forms) {
+    fs.mkdirSync(path.dirname(path.join(dir, target)), { recursive: true });
+    fs.copyFileSync(FORM_FILES[name], path.join(dir, target));
+    if (!typedBy) fs.writeFileSync(path.join(dir, target.replace(/\.json$/, ".d.json.ts")), FORM_FILE_TYPES);
+  }
   for (const example of examples) {
     if (!COMPILED_LANGS.includes(example.lang) || example.check === "app") continue;
     const full = path.join(dir, example.file);
     fs.mkdirSync(path.dirname(full), { recursive: true });
     fs.writeFileSync(full, fileText(example));
-  }
-  const written = examples.filter((e) => COMPILED_LANGS.includes(e.lang) && e.check !== "app");
-  const isWrapped = (e: CodeExample) => e.check === "fragment" || e.check === "statements";
-  if (!written.some((e) => /\.tsx?$/.test(e.file) && !isWrapped(e))) {
-    for (const form of ["intake-form.d.json.ts", path.join("src", "intake-form.d.json.ts")]) fs.writeFileSync(path.join(dir, form), FORM_FILE_TYPES);
   }
   return dir;
 }

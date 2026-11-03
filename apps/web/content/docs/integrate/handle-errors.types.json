@@ -1,0 +1,37 @@
+{
+  "package": "@zoworkhq/forms 0.28.0",
+  "types": [
+    {
+      "name": "DraftProblem",
+      "file": "types.d.ts",
+      "text": "interface DraftProblem {\n    type: 'drafts-unavailable' | 'draft-unreadable' | 'draft-save-failed' | 'draft-load-failed' | 'draft-delete-failed';\n    mode: 'device' | 'server';\n    reason?: DraftsUnavailableReason;\n    error?: unknown;\n}",
+      "doc": "A drafts problem, reported through `onDraftProblem` — never `onError`, which stays about submitting (drafts contract section 4).",
+      "members": [
+        {
+          "name": "type",
+          "type": "'drafts-unavailable' | 'draft-unreadable' | 'draft-save-failed' | 'draft-load-failed' /** A draft could not be deleted. Reported only; the respondent is not told. */ | 'draft-delete-failed'",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "mode",
+          "type": "'device' | 'server'",
+          "required": true,
+          "doc": "The mode the author asked for."
+        },
+        {
+          "name": "reason",
+          "type": "DraftsUnavailableReason",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "error",
+          "type": "unknown",
+          "required": false,
+          "doc": null
+        }
+      ]
+    }
+  ]
+}

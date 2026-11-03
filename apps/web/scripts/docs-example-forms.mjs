@@ -111,6 +111,27 @@ const FORMS = [
       { id: "reason_for_visit", type: "long", label: "What brings you in today?" },
     ],
   },
+  // The "Read scores" guide's form: scores on visit feedback, never on anything clinical.
+  {
+    file: "integrate/visit-feedback.form.json",
+    title: "Visit feedback",
+    blocks: [
+      {
+        id: "visit",
+        type: "group",
+        label: "About your visit",
+        scores: [
+          { label: "Total score", formulaText: "booking + waiting + session", unanswered: "no-score", showToRespondent: true },
+          { label: "Average", formulaText: "(booking + waiting + session) / 3", unanswered: "no-score", decimals: 1 },
+        ],
+        blocks: [
+          { id: "booking_ease", name: "booking", type: "rating", label: "How easy was booking your visit?", required: true },
+          { id: "waiting_time", name: "waiting", type: "rating", label: "How did you find the waiting time?" },
+          { id: "session_rating", name: "session", type: "rating", label: "How was the session itself?", required: true },
+        ],
+      },
+    ],
+  },
   // The simple inputs (docs/briefs/BUILDER-BRIEF-DOCS-QUESTIONS.md, CP1): one question each.
   ...[
     ["short-answer", "Short answer example", { id: "preferred_name", type: "short", label: "Preferred name", description: "The name you'd like staff to use." }],

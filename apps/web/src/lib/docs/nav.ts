@@ -55,9 +55,14 @@ export function neighbours(slug: string): { prev: LivePage | null; next: LivePag
   return { prev: pages[i - 1] ?? null, next: pages[i + 1] ?? null };
 }
 
-/** The live pages of a page's own section, in order: a how-to guide's "More about …" list. */
-export function sectionPages(slug: string): LivePage[] {
+/**
+ * The live pages of a page's own section, in order: a how-to guide's "More
+ * about …" list. With `inGroup`, only those of its group, for a section as
+ * long as "Integrate forms".
+ */
+export function sectionPages(slug: string, inGroup = false): LivePage[] {
   const pages = livePages();
-  const section = pages.find((p) => p.slug === slug)?.section;
-  return section ? pages.filter((p) => p.section === section) : [];
+  const self = pages.find((p) => p.slug === slug);
+  if (!self?.section) return [];
+  return pages.filter((p) => p.section === self.section && (!inGroup || p.group === self.group));
 }

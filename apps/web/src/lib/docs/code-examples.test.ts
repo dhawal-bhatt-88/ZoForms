@@ -6,7 +6,7 @@ import postcss from "postcss";
 import { beforeAll, describe, expect, it } from "vitest";
 import { prepareSubmission, type FormSchema } from "@zoworkhq/forms/core";
 import { classNames } from "@zoworkhq/forms/react";
-import { compileExamples, examplesOf, fenceProblem, INTAKE_FORM, isDeveloperPage, pageFolder, writeProject, type CodeExample } from "./code-examples";
+import { compileExamples, examplesOf, fenceProblem, FORM_FILES, isDeveloperPage, pageFolder, writeProject, type CodeExample } from "./code-examples";
 import { getLivePages } from "./content";
 
 /*
@@ -32,16 +32,11 @@ const COMMANDS = new Set([
   "npm run dev",
 ]);
 
-const readForm = () => JSON.parse(fs.readFileSync(INTAKE_FORM, "utf8")) as FormSchema;
-
-/** A body as the browser posts it: the demo ids the pages show, on the real form. */
-function validBody(key = "demo-key-1") {
-  return {
-    idempotencyKey: key,
-    schemaVersion: 2,
-    formId: "form-demo-1",
-    formVersionId: "version-demo-3",
-    submittedAt: "2026-10-30T09:15:00.000Z",
+/** The real downloads the pages' code loads, by the form= word. */
+const FORMS: Record<string, { file: string; required: string; answers: Record<string, unknown> }> = {
+  intake: {
+    file: FORM_FILES["intake-form.json"],
+    required: "preferred_name",
     answers: {
       preferred_name: { state: "answered", value: "Demo Client" },
       contact_email: { state: "answered", value: "client@example.org" },
@@ -49,6 +44,30 @@ function validBody(key = "demo-key-1") {
       sees_therapist: { state: "answered", value: "no" },
       reason_for_visit: { state: "empty" },
     },
+  },
+  "visit-feedback": {
+    file: FORM_FILES["visit-feedback.json"],
+    required: "booking_ease",
+    answers: {
+      booking_ease: { state: "answered", value: 4 },
+      waiting_time: { state: "answered", value: 3 },
+      session_rating: { state: "answered", value: 5 },
+    },
+  },
+};
+
+const formOf = (example: CodeExample) => FORMS[example.words.form ?? "intake"];
+const readForm = (form = FORMS.intake) => JSON.parse(fs.readFileSync(form.file, "utf8")) as FormSchema;
+
+/** A body as the browser posts it: the demo ids the pages show, on the real form. */
+function validBody(form = FORMS.intake, key = "demo-key-1") {
+  return {
+    idempotencyKey: key,
+    schemaVersion: 2,
+    formId: "form-demo-1",
+    formVersionId: "version-demo-3",
+    submittedAt: "2026-10-30T09:15:00.000Z",
+    answers: form.answers,
     derived: {},
   };
 }
@@ -108,7 +127,7 @@ describe("the developer pages' code", () => {
   it("compiles against the installed package, in every module system used", { timeout: 120_000 }, () => {
     const { programs, errors } = compileExamples(examples);
     expect(errors.map((e) => `${e.where}: ${e.message}`)).toEqual([]);
-    expect(programs).toEqual(["Node, JavaScript", "bundler, JavaScript", "bundler, strict TypeScript"]);
+    expect(programs).toEqual(["Node, JavaScript", "Node, strict TypeScript", "bundler, JavaScript", "bundler, strict TypeScript"]);
   });
 
   it("imports only the package's three entry points", () => {
@@ -125,8 +144,20 @@ describe("the developer pages' code", () => {
     for (const example of examples.filter((e) => e.lang === "json")) {
       const parsed = JSON.parse(example.code) as { formId?: string; formVersionId?: string };
       if (example.check !== "body") continue;
-      const result = prepareSubmission(readForm(), parsed);
+      const result = prepareSubmission(readForm(formOf(example)), parsed);
       expect(result, `${example.page}.mdx, line ${example.line}`).toMatchObject({ ok: true });
+    }
+  });
+
+  it("shows stored submissions exactly as prepareSubmission returns them", () => {
+    for (const stored of examples.filter((e) => e.check === "stored")) {
+      const body = examples.find((e) => e.page === stored.page && e.words.name === stored.words.of);
+      expect(body, `${stored.page}.mdx, line ${stored.line}: no body named "${stored.words.of}"`).toBeDefined();
+      const sent = JSON.parse(body!.code) as { formId: string; formVersionId: string };
+      // The pages show demo ids; the real file has the builder's.
+      const form = { ...readForm(formOf(body!)), formId: sent.formId, formVersionId: sent.formVersionId };
+      const result = prepareSubmission(form, sent) as { submission: unknown };
+      expect(JSON.parse(stored.code), `${stored.page}.mdx, line ${stored.line}`).toEqual(result.submission);
     }
   });
 
@@ -142,14 +173,61 @@ describe("the developer pages' code", () => {
 });
 
 /** Stands in for the reader's storage while a server runs, and writes down what it is given. */
-const STORE_STUB = `import fs from 'node:fs';
-const seen = new Set();
-export async function alreadyStored(key) { return seen.has(key); }
-export async function store(submission) {
+const storeStub = (file: string) => {
+  const body = `const seen = new Set();
+async function alreadyStored(key) { return seen.has(key); }
+async function store(submission) {
   seen.add(submission.idempotencyKey);
   fs.appendFileSync(process.env.DOCS_STORE_FILE, JSON.stringify(submission) + '\\n');
 }
 `;
+  return file.endsWith(".cjs")
+    ? `const fs = require('node:fs');\n${body}module.exports = { alreadyStored, store };\n`
+    : `import fs from 'node:fs';\n${body}export { alreadyStored, store };\n`;
+};
+
+type Post = (body: unknown, headers?: Record<string, string>) => Promise<{ status: number; json: () => Promise<unknown> }>;
+
+/**
+ * What every runnable endpoint must do, whatever it runs in: store a real
+ * submission once, answer a retry with a 2xx, and refuse a bad body, plus
+ * what its words ask for.
+ */
+async function endpointScenario(example: CodeExample, send: Post, storedFile: string) {
+  const form = formOf(example);
+  const auth: Record<string, string> = example.words.auth ? { Authorization: `Bearer ${example.words.auth}` } : {};
+  const post: Post = (body, headers = {}) => send(body, { ...auth, ...headers });
+  const stored = () => (fs.existsSync(storedFile) ? fs.readFileSync(storedFile, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line)) : []);
+
+  if (example.words.auth) expect((await send(validBody(form, "demo-key-0"), {})).status, "no sign-in").toBe(401);
+
+  const body = validBody(form);
+  expect((await post(body)).status).toBe(200);
+  // A retry that reached the server the first time: answered, and not stored again.
+  expect((await post(body)).status).toBe(200);
+  // A page may store more beside the submission, such as its own receipt time, but the submission is whole.
+  const expected = (prepareSubmission(readForm(form), body) as unknown as { submission: Record<string, unknown> }).submission;
+  expect(stored().map((record) => Object.fromEntries(Object.keys(expected).map((k) => [k, record[k]])))).toEqual([expected]);
+
+  const { [form.required]: _, ...missing } = body.answers;
+  const refused = await post({ ...body, idempotencyKey: "demo-key-2", answers: missing });
+  expect(refused.status).toBe(422);
+  expect(((await refused.json()) as { errors: { blockId: string }[] }).errors.map((e) => e.blockId)).toEqual([form.required]);
+
+  expect((await post({ answers: "nothing" })).status).toBe(422);
+
+  if (example.words.rejects) {
+    const long = { ...body, idempotencyKey: "demo-key-3", answers: { ...body.answers, [example.words.rejects]: { state: "answered", value: "x".repeat(60) } } };
+    const response = await post(long);
+    expect(response.status).toBe(422);
+    expect(((await response.json()) as { errors: { blockId: string }[] }).errors.map((e) => e.blockId)).toEqual([example.words.rejects]);
+  }
+  if (example.words.limit) {
+    const big = { ...body, idempotencyKey: "demo-key-4", padding: "x".repeat(2 * 1024 * 1024) };
+    expect((await post(big)).status).toBe(413);
+  }
+  expect(stored()).toHaveLength(1);
+}
 
 /** Loaded before a server: any port it asks for becomes a free one, written to a file. */
 const LISTEN_ANYWHERE = `import fs from 'node:fs';
@@ -176,6 +254,7 @@ async function waitFor<T>(read: () => T | undefined, what: string, ms = 20_000):
 
 describe("the runnable examples", () => {
   const servers = examples.filter((e) => e.run === "server");
+  const handlers = examples.filter((e) => e.run === "handler");
   const scripts = examples.filter((e) => e.run === "node");
 
   it("includes a server and a CommonJS script", () => {
@@ -193,7 +272,7 @@ describe("the runnable examples", () => {
 
   it.each(servers.map((e) => [`${e.page}, ${e.file}`, e] as const))("%s stores a real submission once and rejects a bad one", { timeout: 60_000 }, async (_, example: CodeExample) => {
     const dir = pageFolder(example.page);
-    for (const stub of examples.filter((e) => e.page === example.page && e.words.stub === "store")) fs.writeFileSync(path.join(dir, stub.file), STORE_STUB);
+    for (const stub of examples.filter((e) => e.page === example.page && e.words.stub === "store")) fs.writeFileSync(path.join(dir, stub.file), storeStub(stub.file));
     const preload = path.join(dir, "_listen-anywhere.mjs");
     const portFile = path.join(dir, "_port");
     const storeFile = path.join(dir, "_stored.jsonl");
@@ -211,25 +290,30 @@ describe("the runnable examples", () => {
     try {
       const port = await waitFor(() => (fs.existsSync(portFile) ? fs.readFileSync(portFile, "utf8") || undefined : undefined), `${example.file} to listen. ${logged}`);
       const url = `http://127.0.0.1:${port}${example.words.route}`;
-      const post = (body: unknown) => fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-
-      const body = validBody();
-      expect((await post(body)).status).toBe(200);
-      // A retry that reached the server the first time: answered, and not stored again.
-      expect((await post(body)).status).toBe(200);
-      const stored = fs.readFileSync(storeFile, "utf8").trim().split("\n").map((line) => JSON.parse(line));
-      expect(stored).toEqual([(prepareSubmission(readForm(), body) as { submission: unknown }).submission]);
-
-      const { preferred_name: _, ...missing } = body.answers;
-      const refused = await post({ ...body, idempotencyKey: "demo-key-2", answers: missing });
-      expect(refused.status).toBe(422);
-      expect(await refused.json()).toEqual({ errors: [{ blockId: "preferred_name", message: '"Preferred name" is required.', path: ["preferred_name"] }] });
-
-      const junk = await post({ answers: "nothing" });
-      expect(junk.status).toBe(422);
-      expect(fs.readFileSync(storeFile, "utf8").trim().split("\n")).toHaveLength(1);
+      await endpointScenario(
+        example,
+        (body, headers = {}) => fetch(url, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) }),
+        storeFile,
+      );
+    } catch (error) {
+      throw new Error(`${(error as Error).message}\n\nThe server said:\n${logged}`);
     } finally {
       server.kill();
     }
+  });
+
+  it.each(handlers.map((e) => [`${e.page}, ${e.file}`, e] as const))("%s stores a real submission once and rejects a bad one", { timeout: 60_000 }, async (_, example: CodeExample) => {
+    const dir = pageFolder(example.page);
+    for (const stub of examples.filter((e) => e.page === example.page && e.words.stub === "store")) fs.writeFileSync(path.join(dir, stub.file), storeStub(stub.file));
+    const storeFile = path.join(dir, "_stored-handler.jsonl");
+    fs.rmSync(storeFile, { force: true });
+    process.env.DOCS_STORE_FILE = storeFile;
+    const { POST } = (await import(/* @vite-ignore */ path.join(dir, example.file))) as { POST: (request: Request) => Promise<Response> };
+    await endpointScenario(
+      example,
+      (body, headers = {}) =>
+        POST(new Request(`http://localhost${example.words.route}`, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) })),
+      storeFile,
+    );
   });
 });

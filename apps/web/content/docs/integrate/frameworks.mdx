@@ -1,0 +1,174 @@
+---
+title: Use it with your framework
+summary: Vite, the Next.js App Router, CommonJS servers, TypeScript, and React 18 and 19.
+template: how-to
+badges: [React, Server]
+appliesTo: [package]
+updated: 2026-11-03
+prev: /docs/integrate/handle-errors
+next: /docs/integrate/content-security-policy
+---
+
+## When you'd use this
+
+<UseCases>
+<UseCase title="A Next.js app">
+Render the form from a server component, and receive it in a route handler.
+</UseCase>
+<UseCase title="TypeScript">
+Import the form file from JSON, and type your own code against the package.
+</UseCase>
+<UseCase title="An older Node server">
+Check submissions from CommonJS.
+</UseCase>
+</UseCases>
+
+## Before you start
+
+- `react` and `react-dom` 18 or 19.
+- Node 20 or later wherever `/core` runs on a server.
+
+## Steps
+
+### Vite
+
+Nothing special: follow the [Quickstart](/docs/integrate/quickstart). Other bundlers work the same way.
+
+If your app is served under a sub-path, pass Vite's `import.meta.env.BASE_URL` as `assetBase`, so images, video and audio stored on your server load from under it. See [Serve images, video and audio](/docs/integrate/media).
+
+### Next.js App Router
+
+`/react` is marked `'use client'`, so a server component can render `FormRenderer` directly. Import the stylesheet in a layout:
+
+```tsx file=app/layout.tsx check=browser
+import type { ReactNode } from 'react';
+import '@zoworkhq/forms/styles.css';
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}
+```
+
+```tsx file=app/intake/page.tsx check=browser
+import { FormRenderer } from '@zoworkhq/forms/react';
+import type { FormSchema } from '@zoworkhq/forms/core';
+import schema from './intake-form.json';
+
+export default function IntakePage() {
+  return (
+    <main>
+      <h1>{schema.title}</h1>
+      <FormRenderer schema={schema as FormSchema} endpoint="/api/submit" />
+    </main>
+  );
+}
+```
+
+A route handler receives it:
+
+```ts file=app/api/submit/route.ts check=browser run=handler route=/api/submit
+import { prepareSubmission } from '@zoworkhq/forms/core';
+import type { FormSchema } from '@zoworkhq/forms/core';
+import schema from '../../intake/intake-form.json';
+import { alreadyStored, store } from '../../../lib/store';
+
+export async function POST(request: Request) {
+  const result = prepareSubmission(schema as FormSchema, await request.json().catch(() => null));
+  if (result.ok === false) return Response.json({ errors: result.errors }, { status: 422 });
+
+  const { submission } = result;
+  if (!(await alreadyStored(submission.idempotencyKey))) await store(submission);
+  return Response.json({ ok: true });
+}
+```
+
+```ts file=lib/store.ts check=browser stub=store
+import type { StoredSubmission } from '@zoworkhq/forms/core';
+
+// Stands in for your storage, and loses everything when the server stops.
+const submissions = new Map<string, StoredSubmission>();
+
+export async function alreadyStored(key: string) {
+  return submissions.has(key);
+}
+
+export async function store(submission: StoredSubmission) {
+  submissions.set(submission.idempotencyKey, submission);
+}
+```
+
+**Functions need a client component.** A server component can't pass functions to a client component. For `onSuccess`, `getAuthHeaders`, `validators` or `getKey`, or to call `clearDrafts`, put the form in your own file that starts with `'use client'`:
+
+```tsx file=app/intake/intake-form.tsx check=browser run=browser
+'use client';
+
+import { FormRenderer } from '@zoworkhq/forms/react';
+import type { FormSchema } from '@zoworkhq/forms/core';
+import schema from './intake-form.json';
+
+export function IntakeForm() {
+  return (
+    <FormRenderer
+      schema={schema as FormSchema}
+      endpoint="/api/submit"
+      onSuccess={() => window.location.assign('/intake/thank-you')}
+    />
+  );
+}
+```
+
+The server renders the empty form. A saved fill is read in the browser after hydration, so the two always match.
+
+A tutorial that builds a whole intake page this way is on its way. [TODO: link the Next.js tutorial, written at CP5]
+
+### CommonJS servers
+
+`/core` works from `require`:
+
+```js check=cjs run=node
+const { prepareSubmission } = require('@zoworkhq/forms/core');
+
+console.log(typeof prepareSubmission);
+```
+
+`/react` is ES modules only, for bundlers. `require('@zoworkhq/forms/react')` fails, as does any import of the bare package name. [Validate and store submissions](/docs/integrate/validate-and-store) has a whole CommonJS server.
+
+### TypeScript
+
+Types ship with the package. `FormSchema` and the rest come from `@zoworkhq/forms/core`, `FormRendererProps` and `DraftsOptions` from `@zoworkhq/forms/react`.
+
+- Use `moduleResolution` `bundler`, `node16` or `nodenext`. The older `node` setting doesn't read the package's entry points.
+- A form file imported from JSON needs a cast. TypeScript reads its strings as `string` rather than the exact values `FormSchema` allows. The cast is safe: the form checks the file when it mounts.
+
+```ts check=browser
+import type { FormSchema } from '@zoworkhq/forms/core';
+import data from './intake-form.json';
+
+export const schema = data as FormSchema;
+```
+
+### React 18 and 19
+
+The package's peers are `react` and `react-dom` `^18.0.0 || ^19.0.0`. These docs render their live examples with React 18.3, and the Quickstart is checked in a new Vite app, which brings React 19.
+
+## What happens behind the scenes
+
+- The package has three entry points: `@zoworkhq/forms/react`, `@zoworkhq/forms/core` and `@zoworkhq/forms/styles.css`. There is no bare `@zoworkhq/forms` import.
+- `/core` has an `import` and a `require` build, so Node picks the right one. `/react` has only the first.
+- On a server, `/core` needs no React and no DOM.
+
+## Troubleshooting
+
+**TypeScript can't find `@zoworkhq/forms/core`.** Your `moduleResolution` is `node`. Change it to `bundler`, `node16` or `nodenext`.
+
+**TypeScript says your form file isn't assignable to `FormSchema`.** Cast it, as above.
+
+**Next.js says functions can't be passed to client components.** Move the form into a file that starts with `'use client'`, as above.
+
+## More about integrating forms
+
+<Series group />

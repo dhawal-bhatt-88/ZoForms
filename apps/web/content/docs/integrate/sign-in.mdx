@@ -1,0 +1,153 @@
+---
+title: Send the submission with your app's sign-in
+summary: Send cookies or a token with the form's request, check them on your server, and handle success, failure and time limits.
+template: how-to
+badges: [React, Server]
+appliesTo: [package]
+updated: 2026-11-03
+prev: /docs/integrate/custom-validation
+next: /docs/integrate/handle-errors
+---
+
+## When you'd use this
+
+<UseCases>
+<UseCase title="A signed-in portal">
+Staff or patients sign in to your app, and your endpoint accepts submissions only from them.
+</UseCase>
+<UseCase title="Tokens that expire">
+Your app holds an access token that it refreshes. The form asks for a current one on every attempt.
+</UseCase>
+<UseCase title="An endpoint on another origin">
+Your API lives on its own domain, so cookies and CORS need setting up.
+</UseCase>
+</UseCases>
+
+## Before you start
+
+- Your app's own sign-in, and a way for your server to check it.
+- An endpoint that calls `prepareSubmission`. See [Validate and store submissions](/docs/integrate/validate-and-store).
+
+## Steps
+
+### 1. Choose cookies or a token
+
+**Cookies.** `credentials` is passed to `fetch`, and is `same-origin` by default: cookies go with a request to your page's own origin. For an endpoint on another origin, pass `credentials="include"`, and see step 4.
+
+**A token.** `getAuthHeaders` returns extra headers. It is called on every attempt, not once when the form mounts, so a form left open for an hour still sends a current token. It may return the headers or a promise of them.
+
+```js file=auth-client.js check=esm
+// Stands in for your sign-in library.
+export async function getAccessToken() {
+  return 'demo-token';
+}
+```
+
+```jsx file=IntakePage.jsx check=browser run=browser
+import { FormRenderer } from '@zoworkhq/forms/react';
+import schema from './intake-form.json';
+import { getAccessToken } from './auth-client.js';
+
+export function IntakePage() {
+  return (
+    <FormRenderer
+      schema={schema}
+      endpoint="/api/submit"
+      getAuthHeaders={async () => ({ Authorization: `Bearer ${await getAccessToken()}` })}
+      onSuccess={() => window.location.assign('/thank-you')}
+      onError={(error) => console.warn('Submit failed:', error instanceof Error ? error.message : error)}
+    />
+  );
+}
+```
+
+If `getAuthHeaders` throws or its promise rejects, the submit fails as if the request had: the form shows its failure message, keeps every answer, and calls `onError`.
+
+### 2. Check the sign-in on your server
+
+Refuse the request before you look at its body.
+
+```js file=auth.js check=esm
+// Stands in for your sign-in check: look the token up, or verify it.
+export async function userFromToken(token) {
+  return token === 'demo-token' ? { id: 'user-demo-1' } : null;
+}
+```
+
+```js file=server.js check=esm run=server route=/api/submit auth=demo-token
+import { readFileSync } from 'node:fs';
+import express from 'express';
+import { prepareSubmission } from '@zoworkhq/forms/core';
+import { userFromToken } from './auth.js';
+import { alreadyStored, store } from './store.js';
+
+const schema = JSON.parse(readFileSync('./intake-form.json', 'utf8'));
+const app = express();
+app.use(express.json({ limit: '1mb' }));
+
+app.post('/api/submit', async (req, res) => {
+  const token = req.get('Authorization')?.replace(/^Bearer /, '');
+  const user = token ? await userFromToken(token) : null;
+  if (!user) return res.sendStatus(401);
+
+  const result = prepareSubmission(schema, req.body);
+  if (result.ok === false) return res.status(422).json({ errors: result.errors });
+
+  const { submission } = result;
+  if (!(await alreadyStored(submission.idempotencyKey))) await store({ ...submission, submittedBy: user.id });
+  res.json({ ok: true });
+});
+
+app.listen(3000);
+```
+
+```js file=store.js check=esm stub=store
+const submissions = new Map();
+
+export async function alreadyStored(key) {
+  return submissions.has(key);
+}
+
+export async function store(submission) {
+  submissions.set(submission.idempotencyKey, submission);
+}
+```
+
+Store who sent it beside `result.submission`, as `submittedBy` above. The submission itself says nothing about the respondent beyond their answers.
+
+### 3. Handle success, failure and the time limit
+
+- **`onSuccess`** gets the `fetch` response after any 2xx. The form has already been replaced by "Form submitted successfully." and focus has moved there. The form never reads the response body, so you can.
+- **`onError`** gets the error after a failure: a response that isn't a 2xx, a network failure, `getAuthHeaders` failing, or the time limit. The respondent sees "Submission failed. Your answers have been kept — please try again." and can send again, with the same key.
+- **`timeoutMs`** is how long a request may take, 30000 by default. After that the request is abandoned and counted as a failure.
+
+A 401 or 403 arrives in `onError` as an `Error` such as `Submission failed with status 401`. Only the message carries the status, so your app can't read the response there. [TODO: changing in 0.28.1]
+
+### 4. For an endpoint on another origin
+
+- Pass `credentials="include"` if the endpoint uses cookies.
+- The form posts JSON, so the browser asks your endpoint first with an `OPTIONS` request. Your endpoint must allow your page's origin, the `Content-Type` header and any header `getAuthHeaders` adds, and, with cookies, credentials. With credentials, `Access-Control-Allow-Origin` must name your page's origin, never `*`. [MDN's guide to CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS) explains each header.
+- Add the endpoint's origin to your Content Security Policy's `connect-src`. See [Content Security Policy](/docs/integrate/content-security-policy).
+
+## What happens behind the scenes
+
+- The request carries `Content-Type: application/json` and every header `getAuthHeaders` returned.
+- A retry asks `getAuthHeaders` again, and sends the same `idempotencyKey` with a new `submittedAt`.
+- Nothing about sign-in is kept by the form. Saved progress is separate: see `scope` and `owner` on [`FormRenderer`'s `drafts`](/docs/integrate/reference/form-renderer), and [`clearDrafts`](/docs/integrate/reference/clear-drafts) for signing out.
+
+## Rules the package enforces
+
+- `endpoint` must be `https://`, or `http://` on `localhost` or `127.0.0.1`, or a path on the page's own origin. Anything else is refused: the form isn't shown.
+- `credentials` is one of `omit`, `same-origin` and `include`.
+
+## Troubleshooting
+
+**Every submit fails, and your server never sees a request.** On another origin, the browser's `OPTIONS` request is refused. Check its response in the browser's network panel, and step 4.
+
+**Your server sees no cookie.** The endpoint is on another origin and `credentials` isn't `include`.
+
+**A form open for a long time fails with a 401.** `getAuthHeaders` returns a stale token. It's called on every attempt, so have it refresh the token.
+
+## More about integrating forms
+
+<Series group />

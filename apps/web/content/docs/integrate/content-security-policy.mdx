@@ -1,0 +1,82 @@
+---
+title: Content Security Policy
+summary: One complete policy for a page that renders a form, what each directive is for, and what Next.js needs on top.
+template: how-to
+badges: [Security]
+appliesTo: [package]
+updated: 2026-11-03
+prev: /docs/integrate/frameworks
+next: /docs/integrate/media
+---
+
+## When you'd use this
+
+<UseCases>
+<UseCase title="A strict policy">
+Your app sends a Content Security Policy, and the form has to work under it.
+</UseCase>
+<UseCase title="Forms with video or audio">
+Allow the players and files a form uses, and nothing more.
+</UseCase>
+<UseCase title="Next.js">
+Know what Next.js needs, and what the package doesn't.
+</UseCase>
+</UseCases>
+
+## Before you start
+
+- A page that renders `FormRenderer`, and a way to send headers from your app.
+
+## Steps
+
+### 1. Start from this policy
+
+The package needs no inline scripts or styles and doesn't use `eval`, so a strict policy works. This one covers everything the package can do, served from your own origin:
+
+```text
+default-src 'self';
+script-src 'self';
+style-src 'self';
+img-src 'self' https:;
+media-src 'self';
+connect-src 'self';
+frame-src https://www.youtube-nocookie.com https://player.vimeo.com;
+object-src 'none';
+base-uri 'none';
+```
+
+It also works with `require-trusted-types-for 'script'`.
+
+### 2. Narrow it to your forms
+
+| Directive | Why | When to change it |
+|---|---|---|
+| `style-src` | The stylesheet, as a file | Add your stylesheet's origin if it's elsewhere. |
+| `img-src` | Image blocks. `https:` allows the `https://` sources authors may use. | Narrow it to your hosts if you can. |
+| `media-src` | Video and audio files, and captions | Add the hosts they're served from. |
+| `connect-src` | The `POST` to `endpoint` | Add the endpoint's origin if it's on another one. |
+| `frame-src` | YouTube and Vimeo video blocks | Drop it if your forms have none. |
+
+### 3. Add what Next.js needs
+
+Next.js adds inline scripts of its own to every page. [Its guide to Content Security Policy](https://nextjs.org/docs/app/guides/content-security-policy) explains the two ways to allow them under a strict `script-src`: a nonce made for each request in Proxy, which needs every page rendered dynamically, or its experimental Subresource Integrity option. Follow that guide for Next.js's part.
+
+The package needs neither: it adds no inline scripts. Its one inline style is the progress bar's on a paged form rendered on the server, below, and a nonce doesn't cover a `style` attribute.
+
+## What happens behind the scenes
+
+- The form's only request of its own is the `POST` to `endpoint`, hence `connect-src`.
+- Images are requested with `referrerPolicy="no-referrer"`. YouTube and Vimeo players are sent only your site's origin, never the page path.
+- **One exception.** A paged form rendered on the server has `style="display:none"` on its progress bar, which `style-src` without `'unsafe-inline'` blocks. The bar then shows, even if the author didn't ask for one, and it stays after hydration. It's only a visual difference, and a form rendered in the browser isn't affected.
+
+## Troubleshooting
+
+**Every submit fails, and the console reports a `connect-src` violation.** The endpoint is on another origin. Add it to `connect-src`.
+
+**A video shows nothing.** Its player isn't in `frame-src`, or its file's host isn't in `media-src`.
+
+**A paged form shows a progress bar the author didn't ask for.** That's the exception above.
+
+## More about integrating forms
+
+<Series group />

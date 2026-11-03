@@ -1,0 +1,107 @@
+{
+  "package": "@zoworkhq/forms 0.28.0",
+  "types": [
+    {
+      "name": "FormulaNode",
+      "file": "types.d.ts",
+      "text": "type FormulaNode = {\n    num: number;\n} | {\n    ref: string;\n} | {\n    op: '+' | '-' | '*' | '/';\n    args: [\n        FormulaNode,\n        FormulaNode\n    ];\n};",
+      "doc": "A score formula as the builder exports it (contract 17.1): a tree, never text. A `ref` is the block id of a question within the group's reach. Evaluated exactly as structured.",
+      "members": []
+    },
+    {
+      "name": "Score",
+      "file": "types.d.ts",
+      "text": "interface Score {\n    id: string;\n    label: string;\n    formula: FormulaNode;\n    unanswered: 'no-score' | 'zero';\n    decimals?: number;\n    showToRespondent?: boolean;\n}",
+      "doc": "One score on a group (contract 17.1): a formula over the questions within the group's reach, calculated once per context the group appears in.",
+      "members": [
+        {
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "doc": "Code pattern (contract 13.2); unique within this group's scores."
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "required": true,
+          "doc": "Non-blank plain text, e.g. \"Total score\"."
+        },
+        {
+          "name": "formula",
+          "type": "FormulaNode",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "unanswered",
+          "type": "'no-score' | 'zero'",
+          "required": true,
+          "doc": "\"no-score\": any unanswered question leaves the score without a value. \"zero\": an unanswered question counts as 0 (contract 17.3)."
+        },
+        {
+          "name": "decimals",
+          "type": "number",
+          "required": false,
+          "doc": "Whole number 0–4; default 0. Only the final result is rounded, half away from zero."
+        },
+        {
+          "name": "showToRespondent",
+          "type": "boolean",
+          "required": false,
+          "doc": "Listed for the respondent after a successful submit. Default false."
+        }
+      ]
+    },
+    {
+      "name": "ScoreResult",
+      "file": "types.d.ts",
+      "text": "interface ScoreResult {\n    groupId: string;\n    scoreId: string;\n    label: string;\n    path: (string | number)[];\n    value: number | null;\n    reason?: 'unanswered' | 'invalid';\n}",
+      "doc": "One calculated score (contract 17.5). `path` runs to the group as ValidationError.path does, ending with the instance position for a repeating group, e.g. [\"patients\", 1].",
+      "members": [
+        {
+          "name": "groupId",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "scoreId",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "path",
+          "type": "(string | number)[]",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "value",
+          "type": "number | null",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "reason",
+          "type": "'unanswered' | 'invalid'",
+          "required": false,
+          "doc": "Present only when value is null."
+        }
+      ]
+    },
+    {
+      "name": "calculateScores",
+      "file": "core/index.d.ts",
+      "text": "function calculateScores(schema: FormSchema, answers: Answers): ScoreResult[];",
+      "doc": "Every score in the form (contract section 17), calculated from `answers`. A score is calculated once for each context its group appears in: once for a group outside any repeat, once per instance of a repeating group, and once per enclosing instance for a plain group inside a repeat. A group that is hidden there, and a repeating group with no instances, give nothing. \"Hidden\" and \"unanswered\" mean exactly what they mean for validation and the payload filter: the same visibility, resolved per instance, and the same built-in checks. Results follow the form's reading order instance by instance — the order validation errors and the error summary use — and each context lists its group's scores in `scores` order (contract 17.5). Meant for answers that pass validateSubmission: prepareSubmission calls it only then, and so does the renderer, after a successful submit. A value that fails its built-in checks counts as unanswered; this never throws on answers. A schema that fails the integrity check throws, as everywhere in /core.",
+      "members": []
+    }
+  ]
+}

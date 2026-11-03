@@ -1,0 +1,182 @@
+---
+title: Validate and store submissions on your server
+summary: Check every posted body with prepareSubmission, store result.submission once per key, and decide what to do with a body built against another form version.
+template: how-to
+badges: [Server]
+appliesTo: [package]
+updated: 2026-11-03
+prev: /docs/integrate/quickstart
+next: /docs/integrate/custom-validation
+---
+
+## When you'd use this
+
+<UseCases>
+<UseCase title="Every form in production">
+The browser's checks are a convenience: anyone can post straight to your endpoint. Your server checks every body again.
+</UseCase>
+<UseCase title="Lost responses and retries">
+A submit that reached you but whose response never got back is sent again with the same key. You store it once.
+</UseCase>
+<UseCase title="A CommonJS server">
+`/core` works from `require`, so an older Node app checks submissions the same way.
+</UseCase>
+</UseCases>
+
+## Before you start
+
+- A form rendered with `FormRenderer` that posts to your endpoint. The [Quickstart](/docs/integrate/quickstart) sets one up.
+- The same form file on your server.
+- Node 20 or later.
+
+## Steps
+
+### 1. Load the form file the page renders
+
+Pass `prepareSubmission` the same form file the form was rendered from. Keep it beside your server code, and replace both together when the author sends a new version.
+
+### 2. Limit the size of a body
+
+The package caps each free-text answer at 20,000 characters, and a repeating group without its own maximum at 1,000 entries. It sets no limit on a whole body. Your server parses the body before `prepareSubmission` sees it, so set a limit that fits your largest form.
+
+[Express's JSON parser](https://expressjs.com/en/api.html#express.json) takes 100kb unless you say otherwise, and answers a bigger body with a 413. The form treats a 413 as any failure: the respondent sees "Submission failed. Your answers have been kept — please try again.", and keeps their answers.
+
+### 3. Check the body, and store the submission once
+
+Your storage goes in two functions. These stand-ins lose everything when the server stops: replace them with your own.
+
+```js file=store.js check=esm stub=store
+const submissions = new Map();
+
+export async function alreadyStored(key) {
+  return submissions.has(key);
+}
+
+export async function store(submission) {
+  submissions.set(submission.idempotencyKey, submission);
+}
+```
+
+```js file=server.js check=esm run=server route=/api/submit limit=1mb
+import { readFileSync } from 'node:fs';
+import express from 'express';
+import { prepareSubmission } from '@zoworkhq/forms/core';
+import { alreadyStored, store } from './store.js';
+
+const schema = JSON.parse(readFileSync('./intake-form.json', 'utf8'));
+const app = express();
+app.use(express.json({ limit: '1mb' }));
+
+app.post('/api/submit', async (req, res) => {
+  const result = prepareSubmission(schema, req.body);
+  if (result.ok === false) return res.status(422).json({ errors: result.errors });
+
+  const { submission } = result;
+  if (result.versionMismatch) {
+    // Ids only: never the answers.
+    console.warn('Submitted from another version', req.body.formVersionId, submission.idempotencyKey);
+  }
+  if (!(await alreadyStored(submission.idempotencyKey))) {
+    await store({ ...submission, receivedAt: new Date().toISOString() });
+  }
+  res.json({ ok: true });
+});
+
+app.listen(3000);
+```
+
+- **Store `result.submission`, never the body.** Nothing else from the request reaches it.
+- **Answer a repeat with a 2xx.** The respondent's form then shows "Form submitted successfully." as it would have the first time.
+- **Record your own receipt time.** `submittedAt` comes from the respondent's clock, and a retry has a new one.
+
+### 4. Make the key unique in your storage
+
+The form gives up on a request after `timeoutMs`, 30 seconds by default, but your server may still be working on it. If the respondent then sends again, two requests with one key can arrive together, and both can pass the check in step 3. Have your storage refuse a second submission with the same `idempotencyKey`, so the check and the store happen as one step.
+
+### 5. Decide what to do with another version
+
+`versionMismatch` is `true` when the body's `formId` or `formVersionId` isn't the form file's. The body is still checked against your file, so it is accepted when its answers fit. Logging it, as above, is enough for most forms. Whether to refuse such a body is your call.
+
+`submission.formVersionId` is always your file's, never the body's, so keep the body's own `formVersionId` with the submission if you need to know which version the respondent filled in. [TODO: changing in 0.28.1]
+
+[Update to a new form version](/docs/integrate/form-versions) covers accepting more than one version.
+
+### 6. Keep answers out of your logs
+
+Bodies carry the respondent's answers. Keep them out of request logs, access logs, error reports and analytics, and log ids such as `formId`, `formVersionId` and `idempotencyKey` instead.
+
+### In CommonJS
+
+`/core` works from `require`. The same server:
+
+```js file=store.cjs check=cjs stub=store
+const submissions = new Map();
+
+async function alreadyStored(key) {
+  return submissions.has(key);
+}
+
+async function store(submission) {
+  submissions.set(submission.idempotencyKey, submission);
+}
+
+module.exports = { alreadyStored, store };
+```
+
+```js file=server.cjs check=cjs run=server route=/api/submit limit=1mb
+const { readFileSync } = require('node:fs');
+const express = require('express');
+const { prepareSubmission } = require('@zoworkhq/forms/core');
+const { alreadyStored, store } = require('./store.cjs');
+
+const schema = JSON.parse(readFileSync('./intake-form.json', 'utf8'));
+const app = express();
+app.use(express.json({ limit: '1mb' }));
+
+app.post('/api/submit', async (req, res) => {
+  const result = prepareSubmission(schema, req.body);
+  if (result.ok === false) return res.status(422).json({ errors: result.errors });
+
+  const { submission } = result;
+  if (!(await alreadyStored(submission.idempotencyKey))) await store(submission);
+  res.json({ ok: true });
+});
+
+app.listen(3000);
+```
+
+`/react` is ES modules only, so `require('@zoworkhq/forms/react')` fails, as does any import of the bare package name. That matters only to a bundler, never to a server.
+
+## What happens behind the scenes
+
+- **The same checks as the browser.** `prepareSubmission` runs the checks the form ran before sending, so a body the form sent passes, and its errors carry the messages the form shows beside each question.
+- **The request first.** A body that isn't an object with an `answers` object is refused alone. A bad `idempotencyKey` or `submittedAt` is refused before any answer is checked.
+- **Visible questions only.** Answers to questions hidden by their conditions are stripped, never a reason to reject. Hidden answers are never in the submission.
+- **Every answer rebuilt.** Each comes back as exactly `{ "state": "empty" }` or `{ "state": "answered", "value": … }`, with option labels looked up from your file.
+- **Scores from your file.** `submission.scores` is calculated here. Anything score-like in the request is ignored.
+
+## Rules the package enforces
+
+- `idempotencyKey` is 1–128 characters of A–Z, a–z, 0–9, `-` and `_`. The form sends one that fits.
+- `submittedAt` is a real ISO-8601 UTC time, such as `2026-10-30T09:15:00.000Z`.
+- A free-text answer is at most 20,000 characters (`MAX_FREE_TEXT_LENGTH`).
+- A repeating group without a `maxOccurs` holds at most 1,000 entries (`DEFAULT_MAX_OCCURS`), refused on the count alone.
+- A malformed form file, or a malformed `validators` array, throws rather than returning errors: no request can cause either, so answer them with a 500.
+
+[`prepareSubmission`](/docs/integrate/reference/prepare-submission) lists every error.
+
+## Troubleshooting
+
+**Every submission gets a 422 with `Invalid submission: idempotencyKey must be 1–128 characters of A–Z, a–z, 0–9, "-" and "_".`** The body didn't come from `FormRenderer`, or something between them rewrote it. A hand-made body needs a key and a time too.
+
+**A choice question gets "Select a valid option."** The body carries a label, a code in another case, or a `{ code, label }` object where the code belongs. The form sends codes exactly as stored.
+
+**Your server throws `Block "…" has unknown type "…".`** The form file on your server is malformed, or newer than your installed package can read. Re-download it, or update `@zoworkhq/forms`.
+
+**Respondents see "Submission failed" and your server logs a 413.** The body is larger than your server's limit. Raise it in step 2.
+
+**Submissions from an open tab fail after you deploy a new version.** The old form's answers are checked against the new file: a question that is new and required has no answer. See [Update to a new form version](/docs/integrate/form-versions).
+
+## More about integrating forms
+
+<Series group />

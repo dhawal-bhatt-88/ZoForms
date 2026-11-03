@@ -84,10 +84,10 @@ export const MARKDOWN_COMPONENTS: Record<string, Convert> = {
 
   Gif: (_, { alt }) => [p({ type: "emphasis", children: [text(`[Animation not recorded yet: ${alt}]`)] })],
 
-  Series: (_, __, ___, ctx) => [
+  Series: (_, attrs, ___, ctx) => [
     list(
       false,
-      sectionPages(ctx.page.slug).map((page) =>
+      sectionPages(ctx.page.slug, "group" in attrs).map((page) =>
         item(p(page.slug === ctx.page.slug ? text(`${page.title} (this page)`) : link(docsHref(page.slug), page.title))),
       ),
     ),

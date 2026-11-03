@@ -85,7 +85,7 @@ function components(page: DocsPage) {
     UseCases,
     UseCase,
     Gif,
-    Series: () => <Series slug={page.slug} />,
+    Series: ({ group }: { group?: string }) => <Series slug={page.slug} inGroup={group !== undefined} />,
     FormExcerpt: ({ form, block, field }: { form: string; block: string; field: string }) => (
       <CodeBlock code={formExcerpt(readExampleForm(page.slug, form).schema, block, field)} lang="json" title={`${form}.json, block "${block}"`} />
     ),

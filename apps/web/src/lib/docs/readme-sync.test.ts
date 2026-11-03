@@ -92,6 +92,25 @@ describe("the FormRenderer page and the README", () => {
   });
 });
 
+describe("the Content Security Policy page and the README", () => {
+  it("give the same policy, word for word", () => {
+    const page = getPage("integrate/content-security-policy")!;
+    const policy = [...walk(page.tree)].find((n) => n.type === "code" && n.lang === "text")?.value;
+    expect(policy).toBe(codeAfter("Content Security Policy"));
+  });
+
+  it("say the same about Trusted Types and the progress bar", () => {
+    const page = getPage("integrate/content-security-policy")!;
+    for (const sentence of [
+      "It also works with `require-trusted-types-for 'script'`.",
+      "The bar then shows, even if the author didn't ask for",
+    ]) {
+      expect(readme.replace(/\s+/g, " ")).toContain(sentence);
+      expect(page.body.replace(/\s+/g, " ")).toContain(sentence);
+    }
+  });
+});
+
 describe("the overview and the package", () => {
   const page = getPage("integrate/overview")!;
 
@@ -132,7 +151,7 @@ describe("the messages the developer pages quote", () => {
     for (const node of walk(page.tree)) {
       if (node.type === "text") for (const [, quoted] of (node.value ?? "").matchAll(/"([A-Z][^"\n]*[.?!])"/g)) found.push(quoted);
       // Messages holding quotation marks are in code, whole.
-      if (node.type === "inlineCode" && /^(Invalid submission|clearDrafts |This form uses|Submission failed|Must be at|"\{label\}"|Answer every|Rank every|Cannot validate)/.test(node.value ?? "")) found.push(node.value ?? "");
+      if (node.type === "inlineCode" && /^(Invalid submission|clearDrafts |This form uses|Submission failed|Must be at|"\{label\}"|Answer every|Rank every|Cannot validate|validators\[)/.test(node.value ?? "")) found.push(node.value ?? "");
     }
     return found;
   };

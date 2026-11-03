@@ -34,11 +34,11 @@ export const Gif = ({ alt }: { alt: string }) => (
   </div>
 );
 
-/** "More about …": the other live pages of this page's section, this one marked. */
-export function Series({ slug }: { slug: string }) {
+/** "More about …": the other live pages of this page's section (or its group), this one marked. */
+export function Series({ slug, inGroup = false }: { slug: string; inGroup?: boolean }) {
   return (
     <ul className="my-4 space-y-1">
-      {sectionPages(slug).map((page) =>
+      {sectionPages(slug, inGroup).map((page) =>
         page.slug === slug ? (
           <li key={page.slug}>
             <span aria-current="page" className="flex items-center gap-2 text-[0.875rem] font-medium text-ink">

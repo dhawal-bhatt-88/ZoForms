@@ -1,0 +1,198 @@
+---
+title: Read scores
+summary: Scores are calculated on your server by prepareSubmission, from the form file and the checked answers. What you get, what can be null, and what respondents see.
+template: how-to
+badges: [Server]
+appliesTo: [package]
+updated: 2026-11-03
+prev: /docs/integrate/form-versions
+next: /docs/integrate/reference/form-renderer
+---
+
+## When you'd use this
+
+<UseCases>
+<UseCase title="A questionnaire total">
+The author added a score to a group, and you store it with each submission.
+</UseCase>
+<UseCase title="One score per entry">
+A score on a repeating group gives one result for each entry.
+</UseCase>
+<UseCase title="Showing a score">
+The author chose to show a score to the respondent after they submit.
+</UseCase>
+</UseCases>
+
+## Before you start
+
+- A form whose author added scores in the builder. Each score sits on a group, with a formula over the group's questions. The form file carries the formula as a tree, never as text.
+- An endpoint that calls `prepareSubmission`. See [Validate and store submissions](/docs/integrate/validate-and-store).
+
+## Steps
+
+### 1. Store `submission.scores`
+
+`prepareSubmission` calculates every score from the form file you pass and the answers it has checked. Store them with the rest of `result.submission`.
+
+```js file=server.js check=esm run=server route=/api/feedback form=visit-feedback
+import { readFileSync } from 'node:fs';
+import express from 'express';
+import { prepareSubmission } from '@zoworkhq/forms/core';
+import { alreadyStored, store } from './store.js';
+
+const schema = JSON.parse(readFileSync('./visit-feedback.json', 'utf8'));
+const app = express();
+app.use(express.json({ limit: '1mb' }));
+
+app.post('/api/feedback', async (req, res) => {
+  const result = prepareSubmission(schema, req.body);
+  if (result.ok === false) return res.status(422).json({ errors: result.errors });
+
+  // result.submission.scores, and the same results in result.derived.scores.
+  const { submission } = result;
+  if (!(await alreadyStored(submission.idempotencyKey))) await store(submission);
+  res.json({ ok: true });
+});
+
+app.listen(3000);
+```
+
+```js file=store.js check=esm stub=store
+const submissions = new Map();
+
+export async function alreadyStored(key) {
+  return submissions.has(key);
+}
+
+export async function store(submission) {
+  submissions.set(submission.idempotencyKey, submission);
+}
+```
+
+### 2. Read each result
+
+For this body, from a visit-feedback form with a total and an average:
+
+```json name=feedback check=body form=visit-feedback
+{
+  "idempotencyKey": "demo-key-5",
+  "schemaVersion": 2,
+  "formId": "form-demo-2",
+  "formVersionId": "version-demo-1",
+  "submittedAt": "2026-10-30T09:15:00.000Z",
+  "answers": {
+    "booking_ease": { "state": "answered", "value": 4 },
+    "waiting_time": { "state": "empty" },
+    "session_rating": { "state": "answered", "value": 5 }
+  },
+  "derived": {}
+}
+```
+
+`prepareSubmission` stores this. Waiting time wasn't answered, and the author chose "No score" for that case, so neither score has a value:
+
+```json check=stored of=feedback
+{
+  "formId": "form-demo-2",
+  "formVersionId": "version-demo-1",
+  "schemaVersion": 2,
+  "idempotencyKey": "demo-key-5",
+  "submittedAt": "2026-10-30T09:15:00.000Z",
+  "answers": {
+    "booking_ease": { "state": "answered", "value": 4 },
+    "waiting_time": { "state": "empty" },
+    "session_rating": { "state": "answered", "value": 5 }
+  },
+  "scores": [
+    { "groupId": "visit", "scoreId": "s_r6xkhlm2", "label": "Total score", "path": ["visit"], "value": null, "reason": "unanswered" },
+    { "groupId": "visit", "scoreId": "s_ilh1mno6", "label": "Average", "path": ["visit"], "value": null, "reason": "unanswered" }
+  ]
+}
+```
+
+<FieldList of="ScoreResult">
+<Field name="groupId">
+The group the score is on.
+</Field>
+<Field name="scoreId">
+The score's id within its group. The builder makes it, and keeps it when the score is edited.
+</Field>
+<Field name="label">
+The score's name, as the author wrote it. Plain text.
+</Field>
+<Field name="path">
+Where the group is, as in an error's `path`. For a repeating group it ends with the entry's position, from 0: `["meds", 1]`.
+</Field>
+<Field name="value">
+The score, rounded to the author's number of decimal places, or `null`.
+</Field>
+<Field name="reason">
+Only when `value` is `null`: `"unanswered"` or `"invalid"`.
+</Field>
+</FieldList>
+
+### 3. Handle a score without a value
+
+A score is `null`, and says why in `reason`, when:
+
+- **`"unanswered"`**: a question the formula uses was hidden or not answered, and the author chose "No score" for that case. With "Count as 0", such a question counts as 0 instead.
+- **`"invalid"`**: the formula divided by zero, or its result isn't a finite number.
+
+## What happens behind the scenes
+
+- **The browser never sends scores.** Its body's `derived` is always `{}`, and `prepareSubmission` never reads `derived`, or anything else score-like, from the request. A forged score can't get in.
+- **Only for a submission that passes.** A failed one returns `{ ok: false, errors }` with no scores. Scores never cause errors.
+- **Always there.** A form without scores gives `scores: []`.
+- **One result per place the group appears.** A score on a repeating group gives one result per entry. A hidden group, and a repeating group with no entries, give none.
+- **In reading order**, entry by entry, the same order as errors. Each group's scores keep their order.
+- **Rounded once.** Only the final value is rounded, to the author's 0 to 4 decimal places, with halves away from zero: 2.5 becomes 3, and −2.5 becomes −3.
+
+**What respondents see.** When the author turned on "Show to respondent after submit", the form lists that score under its success message, as `Total score: 12`, or `Patient 2: Total score: 12` inside a repeating group. It's never shown while the form is being filled in, nor on the review page, and a `null` score isn't shown. That value is calculated in the browser for display only: store and act on your server's.
+
+### In the form file
+
+<FieldList of="Score">
+<Field name="id">
+The score's id within its group.
+</Field>
+<Field name="label">
+Its name, such as "Total score".
+</Field>
+<Field name="formula">
+The formula, as a tree.
+</Field>
+<Field name="unanswered">
+`"no-score"` or `"zero"`: what an unanswered question does.
+</Field>
+<Field name="decimals">
+Decimal places, 0 to 4. 0 when absent.
+</Field>
+<Field name="showToRespondent">
+Whether the form lists it after a successful submit.
+</Field>
+</FieldList>
+
+<Signature of="FormulaNode" />
+
+A `ref` is the block id of a question in the group. Number, linear scale and rating questions give their answer; multiple choice and dropdown, the chosen option's score; checkboxes and multi-select, the sum of the chosen options' scores; and a matrix, the sum of each row's chosen column's score.
+
+### `calculateScores`
+
+<Signature of="calculateScores" />
+
+It's the function `prepareSubmission` uses, exported from `@zoworkhq/forms/core`. Call it only on answers that passed `validateSubmission`, in the shape the browser posts.
+
+```js check=statements
+const errors = validateSubmission(schema, {});
+if (errors.length === 0) console.log(calculateScores(schema, {}));
+```
+
+## Troubleshooting
+
+**Every score is `null`, with `"unanswered"`.** A question the formula uses wasn't answered or was hidden, and the author chose "No score". That's the author's setting, in the builder.
+
+**The score your server stored differs from the one the respondent saw.** It can't, for the same form file. Check that your server has the version the page rendered.
+
+## More about integrating forms
+
+<Series group />

@@ -1,0 +1,64 @@
+{
+  "package": "@zoworkhq/forms 0.28.0",
+  "types": [
+    {
+      "name": "FieldValidator",
+      "file": "types.d.ts",
+      "text": "interface FieldValidator {\n    field: string;\n    validate: (input: ValidatorInput) => string | null | undefined;\n}",
+      "doc": "A host validator (contract section 16): the host's own check on one answerable question, written in the host's code. It runs only when the question is visible, answered and passes every built-in check, once per repeat instance. It returns an error message, or null or undefined when the answer is valid. Anything else, a throw included, fails closed.",
+      "members": [
+        {
+          "name": "field",
+          "type": "string",
+          "required": true,
+          "doc": "The block id of an answerable question."
+        },
+        {
+          "name": "validate",
+          "type": "(input: ValidatorInput) => string | null | undefined",
+          "required": true,
+          "doc": null
+        }
+      ]
+    },
+    {
+      "name": "ValidatorAnswers",
+      "file": "types.d.ts",
+      "text": "type ValidatorAnswers = Record<string, unknown>;",
+      "doc": "Block id → answer value, in payload form.",
+      "members": []
+    },
+    {
+      "name": "ValidatorInput",
+      "file": "types.d.ts",
+      "text": "interface ValidatorInput {\n    value: unknown;\n    answers: ValidatorAnswers;\n    field: string;\n    path: (string | number)[];\n}",
+      "doc": "What a host validator receives (contract 16.3). Copies: changing them has no effect.",
+      "members": [
+        {
+          "name": "value",
+          "type": "unknown",
+          "required": true,
+          "doc": "This question's answer in payload form: codes, never labels; numbers as numbers. Always well-formed."
+        },
+        {
+          "name": "answers",
+          "type": "ValidatorAnswers",
+          "required": true,
+          "doc": "Visible, answered questions in this question's context that pass their own built-in checks, this one included: the same instance, every enclosing instance and questions outside any repeat."
+        },
+        {
+          "name": "field",
+          "type": "string",
+          "required": true,
+          "doc": "The block id, as in FieldValidator.field."
+        },
+        {
+          "name": "path",
+          "type": "(string | number)[]",
+          "required": true,
+          "doc": "As ValidationError.path, e.g. [\"patients\", 1, \"mrn\"]."
+        }
+      ]
+    }
+  ]
+}

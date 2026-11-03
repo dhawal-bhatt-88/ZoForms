@@ -1,0 +1,90 @@
+---
+title: Update to a new form version
+summary: Put a new download in your app, and know what happens to tabs left open, saved progress and submissions built against the old version.
+template: how-to
+badges: [Server]
+appliesTo: [package]
+updated: 2026-11-03
+prev: /docs/integrate/media
+next: /docs/integrate/scores
+---
+
+## When you'd use this
+
+<UseCases>
+<UseCase title="The author changed the form">
+A question was added, reworded or removed, and the author sends you a new file.
+</UseCase>
+<UseCase title="Tabs left open across a deploy">
+A respondent started the old version and submits after your deploy.
+</UseCase>
+<UseCase title="Saved progress">
+Respondents have drafts saved on their device or your server.
+</UseCase>
+</UseCases>
+
+## Before you start
+
+- The new download. Every saved version has its own `formVersionId`, and **Download** in the builder gives the latest saved version.
+
+## Steps
+
+### 1. Replace the file in both places
+
+Put the new file where your page imports it and where your server reads it, and deploy both together. `prepareSubmission` checks each body against the file you pass it, so the page and the server must agree.
+
+### 2. Know what happens to old fills
+
+A tab opened before your deploy still runs the old version, and posts its `formVersionId`. Your server checks that body against the new file:
+
+- `versionMismatch` is `true`.
+- Answers to questions the new version doesn't have are stripped, never a reason to reject.
+- A question that is new and required has no answer, so the body is refused with a 422. The respondent sees "Submission failed. Your answers have been kept — please try again.", and trying again gives the same result until they reload the page.
+- `submission.formVersionId` is the new file's, so the stored submission doesn't say it was filled in on the old version. Keep the body's own `formVersionId` beside it if you need to know. [TODO: changing in 0.28.1]
+
+### 3. Accept the old version for a while, if you need to
+
+Keep each version's file, and check a body against the one it was built from. A body from a version you no longer keep falls back to the newest.
+
+```js file=versions.js check=esm
+import { readdirSync, readFileSync } from 'node:fs';
+import { prepareSubmission } from '@zoworkhq/forms/core';
+
+// Every version you still accept: one download each, in ./forms.
+const versions = new Map(
+  readdirSync('./forms')
+    .filter((name) => name.endsWith('.json'))
+    .map((name) => {
+      const schema = JSON.parse(readFileSync(`./forms/${name}`, 'utf8'));
+      return [schema.formVersionId, schema];
+    }),
+);
+
+export function prepare(body, newest) {
+  const schema = versions.get(body?.formVersionId) ?? newest;
+  return prepareSubmission(schema, body);
+}
+```
+
+Store `result.submission` as usual. Its `formVersionId` is then the version it was checked against.
+
+## What happens behind the scenes
+
+**Saved progress belongs to one version.** Drafts never cross from one version to another:
+
+| Where progress was kept | After the new version is deployed |
+|---|---|
+| The tab's copy, in every mode | Kept under the old version's key, so the new form doesn't find it and starts empty. The old entry is removed when the form mounts. |
+| A draft on this device, or on your server | Deleted when found, and the respondent sees "This form was updated since you saved your draft, so your earlier answers couldn't be kept." In server mode, `deleteDraft` is called. |
+
+A tab open across the deploy keeps its answers in memory until it is reloaded.
+
+## Troubleshooting
+
+**Old tabs fail to submit after a deploy.** The new version has a required question they never saw. Accept the old version for a while, as in step 3, or make the new question optional.
+
+**A respondent lost their saved progress.** It was saved on the previous version. Drafts don't carry across versions.
+
+## More about integrating forms
+
+<Series group />

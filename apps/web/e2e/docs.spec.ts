@@ -101,8 +101,11 @@ test.describe("docs", () => {
 
     await expect(menu).toHaveAttribute("aria-expanded", "false");
     await expect(link).toBeHidden();
-    await menu.click();
-    await expect(link).toBeVisible();
+    // As the first test on a fresh dev server, this can click before the page has hydrated, when a click does nothing.
+    await expect(async () => {
+      if ((await menu.getAttribute("aria-expanded")) === "false") await menu.click();
+      await expect(link).toBeVisible({ timeout: 1000 });
+    }).toPass({ timeout: 20_000 });
     await link.click();
     // A fresh dev server compiles the page on this first visit, which can take longer than the default 5s.
     await expect(page).toHaveURL(/form-renderer$/, { timeout: 20_000 });

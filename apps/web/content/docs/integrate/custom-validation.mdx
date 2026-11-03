@@ -1,0 +1,212 @@
+---
+title: Add your own validation
+summary: Your own checks on any question, written as functions in your code, run in the browser and again on your server.
+template: how-to
+badges: [React, Server]
+appliesTo: [package]
+updated: 2026-11-03
+prev: /docs/integrate/validate-and-store
+next: /docs/integrate/sign-in
+---
+
+## When you'd use this
+
+<UseCases>
+<UseCase title="Your own formats">
+A record number, a member id or a reference that must match a pattern only your organization knows.
+</UseCase>
+<UseCase title="Rules across questions">
+A discharge date after the admission date, or a dose that depends on another answer.
+</UseCase>
+<UseCase title="Limits the builder doesn't offer">
+A shorter maximum length for a name, or a narrower range for a number.
+</UseCase>
+</UseCases>
+
+## Before you start
+
+- A form rendered with `FormRenderer`, and an endpoint that calls `prepareSubmission`. See [Validate and store submissions](/docs/integrate/validate-and-store).
+- The block id of each question you'll check. It's in the form file, as each block's `id`.
+
+Nothing about your validators goes in the form file or the builder.
+
+## Steps
+
+### 1. Write the validators in one module
+
+Each entry is `{ field, validate }`: the block id of an answerable question, and a function that returns an error message, or `null` when the answer is valid.
+
+```js file=validators.js check=esm
+// Imported by the page and by the server.
+export const validators = [
+  {
+    field: 'preferred_name',
+    validate: ({ value }) =>
+      typeof value === 'string' && value.trim().length > 40 ? 'Keep the preferred name to 40 characters or fewer.' : null,
+  },
+  {
+    field: 'therapist_name',
+    // Runs only while the question shows, so only when the respondent sees a therapist.
+    validate: ({ value }) => (typeof value === 'string' && /\d/.test(value) ? "Enter the therapist's name without numbers." : null),
+  },
+];
+```
+
+### 2. Pass them to the form
+
+```jsx file=src/IntakePage.jsx check=browser run=browser
+import { FormRenderer } from '@zoworkhq/forms/react';
+import '@zoworkhq/forms/styles.css';
+import schema from './intake-form.json';
+import { validators } from '../validators.js';
+
+export function IntakePage() {
+  return (
+    <main>
+      <h1>{schema.title}</h1>
+      <FormRenderer schema={schema} endpoint="/api/submit" validators={validators} />
+    </main>
+  );
+}
+```
+
+### 3. Pass the same validators to `prepareSubmission`
+
+The browser's checks are only a convenience: anyone can post straight to your endpoint. Without this step, your rules aren't enforced.
+
+```js file=server.js check=esm run=server route=/api/submit rejects=preferred_name
+import { readFileSync } from 'node:fs';
+import express from 'express';
+import { prepareSubmission } from '@zoworkhq/forms/core';
+import { alreadyStored, store } from './store.js';
+import { validators } from './validators.js';
+
+const schema = JSON.parse(readFileSync('./intake-form.json', 'utf8'));
+const app = express();
+app.use(express.json({ limit: '1mb' }));
+
+app.post('/api/submit', async (req, res) => {
+  const result = prepareSubmission(schema, req.body, { validators });
+  if (result.ok === false) {
+    // A validator that threw: log what it threw, which JSON.stringify leaves out.
+    for (const error of result.errors) if (error.cause !== undefined) console.error('A validator failed', error.blockId, error.cause);
+    return res.status(422).json({ errors: result.errors });
+  }
+  const { submission } = result;
+  if (!(await alreadyStored(submission.idempotencyKey))) await store(submission);
+  res.json({ ok: true });
+});
+
+app.listen(3000);
+```
+
+```js file=store.js check=esm stub=store
+const submissions = new Map();
+
+export async function alreadyStored(key) {
+  return submissions.has(key);
+}
+
+export async function store(submission) {
+  submissions.set(submission.idempotencyKey, submission);
+}
+```
+
+### In TypeScript
+
+Annotate the array with `FieldValidator[]`. `value` is then `unknown`, so check its type before treating it as text: the built-in checks have already made sure it has the question's shape.
+
+```ts file=validators.ts check=esm in=typescript
+import type { FieldValidator } from '@zoworkhq/forms/core';
+
+export const validators: FieldValidator[] = [
+  {
+    field: 'preferred_name',
+    validate: ({ value }) =>
+      typeof value === 'string' && value.trim().length > 40 ? 'Keep the preferred name to 40 characters or fewer.' : null,
+  },
+];
+```
+
+### A rule across two questions
+
+`answers` holds the other visible, answered questions that pass their own checks. Dates are `"YYYY-MM-DD"`, so they compare as strings.
+
+```js check=esm
+/** @type {import('@zoworkhq/forms/core').FieldValidator} */
+export const dischargeAfterAdmission = {
+  field: 'discharged',
+  validate: ({ value, answers }) =>
+    typeof answers.admitted === 'string' && typeof value === 'string' && value <= answers.admitted
+      ? 'Discharge must be after admission.'
+      : null,
+};
+```
+
+## What happens behind the scenes
+
+**What a validator receives.**
+
+<FieldList of="ValidatorInput">
+<Field name="value">
+This question's answer, in the shape the browser posts: codes, never labels. Numbers are numbers, dates `"YYYY-MM-DD"`; `checkbox`, `multiselect` and `ranking` are arrays of codes; `matrix` is `{ [rowCode]: columnCode }` and `grid` `{ [rowCode]: { [columnCode]: string } }`.
+</Field>
+<Field name="answers">
+The other visible, answered questions that pass their own checks, by block id: the same repeat entry, every enclosing entry, and questions outside any repeating group. Never other entries.
+</Field>
+<Field name="field">
+The block id, as in the validator's `field`.
+</Field>
+<Field name="path">
+Where the question is, as in an error's `path`: `["patients", 1, "mrn"]` inside a repeating group.
+</Field>
+</FieldList>
+
+<Signature of="ValidatorAnswers" />
+
+`value` and `answers` are copies, so changing them has no effect.
+
+**When it runs.** Only when the question is visible, answered, and passes every built-in check: format, allowed options, minimum and maximum, "Answer every row" and "Rank every option", a grid's required columns. So it never sees an empty or invalid answer. Inside a repeating group it runs once per entry.
+
+In the browser that is on Next, Submit and Return to review, and again as answers change on any question the last Submit or Next marked with an error.
+
+**What it returns.**
+
+<FieldList of="FieldValidator">
+<Field name="field">
+The block id of an answerable question.
+</Field>
+<Field name="validate">
+Returns an error message, or `null` or `undefined` when the answer is valid.
+</Field>
+</FieldList>
+
+- The message is trimmed and shown as plain text, never HTML.
+- It appears beside the question, as you wrote it, and in the error summary with the question's label in front: `"Preferred name": Keep the preferred name to 40 characters or fewer.` Inside a repeating group, the entry comes first, as in `Patient 2: …`.
+- On a grid, it shows under the grid as a whole.
+- Several validators may name one question. They run in order, and every error is reported. The browser shows an identical message once per question.
+- `prepareSubmission` returns your message as you wrote it, with no label in front.
+
+**When it fails.** A throw, an empty or whitespace-only string, a number, an object or a Promise fails closed. The question shows "This answer couldn't be checked." and can't be submitted. The browser logs the real error with `console.error`, naming the field. On your server the error carries it as `cause`, which `JSON.stringify` leaves out.
+
+## Rules the package enforces
+
+- **Pure and fast.** In a form with pages, validators run on every render, so on each keystroke. Don't log, count or cache anything from inside one.
+- **No `window`, no `document`, no network.** The same code runs on your server, where none of these exist.
+- **Errors only, and synchronous only.** Warnings and async checks, such as looking a record number up, aren't supported. A returned Promise counts as a failure.
+- **Checked when the form mounts**, whenever you pass a different array, and on every `prepareSubmission` call. An entry that isn't `{ field, validate }`, or whose `field` isn't an answerable question in the form, is a `TypeError` naming the entry. In the browser the form isn't shown and `onRenderError` gets it; on your server `prepareSubmission` throws it.
+- **JavaScript only.** Only a Node, or other JavaScript, backend can run them. A backend in another language can't enforce them.
+
+## Troubleshooting
+
+**The form shows "This form can't be shown right now. Please try again later."** One of your entries names a block that isn't in this form, or isn't a question. In a development build the message underneath names the entry, such as `validators[0] (field "nope") names a block that is not in this form.`
+
+**After fixing that, the form still won't show.** A form refused for its validators tries again only when it gets a new React `key`, because an inline array is new on every render.
+
+**A question always shows "This answer couldn't be checked."** Its validator throws, or returns something other than a message, `null` or `undefined`. The browser's console has the real error.
+
+**Your server accepts what the browser refused.** It isn't passing `{ validators }` to `prepareSubmission`.
+
+## More about integrating forms
+
+<Series group />

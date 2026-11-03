@@ -1,0 +1,93 @@
+{
+  "title": "Visit feedback",
+  "formId": "c3cbd0e8-8330-469b-bdc4-af49eb2cc722",
+  "formVersionId": "ee721ef4-9788-4b84-9881-350c965788a3",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "visit",
+      "type": "group",
+      "label": "About your visit",
+      "scores": [
+        {
+          "id": "s_r6xkhlm2",
+          "label": "Total score",
+          "formula": {
+            "op": "+",
+            "args": [
+              {
+                "op": "+",
+                "args": [
+                  {
+                    "ref": "booking_ease"
+                  },
+                  {
+                    "ref": "waiting_time"
+                  }
+                ]
+              },
+              {
+                "ref": "session_rating"
+              }
+            ]
+          },
+          "unanswered": "no-score",
+          "showToRespondent": true
+        },
+        {
+          "id": "s_ilh1mno6",
+          "label": "Average",
+          "formula": {
+            "op": "/",
+            "args": [
+              {
+                "op": "+",
+                "args": [
+                  {
+                    "op": "+",
+                    "args": [
+                      {
+                        "ref": "booking_ease"
+                      },
+                      {
+                        "ref": "waiting_time"
+                      }
+                    ]
+                  },
+                  {
+                    "ref": "session_rating"
+                  }
+                ]
+              },
+              {
+                "num": 3
+              }
+            ]
+          },
+          "unanswered": "no-score",
+          "decimals": 1
+        }
+      ],
+      "blocks": [
+        {
+          "id": "booking_ease",
+          "type": "rating",
+          "label": "How easy was booking your visit?",
+          "required": true
+        },
+        {
+          "id": "waiting_time",
+          "type": "rating",
+          "label": "How did you find the waiting time?",
+          "required": false
+        },
+        {
+          "id": "session_rating",
+          "type": "rating",
+          "label": "How was the session itself?",
+          "required": true
+        }
+      ]
+    }
+  ]
+}
