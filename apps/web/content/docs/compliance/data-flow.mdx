@@ -1,0 +1,80 @@
+---
+title: Where respondents' data goes
+summary: The path of a respondent's answers from their browser to your server. What the builder holds, what the package sends and keeps in the browser, and what your app decides.
+template: concept
+badges: []
+appliesTo: [package]
+updated: 2026-11-03
+prev: /docs/examples/follow-up-question
+next: null
+---
+
+## In short
+
+- The Zowork Forms builder holds forms. It doesn't receive or store respondents' answers. [TODO: legal review]
+- `@zoworkhq/forms` sends answers from the respondent's browser to your endpoint, and makes no other request with them.
+- Until the form is sent, the package may keep the answers in the browser, depending on the form's drafts mode.
+- Once they reach your server, where they go is up to your app.
+
+This page states what the software does. It doesn't say what that means under any law or agreement that applies to you. [TODO: legal review]
+
+## What the builder holds
+
+The builder's database has tables for:
+
+- the authors' accounts, their organizations, members and invites;
+- forms, and every saved version of each one;
+- templates;
+- a log of administrators' actions.
+
+It has no table for answers, and the builder's API has no route that receives them. The form file an author downloads is the form itself: its questions, conditions, scores and settings, with no answers.
+
+## The path of an answer
+
+1. **Your app serves the page.** The form file and the package are part of your app. The form doesn't load either from Zowork.
+2. **The respondent fills in the form.** Their answers are in the page's memory. Depending on the drafts mode, a copy is also kept in the tab, an encrypted draft on the device, or a draft on your server. See [What is stored in the browser](/docs/integrate/concepts/browser-storage).
+3. **The respondent submits.** The form sends one `POST`, with the answers as JSON, to the `endpoint` you gave it. This is the only request the package makes with answers in it.
+4. **Your server checks it.** `prepareSubmission` runs on your server and makes no requests of its own. You store `result.submission` wherever your app stores data.
+5. **The form tidies up.** After your endpoint answers with a 2xx, the form deletes the tab's copy and any device draft, and calls your `deleteDraft` for a server draft.
+
+**The endpoint must be `https://`,** or `http://` on `localhost` or `127.0.0.1`. The form refuses any other absolute address. A relative path uses the page's own protocol, so on a plain-HTTP page the answers are sent unencrypted.
+
+**What is sent** is listed field by field in [The posted body](/docs/integrate/reference/posted-body): the answers to visible questions, an `idempotencyKey`, the respondent's clock time, and the form's ids. Answers to questions hidden by conditions are never in it.
+
+## Requests without answers
+
+A form's images, video and audio load from wherever the author pointed them, from the respondent's browser:
+
+- **Image files** are requested with no referrer.
+- **YouTube and Vimeo videos** play in those services' own players, in a frame: YouTube from `www.youtube-nocookie.com`, Vimeo with `dnt=1`. The players are sent your site's origin, never the page's path.
+- **Video and audio files** on another host are requested with your page's referrer policy.
+
+None of these requests carries answers. What those services and hosts do with the requests is outside the package. [Serve images, video and audio](/docs/integrate/media) has the details.
+
+## What the package keeps in the browser
+
+| Mode | Kept in the browser |
+|---|---|
+| `off` | Nothing |
+| Only while the form is open | A copy of the visible answers in the tab's `sessionStorage`, as plain text |
+| On this device | That copy, with answers to hidden questions too, and a draft in IndexedDB, encrypted with your key |
+| On the app's server | That copy, with answers to hidden questions too. The draft itself is on your server. |
+
+It sets no cookies and writes nothing to `localStorage`. [What is stored in the browser](/docs/integrate/concepts/browser-storage) has every key, how long each lasts, and what deletes it.
+
+## What your app decides
+
+The package and the builder leave these to you: [TODO: legal review]
+
+- **Where submissions are stored,** who can read them and how long they're kept.
+- **Server-mode drafts:** where they're stored, who can read them and how long they're kept. The package doesn't expire them.
+- **The key for device-mode drafts.** The package never makes, stores or exports it.
+- **Shared devices:** the drafts mode, and clearing saved progress between people. See [Shared devices and kiosks](/docs/integrate/shared-devices).
+- **Logs.** Submission and draft bodies carry respondents' answers. Keep them out of request logs, error reports and analytics, and log ids such as `formId`, `formVersionId` and `idempotencyKey` instead.
+- **Your page's headers,** such as its [Content Security Policy](/docs/integrate/content-security-policy) and referrer policy.
+
+## Related
+
+- [How Zowork Forms fits your app](/docs/integrate/overview): the parts and who runs them.
+- [What is stored in the browser](/docs/integrate/concepts/browser-storage): every key, lifetime and deletion.
+- [Validate and store submissions](/docs/integrate/validate-and-store): what your endpoint does with a submission.

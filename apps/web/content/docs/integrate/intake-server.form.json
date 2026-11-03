@@ -1,0 +1,99 @@
+{
+  "title": "Client intake",
+  "formId": "cdc4f6aa-58db-4b5c-91d6-722c6b7c7b39",
+  "formVersionId": "20cc1836-1521-43a3-bc3d-0337e9e5b121",
+  "schemaVersion": 2,
+  "description": "We use this to prepare for the first visit.",
+  "blocks": [
+    {
+      "id": "page_about",
+      "type": "page",
+      "title": "About you",
+      "blocks": [
+        {
+          "id": "preferred_name",
+          "type": "short",
+          "label": "Preferred name",
+          "required": true
+        },
+        {
+          "id": "contact_email",
+          "type": "email",
+          "label": "Email address",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "page_visit",
+      "type": "page",
+      "title": "Your visit",
+      "blocks": [
+        {
+          "id": "attend_format",
+          "type": "choice",
+          "label": "How would you like to attend sessions?",
+          "required": true,
+          "options": [
+            {
+              "code": "in_person",
+              "label": "In person"
+            },
+            {
+              "code": "video",
+              "label": "Video"
+            },
+            {
+              "code": "phone",
+              "label": "Phone"
+            }
+          ]
+        },
+        {
+          "id": "sees_therapist",
+          "type": "choice",
+          "label": "Do you currently see a therapist?",
+          "required": true,
+          "options": [
+            {
+              "code": "yes",
+              "label": "Yes"
+            },
+            {
+              "code": "no",
+              "label": "No"
+            }
+          ]
+        },
+        {
+          "id": "therapist_name",
+          "type": "short",
+          "label": "Therapist's name",
+          "required": true,
+          "enableWhen": [
+            {
+              "id": "c_11aezra7",
+              "question": "sees_therapist",
+              "operator": "=",
+              "answer": "yes"
+            }
+          ]
+        },
+        {
+          "id": "reason_for_visit",
+          "type": "long",
+          "label": "What brings you in today?",
+          "required": false
+        }
+      ]
+    }
+  ],
+  "navigation": {
+    "showProgress": true,
+    "progressStyle": "caption",
+    "reviewPage": false
+  },
+  "drafts": {
+    "mode": "server"
+  }
+}

@@ -1,0 +1,404 @@
+---
+title: Save progress (drafts)
+summary: Keep a respondent's answers through a refresh, a closed tab or a later visit, in the tab, on the device or on your server, and clear them when someone signs out.
+template: how-to
+badges: [React, Server]
+appliesTo: [package]
+updated: 2026-11-03
+prev: /docs/integrate/scores
+next: /docs/integrate/shared-devices
+---
+
+## When you'd use this
+
+<UseCases>
+<UseCase title="A long intake">
+Respondents close the tab part-way through and come back to it later on the same device.
+</UseCase>
+<UseCase title="A signed-in portal">
+Staff fill the same form for several clients. Each client's answers come back only into that client's form.
+</UseCase>
+<UseCase title="Progress kept on your server">
+A form with pages saves each page to your own backend.
+</UseCase>
+</UseCases>
+
+## Before you start
+
+- A form rendered with `FormRenderer`, as in the [Quickstart](/docs/integrate/quickstart).
+- For "On this device" and "On the app's server": a signed-in user, so you can say whose progress it is.
+
+## Steps
+
+### 1. Find the form's mode
+
+The author picks how progress is kept, under **Save progress** in the builder. The form file says which:
+
+| Save progress in the builder | In the form file | Where progress is kept | Survives a closed tab | You provide |
+|---|---|---|---|---|
+| Only while the form is open | no `drafts` | This tab's `sessionStorage`, as plain text, visible answers only | No | Nothing. `scope` and `owner` are optional. |
+| On this device | `"drafts": { "mode": "device" }` | IndexedDB, encrypted with your key, plus the tab's copy | Yes, on this device | `scope` and `getKey` |
+| On the app's server (forms with pages only) | `"drafts": { "mode": "server" }` | Your backend, plus the tab's copy | Yes | `scope`, `loadDraft`, `saveDraft` and `deleteDraft` |
+| Not in the builder: your app sets it | | Nowhere | No, nor a refresh | `drafts={{ mode: 'off' }}` |
+
+In TypeScript, the file's `drafts` is a `DraftsSettings`:
+
+<Signature of="DraftsSettings" />
+
+<Signature of="DraftMode" />
+
+You pass what the mode needs in the `drafts` prop. If you don't, or the browser can't do what the mode needs, the form keeps progress in the tab only and calls `onDraftProblem` with the reason. It never stops the respondent filling in the form. See [Handle errors](/docs/integrate/handle-errors).
+
+`mode: 'off'` is for kiosks and other shared devices. See [Shared devices and kiosks](/docs/integrate/shared-devices).
+
+### 2. Only while the form is open
+
+This needs nothing from you. Every change is kept in the tab, so a refresh doesn't lose the answers. Answers to questions hidden by conditions stay in the open form, but aren't written to the tab.
+
+If your app knows who is signed in, give it a `scope` and an `owner`:
+
+```jsx check=fragment
+<FormRenderer
+  key={scope}
+  schema={schema}
+  endpoint="/api/submit"
+  drafts={{ scope: `${user.id}:${patient.id}`, owner: user.id, label: patient.displayName }}
+/>
+```
+
+- **`scope` says whose answers these are, and about whom.** It must identify the user and, when one form is filled in for several people, the person it's about. A wrong scope can restore one client's answers into another client's form. The package never reads it: it stores only its hash.
+- **`owner` is the user alone,** so [`clearDrafts({ owner })`](/docs/integrate/reference/clear-drafts) can clear everything they saved.
+- **`label` is shown when the respondent is asked** whether to continue.
+- **Both are read once, when the form mounts.** To switch to another user or client, mount the form afresh. A React `key` does that.
+
+With a `scope`, the tab's copy comes back without asking. Without one, it comes back without asking only after a refresh of the form's own page, for the first form on that page. Any other time, the respondent chooses first, and none of their answers are on screen until they do:
+
+> **Continue where you left off?**
+> This form was started in this browser tab at 3:40 PM for Demo Client and hasn't been sent.
+> \[Continue\] \[Start over\]
+
+That covers a link to the form, Back or Forward, a reopened tab and a route change in your app.
+
+### 3. On this device
+
+The form keeps an encrypted draft in the browser's IndexedDB, so the respondent can close the tab and continue later on the same device. It needs a `scope` and a key.
+
+This stands in for your app's sign-in:
+
+```js file=src/signed-in.js check=browser
+// Stands in for your app's sign-in: who is signed in, and whose form this is.
+export function useSignedIn() {
+  return {
+    user: { id: 'user-demo-1' },
+    client: { id: 'client-demo-1', displayName: 'Demo Client' },
+  };
+}
+```
+
+`getKey` returns the signed-in user's key. Here your server sends it as 32 bytes, and the browser imports it with Web Crypto's [`importKey`](https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto/importKey):
+
+```js file=src/draft-key.js check=browser
+let key = null;
+
+// The signed-in user's key for their drafts, fetched once.
+export async function getDraftKey() {
+  if (key === null) {
+    const response = await fetch('/api/draft-key', { credentials: 'same-origin' });
+    if (!response.ok) throw new Error(`The draft key couldn't be fetched: ${response.status}`);
+    key = await crypto.subtle.importKey('raw', await response.arrayBuffer(), 'AES-GCM', false, ['encrypt', 'decrypt']);
+  }
+  return key;
+}
+
+// At sign-out, so the next user never gets this key.
+export function forgetDraftKey() {
+  key = null;
+}
+```
+
+```jsx file=src/DeviceIntakePage.jsx check=browser run=browser
+import { FormRenderer } from '@zoworkhq/forms/react';
+import schema from './intake-device.json';
+import { getDraftKey } from './draft-key.js';
+import { useSignedIn } from './signed-in.js';
+
+export function DeviceIntakePage() {
+  const { user, client } = useSignedIn();
+  const scope = `${user.id}:${client.id}`;
+
+  return (
+    <main>
+      <h1>{schema.title}</h1>
+      <FormRenderer
+        key={scope}
+        schema={schema}
+        endpoint="/api/submit"
+        drafts={{ scope, owner: user.id, label: client.displayName, getKey: getDraftKey }}
+      />
+    </main>
+  );
+}
+```
+
+- **The key is an AES-GCM 256 `CryptoKey`** that can encrypt and decrypt. The package never makes, stores or exports it.
+- **`getKey` is called each time the form saves, and when it opens a saved draft,** so return a key you already hold.
+- **Where the key comes from is up to you.** The package needs only the `CryptoKey`. [TODO: how a host creates and keeps each user's key. The drafts contract says only that the host supplies it after sign-in, for example from a per-user key its server holds or derives.]
+- **A key that can't open the draft,** for example after you change it, deletes the draft. The respondent sees "Your saved draft couldn't be opened, so you're starting a new form."
+- **Drafts expire** 7 days after the last save. Pass `expiresAfterDays` to change that. Each save moves the date on.
+
+In a new tab, the form finds the draft and asks first, with the date and time in the respondent's own format:
+
+> **Continue where you left off?**
+> You have a saved draft from Nov 3, 3:40 PM for Demo Client.
+> \[Continue\] \[Start over\]
+
+A draft saved on an older version of the form is deleted instead, and the respondent sees "This form was updated since you saved your draft, so your earlier answers couldn't be kept."
+
+Device mode needs IndexedDB and Web Crypto. A plain-HTTP page other than `localhost` has no Web Crypto encryption, so there the form keeps progress in the tab and `onDraftProblem` gets the reason `no-webcrypto`.
+
+### 4. On the app's server
+
+For a form with pages, the form can save to your backend at each page change. It needs a `scope` and three functions:
+
+<Signature of="DraftRef" />
+
+```js file=src/draft-functions.js check=browser
+async function post(action, body) {
+  const response = await fetch(`/api/drafts/${action}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error(`Draft ${action} failed with status ${response.status}`);
+  return response;
+}
+
+// saveDraft is given the draft alone, so it takes the scope from here.
+export function serverDrafts(scope) {
+  return {
+    loadDraft: async (ref) => (await (await post('load', ref)).json()).draft,
+    saveDraft: async (draft) => {
+      await post('save', { scope, draft });
+    },
+    deleteDraft: async (ref) => {
+      await post('delete', ref);
+    },
+  };
+}
+```
+
+```jsx file=src/ServerIntakePage.jsx check=browser run=browser
+import { FormRenderer } from '@zoworkhq/forms/react';
+import schema from './intake-server.json';
+import { serverDrafts } from './draft-functions.js';
+import { useSignedIn } from './signed-in.js';
+
+export function ServerIntakePage() {
+  const { user, client } = useSignedIn();
+  const scope = `${user.id}:${client.id}`;
+
+  return (
+    <main>
+      <h1>{schema.title}</h1>
+      <FormRenderer
+        key={scope}
+        schema={schema}
+        endpoint="/api/submit"
+        drafts={{ scope, owner: user.id, label: client.displayName, ...serverDrafts(scope) }}
+      />
+    </main>
+  );
+}
+```
+
+- **`loadDraft`** returns the saved draft, or `null` when there is none.
+- **`saveDraft`** stores the draft it is given, replacing the last one for that scope and form.
+- **`deleteDraft`** deletes it.
+- **Each one rejects when it fails,** and the form carries on. If `loadDraft` fails, the form keeps progress in the tab for that visit, so it never overwrites the draft you hold, and shows "Your progress can't be saved for later on this visit." If a save fails, it shows "Your progress couldn't be saved just now. It will be saved again when you next move to another page." Nothing is retried in the background.
+
+The draft:
+
+<FieldList of="Draft">
+<Field name="formId">
+The form it belongs to.
+</Field>
+<Field name="formVersionId">
+The version it was filled in on. A draft from another version is deleted rather than restored.
+</Field>
+<Field name="schemaVersion">
+The form file's `schemaVersion`.
+</Field>
+<Field name="answers">
+Every answer so far, including answers to questions hidden by conditions, so showing a question again brings its answer back. Its type, `DraftAnswers`, is the same as `Answers`: a repeating group is a list of its entries, in order.
+</Field>
+<Field name="idempotencyKey">
+The key the submission will carry, so a resumed form can't make a second submission.
+</Field>
+<Field name="currentPageId">
+The page the respondent was on.
+</Field>
+<Field name="visitedPageIds">
+The pages they had been to.
+</Field>
+<Field name="onReview">
+Whether they were on the review page.
+</Field>
+<Field name="savedAt">
+When it was saved, as a UTC ISO-8601 time from the respondent's clock.
+</Field>
+</FieldList>
+
+On your server, keep each draft by scope and form. This adds the three routes to the Quickstart's server:
+
+```js file=store.js check=esm stub=store
+const submissions = new Map();
+
+export async function alreadyStored(key) {
+  return submissions.has(key);
+}
+
+export async function store(submission) {
+  submissions.set(submission.idempotencyKey, submission);
+}
+```
+
+```js file=draft-store.js check=esm
+// Stands in for your storage, and loses everything when the server stops.
+const drafts = new Map();
+const keyOf = (scope, formId) => JSON.stringify([scope, formId]);
+
+export async function loadDraft(scope, formId) {
+  return drafts.get(keyOf(scope, formId)) ?? null;
+}
+
+export async function saveDraft(scope, draft) {
+  drafts.set(keyOf(scope, draft.formId), draft);
+}
+
+export async function deleteDraft(scope, formId) {
+  drafts.delete(keyOf(scope, formId));
+}
+```
+
+```js file=server.js check=esm run=server route=/api/submit form=intake-server drafts=/api/drafts
+import { readFileSync } from 'node:fs';
+import express from 'express';
+import { prepareSubmission } from '@zoworkhq/forms/core';
+import { alreadyStored, store } from './store.js';
+import { deleteDraft, loadDraft, saveDraft } from './draft-store.js';
+
+const schema = JSON.parse(readFileSync('./src/intake-server.json', 'utf8'));
+const app = express();
+app.use(express.json({ limit: '1mb' }));
+
+app.post('/api/submit', async (req, res) => {
+  const result = prepareSubmission(schema, req.body);
+  if (result.ok === false) return res.status(422).json({ errors: result.errors });
+
+  const { submission } = result;
+  if (!(await alreadyStored(submission.idempotencyKey))) await store(submission);
+  res.json({ ok: true });
+});
+
+const isText = (value) => typeof value === 'string' && value !== '';
+
+app.post('/api/drafts/load', async (req, res) => {
+  const { scope, formId } = req.body;
+  if (!isText(scope) || !isText(formId)) return res.status(400).end();
+  res.json({ draft: await loadDraft(scope, formId) });
+});
+
+app.post('/api/drafts/save', async (req, res) => {
+  const { scope, draft } = req.body;
+  if (!isText(scope) || !isText(draft?.formId)) return res.status(400).end();
+  await saveDraft(scope, draft);
+  res.status(204).end();
+});
+
+app.post('/api/drafts/delete', async (req, res) => {
+  const { scope, formId } = req.body;
+  if (!isText(scope) || !isText(formId)) return res.status(400).end();
+  await deleteDraft(scope, formId);
+  res.status(204).end();
+});
+
+app.listen(3000);
+```
+
+- **The scope comes from the browser,** like everything else in a request. Before reading or writing a draft, check that the signed-in user may use that scope, as you would for any other id. [Send the submission with your app's sign-in](/docs/integrate/sign-in) shows how to add sign-in to requests.
+- **Store the draft as it is.** The form checks a draft before restoring it, and deletes one it can't use. The submission is still checked by `prepareSubmission`.
+- **Drafts hold respondents' answers,** as submissions do. Keep their bodies out of request logs, error reports and analytics.
+- **How long you keep them is up to you.** Server drafts have no expiry in the package, and `clearDrafts` doesn't touch them.
+
+### 5. Clear saved progress at sign-out
+
+Call `clearDrafts({ owner })` once the form has gone, for example from your signed-out page:
+
+```jsx file=src/SignedOut.jsx check=browser
+import { useEffect, useState } from 'react';
+import { clearDrafts } from '@zoworkhq/forms/react';
+import { forgetDraftKey } from './draft-key.js';
+
+export function SignedOut({ userId }) {
+  const [cleared, setCleared] = useState(false);
+
+  useEffect(() => {
+    forgetDraftKey();
+    clearDrafts({ owner: userId }).then(
+      () => setCleared(true),
+      (error) => console.error("Saved progress wasn't cleared", error),
+    );
+  }, [userId]);
+
+  return <p>{cleared ? "You've signed out." : 'Signing out…'}</p>;
+}
+```
+
+- It deletes the device drafts and this tab's copies saved with that `owner`. Drafts saved without an `owner` aren't touched.
+- It clears storage, not a form on screen. A form still mounted writes its answers again at its next save, so call it after the form has unmounted.
+- Server drafts are yours to delete.
+- It rejects with a `ClearDraftsError` when it can't delete what you asked. See [`clearDrafts`](/docs/integrate/reference/clear-drafts).
+
+## What happens behind the scenes
+
+| Mode | Saved |
+|---|---|
+| Only while the form is open | At every change |
+| On this device | About a second after a change, at every page change, and when the page is hidden or closed, as far as the browser allows |
+| On the app's server | At every page change: **Next**, **Back**, **Review** and **Return to review**. Never on a single answer. |
+| `off` | Never |
+
+- **Every mode but `off` also keeps a copy in the tab,** at every change, so a refresh never depends on the network or the key. In device and server modes that copy holds answers to hidden questions too.
+- **A draft is deleted** when the form is submitted, when the respondent chooses **Clear form** or **Start over**, when it's from another version of the form, when it expires, and when nothing is left worth keeping: no question answered and the respondent still on the first page.
+- **A draft brings back** the answers, the page, the pages visited, the review page and the `idempotencyKey`.
+- **Two tabs with the same form and scope** each save, and the last save wins.
+- **The same form mounted twice at once:** only the first keeps progress. The second keeps its answers in memory only, with a warning in development builds.
+- Closing the tab can lose up to about a second of typing from a device draft, because the browser may not finish the last save.
+
+[What is stored in the browser](/docs/integrate/concepts/browser-storage) has every key, and when each is deleted.
+
+## Rules the package enforces
+
+- Device and server modes need a `scope` that isn't empty. Without one, the form keeps progress in the tab, and `onDraftProblem` gets the reason `no-scope`.
+- Server mode works only on a form with pages. On a form without pages, the reason is `not-paged`.
+- Server mode needs all three functions. Without them, the reason is `missing-server-functions`.
+- `mode: 'off'` wins over whatever the form file says.
+- `clearDrafts` takes `scope` or `owner`, never both.
+
+Each fall-back calls `onDraftProblem` with a `DraftProblem` whose `type` is `drafts-unavailable` and whose `reason` is one of these:
+
+<Signature of="DraftsUnavailableReason" />
+
+## Troubleshooting
+
+**Device mode starts an empty form every time.** Check `onDraftProblem`. The reason says what's missing: `no-getKey`, `no-indexeddb`, or `no-webcrypto` on a plain-HTTP page.
+
+**"Continue where you left off?" shows when you expected the answers back straight away.** The form has no `scope`, so it asks unless the form's own page was refreshed. Give it a `scope` once you know who is signed in.
+
+**One client's answers appeared in another client's form.** The `scope` doesn't name the client. Use `${userId}:${clientId}`, and a new React `key` when the client changes.
+
+**Your server never receives a draft.** Server mode saves only when the respondent changes page, and only on a form with pages.
+
+## More about integrating forms
+
+<Series group />

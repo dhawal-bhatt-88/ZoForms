@@ -98,8 +98,8 @@ export const DOCS_NAV: DocsNavSection[] = [
           { title: "Serve images, video and audio", slug: "integrate/media", status: "live" },
           { title: "Update to a new form version", slug: "integrate/form-versions", status: "live" },
           { title: "Read scores", slug: "integrate/scores", status: "live" },
-          { title: "Save progress (drafts)", slug: "integrate/drafts", status: "planned", notes: "Developer docs brief, CP3." },
-          { title: "Shared devices and kiosks", slug: "integrate/shared-devices", status: "planned", notes: "Developer docs brief, CP3." },
+          { title: "Save progress (drafts)", slug: "integrate/drafts", status: "live" },
+          { title: "Shared devices and kiosks", slug: "integrate/shared-devices", status: "live" },
           {
             title: "Style the form",
             slug: "integrate/styling",
@@ -129,8 +129,8 @@ export const DOCS_NAV: DocsNavSection[] = [
       {
         title: "Concepts",
         pages: [
-          { title: "Answers and their states", slug: "integrate/concepts/answers", status: "planned", notes: "Developer docs brief, CP3." },
-          { title: "What is stored in the browser", slug: "integrate/concepts/browser-storage", status: "planned", notes: "Developer docs brief, CP3." },
+          { title: "Answers and their states", slug: "integrate/concepts/answers", status: "live" },
+          { title: "What is stored in the browser", slug: "integrate/concepts/browser-storage", status: "live" },
         ],
       },
     ],
@@ -142,12 +142,7 @@ export const DOCS_NAV: DocsNavSection[] = [
   {
     title: "Compliance and security",
     items: [
-      {
-        title: "Where respondents' data goes",
-        slug: "compliance/data-flow",
-        status: "planned",
-        notes: "Developer docs brief, CP3. Facts only; anything that reads as a legal position is [TODO: legal review].",
-      },
+      { title: "Where respondents' data goes", slug: "compliance/data-flow", status: "live" },
     ],
   },
 ];

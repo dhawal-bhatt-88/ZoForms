@@ -28,8 +28,10 @@ import { fenceWords, walk } from "./mdast";
  *             handler    a route handler's POST, called with a real Request
  *             node       run with real Node, and must exit 0
  *             browser    rendered with the real FormRenderer
- *   form=     the form file a server or body is for: intake (the default) or
- *             visit-feedback
+ *   form=     the form file a server or body is for: intake (the default),
+ *             intake-server or visit-feedback
+ *   drafts=   where a server keeps server-mode drafts, as the "Save progress"
+ *             guide describes: POST <drafts>/save, /load and /delete
  *   auth=     the token a server wants, as "Authorization: Bearer <token>"
  *   limit=    the server's body-size limit: a bigger body must get a 413
  *   rejects=  a question one of the page's validators refuses a long answer to
@@ -120,6 +122,7 @@ const user = { id: 'user-demo-1' };
 const userId = user.id;
 const patient = { id: 'client-demo-1', displayName: 'Demo Client' };
 const scope = user.id + ':' + patient.id;
+const checkIn = { id: 'check-in-demo-17' };
 const router = { push: (_url: string) => {} };
 const getAccessToken = async () => 'demo-token';
 const getDraftKey = () => crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
@@ -128,7 +131,7 @@ const validators: FieldValidator[] = [];
 const reportError = (_error: unknown) => {};
 const report = (_error: unknown, _stack?: string) => {};
 void [FormRenderer, clearDrafts, ClearDraftsError, calculateScores, prepareSubmission, validateSubmission];
-void [schema, body, user, userId, patient, scope, router, getAccessToken, getDraftKey, draftOptions, validators, reportError, report];
+void [schema, body, user, userId, patient, scope, checkIn, router, getAccessToken, getDraftKey, draftOptions, validators, reportError, report];
 `;
 
 /** A block as the file that goes on disk: wrapped, or word for word. */
@@ -147,6 +150,9 @@ export const INTAKE_FORM = path.join(CONTENT_DIR, "integrate", "intake-form.form
 export const FORM_FILES: Record<string, string> = {
   "intake-form.json": INTAKE_FORM,
   "visit-feedback.json": path.join(CONTENT_DIR, "integrate", "visit-feedback.form.json"),
+  // The intake with Save progress "On this device", and on two pages "On the app's server".
+  "intake-device.json": path.join(CONTENT_DIR, "integrate", "intake-device.form.json"),
+  "intake-server.json": path.join(CONTENT_DIR, "integrate", "intake-server.form.json"),
 };
 
 const isWrapped = (e: CodeExample) => e.check === "fragment" || e.check === "statements";

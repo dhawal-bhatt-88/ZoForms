@@ -111,6 +111,86 @@ const FORMS = [
       { id: "reason_for_visit", type: "long", label: "What brings you in today?" },
     ],
   },
+  // The same intake, as the author would set it for the "Save progress" guide: "On this device".
+  {
+    file: "integrate/intake-device.form.json",
+    title: "Client intake",
+    description: "We use this to prepare for the first visit.",
+    drafts: { mode: "device" },
+    blocks: [
+      { id: "preferred_name", type: "short", label: "Preferred name", required: true },
+      { id: "contact_email", type: "email", label: "Email address", required: true },
+      {
+        id: "attend_format",
+        type: "choice",
+        label: "How would you like to attend sessions?",
+        required: true,
+        options: options("In person", "Video", "Phone"),
+      },
+      {
+        id: "sees_therapist",
+        type: "choice",
+        label: "Do you currently see a therapist?",
+        required: true,
+        options: options("Yes", "No"),
+      },
+      {
+        id: "therapist_name",
+        type: "short",
+        label: "Therapist's name",
+        required: true,
+        enableWhen: [{ question: "sees_therapist", operator: "=", answer: "yes" }],
+      },
+      { id: "reason_for_visit", type: "long", label: "What brings you in today?" },
+    ],
+  },
+  // And on two pages, with "On the app's server", which needs pages.
+  {
+    file: "integrate/intake-server.form.json",
+    title: "Client intake",
+    description: "We use this to prepare for the first visit.",
+    drafts: { mode: "server" },
+    blocks: [
+      {
+        id: "page_about",
+        type: "page",
+        title: "About you",
+        blocks: [
+          { id: "preferred_name", type: "short", label: "Preferred name", required: true },
+          { id: "contact_email", type: "email", label: "Email address", required: true },
+        ],
+      },
+      {
+        id: "page_visit",
+        type: "page",
+        title: "Your visit",
+        blocks: [
+          {
+            id: "attend_format",
+            type: "choice",
+            label: "How would you like to attend sessions?",
+            required: true,
+            options: options("In person", "Video", "Phone"),
+          },
+          {
+            id: "sees_therapist",
+            type: "choice",
+            label: "Do you currently see a therapist?",
+            required: true,
+            options: options("Yes", "No"),
+          },
+          {
+            id: "therapist_name",
+            type: "short",
+            label: "Therapist's name",
+            required: true,
+            enableWhen: [{ question: "sees_therapist", operator: "=", answer: "yes" }],
+          },
+          { id: "reason_for_visit", type: "long", label: "What brings you in today?" },
+        ],
+      },
+    ],
+  },
   // The "Read scores" guide's form: scores on visit feedback, never on anything clinical.
   {
     file: "integrate/visit-feedback.form.json",
@@ -362,6 +442,7 @@ try {
       ...(form.description ? { description: form.description } : {}),
       blocks: form.blocks,
       ...(form.navigation ? { navigation: form.navigation } : {}),
+      ...(form.drafts ? { drafts: form.drafts } : {}),
     });
     const artifact = await call("GET", `/v1/forms/${id}/artifact`, token);
     fs.writeFileSync(path.join(CONTENT, form.file), artifact);

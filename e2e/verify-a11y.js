@@ -115,11 +115,16 @@ const DOCS_PAGES = [
   ["Serve images, video and audio", "/docs/integrate/media"],
   ["Update to a new form version", "/docs/integrate/form-versions"],
   ["Read scores", "/docs/integrate/scores"],
+  ["Save progress (drafts)", "/docs/integrate/drafts"],
+  ["Shared devices and kiosks", "/docs/integrate/shared-devices"],
   ["FormRenderer", "/docs/integrate/reference/form-renderer"],
   ["prepareSubmission", "/docs/integrate/reference/prepare-submission"],
   ["clearDrafts", "/docs/integrate/reference/clear-drafts"],
   ["The posted body", "/docs/integrate/reference/posted-body"],
+  ["Answers and their states", "/docs/integrate/concepts/answers"],
+  ["What is stored in the browser", "/docs/integrate/concepts/browser-storage"],
   ["Follow-up question", "/docs/examples/follow-up-question"],
+  ["Where respondents' data goes", "/docs/compliance/data-flow"],
 ];
 
 // Every violation, for the report.

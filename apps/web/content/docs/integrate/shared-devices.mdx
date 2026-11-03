@@ -1,0 +1,169 @@
+---
+title: Shared devices and kiosks
+summary: A tablet in a waiting room or a shared workstation. What each drafts mode leaves in the browser, the settings to use, and what no setting can prevent.
+template: how-to
+badges: [React]
+appliesTo: [package]
+updated: 2026-11-03
+prev: /docs/integrate/drafts
+next: /docs/integrate/reference/form-renderer
+---
+
+## When you'd use this
+
+<UseCases>
+<UseCase title="A tablet in the waiting room">
+One client after another fills in the intake form on the same tablet, and nobody signs in.
+</UseCase>
+<UseCase title="A shared staff workstation">
+Staff sign in and out of your app on the same computer, filling in forms for several clients.
+</UseCase>
+<UseCase title="A device that reloads between people">
+A kiosk that refreshes its page to get ready for the next person.
+</UseCase>
+</UseCases>
+
+## Before you start
+
+- A form rendered with `FormRenderer`, and its Save progress mode. See [Save progress (drafts)](/docs/integrate/drafts).
+- The package can't tell whether a device is shared. What it keeps, and who gets it back, depends on the settings below.
+
+## Steps
+
+### 1. See what each mode leaves behind
+
+| Mode | In the tab's `sessionStorage` | In IndexedDB, on the device | Elsewhere |
+|---|---|---|---|
+| `off` | Nothing | Nothing | Nothing |
+| Only while the form is open, no `scope` | A copy of the visible answers, as plain text | Nothing | Nothing |
+| Only while the form is open, with a `scope` | The same, given back only to that `scope` | Nothing | Nothing |
+| On this device | A copy, with answers to hidden questions too | An encrypted draft, until it's submitted, cleared or expires. It opens only with the user's key. | Nothing |
+| On the app's server | A copy, with answers to hidden questions too | Nothing | Your server's draft |
+
+Until the form is submitted or cleared, the copy stays in the tab. The browser ends a tab's [`sessionStorage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage) when the tab is closed, but a browser that reopens or restores the tab can bring it back, and browsers may write it to disk to restore tabs after a crash or a restart. The copy isn't encrypted. A reopened tab without a `scope` gets the prompt (step 6).
+
+### 2. On a kiosk, store nothing
+
+Nobody signs in on a kiosk, so nothing can tell one respondent from the next. Turn drafts off:
+
+```jsx file=src/KioskIntake.jsx check=browser run=browser
+import { useState } from 'react';
+import { FormRenderer } from '@zoworkhq/forms/react';
+import schema from './intake-form.json';
+
+export function KioskIntake() {
+  const [respondent, setRespondent] = useState(1);
+  const [sent, setSent] = useState(false);
+
+  function next() {
+    setSent(false);
+    setRespondent((n) => n + 1);
+  }
+
+  return (
+    <main>
+      <h1>{schema.title}</h1>
+      <FormRenderer
+        key={respondent}
+        schema={schema}
+        endpoint="/api/submit"
+        drafts={{ mode: 'off' }}
+        onSuccess={() => setSent(true)}
+      />
+      {sent && (
+        <button type="button" onClick={next}>
+          Start a new form
+        </button>
+      )}
+    </main>
+  );
+}
+```
+
+- **`mode: 'off'` stores nothing anywhere.** The form writes nothing to `sessionStorage`, IndexedDB or your server, and looks for no saved draft. It wins over whatever the form file says.
+- **A refresh starts a new form.** The answers are lost along with everything else.
+- **A new React `key` gives the next person an empty form.** Here that happens when someone presses **Start a new form** after a submit.
+
+### 3. On a shared workstation, use a scope, an owner and sign-out
+
+When people sign in, tell the form whose answers these are:
+
+```jsx check=fragment
+<FormRenderer
+  key={scope}
+  schema={schema}
+  endpoint="/api/submit"
+  drafts={{ scope: `${user.id}:${patient.id}`, owner: user.id, label: patient.displayName }}
+/>
+```
+
+- **`scope` names the user and the client.** A copy or draft comes back only to the same `scope`, so another user, or the same user with another client, never gets it.
+- **`owner` names the user alone.** At sign-out, once the form has gone, call `clearDrafts({ owner })`. [Save progress (drafts)](/docs/integrate/drafts) has a signed-out page that does it.
+- **In device mode, give each user their own key.** A draft opens only with the key it was saved with.
+
+### 4. If a kiosk needs to survive a refresh
+
+`mode: 'off'` loses the answers on a refresh. If that's a problem, use one of these instead.
+
+Give each respondent their own `scope`, such as the check-in your app creates for them:
+
+```jsx check=fragment
+<FormRenderer key={checkIn.id} schema={schema} endpoint="/api/submit" drafts={{ scope: checkIn.id }} />
+```
+
+Or clear everything between respondents, after the form has unmounted:
+
+```js check=statements
+await clearDrafts();
+```
+
+With no options, `clearDrafts` deletes every copy the package wrote in this tab, scoped or not, and every device draft on this device.
+
+With a scope per respondent, an unfinished copy stays in the tab until the tab is closed. It's never given to another scope, but it is there.
+
+### 5. Don't rely on reloading
+
+A reload of the form's own page looks the same whoever presses it. So without a `scope`, the tab's copy comes back without asking after one. A device that reloads that page between respondents needs `mode: 'off'`, a `scope` per respondent, or `clearDrafts()` between them.
+
+### 6. Know what the prompt covers
+
+Without a `scope`, the form asks before bringing a copy back, with "Continue where you left off?", **Continue** and **Start over**, and none of the answers on screen. It asks after:
+
+- a link to the form;
+- Back or Forward;
+- a reopened tab;
+- a route change in your app;
+- a tablet that reloads its home page and then opens the form;
+- a reload of the prompt itself, which shows the prompt again.
+
+After a reload, if two different forms mount on one page, only the first comes back without asking. The other shows the prompt.
+
+### 7. Know what no setting can prevent
+
+- **A form left on screen.** Its answers are in the page's memory until the form unmounts or the page goes away. Whoever uses the device next can see them. `clearDrafts` clears storage, not a form on screen.
+- **The page after a submit.** The form shows "Form submitted successfully." and any scores the author shows to respondents, until your app shows something else.
+- **The browser's own memory of what was typed.** The package sets no `autocomplete` attribute on its fields, so whether the browser offers earlier entries is up to the browser and its settings. See MDN on [`autocomplete`](https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/autocomplete).
+- **A duplicated tab.** Duplicating a tab copies its `sessionStorage` into the new tab, as MDN's [`sessionStorage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage) page describes.
+
+## What happens behind the scenes
+
+- **Hashes, not ids.** The package stores only SHA-256 hashes of `scope` and `owner`. They hide ids from a casual look, but anyone who can guess the ids, for example sequential ones, can work the hash back to them. The answers in a device draft stay encrypted.
+- **`scope` and `owner` are read when the form mounts.** Changing them later does nothing until the form is mounted again.
+- **Two mounts of the same form at once share one tab copy.** The first keeps it, and the second keeps its answers in memory only.
+
+## Rules the package enforces
+
+- `mode: 'off'` wins over the form file's mode, and reports no drafts problems, because there are no drafts.
+- `clearDrafts` takes `scope` or `owner`, never both.
+
+## Troubleshooting
+
+**The next person sees "Continue where you left off?".** The form has no `scope`, and the last person left an unfinished copy in the tab. The prompt keeps it off the screen, and **Start over** deletes it. To keep nothing at all, use `mode: 'off'`.
+
+**The next person got the last person's answers without being asked.** The device reloaded the form's own page. Use `mode: 'off'`, a `scope` per respondent, or `clearDrafts()` between respondents.
+
+**Answers came back after `clearDrafts`.** The form was still mounted, and wrote them again at its next save. Unmount it first.
+
+## More about integrating forms
+
+<Series group />

@@ -45,6 +45,17 @@ const FORMS: Record<string, { file: string; required: string; answers: Record<st
       reason_for_visit: { state: "empty" },
     },
   },
+  "intake-server": {
+    file: FORM_FILES["intake-server.json"],
+    required: "preferred_name",
+    answers: {
+      preferred_name: { state: "answered", value: "Demo Client" },
+      contact_email: { state: "answered", value: "client@example.org" },
+      attend_format: { state: "answered", value: "video" },
+      sees_therapist: { state: "answered", value: "no" },
+      reason_for_visit: { state: "empty" },
+    },
+  },
   "visit-feedback": {
     file: FORM_FILES["visit-feedback.json"],
     required: "booking_ease",
@@ -229,6 +240,39 @@ async function endpointScenario(example: CodeExample, send: Post, storedFile: st
   expect(stored()).toHaveLength(1);
 }
 
+/**
+ * What a server keeping server-mode drafts must do (the "Save progress" guide):
+ * give back the draft it was given for that scope and form, nothing for
+ * another scope, nothing once deleted, and refuse a body without a scope.
+ */
+async function draftsScenario(example: CodeExample, base: string) {
+  const call = async (action: string, body: unknown) => {
+    const response = await fetch(`${base}/${action}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    return { status: response.status, body: response.headers.get("content-type")?.includes("json") ? ((await response.json()) as unknown) : null };
+  };
+  const form = readForm(formOf(example));
+  const ref = { scope: "user-demo-1:client-demo-1", formId: form.formId };
+  const draft = {
+    formId: form.formId,
+    formVersionId: form.formVersionId,
+    schemaVersion: 2,
+    answers: { preferred_name: { state: "answered", value: "Demo Client" }, therapist_name: { state: "answered", value: "Dr. Demo" } },
+    idempotencyKey: "demo-key-5",
+    currentPageId: "page_visit",
+    visitedPageIds: ["page_about", "page_visit"],
+    onReview: false,
+    savedAt: "2026-11-03T09:15:00.000Z",
+  };
+  expect(await call("load", ref)).toEqual({ status: 200, body: { draft: null } });
+  expect((await call("save", { scope: ref.scope, draft })).status).toBeLessThan(300);
+  expect(await call("load", ref)).toEqual({ status: 200, body: { draft } });
+  expect(await call("load", { ...ref, scope: "user-demo-2:client-demo-1" })).toEqual({ status: 200, body: { draft: null } });
+  expect((await call("delete", ref)).status).toBeLessThan(300);
+  expect(await call("load", ref)).toEqual({ status: 200, body: { draft: null } });
+  expect((await call("load", { formId: form.formId })).status).toBe(400);
+  expect((await call("save", { draft })).status).toBe(400);
+}
+
 /** Loaded before a server: any port it asks for becomes a free one, written to a file. */
 const LISTEN_ANYWHERE = `import fs from 'node:fs';
 import http from 'node:http';
@@ -259,6 +303,7 @@ describe("the runnable examples", () => {
 
   it("includes a server and a CommonJS script", () => {
     expect(servers.length).toBeGreaterThan(0);
+    expect(servers.some((e) => e.words.drafts)).toBe(true);
     expect(scripts.some((e) => e.check === "cjs")).toBe(true);
   });
 
@@ -295,6 +340,7 @@ describe("the runnable examples", () => {
         (body, headers = {}) => fetch(url, { method: "POST", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body) }),
         storeFile,
       );
+      if (example.words.drafts) await draftsScenario(example, `http://127.0.0.1:${port}${example.words.drafts}`);
     } catch (error) {
       throw new Error(`${(error as Error).message}\n\nThe server said:\n${logged}`);
     } finally {

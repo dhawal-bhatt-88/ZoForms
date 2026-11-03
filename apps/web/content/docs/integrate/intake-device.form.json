@@ -1,0 +1,80 @@
+{
+  "title": "Client intake",
+  "formId": "fe607aa2-75aa-4f36-84e5-ae907cd04405",
+  "formVersionId": "2b4dda53-3da0-4e4d-8208-8bca67bc9081",
+  "schemaVersion": 2,
+  "description": "We use this to prepare for the first visit.",
+  "blocks": [
+    {
+      "id": "preferred_name",
+      "type": "short",
+      "label": "Preferred name",
+      "required": true
+    },
+    {
+      "id": "contact_email",
+      "type": "email",
+      "label": "Email address",
+      "required": true
+    },
+    {
+      "id": "attend_format",
+      "type": "choice",
+      "label": "How would you like to attend sessions?",
+      "required": true,
+      "options": [
+        {
+          "code": "in_person",
+          "label": "In person"
+        },
+        {
+          "code": "video",
+          "label": "Video"
+        },
+        {
+          "code": "phone",
+          "label": "Phone"
+        }
+      ]
+    },
+    {
+      "id": "sees_therapist",
+      "type": "choice",
+      "label": "Do you currently see a therapist?",
+      "required": true,
+      "options": [
+        {
+          "code": "yes",
+          "label": "Yes"
+        },
+        {
+          "code": "no",
+          "label": "No"
+        }
+      ]
+    },
+    {
+      "id": "therapist_name",
+      "type": "short",
+      "label": "Therapist's name",
+      "required": true,
+      "enableWhen": [
+        {
+          "id": "c_np2ww5x6",
+          "question": "sees_therapist",
+          "operator": "=",
+          "answer": "yes"
+        }
+      ]
+    },
+    {
+      "id": "reason_for_visit",
+      "type": "long",
+      "label": "What brings you in today?",
+      "required": false
+    }
+  ],
+  "drafts": {
+    "mode": "device"
+  }
+}

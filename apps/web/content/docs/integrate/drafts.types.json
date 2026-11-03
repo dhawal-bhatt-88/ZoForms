@@ -1,0 +1,115 @@
+{
+  "package": "@zoworkhq/forms 0.28.0",
+  "types": [
+    {
+      "name": "Draft",
+      "file": "types.d.ts",
+      "text": "interface Draft {\n    formId: string;\n    formVersionId: string;\n    schemaVersion: number;\n    answers: DraftAnswers;\n    idempotencyKey: string;\n    currentPageId?: string;\n    visitedPageIds?: string[];\n    onReview?: boolean;\n    savedAt: string;\n}",
+      "doc": "A saved draft (drafts contract section 5). A host's backend stores it as is in server mode; in device mode it is encrypted whole.",
+      "members": [
+        {
+          "name": "formId",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "formVersionId",
+          "type": "string",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "schemaVersion",
+          "type": "number",
+          "required": true,
+          "doc": null
+        },
+        {
+          "name": "answers",
+          "type": "DraftAnswers",
+          "required": true,
+          "doc": "Including hidden answers, as in the open form. Repeating groups as arrays of instances, in order, without instance ids (drafts contract section 5)."
+        },
+        {
+          "name": "idempotencyKey",
+          "type": "string",
+          "required": true,
+          "doc": "So a resumed form cannot create a duplicate submission."
+        },
+        {
+          "name": "currentPageId",
+          "type": "string",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "visitedPageIds",
+          "type": "string[]",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "onReview",
+          "type": "boolean",
+          "required": false,
+          "doc": null
+        },
+        {
+          "name": "savedAt",
+          "type": "string",
+          "required": true,
+          "doc": "UTC ISO-8601."
+        }
+      ]
+    },
+    {
+      "name": "DraftMode",
+      "file": "types.d.ts",
+      "text": "type DraftMode = 'session' | 'device' | 'server';",
+      "doc": "Where a draft lives (drafts contract section 2): the tab's sessionStorage (today's behaviour), the browser's IndexedDB, encrypted, or the host's own backend.",
+      "members": []
+    },
+    {
+      "name": "DraftRef",
+      "file": "types.d.ts",
+      "text": "interface DraftRef {\n    scope: string;\n    formId: string;\n}",
+      "doc": "Which draft a host's server functions are asked about: one per (scope, formId).",
+      "members": [
+        {
+          "name": "scope",
+          "type": "string",
+          "required": true,
+          "doc": "Opaque to the package: identifies the user and, where it matters, the subject."
+        },
+        {
+          "name": "formId",
+          "type": "string",
+          "required": true,
+          "doc": null
+        }
+      ]
+    },
+    {
+      "name": "DraftsSettings",
+      "file": "types.d.ts",
+      "text": "interface DraftsSettings {\n    mode: DraftMode;\n}",
+      "doc": "The author's choice, stored in the schema. Exported only when not \"session\".",
+      "members": [
+        {
+          "name": "mode",
+          "type": "DraftMode",
+          "required": true,
+          "doc": null
+        }
+      ]
+    },
+    {
+      "name": "DraftsUnavailableReason",
+      "file": "types.d.ts",
+      "text": "type DraftsUnavailableReason = 'no-scope' | 'no-getKey' | 'missing-server-functions' | 'not-paged' | 'no-indexeddb' | 'no-webcrypto';",
+      "doc": "Why drafts fell back to \"session\" (drafts contract section 4).",
+      "members": []
+    }
+  ]
+}

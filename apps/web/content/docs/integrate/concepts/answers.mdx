@@ -1,0 +1,137 @@
+---
+title: Answers and their states
+summary: How every answer is sent and stored. Answered or empty, the empty-answer rule, answers to hidden questions, and the value each type of question gives.
+template: concept
+badges: []
+appliesTo: [package]
+updated: 2026-11-03
+prev: /docs/integrate/reference/posted-body
+next: /docs/integrate/concepts/browser-storage
+---
+
+## In short
+
+Each entry in `answers` is keyed by the question's id, and is one of two shapes:
+
+- `{ "state": "answered", "value": … }`
+- `{ "state": "empty" }`
+
+Only visible questions are there. A question hidden by a condition, and anything that isn't a question, such as a group, a page or a text block, has no entry. A repeating group is a list of objects like `answers`, one per entry.
+
+In TypeScript, from `@zoworkhq/forms/core`:
+
+<Signature of="BlockValue" />
+
+<Signature of="AnswerValue" />
+
+<Signature of="Answers" />
+
+What `prepareSubmission` returns has the same shape, with coded answers labelled: see below.
+
+## What the browser sends, and what you store
+
+The browser sends codes for coded answers. `prepareSubmission` checks each answer, rebuilds it, and adds the labels from your form file. Here the respondent said they don't see a therapist, so "Therapist's name" was hidden and has no entry:
+
+```json name=answers check=body
+{
+  "idempotencyKey": "demo-key-6",
+  "schemaVersion": 2,
+  "formId": "form-demo-1",
+  "formVersionId": "version-demo-3",
+  "submittedAt": "2026-10-30T09:15:00.000Z",
+  "answers": {
+    "preferred_name": { "state": "answered", "value": "Demo Client" },
+    "contact_email": { "state": "answered", "value": "client@example.org" },
+    "attend_format": { "state": "answered", "value": "video" },
+    "sees_therapist": { "state": "answered", "value": "no" },
+    "reason_for_visit": { "state": "empty" }
+  },
+  "derived": {}
+}
+```
+
+```json check=stored of=answers
+{
+  "formId": "form-demo-1",
+  "formVersionId": "version-demo-3",
+  "schemaVersion": 2,
+  "idempotencyKey": "demo-key-6",
+  "submittedAt": "2026-10-30T09:15:00.000Z",
+  "answers": {
+    "preferred_name": { "state": "answered", "value": "Demo Client" },
+    "contact_email": { "state": "answered", "value": "client@example.org" },
+    "attend_format": { "state": "answered", "value": { "code": "video", "label": "Video" } },
+    "sees_therapist": { "state": "answered", "value": { "code": "no", "label": "No" } },
+    "reason_for_visit": { "state": "empty" }
+  },
+  "scores": []
+}
+```
+
+Every answer `prepareSubmission` returns is built afresh, so any other key on an answer, and any `value` on an empty one, is dropped.
+
+## Answered and empty
+
+| State | Means | Has a `value` |
+|---|---|---|
+| `answered` | The respondent gave an answer | Yes |
+| `empty` | The question was shown, and has no answer | No |
+| No entry | The question was hidden by a condition, or isn't a question | |
+
+A cleared answer is `empty` too: for example, a multiple-choice option chosen again, or **Clear selection**.
+
+## The empty-answer rule
+
+An answered value that is an empty list, an empty object, or text that is empty or only spaces counts as no answer, for every type of question. Required checks, conditions, scores, the review page and the stored submission all see `{ "state": "empty" }`.
+
+- The form never sends such a value. The rule is there for bodies made by hand.
+- Text that isn't blank is never trimmed. `" Demo "` is stored as `" Demo "`.
+- A required question with a blank answer is refused with its usual message.
+- A grid applies the rule to each cell.
+
+## Answers to hidden questions
+
+While the respondent fills in the form, an answer to a question that a condition then hides is kept. If the question shows again, the answer is still there.
+
+- **It's never in the submission.** The browser leaves it out of the body, and `prepareSubmission` strips an answer to a hidden or unknown question rather than refusing the body.
+- **Only while the form is open:** the tab's copy holds visible answers only, so a refresh loses hidden ones.
+- **On this device and on the app's server:** the draft holds them, and so does the tab's copy. See [What is stored in the browser](/docs/integrate/concepts/browser-storage).
+
+## Value formats
+
+What a visible, answered question's `value` is, by type. The examples use each question page's form:
+
+| Question type | In the posted body | In the stored submission |
+|---|---|---|
+| [Short answer](/docs/build/question-types/short-answer) | `"Demo Client"` | `"Demo Client"` |
+| [Long answer](/docs/build/question-types/long-answer) | `"Line one\nLine two"` | `"Line one\nLine two"` |
+| [Email](/docs/build/question-types/email) | `"client@example.org"` | `"client@example.org"` |
+| [Phone number](/docs/build/question-types/phone-number) | `"555 0100"` | `"555 0100"` |
+| [Link](/docs/build/question-types/link) | `"https://example.org"` | `"https://example.org"` |
+| [Number](/docs/build/question-types/number) | `3` | `3` |
+| [Date](/docs/build/question-types/date) | `"2026-01-15"` | `"2026-01-15"` |
+| [Time](/docs/build/question-types/time) | `"09:30"` | `"09:30"` |
+| [Linear scale](/docs/build/question-types/linear-scale) | `4` | `4` |
+| [Rating](/docs/build/question-types/rating) | `5` | `5` |
+| [Respondent's country](/docs/build/question-types/respondents-country) | `"Canada"` | `"Canada"` |
+| [Multiple choice](/docs/build/question-types/multiple-choice) | `"video"` | `{ "code": "video", "label": "Video" }` |
+| [Dropdown](/docs/build/question-types/dropdown) | `"self"` | `{ "code": "self", "label": "Self" }` |
+| [Checkboxes](/docs/build/question-types/checkboxes) | `["monday", "friday"]` | `[{ "code": "monday", "label": "Monday" }, { "code": "friday", "label": "Friday" }]` |
+| [Ranking](/docs/build/question-types/ranking) | `["cost", "distance_from_home", "appointment_availability", "therapists_specialty"]` | `[{ "code": "cost", "label": "Cost" }, { "code": "distance_from_home", "label": "Distance from home" }, { "code": "appointment_availability", "label": "Appointment availability" }, { "code": "therapists_specialty", "label": "Therapist's specialty" }]` |
+| [Matrix](/docs/build/question-types/matrix) | `{ "booking": "satisfied" }` | `[{ "row": { "code": "booking", "label": "Booking" }, "column": { "code": "satisfied", "label": "Satisfied" } }]` |
+| [Grid](/docs/build/question-types/grid) | `{ "monday": { "available": "yes" } }` | `[{ "row": { "code": "monday", "label": "Monday" }, "cells": [{ "column": { "code": "available", "label": "Available" }, "value": { "code": "yes", "label": "Yes" } }] }]` |
+
+- **Numbers.** A number, scale or rating answer may also be a plain decimal string, such as `"3"`, which is stored as the number `3`. Anything else is refused, such as `"0x10"`, `"Infinity"` or `true`.
+- **Dates and times** are text: a real calendar date `YYYY-MM-DD`, and a time `HH:MM` or `HH:MM:SS` from `00:00` to `23:59`. The form's own time input sends `HH:MM`.
+- **Coded answers** are sent as codes, and stored with the label from the form file you pass to `prepareSubmission`, never one from the request. Checkboxes and ranking keep the order they were sent in. Matrix and grid list answered rows only, in the form's order.
+- **Free text** is at most 20,000 characters. Email, phone and link formats are checked on the trimmed text, and the stored text keeps its spaces.
+
+## Repeating groups
+
+A repeating group's answer is a list under the group's own id, one object per entry in the order shown, each built like `answers`. A visible group with no entries is `[]`. A hidden group has no entry, like a hidden question.
+
+## Related
+
+- [The posted body](/docs/integrate/reference/posted-body): every field the browser sends.
+- [`prepareSubmission` and `validateSubmission`](/docs/integrate/reference/prepare-submission): the checks, and every error.
+- [What is stored in the browser](/docs/integrate/concepts/browser-storage): where answers are kept while the form is filled in.

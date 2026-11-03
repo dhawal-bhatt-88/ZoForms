@@ -28,10 +28,15 @@ const DEVELOPER_PAGES = [
   ["media", "/docs/integrate/media"],
   ["form-versions", "/docs/integrate/form-versions"],
   ["scores", "/docs/integrate/scores"],
+  ["drafts", "/docs/integrate/drafts"],
+  ["shared-devices", "/docs/integrate/shared-devices"],
   ["form-renderer", "/docs/integrate/reference/form-renderer"],
   ["prepare-submission", "/docs/integrate/reference/prepare-submission"],
   ["clear-drafts", "/docs/integrate/reference/clear-drafts"],
   ["posted-body", "/docs/integrate/reference/posted-body"],
+  ["answers", "/docs/integrate/concepts/answers"],
+  ["browser-storage", "/docs/integrate/concepts/browser-storage"],
+  ["data-flow", "/docs/compliance/data-flow"],
 ];
 
 const PAGES = [

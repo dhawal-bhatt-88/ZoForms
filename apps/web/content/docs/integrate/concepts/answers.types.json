@@ -1,0 +1,26 @@
+{
+  "package": "@zoworkhq/forms 0.28.0",
+  "types": [
+    {
+      "name": "AnswerValue",
+      "file": "types.d.ts",
+      "text": "type AnswerValue = BlockValue | Answers[];",
+      "doc": "What a question or a repeating group holds in an answer map: a question's BlockValue, or a repeating group's instances, in order, each its own answer map (contract section 12.4).",
+      "members": []
+    },
+    {
+      "name": "Answers",
+      "file": "types.d.ts",
+      "text": "interface Answers {\n    [blockId: string]: AnswerValue;\n}",
+      "doc": "Answers keyed by block id — the whole form's, or one instance's. The shape every /core entry point takes, the payload carries and drafts store. It never holds instance ids.",
+      "members": []
+    },
+    {
+      "name": "BlockValue",
+      "file": "types.d.ts",
+      "text": "type BlockValue<T = unknown> = {\n    state: 'answered';\n    value: T;\n} | {\n    state: 'empty';\n};",
+      "doc": "The value held for one block. Generic over T because different block types hold fundamentally different value shapes: - short -> BlockValue<string> - checkbox -> BlockValue<string[]> - matrix / instrument (later) -> BlockValue<Record<string, ...>> Defaults to `unknown` rather than `string` — this is the honest type at any boundary (registry, FormRenderer's state) that has to hold every block type together without knowing which one it has. Each block component narrows T to its own concrete shape. Two states only: 'answered' | 'empty'. What \"partially answered\" means for a composite value (e.g. 4 of 9 PHQ-9 items filled) is handled inside that block's own component, not modeled here.",
+      "members": []
+    }
+  ]
+}

@@ -43,9 +43,11 @@ describe("the developer pages' browser examples", () => {
     const module = await load(example.page, example.file);
     const Component = (module.default ?? Object.values(module).find((v) => typeof v === "function")) as ComponentType;
     const { container } = render(createElement(Component));
-    await waitFor(() => expect(container.querySelector(".zf-form, .zf-unavailable")).not.toBeNull());
+    // Device and server modes look for a saved draft first, so the form comes a moment later.
+    // A form with pages starts with Next rather than Submit.
+    await waitFor(() => expect(container.querySelector(".zf-submit, .zf-next, .zf-unavailable")).not.toBeNull());
     expect(container.querySelector(".zf-unavailable")?.textContent ?? null).toBeNull();
-    expect(container.querySelector(".zf-submit")).not.toBeNull();
+    expect(container.querySelector(".zf-submit, .zf-next")).not.toBeNull();
   });
 
   it.each(statements.map(named))("%s runs", { timeout: 30_000 }, async (_, example) => {

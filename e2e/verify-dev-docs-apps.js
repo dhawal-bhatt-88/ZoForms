@@ -185,6 +185,230 @@ async function quickstart(tmp, browser) {
     vite.child.kill();
     server.child.kill();
   }
+  return app;
+}
+
+const sha256 = (text) => require("crypto").createHash("sha256").update(text, "utf8").digest("hex");
+
+/** A page's table, by its header cells, as rows of cell text with the backticks gone. */
+function tableOf(slug, headers) {
+  const lines = fs.readFileSync(path.join(DOCS, `${slug}.mdx`), "utf8").replace(/\r\n/g, "\n").split("\n");
+  const at = lines.indexOf(`| ${headers.join(" | ")} |`);
+  if (at < 0) throw new Error(`${slug} has no table headed ${headers.join(", ")}`);
+  const rows = [];
+  for (const line of lines.slice(at + 2)) {
+    if (!line.startsWith("|")) break;
+    rows.push(line.split("|").slice(1, -1).map((c) => c.trim().replace(/`/g, "")));
+  }
+  return rows;
+}
+
+/**
+ * "Save progress (drafts)", in the quickstart's app: the device and server
+ * modes, word for word. Three changes, for this script only: main.jsx shows
+ * each page at its own path; the server's port; and /api/draft-key, which the
+ * page leaves to your server, answers with a fixed demo key here.
+ */
+async function drafts(app, browser) {
+  const files = fencesOf("integrate/drafts");
+  const names = ["src/signed-in.js", "src/draft-key.js", "src/DeviceIntakePage.jsx", "src/draft-functions.js", "src/ServerIntakePage.jsx", "src/SignedOut.jsx", "store.js", "draft-store.js", "server.js"];
+  const port = await freePort();
+  for (const name of names) {
+    if (!files.has(name)) throw new Error(`the drafts page has no block for ${name}`);
+    fs.writeFileSync(path.join(app, name), files.get(name).replace(/\b3000\b/g, String(port)));
+  }
+  fs.writeFileSync(path.join(app, "vite.config.js"), fencesOf("integrate/quickstart").get("vite.config.js").replace(/\b3000\b/g, String(port)));
+  for (const mode of ["device", "server"]) fs.copyFileSync(path.join(DOCS, `integrate/intake-${mode}.form.json`), path.join(app, `src/intake-${mode}.json`));
+  fs.writeFileSync(
+    path.join(app, "src/main.jsx"),
+    `import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import '@zoworkhq/forms/styles.css';
+import { DeviceIntakePage } from './DeviceIntakePage.jsx';
+import { ServerIntakePage } from './ServerIntakePage.jsx';
+import { SignedOut } from './SignedOut.jsx';
+
+const pages = {
+  '/server': () => <ServerIntakePage />,
+  '/signed-out': () => <SignedOut userId="user-demo-1" />,
+};
+createRoot(document.getElementById('root')).render(<StrictMode>{(pages[location.pathname] ?? (() => <DeviceIntakePage />))()}</StrictMode>);
+`,
+  );
+
+  const deviceForm = JSON.parse(fs.readFileSync(path.join(app, "src/intake-device.json"), "utf8"));
+  const serverForm = JSON.parse(fs.readFileSync(path.join(app, "src/intake-server.json"), "utf8"));
+  const scope = "user-demo-1:client-demo-1";
+  const KEY = Buffer.from(Array.from({ length: 32 }, (_, i) => i + 1));
+
+  const vitePort = await freePort();
+  const server = start(["server.js"], app);
+  const vite = start([path.join("node_modules/vite/bin/vite.js"), "--port", String(vitePort), "--strictPort"], app);
+  const base = `http://localhost:${vitePort}`;
+  try {
+    await waitForUrl(`${base}/`);
+    const problems = [];
+    const watch = (P) => {
+      P.on("pageerror", (e) => problems.push(e.message));
+      P.on("console", (m) => {
+        if (m.type() === "error" || (m.type() === "warning" && m.text().includes("@zoworkhq/forms"))) problems.push(m.text());
+      });
+      return P;
+    };
+    const fillStart = async (P) => {
+      await P.getByLabel("Preferred name", { exact: true }).fill("Demo Client");
+      await P.getByLabel("Email address", { exact: true }).fill("client@example.org");
+    };
+    const answerAndHide = async (P) => {
+      await P.getByRole("radio", { name: "Yes", exact: true }).check();
+      await P.getByLabel("Therapist's name", { exact: true }).fill("Dr. Demo");
+      await P.getByRole("radio", { name: "No", exact: true }).check();
+    };
+    /** The device database, as the page sees it, with binary fields as byte arrays. */
+    const database = (P) =>
+      P.evaluate(
+        () =>
+          new Promise((resolve, reject) => {
+            const open = indexedDB.open("zoworkhq-forms-drafts");
+            open.onerror = () => reject(open.error);
+            open.onsuccess = () => {
+              const db = open.result;
+              const stores = [...db.objectStoreNames];
+              if (!stores.includes("drafts")) return resolve({ stores, records: [] });
+              const store = db.transaction("drafts").objectStore("drafts");
+              const indexes = [...store.indexNames];
+              const keys = store.getAllKeys();
+              const values = store.getAll();
+              values.onsuccess = () =>
+                resolve({
+                  stores,
+                  indexes,
+                  keys: keys.result,
+                  records: values.result.map((r) => ({ ...r, iv: [...new Uint8Array(r.iv)], ciphertext: [...new Uint8Array(r.ciphertext)] })),
+                });
+              values.onerror = () => reject(values.error);
+            };
+          }),
+      );
+    const tabEntries = (P) => P.evaluate(() => Object.fromEntries(Object.keys(sessionStorage).filter((k) => k.startsWith("@zoworkhq/forms:")).map((k) => [k, JSON.parse(sessionStorage.getItem(k))])));
+
+    // On this device.
+    {
+      const context = await browser.newContext({ viewport: { width: 1000, height: 900 } });
+      await context.route("**/api/draft-key", (route) => route.fulfill({ status: 200, contentType: "application/octet-stream", body: KEY }));
+      await context.route("**/api/submit", (route) => route.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true}' }));
+      const P = watch(await context.newPage());
+      await P.goto(`${base}/device`);
+      await P.locator(".zf-submit").waitFor({ timeout: 30000 });
+      await fillStart(P);
+      await answerAndHide(P);
+      await P.waitForTimeout(1800);
+
+      const before = Date.now();
+      const db = await database(P);
+      const [record] = db.records;
+      check("device mode: one IndexedDB database zoworkhq-forms-drafts, store drafts, indexes on scopeHash and ownerHash", db.stores.join() === "drafts" && db.indexes.slice().sort().join() === "ownerHash,scopeHash" && db.records.length === 1, JSON.stringify({ stores: db.stores, indexes: db.indexes, n: db.records.length }));
+      // The device draft's table: the tab copy's has a third column.
+      const fieldTable = tableOf("integrate/concepts/browser-storage", ["Field", "What it holds"]).map((r) => r[0]);
+      check("its record has the fields the browser-storage page lists", JSON.stringify(Object.keys(record ?? {}).sort()) === JSON.stringify(fieldTable.sort()), `${Object.keys(record ?? {})} vs ${fieldTable}`);
+      check("keyed by the hex SHA-256 of scope, U+0000 and formId", db.keys[0] === sha256(`${scope}\u0000${deviceForm.formId}`), db.keys[0]);
+      check("with scopeHash and ownerHash the hashes of scope and owner", record?.scopeHash === sha256(scope) && record?.ownerHash === sha256("user-demo-1"));
+      check("a 96-bit iv", record?.iv.length === 12, String(record?.iv.length));
+      const days = (record?.expiresAt - before) / 86400000;
+      check("expiresAt 7 days on", Math.abs(days - 7) < 0.01, String(days));
+      check("the answers aren't readable in it", !Buffer.from(record?.ciphertext ?? []).includes("Demo Client"));
+      const draft = await P.evaluate(
+        async ({ key, iv, ciphertext }) => {
+          const k = await crypto.subtle.importKey("raw", new Uint8Array(key), "AES-GCM", false, ["decrypt"]);
+          const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: new Uint8Array(iv) }, k, new Uint8Array(ciphertext));
+          return JSON.parse(new TextDecoder().decode(plain));
+        },
+        { key: [...KEY], iv: record.iv, ciphertext: record.ciphertext },
+      );
+      check("it opens with the user's key, as the whole draft, hidden answer included", draft.formId === deviceForm.formId && draft.formVersionId === deviceForm.formVersionId && draft.answers.therapist_name?.value === "Dr. Demo" && typeof draft.savedAt === "string", JSON.stringify(draft));
+
+      const tab = await tabEntries(P);
+      const tabKey = `@zoworkhq/forms:${deviceForm.formId}:${deviceForm.formVersionId}:${sha256(scope)}`;
+      check("the tab's copy is keyed by the scope's hash, holds the hidden answer, and has no startedAt or address", Object.keys(tab).join() === tabKey && tab[tabKey].answers.therapist_name?.value === "Dr. Demo" && tab[tabKey].ownerHash === sha256("user-demo-1") && !("startedAt" in tab[tabKey]) && !("address" in tab[tabKey]), JSON.stringify(tab));
+      await P.screenshot({ path: path.join(DIR, "drafts-device-form.png"), fullPage: true });
+
+      // A new tab: the draft is found and offered.
+      const P2 = watch(await context.newPage());
+      await P2.goto(`${base}/device`);
+      const prompt = P2.getByText(/^You have a saved draft from .+ for Demo Client\.$/);
+      await prompt.waitFor({ timeout: 30000 });
+      check('a new tab asks first: "You have a saved draft from {date, time} for Demo Client."', (await P2.getByRole("heading", { name: "Continue where you left off?" }).count()) === 1);
+      await P2.screenshot({ path: path.join(DIR, "drafts-device-prompt.png"), fullPage: true });
+      await P2.getByRole("button", { name: "Continue" }).click();
+      await P2.getByLabel("Preferred name", { exact: true }).waitFor();
+      await P2.getByRole("radio", { name: "Yes", exact: true }).check();
+      check("Continue brings the answers back, the hidden one too", (await P2.getByLabel("Preferred name", { exact: true }).inputValue()) === "Demo Client" && (await P2.getByLabel("Therapist's name", { exact: true }).inputValue()) === "Dr. Demo");
+      await P2.getByRole("radio", { name: "No", exact: true }).check();
+      await P2.waitForTimeout(1800);
+      const later = (await database(P2)).records[0];
+      check("each save moves expiresAt on", later?.expiresAt > record.expiresAt, `${later?.expiresAt} after ${record.expiresAt}`);
+
+      await P2.getByRole("radio", { name: "Video" }).check();
+      await P2.getByRole("button", { name: "Submit" }).click();
+      await P2.getByText("Form submitted successfully.").waitFor();
+      await P2.waitForTimeout(500);
+      check("a submit deletes the device draft and the tab's copy", (await database(P2)).records.length === 0 && Object.keys(await tabEntries(P2)).length === 0);
+      await P.close();
+      await P2.close();
+
+      // Signing out, after leaving the form.
+      const P3 = watch(await context.newPage());
+      await P3.goto(`${base}/device`);
+      await P3.locator(".zf-submit").waitFor({ timeout: 30000 });
+      await fillStart(P3);
+      await P3.waitForTimeout(1800);
+      const saved = (await database(P3)).records.length;
+      await P3.goto(`${base}/signed-out`);
+      await P3.getByText("You've signed out.").waitFor({ timeout: 30000 });
+      check("the signed-out page's clearDrafts({ owner }) deletes the device draft and the tab's copy", saved === 1 && (await database(P3)).records.length === 0 && Object.keys(await tabEntries(P3)).length === 0, `saved ${saved}`);
+      await context.close();
+    }
+
+    // On the app's server.
+    {
+      const context = await browser.newContext({ viewport: { width: 1000, height: 900 } });
+      const calls = [];
+      context.on("request", (r) => {
+        const m = /\/api\/drafts\/(\w+)$/.exec(r.url());
+        if (m) calls.push({ action: m[1], body: JSON.parse(r.postData() || "null") });
+      });
+      const P = watch(await context.newPage());
+      await P.goto(`${base}/server`);
+      await P.locator(".zf-next").waitFor({ timeout: 30000 });
+      await fillStart(P);
+      check("server mode saves nothing on an answer", !calls.some((c) => c.action === "save"));
+      await P.getByRole("button", { name: "Next" }).click();
+      await P.getByRole("heading", { name: "Your visit" }).waitFor();
+      await P.waitForTimeout(500);
+      const save = calls.find((c) => c.action === "save");
+      check("Next saves the draft to the server, with its scope and the page", save?.body.scope === scope && save?.body.draft.formId === serverForm.formId && save?.body.draft.currentPageId === "page_visit", JSON.stringify(save));
+
+      const P2 = watch(await context.newPage());
+      await P2.goto(`${base}/server`);
+      await P2.getByText(/^You have a saved draft from .+ for Demo Client\.$/).waitFor({ timeout: 30000 });
+      check("a new tab loads it from the server and asks first", calls.some((c) => c.action === "load" && c.body.scope === scope && c.body.formId === serverForm.formId));
+      await P2.getByRole("button", { name: "Continue" }).click();
+      await P2.getByRole("heading", { name: "Your visit" }).waitFor();
+      await P2.getByRole("radio", { name: "Video" }).check();
+      await P2.getByRole("radio", { name: "No", exact: true }).check();
+      await P2.getByRole("button", { name: "Submit" }).click();
+      await P2.getByText("Form submitted successfully.").waitFor();
+      await P2.waitForTimeout(500);
+      const left = await (await fetch(`http://127.0.0.1:${port}/api/drafts/load`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scope, formId: serverForm.formId }) })).json();
+      check("a submit calls deleteDraft, and the server's draft is gone", calls.some((c) => c.action === "delete") && left.draft === null, JSON.stringify(left));
+      await P2.screenshot({ path: path.join(DIR, "drafts-server-submitted.png"), fullPage: true });
+      await context.close();
+    }
+    check("no errors in the browser, in either mode", problems.length === 0, problems.join(" | "));
+  } finally {
+    vite.child.kill();
+    server.child.kill();
+  }
 }
 
 (async () => {
@@ -192,7 +416,8 @@ async function quickstart(tmp, browser) {
   let browser;
   try {
     browser = await launchBrowser();
-    await quickstart(tmp, browser);
+    const app = await quickstart(tmp, browser);
+    await drafts(app, browser);
   } catch (e) {
     check("ran to the end", false, e.stack || String(e));
   } finally {

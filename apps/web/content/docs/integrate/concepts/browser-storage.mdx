@@ -1,0 +1,122 @@
+---
+title: What is stored in the browser
+summary: Every key the package writes in the respondent's browser, what is in it, how long it lasts and what deletes it, for each drafts mode.
+template: concept
+badges: []
+appliesTo: [package]
+updated: 2026-11-03
+prev: /docs/integrate/concepts/answers
+next: /docs/examples/follow-up-question
+---
+
+## In short
+
+The package keeps a respondent's progress in two places in the browser: a copy in the tab's `sessionStorage`, and, in device mode, an encrypted draft in IndexedDB. Which it uses depends on the form's drafts mode:
+
+| Mode | The tab's copy, in `sessionStorage` | The device draft, in IndexedDB |
+|---|---|---|
+| `off` | No | No |
+| Only while the form is open (`session`) | Yes: visible answers only, as plain text | No |
+| On this device (`device`) | Yes, with answers to hidden questions too | Yes, encrypted with your key |
+| On the app's server (`server`) | Yes, with answers to hidden questions too | No. The draft is on your server. |
+
+It sets no cookies and writes nothing to `localStorage`. [Save progress (drafts)](/docs/integrate/drafts) says how to choose and set up a mode.
+
+## The tab's copy
+
+Every mode but `off` keeps one, so a refresh never depends on the network or a key.
+
+**Key.** One per form version, and per scope when the form has one:
+
+| The form has | Key |
+|---|---|
+| No `scope` | `@zoworkhq/forms:{formId}:{formVersionId}` |
+| A `scope`, in any mode | `@zoworkhq/forms:{formId}:{formVersionId}:{scopeHash}` |
+
+`{scopeHash}` is the hex SHA-256 of the `scope`, so a different user or client in the same tab never gets the copy.
+
+**Value.** JSON, with these fields:
+
+| Field | What it holds | When it's there |
+|---|---|---|
+| `answers` | The answers so far. In session mode, visible answers only: answers to hidden questions stay in the open form but aren't written. In device and server modes, hidden answers too. | Always |
+| `idempotencyKey` | The key the submission will carry | Always |
+| `currentPageId` | The page the respondent is on | Forms with pages |
+| `visitedPageIds` | The pages they've been to | Forms with pages |
+| `onReview` | `true` while they're on the review page | Forms with pages, on the review page |
+| `ownerHash` | The hex SHA-256 of the `owner` | When the form has an `owner` |
+| `startedAt` | When this fill was first written, in UTC | Session mode, including a fall-back to it |
+| `address` | The page's address at the last save, without its `#fragment` | Session mode, including a fall-back to it |
+| `awaitingChoice` | `true` while "Continue where you left off?" is shown for it | While the prompt is up |
+
+**Written** at every change. It isn't encrypted.
+
+**Deleted** when:
+
+- the form is submitted;
+- the respondent chooses **Clear form** or **Start over**;
+- nothing is left worth keeping: no question answered and the respondent still on the first page;
+- a form keeping progress starts. It deletes this tab's copies of the same form's other versions and, if it has a `scope`, the same version's copy without one. Copies for other scopes are left alone;
+- [`clearDrafts`](/docs/integrate/reference/clear-drafts) is called: with no options, every copy the package wrote in this tab; with `{ scope }` or `{ owner }`, the matching ones;
+- the browser ends the tab's session.
+
+**How long it lasts.** As long as the tab's [`sessionStorage`](https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage): it survives a refresh, and the browser ends it when the tab is closed. Browsers may write it to disk to restore tabs after a crash or a restart, and duplicating a tab copies it into the new one.
+
+## The device draft
+
+Device mode only.
+
+**Where.** The IndexedDB database `zoworkhq-forms-drafts`, in its object store `drafts`, with indexes on `scopeHash` and `ownerHash` so `clearDrafts` can find every draft for a scope or owner.
+
+**Key.** One record per scope and form: the hex SHA-256 of the `scope`, the character U+0000, and the `formId`.
+
+**Value.**
+
+| Field | What it holds |
+|---|---|
+| `scopeHash` | The hex SHA-256 of the `scope` |
+| `ownerHash` | The hex SHA-256 of the `owner`. Only when the form has one. |
+| `iv` | 96 random bits, new at every save |
+| `ciphertext` | The whole [draft](/docs/integrate/drafts), encrypted with AES-GCM and your key, answers to hidden questions included |
+| `expiresAt` | When it expires, in milliseconds since 1970 UTC. Not encrypted, so an expired draft can be deleted without the key. |
+
+**Written** about a second after a change, at every page change, and when the page is hidden or closed, as far as the browser allows.
+
+**How long it lasts.** Until `expiresAt`: 7 days after the last save, or `expiresAfterDays`. Each save moves it on.
+
+**Deleted** when:
+
+- the form is submitted;
+- the respondent chooses **Clear form** or **Start over**;
+- nothing is left worth keeping, as for the tab's copy;
+- it was saved on another version of the form;
+- it can't be opened, for example with a changed key;
+- it has expired: a device-mode form, when it starts, deletes every expired draft on the device;
+- `clearDrafts` is called: `{ owner }` and `{ scope }` delete the matching drafts, and no options deletes the whole database.
+
+The browser can delete it too, for example when someone clears the site's data. See MDN on [storage eviction](https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria).
+
+## Encryption and hashes
+
+- **Answers in the device draft are encrypted** with AES-GCM and the key your `getKey` returns. The package never makes, stores or exports that key.
+- **The tab's copy isn't encrypted,** in any mode.
+- **Ids are hashed, not encrypted.** Record keys, `scopeHash` and `ownerHash` are SHA-256 hashes with no key. They hide ids from a casual look, but anyone who can guess the ids, for example sequential ones, can work a hash back to them.
+- **The same hash on any page.** The package uses Web Crypto's SHA-256 where it can and its own where it can't, such as on a plain-HTTP page. Both give the same hex, so `clearDrafts` finds every copy.
+
+## On a plain-HTTP page
+
+On a plain-HTTP page other than `localhost`, browsers leave out part of Web Crypto:
+
+| Feature | On plain HTTP |
+|---|---|
+| Session mode, with or without `scope` | Works. |
+| Server mode | Works. |
+| Device mode | Can't encrypt, so it falls back to session mode, keeping its scope, and calls `onDraftProblem` with `{ type: 'drafts-unavailable', reason: 'no-webcrypto' }`. Nothing survives a closed tab. |
+| `clearDrafts` | Works. |
+
+## Related
+
+- [Save progress (drafts)](/docs/integrate/drafts): choosing and setting up a mode.
+- [Shared devices and kiosks](/docs/integrate/shared-devices): what each mode leaves behind for the next person.
+- [`clearDrafts`](/docs/integrate/reference/clear-drafts): deleting saved progress.
+- [Where respondents' data goes](/docs/compliance/data-flow): the whole path, from the browser to your server.
