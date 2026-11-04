@@ -168,6 +168,97 @@ const THEMES = ["light", "dark"];
       await ctx.close();
     }
 
+    // ---------- keyboard: On this page on the reference pages, and every code block's Copy ----------
+    // Each target is marked, then the page is walked with Tab from the top: every
+    // one must be reached. Enter then follows each link, and copies each block.
+    {
+      const { ctx, P } = await open("light", 1440);
+      await ctx.grantPermissions(["clipboard-read", "clipboard-write"], { origin: WEB });
+      const mark = () =>
+        P.evaluate(() => {
+          const shown = (el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== "hidden";
+          const copies = [...document.querySelectorAll("main pre[role=region]")].filter(shown).map((pre, i) => {
+            const button = [...pre.parentElement.querySelectorAll("button")].find((b) => b.textContent.trim() === "Copy");
+            if (button) button.dataset.kbCopy = String(i);
+            return { i, code: pre.textContent, button: !!button };
+          });
+          const links = [...document.querySelectorAll('nav[aria-label="On this page"] a')].filter(shown).map((a, i) => ((a.dataset.kbToc = String(i)), a.getAttribute("href")));
+          return { copies, links };
+        });
+      const tabWalk = async (want) => {
+        const seen = new Set();
+        for (let i = 0; i < 2000 && seen.size < want; i++) {
+          await P.keyboard.press("Tab");
+          const hit = await P.evaluate(() => {
+            const d = document.activeElement?.dataset ?? {};
+            return d.kbCopy !== undefined ? `copy ${d.kbCopy}` : d.kbToc !== undefined ? `toc ${d.kbToc}` : null;
+          });
+          if (hit) seen.add(hit);
+        }
+        return seen;
+      };
+
+      let blocks = 0;
+      for (const [name, url] of PAGES) {
+        await load(P, url);
+        const { copies, links } = await mark();
+        const reference = url.includes("/reference/");
+        if (copies.length === 0 && !reference) continue;
+        const want = copies.length + (reference ? links.length : 0);
+        const seen = await tabWalk(want);
+        const missed = [...copies.map((c) => `copy ${c.i}`), ...(reference ? links.map((_, i) => `toc ${i}`) : [])].filter((t) => !seen.has(t));
+        check(`${name}: Tab reaches ${reference ? "every On this page link and " : ""}every Copy (${want})`, copies.every((c) => c.button) && missed.length === 0, missed.join(", "));
+
+        if (reference) {
+          // The docs scroll smoothly, for focus as well as links, and an Enter during a scroll
+          // still finishing is carried along by it. So: wait for the page to be still (three
+          // readings alike, up to 6s) before each Enter, and again before reading where it stopped.
+          const settle = async () => {
+            await P.waitForTimeout(300);
+            for (let n = 0, last = -1, same = 0; n < 60 && same < 3; n++) {
+              await P.waitForTimeout(100);
+              const y = await P.evaluate(() => scrollY);
+              same = y === last ? same + 1 : 0;
+              last = y;
+            }
+          };
+          // At the top, or for a heading near the page's end, in view with the page scrolled to its bottom.
+          const placed = (at) => at.top !== undefined && ((at.top >= -1 && at.top <= 200) || (at.atBottom && at.top >= 0 && at.top < at.height));
+          const wrong = [];
+          for (const [i, href] of links.entries()) {
+            await settle();
+            await P.locator(`[data-kb-toc="${i}"]`).focus();
+            await P.keyboard.press("Enter");
+            await settle();
+            const at = await P.evaluate((h) => {
+              const top = document.getElementById(decodeURIComponent(h.slice(1)))?.getBoundingClientRect().top;
+              const atBottom = scrollY + innerHeight >= document.documentElement.scrollHeight - 1;
+              return { hash: location.hash, top, atBottom, height: innerHeight };
+            }, href);
+            if (at.hash !== href || !placed(at)) wrong.push(`${href} (${at.hash}, top ${at.top}, bottom ${at.atBottom})`);
+          }
+          check(`${name}: Enter on each On this page link brings its heading to the top (${links.length})`, links.length > 0 && wrong.length === 0, wrong.join(", "));
+        }
+
+        const bad = [];
+        for (const { i, code } of copies) {
+          await P.evaluate(() => navigator.clipboard.writeText(""));
+          const button = P.locator(`[data-kb-copy="${i}"]`);
+          await button.focus();
+          await P.keyboard.press("Enter");
+          await P.waitForTimeout(100);
+          // The Windows clipboard gives line breaks back as \r\n.
+          const copied = (await P.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, "\n");
+          const said = await button.evaluate((b) => [b.textContent.trim(), b.nextElementSibling?.textContent ?? ""]);
+          if (copied !== code || said[0] !== "Copied" || said[1] !== "Copied to the clipboard") bad.push(`block ${i}: ${copied === code ? "copied" : "wrong text"}, "${said[0]}", "${said[1]}"`);
+          blocks++;
+        }
+        if (copies.length) check(`${name}: Enter on each Copy copies its block exactly and says so (${copies.length})`, bad.length === 0, bad.slice(0, 5).join(" | "));
+      }
+      check(`keyboard: every code block's Copy was tried (${blocks})`, blocks > 100, `${blocks}`);
+      await ctx.close();
+    }
+
     // ---------- what the question-type pages say about their examples ----------
     // Each page's messages and stored formats, against the real renderer.
     {

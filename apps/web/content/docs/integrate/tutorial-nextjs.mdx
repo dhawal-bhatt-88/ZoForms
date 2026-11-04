@@ -4,7 +4,7 @@ summary: A signed-in intake page in a Next.js App Router app, and a route handle
 template: tutorial
 badges: []
 appliesTo: [package]
-updated: 2026-11-03
+updated: 2026-11-04
 prev: /docs/integrate/quickstart
 next: /docs/integrate/validate-and-store
 ---
@@ -104,7 +104,7 @@ export function IntakeForm({ userId }: { userId: string }) {
 - **`onSuccess`** runs once your endpoint answers with a 2xx status. Here it moves to a thank-you page.
 - **`onRenderError`** runs in the browser when the form can't be shown. The respondent sees "This form can't be shown right now. Please try again later." in its place. The form's errors don't reach your error boundaries, so this is how you hear about them.
 
-**On your server, a form file the form refuses throws** while the page renders. The form's message and `onRenderError` come only in the browser. What happens depends on how Next.js renders the page, which `next build` lists as ○ (Static) or ƒ (Dynamic). With Next.js 15.5.28:
+**On your server, a form file the form refuses throws** while the page renders. The form's message and `onRenderError` come only in the browser. What happens depends on how Next.js renders the page, which `next build` lists as ○ (Static) or ƒ (Dynamic). With Next.js 15.5.28: [TODO: changing in 0.28.1]
 
 - **Static,** as this page is with the stand-in sign-in: `next build` fails, and prints the reason.
 - **Dynamic:** the response is a 500 without your page, and your server logs the reason. The browser then renders the page itself, shows the form's message and calls `onRenderError`.
@@ -214,7 +214,7 @@ Open `http://localhost:3000/intake`, or the address Next.js prints.
 
 **"This form can't be shown right now. Please try again later."** The form refused the file. Your `onRenderError` gets the reason, in the browser's console here. In a development build it also shows under the message. Often the file isn't a download from the builder, or was edited by hand.
 
-**`next build` fails, or the page answers with a 500, and the reason names the form.** The form refused the file while your server rendered the page. See step 5.
+**`next build` fails, or the page answers with a 500, and the reason names the form.** The form refused the file while your server rendered the page. See step 5. [TODO: changing in 0.28.1]
 
 **"Submission failed. Your answers have been kept — please try again."** The browser got no 2xx from your route handler. Check the terminal running Next.js. A 401 means `getSignedInUser` found no user.
 
