@@ -1,6 +1,6 @@
 # Drafts — Contract
 
-Status: agreed 29 Sep 2026; amended 29 Sep 2026 after renderer Checkpoint 0; amended 5 Oct 2026 for repeating groups (§5, §8); amended 15 Oct 2026 for the package rename (§3, §5); amended 30 Oct 2026 for hashing without Web Crypto (§4, §5), the failed-save notice (§4, §6) and `clearDrafts` rejecting when it can't clear (§3, §8); amended 30 Oct 2026 for shared devices: the `off` mode, `scope` and `owner` in session mode, the session-mode tab copy and when it restores (§2, §3, §5, §6, §7, §8, §9); amended 30 Oct 2026 so Start over moves focus to the start of the form (§7). Shared by the builder repo and the `@zoworkhq/forms` renderer repo.
+Status: agreed 29 Sep 2026; amended 29 Sep 2026 after renderer Checkpoint 0; amended 5 Oct 2026 for repeating groups (§5, §8); amended 15 Oct 2026 for the package rename (§3, §5); amended 30 Oct 2026 for hashing without Web Crypto (§4, §5), the failed-save notice (§4, §6) and `clearDrafts` rejecting when it can't clear (§3, §8); amended 30 Oct 2026 for shared devices: the `off` mode, `scope` and `owner` in session mode, the session-mode tab copy and when it restores (§2, §3, §5, §6, §7, §8, §9); amended 30 Oct 2026 so Start over moves focus to the start of the form (§7); amended 4 Nov 2026 for `clearDrafts` rejecting with a `TypeError` (§3) and the sweep of a form's other versions in the tab, matching its `formId` exactly (§5, §8). Shared by the builder repo and the `@zoworkhq/forms` renderer repo.
 Change it here first, then in both repos.
 
 ## 1. Purpose
@@ -49,7 +49,8 @@ clearDrafts(options?: { scope?: string; owner?: string }): Promise<void>
 //   { owner }  -> every draft recorded with that owner, across all scopes and forms (the normal logout call)
 //   { scope }  -> every draft for that scope, across all forms
 //   no options -> every draft on this device, and every tab entry the package wrote in this tab
-//   { scope, owner } together, or a non-object argument -> throws TypeError (ambiguous, and a mistake here deletes drafts)
+//   { scope, owner } together, or a non-object argument -> rejects with a TypeError (it is async: nothing is thrown synchronously;
+//     ambiguous, and a mistake here deletes drafts)
 //   rejects with ClearDraftsError when it can't delete what it was asked to (see §8); it never resolves without clearing
 ```
 
@@ -122,6 +123,7 @@ Every mode keeps a copy of the fill in the tab's `sessionStorage`, so a refresh 
   - `address`: the page's address, without its `#fragment`, at the last save.
   - `awaitingChoice: true` while the restore prompt is shown for it (§7).
 - **Device and server modes** are unchanged: their copy holds hidden answers too, as the encrypted or server draft does, so a refresh followed by a save never drops them.
+- **A form's other versions are swept.** When a form starts keeping progress in the tab (once its own copy has been dealt with, §7.1; never for a later mount of the same form, nor with `mode: 'off'`), it deletes the tab's copies of the same `formId` under any other `formVersionId`, whatever their scope: nothing restores them once the version has changed. A form with a `scope` also deletes the same version's unscoped copy. Copies of the same version under another scope are kept: they belong to another user or subject. A key is this form's only when its `formId` segment is exactly the form's: what follows `{formId}:` must be a `formVersionId` with no `:`, optionally followed by `:{scopeHash}`. So form `intake` never touches the copies of form `intake:child`, and a copy whose `formVersionId` contains `:` is left for the tab to discard when it closes.
 
 ## 6. When drafts are saved
 
@@ -191,6 +193,7 @@ A draft is deleted on:
 - Clear form;
 - Start over;
 - a version mismatch (§7);
+- in the tab only, a form starting to keep progress: the tab's copies of its other versions, and for a form with a `scope` the same version's unscoped copy (§5). Device and server drafts of another version are deleted when they are looked up (§7.2);
 - expiry (device mode);
 - nothing left worth keeping: at the next save point, if no question is answered anywhere (hidden answers and nested instances included) and the respondent is still on the first displayed page, the draft and the tab's `sessionStorage` entry are deleted rather than saved empty. Empty starting instances of repeating groups don't count as answers;
 - `clearDrafts` from the host, e.g. `clearDrafts({ owner })` on logout. It deletes the matching device drafts and the matching `sessionStorage` entries in the current tab; it does not touch server drafts. In server mode, deleting the server draft on logout is the host's own decision.
