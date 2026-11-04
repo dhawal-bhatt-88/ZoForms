@@ -111,6 +111,34 @@ describe("the Content Security Policy page and the README", () => {
   });
 });
 
+describe("what changed in 0.28.1, on the pages and in the README", () => {
+  const flat = (text: string) => text.replace(/\s+/g, " ");
+  const body = (slug: string) => flat(getPage(slug)!.body);
+
+  it("give the same cases that need the as FormSchema cast", () => {
+    const listed = /A schema imported from JSON needs a cast when it has (.+?)\. /.exec(flat(readme))?.[1];
+    const cases = (listed ?? "").split(/, | or /);
+    expect(cases).toEqual(["conditions", "pages", "a `drafts` mode", "a `navigation.progressStyle`"]);
+    for (const slug of ["integrate/frameworks", "integrate/reference/form-renderer"]) {
+      for (const one of cases) expect(body(slug), `${slug}: ${one}`).toContain(one);
+      expect(body(slug), slug).toMatch(/[Cc]ast every (file|schema)/);
+    }
+  });
+
+  it("say no new React key is needed after a refusal", () => {
+    const sentence = "No new React `key` is needed.";
+    expect(flat(readme)).toContain(sentence);
+    for (const slug of ["integrate/handle-errors", "integrate/reference/form-renderer", "integrate/tutorial-nextjs"]) expect(body(slug), slug).toContain(sentence);
+    for (const page of getLivePages().filter((p) => isDeveloperPage(p.slug))) expect(flat(page.body), page.slug).not.toMatch(/tries again when it gets a new React `key`/);
+  });
+
+  it("give the same bounds for the body's formVersionId", () => {
+    expect(flat(readme)).toContain("a `formVersionId` that isn't text of 1–256 characters");
+    expect(body("integrate/reference/posted-body")).toContain("isn't text of 1–256 characters");
+    expect(body("integrate/reference/prepare-submission")).toContain("isn't text of 1–256 characters");
+  });
+});
+
 describe("the overview and the package", () => {
   const page = getPage("integrate/overview")!;
 

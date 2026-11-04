@@ -33,7 +33,8 @@ Decide which faults are the request's and which are yours.
 
 | What went wrong | The respondent sees | Your app gets |
 |---|---|---|
-| The form can't be shown: a form file or a setting the renderer refuses, or a fault while rendering | "This form can't be shown right now. Please try again later." in its place. Your page stays up. | `onRenderError(error, { componentStack })`, once per failure |
+| The form can't be shown: a form file or a setting the renderer refuses | "This form can't be shown right now. Please try again later." in its place, on your server and in the browser. The rest of your page renders as usual. | `onRenderError(error, {})` in the browser, once per failure |
+| A fault while rendering the form, past those checks | The same message, in the browser | `onRenderError(error, { componentStack })` |
 | A submit failed | "Submission failed. Your answers have been kept — please try again.", with focus on it | `onError(error)` |
 | Answers failed a check | A summary at the top, and a message on each question | Nothing: no request is sent |
 | Progress couldn't be used, loaded, saved or deleted | Usually nothing, or a short notice | `onDraftProblem(problem)` |
@@ -49,8 +50,8 @@ Decide which faults are the request's and which are yours.
 ```
 
 - These errors don't reach an error boundary of yours. `onRenderError` is the way to hear about them.
-- The message and `onRenderError` are the browser's. Where your server renders the page, as Next.js does, a form file the form refuses throws there instead. [Build an intake page in Next.js](/docs/integrate/tutorial-nextjs#5-put-the-form-in-a-client-component) shows what that does to a page. [TODO: changing in 0.28.1]
-- After a failure the form tries again when `schema` or `endpoint` changes. A form refused for its `validators`, which are often written inline and so new on every render, tries again when it gets a new React `key`.
+- Where your server renders the page, as Next.js does, a form file the form refuses shows the same message there, and the rest of your page renders as usual: no error page and no 500. Your server logs the reason once per render; `onRenderError` is called only in the browser. [Build an intake page in Next.js](/docs/integrate/tutorial-nextjs#5-put-the-form-in-a-client-component) shows it.
+- The form is shown as soon as `schema`, `endpoint` and `validators` all pass. No new React `key` is needed.
 - A form that can't be shown is often a newer `schemaVersion` than your package supports. The reason then says so: `This form uses schemaVersion 3, which this version of @zoworkhq/forms does not support (it supports 1 and 2). Upgrade @zoworkhq/forms to render it.`
 
 ### 3. Report a failed submit
@@ -66,7 +67,7 @@ Decide which faults are the request's and which are yours.
 - the time limit, `timeoutMs`;
 - `getAuthHeaders` throwing or rejecting.
 
-The form never reads the response body, so your endpoint's error message can't reach the respondent, or `onError`. [TODO: changing in 0.28.1]
+The form never reads the response body, so your endpoint's error message can't reach the respondent, or `onError`.
 
 ### 4. Hear about progress that can't be kept
 

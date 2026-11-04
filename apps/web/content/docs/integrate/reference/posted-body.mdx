@@ -4,7 +4,7 @@ summary: What the browser sends to your endpoint, field by field, and the respon
 template: data-reference
 badges: [Server]
 appliesTo: [package]
-updated: 2026-10-30
+updated: 2026-11-04
 prev: /docs/integrate/reference/clear-drafts
 next: /docs/integrate/reference/form-file
 ---
@@ -53,13 +53,13 @@ Nothing is sent while the answers fail a check, and the form doesn't retry on it
 Identifies this fill of the form. It stays the same across retries and after a refresh, and changes only when the respondent clears the form or starts over. A resumed draft keeps it too. Dedupe on it.
 </Field>
 <Field name="schemaVersion">
-The form file's `schemaVersion`. Every download from the builder has one.
+The form file's `schemaVersion`. Every download from the builder has one. `prepareSubmission` never reads it.
 </Field>
 <Field name="formId">
 The form file's `formId`.
 </Field>
 <Field name="formVersionId">
-The form file's `formVersionId`, so you can tell which version the page rendered.
+The form file's `formVersionId`: the version the respondent filled in. Required: `prepareSubmission` refuses a body without it, or with one that isn't text of 1–256 characters. Your server stores it as `answeredFormVersionId`.
 </Field>
 <Field name="submittedAt">
 The time of this attempt on the respondent's clock, in UTC ISO-8601. A retry has a new one, so never dedupe on it, and record your own receipt time.
@@ -117,7 +117,7 @@ A visible repeating group is an array under its own id, with one object per entr
 
 The form never reads the response body. To show your own message, use `onSuccess` or `onError`.
 
-`onError` receives an `Error` such as `Submission failed with status 422`. It doesn't carry the response, so the `errors` your endpoint returns can't reach the respondent or your `onError` code. Run the same checks in the browser with `validators` instead. [TODO: changing in 0.28.1]
+`onError` receives an `Error` such as `Submission failed with status 422`. It doesn't carry the response, so the `errors` your endpoint returns can't reach the respondent or your `onError` code. Run the same checks in the browser with `validators` instead.
 
 A submit that reached you but whose response never got back is sent again with the same key. Store it once, and answer the repeat with a 2xx.
 

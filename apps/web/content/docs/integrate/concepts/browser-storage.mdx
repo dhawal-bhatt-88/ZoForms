@@ -4,7 +4,7 @@ summary: Every key the package writes in the respondent's browser, what is in it
 template: concept
 badges: []
 appliesTo: [package]
-updated: 2026-11-03
+updated: 2026-11-04
 prev: /docs/integrate/concepts/answers
 next: /docs/examples/follow-up-question
 ---
@@ -56,7 +56,7 @@ Every mode but `off` keeps one, so a refresh never depends on the network or a k
 - the form is submitted;
 - the respondent chooses **Clear form** or **Start over**;
 - nothing is left worth keeping: no question answered and the respondent still on the first page;
-- a form keeping progress starts. It deletes this tab's copies of the same form's other versions and, if it has a `scope`, the same version's copy without one. Copies for other scopes are left alone;
+- a form keeping progress starts. It deletes this tab's copies of its other versions, whatever their scope, and, if it has a `scope`, its own version's copy without one. Copies of its own version for other scopes are kept, and so are other forms': a form's id must match exactly, so form `intake` never deletes the copies of form `intake:child`;
 - [`clearDrafts`](/docs/integrate/reference/clear-drafts) is called: with no options, every copy the package wrote in this tab; with `{ scope }` or `{ owner }`, the matching ones;
 - the browser ends the tab's session.
 

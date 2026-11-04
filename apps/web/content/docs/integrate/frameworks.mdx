@@ -121,9 +121,9 @@ export function IntakeForm() {
 }
 ```
 
-The server renders the empty form. A saved fill is read in the browser after hydration, so the two always match.
+The server renders the empty form, or the form's message for a file it refuses. A saved fill is read in the browser after hydration, so the two always match.
 
-A form file the form refuses throws while your server renders the page, before the form can show its message. [Build an intake page in Next.js](/docs/integrate/tutorial-nextjs#5-put-the-form-in-a-client-component) says what that does to a static page and a dynamic one. [TODO: changing in 0.28.1]
+A form file the form refuses shows the form's message on your server too, and the rest of the page renders as usual: a static page still builds, and a dynamic one answers with a 200. [Build an intake page in Next.js](/docs/integrate/tutorial-nextjs#5-put-the-form-in-a-client-component) says what your server logs and when `onRenderError` is called.
 
 [Build an intake page in Next.js](/docs/integrate/tutorial-nextjs) builds a whole signed-in intake page this way.
 
@@ -144,7 +144,7 @@ console.log(typeof prepareSubmission);
 Types ship with the package. `FormSchema` and the rest come from `@zoworkhq/forms/core`, `FormRendererProps` and `DraftsOptions` from `@zoworkhq/forms/react`.
 
 - Use `moduleResolution` `bundler`, `node16` or `nodenext`. The older `node` setting doesn't read the package's entry points.
-- A form file imported from JSON needs a cast. TypeScript reads its strings as `string` rather than the exact values `FormSchema` allows. The cast is safe: the form checks the file when it mounts.
+- A form file imported from JSON needs a cast when it has conditions (an `enableWhen` operator or `enableBehavior`), pages, a `drafts` mode or a `navigation.progressStyle`. TypeScript reads their strings as `string`, not the exact values `FormSchema` allows. Other files type-check without one, but cast every file anyway, so a form that gains a page or a condition keeps compiling. The cast is safe: the form checks the file when it renders.
 
 ```ts check=browser
 import type { FormSchema } from '@zoworkhq/forms/core';

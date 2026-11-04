@@ -339,10 +339,11 @@ const moodTemplate = {
           scores[k].groupId === e.groupId && scores[k].label === e.label && scores[k].value === e.value && scores[k].reason === e.reason);
         const all = await (await fetch(new URL("api/submissions", EXTERNAL_APP.endsWith("/") ? EXTERNAL_APP : EXTERNAL_APP + "/"))).json();
         const record = (Array.isArray(all) ? all : all.submissions ?? []).find((x) => x.idempotencyKey === sent.idempotencyKey);
-        // The app stores prepareSubmission's `submission` from 0.28.1 (its scores are `scores`); before, the body with `derived.scores`.
-        const storedScores = record?.scores ?? record?.derived?.scores;
+        // The app stores prepareSubmission's `submission`, never the body: scores are `scores`, and there is no `derived`.
+        check("API: the stored record is the prepared submission: answeredFormVersionId, no derived",
+          record?.answeredFormVersionId === sent.formVersionId && !!record && !("derived" in record), JSON.stringify(record && Object.keys(record)));
         check("API: the stored record's scores, in reading order, with the unanswered one null",
-          same(storedScores), JSON.stringify(storedScores));
+          same(record?.scores), JSON.stringify(record?.scores));
         const logFile = path.join(appRoot, "api-requests.log");
         const logged = fs.existsSync(logFile)
           ? fs.readFileSync(logFile, "utf8").trim().split("\n").map((l) => { try { return JSON.parse(l); } catch { return null; } })

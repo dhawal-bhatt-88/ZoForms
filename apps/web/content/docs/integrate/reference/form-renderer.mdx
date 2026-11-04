@@ -4,7 +4,7 @@ summary: The React component that renders a form file, validates it and posts th
 template: api-reference
 badges: [React]
 appliesTo: [package]
-updated: 2026-10-30
+updated: 2026-11-04
 prev: /docs/integrate/styling
 next: /docs/integrate/reference/prepare-submission
 ---
@@ -27,7 +27,7 @@ export function IntakeForm() {
 }
 ```
 
-Your own TypeScript needs a cast on a schema imported from JSON: `schema as FormSchema`, with `FormSchema` from `@zoworkhq/forms/core`.
+Your own TypeScript needs a cast on a schema imported from JSON that has conditions, pages, a `drafts` mode or a `navigation.progressStyle`: `schema as FormSchema`, with `FormSchema` from `@zoworkhq/forms/core`. Cast every schema, so a form that gains one keeps compiling.
 
 ## Props at a glance
 
@@ -45,7 +45,8 @@ The form file you downloaded from the builder, as an object.
 
 <Rules>
 
-- It is checked when the form mounts. A form file the renderer refuses, for an unknown block type, a bad condition or an unsupported `schemaVersion`, isn't shown: the respondent sees "This form can't be shown right now. Please try again later." in its place, your page stays up, and `onRenderError` gets the reason.
+- It is checked as the form renders, on your server too. A form file the renderer refuses, for an unknown block type, a bad condition or an unsupported `schemaVersion`, isn't shown: the respondent sees "This form can't be shown right now. Please try again later." in its place, the rest of your page renders as usual, and `onRenderError` gets the reason in the browser.
+- Treat it as fixed once passed: each schema object is checked once, so pass a new object rather than changing one in place.
 - It must have a `formId` and a `formVersionId`. Every download from the builder has both. Without one, the reason is "FormSchema is missing a formId — it is required and must be unique per form." or "FormSchema is missing a formVersionId — it is required and must change whenever the form changes."
 - The renderer shows the questions, not the form's `title` or `description`. Your page shows those, and owns the `h1`. The renderer's own headings start at `h2`.
 - Pass the same form file to `prepareSubmission` on your server.
@@ -125,7 +126,7 @@ Called when submitting fails, with the error. That can be a network failure, the
 <Rules>
 
 - It is only about submitting. Problems with drafts go to `onDraftProblem`.
-- The error doesn't carry the response, only its status in the message, so your endpoint's error body can't be read here. [TODO: changing in 0.28.1]
+- The error doesn't carry the response, only its status in the message, so your endpoint's error body can't be read here.
 
 </Rules>
 
@@ -229,7 +230,7 @@ Called when drafts can't work as the author asked. The problem's `type` is one o
 
 <Prop name="assetBase">
 
-Where your app serves its own files, for image, video and audio blocks whose source is a path starting with a single `/`. Pass it when your app is served under a sub-path, so `/images/a.png` loads from `/app/images/a.png`. With Vite, pass `import.meta.env.BASE_URL`.
+Where your app serves its own files, for image, video, captions and audio files whose source is a path starting with a single `/`. Pass it when your app is served under a sub-path, so `/images/a.png` loads from `/app/images/a.png`. With Vite, pass `import.meta.env.BASE_URL`.
 
 ```jsx check=fragment
 <FormRenderer schema={schema} endpoint="/api/submit" assetBase="/app/" />
@@ -270,7 +271,7 @@ export const validators = [
 - It must be pure, fast and synchronous, and must not use `window`, `document` or the network. The same code runs on your server.
 - A throw, an empty string, a number, an object or a promise fails closed: the question shows "This answer couldn't be checked." and the form can't be submitted.
 - In the error summary your message starts with the question's label in quotation marks, as does "This answer couldn't be checked.": for a question labelled Medical record number, `"Medical record number": Enter the MRN as MRN followed by 6 digits.` The message beside the field, and the one `prepareSubmission` returns, are as you wrote them.
-- The array is checked when the form mounts and whenever you pass a different array. An entry that isn't `{ field, validate }`, or names a field that isn't an answerable question, is refused: the form isn't shown, and `onRenderError` gets a `TypeError` naming the entry. `prepareSubmission` throws the same error on your server.
+- The array is checked as the form renders. An entry that isn't `{ field, validate }`, or names a field that isn't an answerable question, is refused: the form isn't shown, and `onRenderError` gets a `TypeError` naming the entry. `prepareSubmission` throws the same error on your server.
 
 </Rules>
 
@@ -278,7 +279,7 @@ export const validators = [
 
 <Prop name="onRenderError">
 
-Called when the form can't be shown: a schema or setting the renderer refuses, or a fault while rendering. In its place the respondent sees "This form can't be shown right now. Please try again later.", and your page stays up. The first argument is the error, the second `{ componentStack }`.
+Called when the form can't be shown: a schema or setting the renderer refuses, or a fault while rendering. In its place the respondent sees "This form can't be shown right now. Please try again later.", and the rest of your page renders as usual, on your server too. The first argument is the error. The second is `{}` for a schema or setting the renderer refuses, or `{ componentStack }` for a fault further in, which is caught in the browser only.
 
 ```jsx check=fragment
 <FormRenderer
@@ -290,10 +291,10 @@ Called when the form can't be shown: a schema or setting the renderer refuses, o
 
 <Rules>
 
-- It's called once per failure.
+- It's called in the browser only, once per failure, however often your page re-renders.
 - These errors don't reach a host error boundary. Use this to report them.
-- A development build also shows the error's text in the message and logs it. A production build shows only the message.
-- After a failure the form tries again when `schema` or `endpoint` changes. A form refused for its `validators`, which are often written inline and so new on every render, tries again when it gets a new React `key`.
+- Each failure is also logged with `console.error`, in every build; where your server renders the page, once per render there. A development build also shows the error's text in the message. A production build shows only the message.
+- The form is shown as soon as `schema`, `endpoint` and `validators` all pass. No new React `key` is needed.
 
 </Rules>
 

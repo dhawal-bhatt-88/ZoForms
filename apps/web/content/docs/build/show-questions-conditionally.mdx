@@ -4,7 +4,7 @@ summary: Show a question, group or page only when earlier answers meet its condi
 template: how-to
 badges: [Conditional logic]
 appliesTo: [builder, package]
-updated: 2026-10-30
+updated: 2026-11-04
 prev: /docs/build/structure/pages
 next: /docs/integrate/overview
 ---
@@ -28,7 +28,7 @@ See the first one working in the [follow-up question example](/docs/examples/fol
 ## Before you start
 
 - The question the condition reads, its **source**, must come **before** the question, group or page you are making conditional, in reading order. Add or move it there first.
-- The source must be a question whose answer can be compared. These can be sources: Short answer, Multiple choice, Checkboxes, Dropdown, Multi-select, Number, Email, Phone number, Link, Date, Time, Linear scale, Rating, Ranking and Respondent's country.
+- The source must be a question whose answer can be compared. These can be sources: Short answer, Multiple choice, Checkboxes, Dropdown, Number, Email, Phone number, Link, Date, Time, Linear scale, Rating, Ranking and Respondent's country.
 - These can't: Long answer, Matrix, Grid, groups, pages, and the blocks that collect no answer (Heading, Text, Divider, Title, Label, Image, Video and Audio).
 
 ## Steps
@@ -43,7 +43,7 @@ See the first one working in the [follow-up question example](/docs/examples/fol
 |---|---|
 | Multiple choice, Dropdown, Respondent's country, Short answer, Email, Phone number, Link, Date, Time | is answered, is, is not |
 | Number, Linear scale, Rating | is answered, is, is not, is greater than, is less than, is at least, is at most |
-| Checkboxes, Multi-select, Ranking | is answered, includes |
+| Checkboxes, Ranking | is answered, includes |
 
 5. Unless you chose is answered, give the answer to compare with. For a source with options you choose an option by its label, and the builder stores its code. For Number, Linear scale and Rating you type a number. For the others you type the text.
 6. For a second condition, select **Add condition** again. A **Logic** field appears, filled in with `1 AND 2`.

@@ -114,6 +114,13 @@ describe("the compile check itself", () => {
     expect(compileExamples([example]).errors).not.toEqual([]);
   });
 
+  it("accepts, without a cast, a form file with no condition, page, drafts mode or progress style", { timeout: 60_000 }, () => {
+    // The cast rule the pages give (renderer 0.28.1): visit-feedback has questions, a group and scores only.
+    const example = broken("browser", "tsx", "import { FormRenderer } from '@zoworkhq/forms/react';\nimport schema from './visit-feedback.json';\nexport const A = () => <FormRenderer schema={schema} endpoint=\"/x\" />;", "src/FeedbackNoCast.tsx");
+    writeProject(example.page, [example]);
+    expect(compileExamples([example]).errors).toEqual([]);
+  });
+
   it("accepts the same form file with its cast", { timeout: 60_000 }, () => {
     const example = broken("browser", "tsx", "import { FormRenderer } from '@zoworkhq/forms/react';\nimport type { FormSchema } from '@zoworkhq/forms/core';\nimport data from './intake-form.json';\nexport const A = () => <FormRenderer schema={data as FormSchema} endpoint=\"/x\" />;", "src/IntakeCast.tsx");
     writeProject(example.page, [example]);

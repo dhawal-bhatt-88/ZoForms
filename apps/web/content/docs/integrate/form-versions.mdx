@@ -4,7 +4,7 @@ summary: Put a new download in your app, and know what happens to tabs left open
 template: how-to
 badges: [Server]
 appliesTo: [package]
-updated: 2026-11-03
+updated: 2026-11-04
 prev: /docs/integrate/media
 next: /docs/integrate/scores
 ---
@@ -40,7 +40,7 @@ A tab opened before your deploy still runs the old version, and posts its `formV
 - `versionMismatch` is `true`.
 - Answers to questions the new version doesn't have are stripped, never a reason to reject.
 - A question that is new and required has no answer, so the body is refused with a 422. The respondent sees "Submission failed. Your answers have been kept — please try again.", and trying again gives the same result until they reload the page.
-- `submission.formVersionId` is the new file's, so the stored submission doesn't say it was filled in on the old version. Keep the body's own `formVersionId` beside it if you need to know. [TODO: changing in 0.28.1]
+- `submission.formVersionId` is the new file's, and `submission.answeredFormVersionId` is the old version's, exactly as the body sent it, so the stored submission says which version was filled in.
 
 ### 3. Accept the old version for a while, if you need to
 
@@ -66,7 +66,7 @@ export function prepare(body, newest) {
 }
 ```
 
-Store `result.submission` as usual. Its `formVersionId` is then the version it was checked against.
+Store `result.submission` as usual. Its `formVersionId` is then the version it was checked against, and its `answeredFormVersionId` the version filled in.
 
 ## What happens behind the scenes
 
@@ -74,7 +74,7 @@ Store `result.submission` as usual. Its `formVersionId` is then the version it w
 
 | Where progress was kept | After the new version is deployed |
 |---|---|
-| The tab's copy, in every mode | Kept under the old version's key, so the new form doesn't find it and starts empty. The old entry is removed when the form mounts. |
+| The tab's copy, in every mode | Kept under the old version's key, so the new form doesn't find it and starts empty. The new form deletes it when it starts keeping progress in the tab. |
 | A draft on this device, or on your server | Deleted when found, and the respondent sees "This form was updated since you saved your draft, so your earlier answers couldn't be kept." In server mode, `deleteDraft` is called. |
 
 A tab open across the deploy keeps its answers in memory until it is reloaded.

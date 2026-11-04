@@ -553,9 +553,9 @@ const listening = (port) =>
  * used, and the tarball is installed offline. Three changes, for this script
  * only: a tsconfig.json like a new app's; the app is built and started (next
  * build, next start) on a free port rather than run with npm run dev, whose
- * server is a second process this script wouldn't hold; and a copy of
- * app/intake at app/broken, with a form file the form refuses, to see
- * onRenderError. The app sits under OUT, not the system's temp folder:
+ * server is a second process this script wouldn't hold; and three copies of
+ * app/intake (static, dynamic, and dynamic inside <Suspense>) with a form file
+ * the form refuses, for step 5's note on the server. The app sits under OUT, not the system's temp folder:
  * Next.js finds its own files by a relative path, so it must be on the same
  * drive as the workspace.
  */
@@ -627,29 +627,30 @@ async function nextjsIn(tmp, browser) {
     return { ok: result.status === 0, log: `${result.stdout}\n${result.stderr}` };
   };
 
-  // Step 5's note on the server, 1: a static page with a form file the form refuses fails the build.
+  // Step 5's note on the server: the same page with a form file the form refuses, built statically,
+  // rendered for each request, and rendered for each request with the form inside <Suspense>.
   const copy = (route, change = (s) => s) => {
     fs.mkdirSync(path.join(app, "app", route));
     fs.copyFileSync(path.join(app, "app/intake/intake-form.tsx"), path.join(app, "app", route, "intake-form.tsx"));
     fs.writeFileSync(path.join(app, "app", route, "page.tsx"), change(fs.readFileSync(path.join(app, "app/intake/page.tsx"), "utf8")));
     fs.writeFileSync(path.join(app, "app", route, "intake-form.json"), JSON.stringify({ ...form, schemaVersion: 3 }, null, 2));
   };
-  copy("broken");
-  const refused = build();
-  check(
-    "nextjs: a static page whose form file is refused fails next build, which prints the reason",
-    !refused.ok && refused.log.includes("Upgrade @zoworkhq/forms to render it.") && refused.log.includes("/broken"),
-    refused.log.slice(-800),
-  );
-
-  // 2 and 3: the same page rendered for each request, and then with the form inside <Suspense>.
   const dynamic = (s) => `export const dynamic = 'force-dynamic';\n${s}`;
-  fs.rmSync(path.join(app, "app/broken"), { recursive: true });
+  copy("broken-static");
   copy("broken", dynamic);
   copy("broken-suspense", (s) => `import { Suspense } from 'react';\n${dynamic(s).replace("<IntakeForm userId={user.id} />", "<Suspense><IntakeForm userId={user.id} /></Suspense>")}`);
   const built = build();
   if (!built.ok) throw new Error(`next build failed: ${built.log.slice(-1500)}`);
-  check("nextjs: next build compiles the tutorial's files, strict TypeScript included, and lists /intake as static", /○ \/intake\s/.test(built.log) && /ƒ \/broken\s/.test(built.log), built.log.slice(-1500));
+  check(
+    "nextjs: next build compiles the tutorial's files, strict TypeScript included; /intake and the refused static page are static, the others dynamic",
+    /○ \/intake\s/.test(built.log) && /○ \/broken-static\s/.test(built.log) && /ƒ \/broken\s/.test(built.log) && /ƒ \/broken-suspense\s/.test(built.log),
+    built.log.slice(-1500),
+  );
+  check(
+    "nextjs: building the static page with a refused form file succeeds, and the build's output has the reason",
+    built.log.includes("@zoworkhq/forms: this form can't be shown.") && built.log.includes("Upgrade @zoworkhq/forms to render it."),
+    built.log.slice(-1500),
+  );
 
   const port = await freePort();
   const server = start([path.join("node_modules/next/dist/bin/next"), "start", "-p", String(port)], app);
@@ -674,9 +675,12 @@ async function nextjsIn(tmp, browser) {
       const P = await context.newPage();
       const problems = [];
       const posted = [];
+      // The tutorial's onRenderError logs (message, error, componentStack): the third argument, each time.
+      const stacks = [];
       P.on("pageerror", (e) => problems.push(e.message));
       // Failed requests are listed by address below, not by the console's line for them.
       P.on("console", (m) => {
+        if (m.text().startsWith("The intake form could not be shown")) stacks.push(m.args()[2]?.jsonValue().catch(() => "?"));
         if (m.text().startsWith("Failed to load resource")) return;
         if (m.type() === "error" || (m.type() === "warning" && m.text().includes("@zoworkhq/forms"))) problems.push(m.text());
       });
@@ -686,7 +690,7 @@ async function nextjsIn(tmp, browser) {
         if (r.url().endsWith("/api/submit")) posted.push(JSON.parse(r.postData()));
       });
       await P.goto(`${base}${route}`);
-      return { context, P, problems, posted };
+      return { context, P, problems, posted, stacks };
     };
     const fill = async (P) => {
       await P.getByLabel("Preferred name", { exact: true }).fill("Demo Client");
@@ -773,24 +777,28 @@ async function nextjsIn(tmp, browser) {
       await context.close();
     }
 
-    // onRenderError, on the same page and component with a form file the form refuses, rendered for each request.
-    for (const [route, status, withPage] of [
-      ["/broken", 500, false],
-      ["/broken-suspense", 200, true],
-    ]) {
+    // A form file the form refuses: the message on the server and in the browser, a 200, and onRenderError once, in the browser.
+    const MESSAGE = /This form can(?:'|&#x27;|&#39;)t be shown right now\. Please try again later\./;
+    const ours = (p) => p.includes("The intake form could not be shown") || p.includes("@zoworkhq/forms: this form can't be shown.");
+    for (const route of ["/broken-static", "/broken", "/broken-suspense"]) {
       const response = await fetch(`${base}${route}`);
       const html = await response.text();
-      check(`nextjs: ${route} answers ${status}, ${withPage ? "with" : "without"} the page`, response.status === status && html.includes(`<h1>${form.title}</h1>`) === withPage, `${response.status}`);
-      const { context, P, problems } = await open(route);
+      check(`nextjs: ${route} answers 200, with the page and the form's message in the server's HTML`,
+        response.status === 200 && html.includes(`<h1>${form.title}</h1>`) && MESSAGE.test(html), `${response.status}`);
+      const { context, P, problems, stacks } = await open(route);
       await P.getByText("This form can't be shown right now. Please try again later.").waitFor({ timeout: 30000 });
+      await new Promise((r) => setTimeout(r, 1000));
+      const seen = await Promise.all(stacks);
       check(
-        `nextjs: in the browser, ${route} shows the page and the form's message, and onRenderError logs the reason`,
-        (await P.locator("h1").textContent()) === form.title && problems.some((p) => p.includes("The intake form could not be shown") && p.includes("schemaVersion 3")),
-        problems.join(" | "),
+        `nextjs: in the browser, ${route} keeps the page and the message; onRenderError gets the reason once, with no componentStack`,
+        (await P.locator("h1").textContent()) === form.title && seen.length === 1 && seen[0] === undefined
+          && problems.some((p) => p.includes("The intake form could not be shown") && p.includes("schemaVersion 3")),
+        `${seen.length} calls ${JSON.stringify(seen)} | ${problems.join(" | ")}`,
       );
+      check(`nextjs: in the browser, ${route} has no other error, hydration included`, problems.filter((p) => !ours(p)).length === 0, problems.join(" | "));
       await context.close();
     }
-    check("nextjs: the server logged the reason", server.log.includes("Upgrade @zoworkhq/forms to render it."));
+    check("nextjs: the server logged the reason", server.log.includes("@zoworkhq/forms: this form can't be shown.") && server.log.includes("Upgrade @zoworkhq/forms to render it."));
   } finally {
     server.child.kill();
   }

@@ -4,7 +4,7 @@ summary: Keep a respondent's answers through a refresh, a closed tab or a later 
 template: how-to
 badges: [React, Server]
 appliesTo: [package]
-updated: 2026-11-03
+updated: 2026-11-04
 prev: /docs/integrate/scores
 next: /docs/integrate/shared-devices
 ---
@@ -142,7 +142,7 @@ export function DeviceIntakePage() {
 
 - **The key is an AES-GCM 256 `CryptoKey`** that can encrypt and decrypt. The package never makes, stores or exports it.
 - **`getKey` is called each time the form saves, and when it opens a saved draft,** so return a key you already hold.
-- **Where the key comes from is up to you.** The package needs only the `CryptoKey`. [TODO: how a host creates and keeps each user's key. The drafts contract says only that the host supplies it after sign-in, for example from a per-user key its server holds or derives.]
+- **How your app creates and keeps each user's key is your own decision;** the package needs only the `CryptoKey`, once the user has signed in.
 - **A key that can't open the draft,** for example after you change it, deletes the draft. The respondent sees "Your saved draft couldn't be opened, so you're starting a new form."
 - **Drafts expire** 7 days after the last save. Pass `expiresAfterDays` to change that. Each save moves the date on.
 

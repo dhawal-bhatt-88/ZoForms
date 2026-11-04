@@ -104,11 +104,11 @@ export function IntakeForm({ userId }: { userId: string }) {
 - **`onSuccess`** runs once your endpoint answers with a 2xx status. Here it moves to a thank-you page.
 - **`onRenderError`** runs in the browser when the form can't be shown. The respondent sees "This form can't be shown right now. Please try again later." in its place. The form's errors don't reach your error boundaries, so this is how you hear about them.
 
-**On your server, a form file the form refuses throws** while the page renders. The form's message and `onRenderError` come only in the browser. What happens depends on how Next.js renders the page, which `next build` lists as ○ (Static) or ƒ (Dynamic). With Next.js 15.5.28: [TODO: changing in 0.28.1]
+**A form file the form refuses shows the form's message on your server too.** The rest of your page renders as usual: `next build` succeeds, and the page answers with a 200, static or dynamic, with or without `<Suspense>`. With Next.js 15.5.28:
 
-- **Static,** as this page is with the stand-in sign-in: `next build` fails, and prints the reason.
-- **Dynamic:** the response is a 500 without your page, and your server logs the reason. The browser then renders the page itself, shows the form's message and calls `onRenderError`.
-- **Dynamic, with the form inside `<Suspense>`:** the response is a 200 with the rest of your page. The browser shows the form's message and calls `onRenderError`.
+- Your server logs the reason with `console.error` each time it renders the page, so it shows in `next build`'s output and your server's.
+- In the browser the page keeps the message, and `onRenderError` gets the reason once, with `{}` as its second argument: no `componentStack`, because nothing below the form rendered.
+- The form shows as soon as `schema`, `endpoint` and `validators` all pass. No new React `key` is needed.
 
 ### 6. Create the page
 
@@ -212,9 +212,7 @@ Open `http://localhost:3000/intake`, or the address Next.js prints.
 
 **Next.js says functions can't be passed to client components.** The form is in a server component. Keep it in `app/intake/intake-form.tsx`, with `'use client'` as its first line.
 
-**"This form can't be shown right now. Please try again later."** The form refused the file. Your `onRenderError` gets the reason, in the browser's console here. In a development build it also shows under the message. Often the file isn't a download from the builder, or was edited by hand.
-
-**`next build` fails, or the page answers with a 500, and the reason names the form.** The form refused the file while your server rendered the page. See step 5. [TODO: changing in 0.28.1]
+**"This form can't be shown right now. Please try again later."** The form refused the file. Your `onRenderError` gets the reason, in the browser's console here, and your server logs it too, after `@zoworkhq/forms: this form can't be shown.`, in the terminal running Next.js or in `next build`'s output. In a development build it also shows under the message. Often the file isn't a download from the builder, or was edited by hand. See step 5.
 
 **"Submission failed. Your answers have been kept — please try again."** The browser got no 2xx from your route handler. Check the terminal running Next.js. A 401 means `getSignedInUser` found no user.
 

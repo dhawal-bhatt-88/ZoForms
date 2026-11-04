@@ -45,8 +45,15 @@ export type QuestionValue = {
 // A function, not a constant: content.ts imports this file, so CONTENT_DIR isn't set yet when it loads.
 export const questionValuesFile = () => path.join(CONTENT_DIR, "build", "question-types", "question-values.json");
 
+/** Every question type with a page, by type. Keys starting with `$` are notes, not types. */
 export function questionValues(): Record<string, QuestionValue> {
-  return readJson(questionValuesFile()) as Record<string, QuestionValue>;
+  const all = readJson(questionValuesFile()) as Record<string, unknown>;
+  return Object.fromEntries(Object.entries(all).filter(([key]) => !key.startsWith("$"))) as Record<string, QuestionValue>;
+}
+
+/** Answerable types the builder no longer offers, which have no page on purpose: type → why. */
+export function notOffered(): Record<string, string> {
+  return ((readJson(questionValuesFile()) as Record<string, unknown>).$notOffered ?? {}) as Record<string, string>;
 }
 
 /** The operators the builder offers for a type, in its order: none for a type that can't be a source. */

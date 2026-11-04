@@ -4,7 +4,7 @@ summary: Check every posted body with prepareSubmission, store result.submission
 template: how-to
 badges: [Server]
 appliesTo: [package]
-updated: 2026-11-03
+updated: 2026-11-04
 prev: /docs/integrate/tutorial-nextjs
 next: /docs/integrate/custom-validation
 ---
@@ -74,7 +74,7 @@ app.post('/api/submit', async (req, res) => {
   const { submission } = result;
   if (result.versionMismatch) {
     // Ids only: never the answers.
-    console.warn('Submitted from another version', req.body.formVersionId, submission.idempotencyKey);
+    console.warn('Filled in on another version', submission.answeredFormVersionId, submission.formVersionId);
   }
   if (!(await alreadyStored(submission.idempotencyKey))) {
     await store({ ...submission, receivedAt: new Date().toISOString() });
@@ -85,7 +85,7 @@ app.post('/api/submit', async (req, res) => {
 app.listen(3000);
 ```
 
-- **Store `result.submission`, never the body.** Nothing else from the request reaches it.
+- **Store `result.submission`, never the body.** It holds your file's `formId`, `formVersionId` and `schemaVersion`; `answeredFormVersionId`, the version the respondent filled in, as the body sent it; the checked `idempotencyKey` and `submittedAt`; and the answers and scores. Nothing else from the request reaches it, the body's `schemaVersion` included.
 - **Answer a repeat with a 2xx.** The respondent's form then shows "Form submitted successfully." as it would have the first time.
 - **Record your own receipt time.** `submittedAt` comes from the respondent's clock, and a retry has a new one.
 
@@ -97,7 +97,7 @@ The form gives up on a request after `timeoutMs`, 30 seconds by default, but you
 
 `versionMismatch` is `true` when the body's `formId` or `formVersionId` isn't the form file's. The body is still checked against your file, so it is accepted when its answers fit. Logging it, as above, is enough for most forms. Whether to refuse such a body is your call.
 
-`submission.formVersionId` is always your file's, never the body's, so keep the body's own `formVersionId` with the submission if you need to know which version the respondent filled in. [TODO: changing in 0.28.1]
+`submission.formVersionId` is always your file's. `submission.answeredFormVersionId` is the body's, exactly as sent: the version the respondent filled in. Both are stored, so a record checked against a newer file still says which version was answered.
 
 [Update to a new form version](/docs/integrate/form-versions) covers accepting more than one version.
 

@@ -4,7 +4,7 @@ summary: Send cookies or a token with the form's request, check them on your ser
 template: how-to
 badges: [React, Server]
 appliesTo: [package]
-updated: 2026-11-03
+updated: 2026-11-04
 prev: /docs/integrate/custom-validation
 next: /docs/integrate/handle-errors
 ---
@@ -121,7 +121,7 @@ Store who sent it beside `result.submission`, as `submittedBy` above. The submis
 - **`onError`** gets the error after a failure: a response that isn't a 2xx, a network failure, `getAuthHeaders` failing, or the time limit. The respondent sees "Submission failed. Your answers have been kept — please try again." and can send again, with the same key.
 - **`timeoutMs`** is how long a request may take, 30000 by default. After that the request is abandoned and counted as a failure.
 
-A 401 or 403 arrives in `onError` as an `Error` such as `Submission failed with status 401`. Only the message carries the status, so your app can't read the response there. [TODO: changing in 0.28.1]
+A 401 or 403 arrives in `onError` as an `Error` such as `Submission failed with status 401`. Only the message carries the status, so your app can't read the response there.
 
 ### 4. For an endpoint on another origin
 

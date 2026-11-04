@@ -1,9 +1,10 @@
 // Every block type the builder offers is one the renderer knows. The types are
 // the schema's own (`BlockType`, plus group and page), so a new type is
 // included without editing this suite. The editor's insert menu must offer
-// exactly those leaf types, except `hidden`: the renderer neither shows it nor
-// collects a value yet, so it isn't offered, though it still saves and renders
-// (it is in the form below). A paged form with one block of each type is saved
+// exactly those leaf types, except `hidden` (the renderer neither shows it nor
+// collects a value yet) and `multiselect` (no longer offered from 4 Nov 2026:
+// Checkboxes does the same). Both still save and render: they are in the form
+// below. A paged form with one block of each type is saved
 // and downloaded through the API, and the download passes the external test
 // app's installed @zoworkhq/forms (`KNOWN_TYPES`, `assertSchemaIntegrity`).
 const fs = require("fs");
@@ -67,10 +68,10 @@ const CONTENT = {
     await P.goto(`${WEB}/app/forms/${menuForm}/edit`);
     await P.getByTitle("Insert a block").click();
     const offered = [...new Set(await P.locator("[data-block-type]").evaluateAll((els) => els.map((e) => e.dataset.blockType)))].filter((t) => t !== "group");
-    const NOT_OFFERED = ["hidden"];
+    const NOT_OFFERED = ["hidden", "multiselect"];
     const missing = LEAF_TYPES.filter((t) => !offered.includes(t) && !NOT_OFFERED.includes(t));
     const extra = offered.filter((t) => !LEAF_TYPES.includes(t) || NOT_OFFERED.includes(t));
-    check(`the insert menu offers exactly the schema's ${LEAF_TYPES.length} leaf types but Hidden field`, !missing.length && !extra.length,
+    check(`the insert menu offers exactly the schema's ${LEAF_TYPES.length} leaf types but Hidden field and Multi-select`, !missing.length && !extra.length,
       `not offered: ${missing.join(", ") || "none"}; not in the schema: ${extra.join(", ") || "none"}`);
     check("…and groups", (await P.locator('[data-block-type="group"]').count()) === 1);
     await browser.close();

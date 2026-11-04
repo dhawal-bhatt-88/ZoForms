@@ -193,16 +193,20 @@ describe("what deletes the tab's copy", () => {
     await waitFor(() => expect(ours()).toEqual([]));
   });
 
-  it("a form starting: other versions, and its own version's unscoped copy, but not other scopes'", async () => {
-    deletes("It deletes this tab's copies of the same form's other versions and, if it has a `scope`, the same version's copy without one. Copies for other scopes are left alone;");
+  // DRAFTS-CONTRACT §5 and §8 since 0.28.1, which also matches the formId exactly.
+  it("a form starting: other versions, and its own version's unscoped copy, but not other scopes' or other forms'", async () => {
+    deletes("It deletes this tab's copies of its other versions, whatever their scope, and, if it has a `scope`, its own version's copy without one. Copies of its own version for other scopes are kept, and so are other forms': a form's id must match exactly, so form `intake` never deletes the copies of form `intake:child`;");
     const otherScope = `${PREFIX}${intake.formId}:${intake.formVersionId}:${sha256("user-demo-2:client-demo-1")}`;
     const oldVersion = `${PREFIX}${intake.formId}:version-demo-old`;
     const oldScoped = `${PREFIX}${intake.formId}:version-demo-old:${sha256(SCOPE)}`;
+    const oldOtherScope = `${PREFIX}${intake.formId}:version-demo-old:${sha256("user-demo-2:client-demo-1")}`;
     const otherForm = `${PREFIX}form-demo-9:version-demo-1`;
-    for (const key of [otherScope, oldVersion, oldScoped, otherForm, unscoped()]) sessionStorage.setItem(key, JSON.stringify({ answers: {}, idempotencyKey: "demo-key-9" }));
+    // A form whose id starts with this one's and a colon: 0.28.0 deleted its copies.
+    const childForm = `${PREFIX}${intake.formId}:child:version-demo-1`;
+    for (const key of [otherScope, oldVersion, oldScoped, oldOtherScope, otherForm, childForm, unscoped()]) sessionStorage.setItem(key, JSON.stringify({ answers: {}, idempotencyKey: "demo-key-9" }));
     show(intake, { scope: SCOPE });
     await ready();
-    await waitFor(() => expect(ours().sort()).toEqual([otherForm, otherScope].sort()));
+    await waitFor(() => expect(ours().sort()).toEqual([otherForm, otherScope, childForm].sort()));
   });
 
   it("clearDrafts, with each of its options", async () => {

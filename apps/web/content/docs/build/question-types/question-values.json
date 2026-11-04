@@ -1,4 +1,7 @@
 {
+  "$notOffered": {
+    "multiselect": "No longer offered in the builder (decided 4 Nov 2026), so it has no question page. Form files that have it still render and submit, as Checkboxes do: see the form file page."
+  },
   "short": {
     "page": "short-answer",
     "name": "a short answer",

@@ -4,7 +4,7 @@ summary: Check a posted body on your server against the form file, and get back 
 template: function-reference
 badges: [Server]
 appliesTo: [package]
-updated: 2026-10-30
+updated: 2026-11-04
 prev: /docs/integrate/reference/form-renderer
 next: /docs/integrate/reference/clear-drafts
 ---
@@ -76,12 +76,12 @@ A successful result has these fields:
 | `ok` | `true`. |
 | `submission` | What to store. |
 | `answers` | The same answers as `submission.answers`. |
-| `versionMismatch` | `true` when the body's `formId` or `formVersionId` differs from the form file's, or the body has none. Whether to refuse such a body is your call. |
+| `versionMismatch` | `true` when the body's `formId` or `formVersionId` differs from the form file's, or the body has no `formId`. Whether to refuse such a body is your call. |
 | `derived` | `{ scores }`, the same results as `submission.scores`, and `{ scores: [] }` for a form with none. |
 
 A failed result is `{ ok: false, errors }`, and has no scores.
 
-**Store only `result.submission`, never the body.** Nothing else from the request reaches it.
+**Store only `result.submission`, never the body.** Nothing else from the request reaches it, the body's `schemaVersion` included.
 
 <FieldList of="StoredSubmission">
 <Field name="formId">

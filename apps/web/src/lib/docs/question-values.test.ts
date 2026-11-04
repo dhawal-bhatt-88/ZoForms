@@ -18,7 +18,7 @@ import { compileExamples, writeProject, type CodeExample } from "./code-examples
 import { CONTENT_DIR, getPage } from "./content";
 import { markdownFor } from "./page-markdown";
 import { looseForm, stores } from "./question-forms";
-import { operatorsFor, questionValues, type QuestionValue } from "./question-values";
+import { notOffered, operatorsFor, questionValues, type QuestionValue } from "./question-values";
 
 /*
  * The question pages' "For developers" sections (developer docs brief, scope
@@ -34,9 +34,11 @@ const formOf = (v: QuestionValue) => looseForm(slugOf(v));
 const blockOf = (v: QuestionValue) => formOf(v).blocks.find((b) => b.id === v.field)!;
 
 describe("question-values.json", () => {
-  it("has every answerable type with a question page, and multiselect has no page yet", () => {
-    // Multi-select stays a [TODO] (the form file page) until Dhawal decides between it and Checkboxes.
-    expect(Object.keys(values).sort()).toEqual([...ANSWERABLE_TYPES].filter((t) => t !== "multiselect").sort());
+  it("has every answerable type with a question page, but the ones the builder no longer offers", () => {
+    // Multi-select left the insert menu on 4 Nov 2026 (Dhawal): no page, on purpose, and recorded in the file.
+    expect(Object.keys(notOffered())).toEqual(["multiselect"]);
+    expect(Object.keys(values).sort()).toEqual([...ANSWERABLE_TYPES].filter((t) => !(t in notOffered())).sort());
+    expect(getPage("integrate/reference/form-file")!.body).toContain("| `multiselect` | Multi-select. No longer offered in the builder.");
     const pages = fs.readdirSync(path.join(CONTENT_DIR, "build", "question-types")).filter((f) => f.endsWith(".mdx"));
     expect(entries.map(([, v]) => `${v.page}.mdx`).sort()).toEqual(pages.sort());
   });
