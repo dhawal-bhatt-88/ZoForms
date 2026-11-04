@@ -1,6 +1,6 @@
 # Groups and Pages — Schema Contract
 
-Status: agreed 25 Sep 2026; amended 5 Oct 2026 for repeating groups (§12, with matching changes in §1–§8); amended 6 Oct 2026 for coded options and option import (§13); amended 7 Oct 2026 for the grid block (§14); amended 9 Oct 2026 for custom condition logic (§15); amended 13 Oct 2026 for host validators (§16); amended 14 Oct 2026 for grid layout by available width (§14.5); amended 14 Oct 2026 for the required marker and ranking announcements (§7); amended 15 Oct 2026 for scoring (§17, with matching changes in §1, §6 and §13.1); amended 15 Oct 2026 for the package rename (`@zoworkhq/forms`, public prefix `zf-`: §7, §8, §12.6, §14.5); amended 27 Oct 2026 for new page titles (§2.5) and builder-only save rules for scale and number (§6); amended 28 Oct 2026 for empty answers and link answers (§5); amended 28 Oct 2026 for clearing answers (§7, §14.5) and naming the question in each error summary entry (§12.5); amended 28 Oct 2026 for video captions (§10) and the form's title and description (§7); amended 29 Oct 2026 for the builder's captions setting (§10); amended 30 Oct 2026 for the renderer's nesting limit (§2.1, §6), value formats and stored answers (§5), text-value checks (§6), schemas the renderer refuses (§7) and the repeat ceiling (§12.1); amended 30 Oct 2026 for counts in the respondent's locale (§12.2) and refusing too many instances first (§12.5). Shared by the builder repo and the `@zoworkhq/forms` renderer repo.
+Status: agreed 25 Sep 2026; amended 5 Oct 2026 for repeating groups (§12, with matching changes in §1–§8); amended 6 Oct 2026 for coded options and option import (§13); amended 7 Oct 2026 for the grid block (§14); amended 9 Oct 2026 for custom condition logic (§15); amended 13 Oct 2026 for host validators (§16); amended 14 Oct 2026 for grid layout by available width (§14.5); amended 14 Oct 2026 for the required marker and ranking announcements (§7); amended 15 Oct 2026 for scoring (§17, with matching changes in §1, §6 and §13.1); amended 15 Oct 2026 for the package rename (`@zoworkhq/forms`, public prefix `zf-`: §7, §8, §12.6, §14.5); amended 27 Oct 2026 for new page titles (§2.5) and builder-only save rules for scale and number (§6); amended 28 Oct 2026 for empty answers and link answers (§5); amended 28 Oct 2026 for clearing answers (§7, §14.5) and naming the question in each error summary entry (§12.5); amended 28 Oct 2026 for video captions (§10) and the form's title and description (§7); amended 29 Oct 2026 for the builder's captions setting (§10); amended 30 Oct 2026 for the renderer's nesting limit (§2.1, §6), value formats and stored answers (§5), text-value checks (§6), schemas the renderer refuses (§7) and the repeat ceiling (§12.1); amended 30 Oct 2026 for counts in the respondent's locale (§12.2) and refusing too many instances first (§12.5); amended 4 Nov 2026 for what a server stores (§5) and refused forms during server rendering (§7); amended 4 Nov 2026 for hidden answers in session mode (§3.6). Shared by the builder repo and the `@zoworkhq/forms` renderer repo.
 Both implementations must follow this file exactly. Change it here first, then in both repos.
 
 ## 1. Shapes
@@ -55,7 +55,7 @@ navigation?: {
 3. Not allowed as a source: `group`, `page`, `matrix`, `grid`, `long`, `divider`, `heading`, `title`, `label`, `hidden`, `text`, `image`, `video`, `audio`.
 4. **Visibility:** an item is visible if and only if its own conditions pass **and** every ancestor is visible.
 5. A hidden source makes only **that condition** fail (existing rule, matters for `"any"`).
-6. **Hidden answers:** kept in state and sessionStorage, re-shown when visible again, never submitted, never validated (existing rule).
+6. **Hidden answers:** kept in the open form's state and re-shown when visible again, never submitted, never validated. In device and server modes the tab's copy and the draft keep them too; session mode doesn't write them (DRAFTS-CONTRACT §5), so a refresh loses them there.
 7. **Prefix rule (repeating groups, §12.3):** a condition's source is allowed only if every repeating group enclosing the source also encloses the dependent. It applies alongside the ordering rule.
 8. **Custom logic (§15):** when an item has `enableLogic`, its conditions are combined by that tree instead of by `enableBehavior`. Rules 2, 3, 5 and 7 apply to every condition, at any depth of the tree.
 
@@ -94,6 +94,15 @@ Both repos share this test table:
 
 **What `prepareSubmission` returns.** Every answer it returns is built afresh, never the object that was sent: exactly `{ state: "empty" }`, or `{ state: "answered", value }` with the value rebuilt for its type: free text, `date`, `time` and `country` as the string; `number`, `scale` and `rating` as a number; coded answers labelled as in §13.5; a grid as in §14.2. Any other key on an answer, and any `value` on an empty answer, is dropped. The same applies inside every repeating-group instance (§12.4).
 
+**What a server stores.** A successful `prepareSubmission` result carries `submission`, the record to store. Nothing else from the request reaches it:
+
+- `formId`, `formVersionId` and `schemaVersion`: the server's schema's, never the body's (`schemaVersion` is 1 when the schema has none).
+- `answeredFormVersionId`: the body's own `formVersionId`, exactly as sent: the version the respondent filled in. Always present. When it differs from `formVersionId`, `versionMismatch` is true.
+- `idempotencyKey` and `submittedAt`: the body's, checked.
+- `answers`, as above, and `scores`, as `derived.scores` (§17.5).
+
+The body must carry a `formVersionId` that is a string, not empty or whitespace only, and at most 256 characters long; one exactly equal to the schema's `formVersionId` is accepted whatever its length. It is not limited to UUIDs. Anything else rejects the body with one "Invalid submission" error (`blockId: ""`, `path: []`). The body's `schemaVersion` is never read.
+
 ## 6. Integrity checks
 
 The builder rejects these at save (400 naming the block). The renderer throws at mount (defence against hand-edited schemas):
@@ -124,7 +133,12 @@ The builder rejects these at save (400 naming the block). The renderer throws at
 
 ## 7. Rendering (renderer only)
 
-- **Schemas the renderer refuses.** Wherever this contract says the renderer *throws at mount* (§6, §13.6, §14.4, §15.5, §16.2, §17.6), the form is not shown. In its place the renderer shows "This form can't be shown right now. Please try again later." (`role="alert"`, class `zf-unavailable`) and passes the error to the host's `onRenderError` callback; the host's own page stays up. A development build also shows the error's text in the message. `/core` still throws the same errors to its callers (`assertSchemaIntegrity`, `validateSubmission`, `prepareSubmission`).
+- **Schemas the renderer refuses.** Wherever this contract says the renderer *throws at mount* (§6, §13.6, §14.4, §15.5, §16.2, §17.6), the form is not shown. In its place the renderer shows "This form can't be shown right now. Please try again later." (`role="alert"`, class `zf-unavailable`); the rest of the host's page renders as usual. The same applies to the renderer's own checks on a blank `formId` or `formVersionId` and on `endpoint`.
+  - These checks run while the form renders, before anything else in it, so the message is rendered on the server and in the browser alike: a server-rendered or statically built page carries it, and hydrates to it.
+  - In the browser, the renderer passes the error to the host's `onRenderError(error, {})`, once per failure however often the host re-renders, and logs it once with `console.error`. On the server it logs the error once per render with `console.error`, never calls `onRenderError`, and never fails the render or a static build.
+  - The checks run again on every render, so the form is shown as soon as `schema`, `endpoint` and `validators` all pass; no new React `key` is needed.
+  - A fault deeper in the form while rendering shows the same message in the browser, with `onRenderError(error, { componentStack })`. On the server React has no error boundaries, so such a fault fails the render as any component's error does.
+  - A development build also shows the error's text in the message. `/core` still throws the same errors to its callers (`assertSchemaIntegrity`, `validateSubmission`, `prepareSubmission`).
 - **Form title and description:** the renderer never shows the form's `title` or `description`; the host does, and owns the page's `h1`.
 - Group → `<fieldset>` with a `<legend>` containing the label as a heading.
 - Heading level: in a single-page form, root-level groups use `h2`; in a paged form the page title is `h2` and its root-level groups `h3`. Each nesting level adds one, **capped at `h6`** (nesting continues; only the level stops rising). Author heading blocks keep their own `level`.
