@@ -1,11 +1,11 @@
 {
-  "package": "@zoworkhq/forms 0.28.0",
+  "package": "@zoworkhq/forms 0.28.1",
   "types": [
     {
       "name": "Submission",
       "file": "types.d.ts",
-      "text": "interface Submission {\n    idempotencyKey: string;\n    schemaVersion?: number;\n    formId?: string;\n    formVersionId?: string;\n    submittedAt: string;\n    answers: Answers;\n    derived: Record<string, unknown>;\n}",
-      "doc": "The POST body FormRenderer sends on submit. schemaVersion mirrors the same optional field on FormSchema — the builder doesn't emit it yet, but JSON.stringify drops `undefined` keys automatically, so the payload already omits it today and will pick it up with zero code changes once the builder does. formId and formVersionId are required on FormSchema, so they are always present in practice. derived is always empty: the browser never sends scores (contract 17.5). prepareSubmission ignores whatever arrives in it and calculates scores from the schema it was given. idempotencyKey is fixed for the lifetime of one form fill and reused across every retry, so the backend can deduplicate an attempt that reached the server but whose response never made it back.",
+      "text": "interface Submission {\n    idempotencyKey: string;\n    schemaVersion?: number;\n    formId?: string;\n    formVersionId: string;\n    submittedAt: string;\n    answers: Answers;\n    derived: Record<string, unknown>;\n}",
+      "doc": "The POST body FormRenderer sends on submit. schemaVersion is the schema's own (the builder writes 2), left out when the schema has none. formId and formVersionId are the schema's; prepareSubmission requires formVersionId and stores it as `answeredFormVersionId` (contract section 5). derived is always empty: the browser never sends scores (contract 17.5). prepareSubmission ignores whatever arrives in it and calculates scores from the schema it was given. idempotencyKey is fixed for the lifetime of one form fill and reused across every retry, so the backend can deduplicate an attempt that reached the server but whose response never made it back.",
       "members": [
         {
           "name": "idempotencyKey",
@@ -28,8 +28,8 @@
         {
           "name": "formVersionId",
           "type": "string",
-          "required": false,
-          "doc": null
+          "required": true,
+          "doc": "The form version filled in. Text of 1–256 characters, not blank, or exactly the schema's."
         },
         {
           "name": "submittedAt",

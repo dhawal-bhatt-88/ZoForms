@@ -20,7 +20,7 @@ export type MarkdownContext = {
   page: DocsPage;
   /** The site's address, for absolute links. */
   origin: string;
-  /** "0.28.0". */
+  /** "0.28.1". */
   version: string;
   /** An example's form file, by name. */
   exampleForm: (name: string) => Record<string, unknown>;
@@ -235,7 +235,7 @@ export function pageMarkdown(ctx: MarkdownContext): string {
   return String(out);
 }
 
-/** "Applies to: Zowork Forms builder · @zoworkhq/forms 0.28.0 or later." */
+/** "Applies to: Zowork Forms builder · @zoworkhq/forms 0.28.1 or later." */
 export function appliesToText(appliesTo: readonly string[], version: string): string {
   const parts = [
     ...(appliesTo.includes("builder") ? ["Zowork Forms builder"] : []),

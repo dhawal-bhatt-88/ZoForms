@@ -106,8 +106,8 @@ export function ScoresPanel({
             </ul>
           ) : (
             <p className="mt-1.5">
-              No questions this group can score yet. Add number, scale, rating, choice, dropdown, checkbox,
-              multiselect or matrix questions to it.
+              No questions this group can score yet. Add number, scale, rating, choice, dropdown, checkbox or
+              matrix questions to it.
             </p>
           )}
         </details>

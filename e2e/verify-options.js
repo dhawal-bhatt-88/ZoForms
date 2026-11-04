@@ -203,8 +203,9 @@ const file = (name, text) => ({ name, mimeType: name.endsWith(".csv") ? "text/cs
     check("an unclosed quote refuses the file, naming the line", (await dialog.getByRole("alert").textContent()) === "Line 1: a quoted value is never closed. Check the quotes on that line.");
     await dialog.getByRole("button", { name: "Cancel" }).click();
 
-    // ---------- multi-select: one renamed, one untouched, one HTML ----------
-    await deselect(); await add("Multi-select"); await rename("Languages");
+    // ---------- a second checkbox list: one renamed, one untouched, one HTML ----------
+    // (Multi-select until it left the insert menu; the API checks above still save one.)
+    await deselect(); await add("Checkboxes"); await rename("Languages");
     await label("options", 0).fill("English"); await label("options", 0).press("Tab");
     await label("options", 2).fill(HTML); await label("options", 2).press("Tab");
     check("an untouched placeholder keeps an empty code until Save", JSON.stringify(await codes()) === '["english","","img_srcx_onerroralert1"]', JSON.stringify(await codes()));
@@ -342,7 +343,7 @@ const file = (name, text) => ({ name, mimeType: name.endsWith(".csv") ? "text/cs
     check("artifact: choice", JSON.stringify(byLabel("Diagnosis").options) === JSON.stringify([o("F32.0", "Depression"), o("anxiety", "Anxiety"), o("F32.1", "Major depressive disorder"), o("F41.1", "Generalised anxiety")]));
     check("artifact: checkbox", JSON.stringify(byLabel("Symptoms").options) === JSON.stringify(opts("Low mood", "Poor sleep").concat([o("si", "Sí")])));
     check("artifact: dropdown", JSON.stringify(byLabel("Clinic").options.map((x) => x.code)) === '["LDN-01","MAN-02","the_old_surgery","BHM-03"]' && byLabel("Clinic").options[2].label === 'The "Old" Surgery');
-    check("artifact: multiselect, the placeholder filled at save, the HTML label as data", JSON.stringify(byLabel("Languages").options) === JSON.stringify([o("english", "English"), o("option_2", "Option 2"), o("img_srcx_onerroralert1", HTML)]));
+    check("artifact: a second checkbox list, the placeholder filled at save, the HTML label as data", byLabel("Languages").type === "checkbox" && JSON.stringify(byLabel("Languages").options) === JSON.stringify([o("english", "English"), o("option_2", "Option 2"), o("img_srcx_onerroralert1", HTML)]));
     check("artifact: ranking with completeRequired", JSON.stringify(byLabel("Priorities").options) === JSON.stringify(opts("Cost", "Speed", "Quality")) && byLabel("Priorities").completeRequired === true && byLabel("Priorities").required === false);
     check("artifact: matrix rows, columns and completeRequired", JSON.stringify([byLabel("Sleep").options, byLabel("Sleep").columns]) === JSON.stringify([opts("Weekdays", "Weekends"), opts("Never", "Sometimes", "Always")]) && byLabel("Sleep").completeRequired === true);
     check("artifact: condition answers are codes", JSON.stringify(noIds(byLabel("Follow-up").enableWhen)) === JSON.stringify([{ question: ids.dx, operator: "=", answer: "F32.0" }])

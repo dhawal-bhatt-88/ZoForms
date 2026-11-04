@@ -1,5 +1,5 @@
 {
-  "package": "@zoworkhq/forms 0.28.0",
+  "package": "@zoworkhq/forms 0.28.1",
   "types": [
     {
       "name": "ClearDraftsError",
@@ -52,7 +52,7 @@
       "name": "clearDrafts",
       "file": "react/index.d.ts",
       "text": "function clearDrafts(options?: ClearDraftsOptions): Promise<void>;",
-      "doc": "For the host to call, e.g. on logout (drafts contract sections 3 and 8). - `{ owner }`: every device draft and tab entry recorded with that owner, whatever the scope or form. Drafts saved without an owner are not touched. - `{ scope }`: every device draft and tab entry for that scope. - no options: every device draft on this device (the whole database) and every tab entry the package wrote in this tab, scoped or not. Both `scope` and `owner` at once is refused with a TypeError: it could mean either their union or their overlap, and a wrong guess deletes drafts. Server drafts are never touched: deleting those is the host's decision. It clears storage, not a form on screen: a form still mounted writes its answers again at its next save, so call it once the form has unmounted. Works without Web Crypto: the hashes fall back to the package's own SHA-256. Where IndexedDB or sessionStorage doesn't exist, nothing was stored there. Rejects with ClearDraftsError when a delete fails, after trying both storages; never resolves without having cleared.",
+      "doc": "For the host to call, e.g. on logout (drafts contract sections 3 and 8). - `{ owner }`: every device draft and tab entry recorded with that owner, whatever the scope or form. Drafts saved without an owner are not touched. - `{ scope }`: every device draft and tab entry for that scope. - no options: every device draft on this device (the whole database) and every tab entry the package wrote in this tab, scoped or not. Both `scope` and `owner` at once, or options that are not an object: the returned promise rejects with a TypeError (nothing is thrown synchronously). Both at once could mean either their union or their overlap, and a wrong guess deletes drafts. Server drafts are never touched: deleting those is the host's decision. It clears storage, not a form on screen: a form still mounted writes its answers again at its next save, so call it once the form has unmounted. Works without Web Crypto: the hashes fall back to the package's own SHA-256. Where IndexedDB or sessionStorage doesn't exist, nothing was stored there. Rejects with ClearDraftsError when a delete fails, after trying both storages; never resolves without having cleared.",
       "members": []
     }
   ]

@@ -22,6 +22,8 @@ const { ROOT, OUT, launchBrowser } = require("./_setup");
 const WEB = path.join(ROOT, "apps/web");
 const DOCS = path.join(WEB, "content/docs");
 const DIR = path.join(OUT, "dev-docs");
+// The package the web app installs: "file:../../vendor/zoworkhq-forms-<version>.tgz".
+const TARBALL = path.resolve(WEB, JSON.parse(fs.readFileSync(path.join(WEB, "package.json"), "utf8")).dependencies["@zoworkhq/forms"].replace(/^file:/, ""));
 fs.mkdirSync(DIR, { recursive: true });
 
 const results = [];
@@ -78,7 +80,7 @@ async function quickstart(tmp, browser) {
   run("npm create vite@latest intake-app -- --template react", tmp);
   const app = path.join(tmp, "intake-app");
   run("npm install --no-audit --no-fund", app);
-  run(`npm install --no-audit --no-fund "${path.join(ROOT, "vendor/zoworkhq-forms-0.28.0.tgz")}"`, app);
+  run(`npm install --no-audit --no-fund "${TARBALL}"`, app);
   // Linked from the workspace: the check's network use stops at Vite and React.
   fs.symlinkSync(fs.realpathSync(path.join(WEB, "node_modules/express")), path.join(app, "node_modules/express"), "junction");
 
@@ -576,7 +578,7 @@ async function nextjsIn(tmp, browser) {
   fs.writeFileSync(path.join(app, "package.json"), JSON.stringify({ name: "intake-next", private: true, scripts: { dev: "next dev", build: "next build", start: "next start" } }, null, 2));
 
   // Step 1, then the rest of the app linked from the workspace.
-  run(`npm install --offline --legacy-peer-deps --no-audit --no-fund "${path.join(ROOT, "vendor/zoworkhq-forms-0.28.0.tgz")}"`, app);
+  run(`npm install --offline --legacy-peer-deps --no-audit --no-fund "${TARBALL}"`, app);
   for (const name of ["next", "react", "react-dom", "typescript", "@types/react", "@types/react-dom", "@types/node"]) {
     fs.symlinkSync(fs.realpathSync(path.join(WEB, "node_modules", name)), path.join(app, "node_modules", name), "junction");
   }

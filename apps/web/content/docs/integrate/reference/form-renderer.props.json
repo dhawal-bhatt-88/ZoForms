@@ -1,5 +1,5 @@
 {
-  "package": "@zoworkhq/forms 0.28.0",
+  "package": "@zoworkhq/forms 0.28.1",
   "source": "dist/react/index.d.ts (interface FormRendererProps) and dist/react/index.js (defaults)",
   "props": [
     {
@@ -70,7 +70,7 @@
       "type": "string",
       "required": false,
       "default": null,
-      "doc": "Where the host serves its own files, for image blocks whose source is a root-relative path (contract section 9). A host served under a sub-path passes it — e.g. Vite's `import.meta.env.BASE_URL` — so \"/images/a.png\" loads from \"/app/images/a.png\". Unset, such paths load from the page's origin. `https://` sources ignore it."
+      "doc": "Where the host serves its own files, for image, video, captions and audio files whose source is a root-relative path (contract sections 9–11). A host served under a sub-path passes it — e.g. Vite's `import.meta.env.BASE_URL` — so \"/images/a.png\" loads from \"/app/images/a.png\". Unset, such paths load from the page's origin. `https://` sources ignore it."
     },
     {
       "name": "validators",
@@ -84,7 +84,7 @@
       "type": "(error: unknown, info: { componentStack?: string; }) => void",
       "required": false,
       "default": null,
-      "doc": "The form could not be shown (contract section 7): a schema or a setting the renderer refuses — the checks that used to throw at mount — or any other error while rendering it. In its place the respondent sees \"This form can't be shown right now. Please try again later.\" and the host's own page stays up. Called once per failure, however often the host re-renders. The form tries again when `schema` or `endpoint` changes; a form refused for its `validators`, which are often written inline and so new on every render, tries again when it gets a new React `key`."
+      "doc": "The form could not be shown (contract section 7). In its place the respondent sees \"This form can't be shown right now. Please try again later.\" and the rest of the host's page renders as usual. - A schema or a setting the renderer refuses (the schema's checks, a blank formId or formVersionId, `endpoint`, `validators`) is caught while the form renders, so the message is rendered on the server too. `info` is then `{}`. - Any other error while rendering is caught in the browser, with `info.componentStack`. On the server React has no error boundaries. Called in the browser only, once per failure however often the host re-renders. Each failure is also logged with console.error, and on the server once per render. The form is shown again as soon as `schema`, `endpoint` and `validators` all pass."
     }
   ]
 }

@@ -3239,6 +3239,13 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
               <h2 id={SETTINGS_PANE_HEADING_ID} className="eyebrow mb-3 text-graphite-soft">
                 {inspectorHeading(selected)}
               </h2>
+              {/* No longer in the insert menu (block-catalog.ts); a form that has one keeps it. */}
+              {selected.type === "multiselect" && (
+                <p data-not-offered className="-mt-1 mb-3 text-[0.75rem] text-graphite">
+                  Multi-select is no longer offered. This question still works for respondents, the same as Checkboxes. For
+                  new questions, use Checkboxes.
+                </p>
+              )}
               {/* Title and Label blocks have one field, Text, below: their label follows it. */}
               {!TEXT_ONLY_TYPES.includes(selected.type) && (
                 <Field

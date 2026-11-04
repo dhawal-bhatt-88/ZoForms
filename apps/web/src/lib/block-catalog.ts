@@ -17,9 +17,11 @@ export type CatalogItem = {
 export type CatalogGroup = { group: string; items: CatalogItem[] };
 
 /**
- * The slash-menu block catalog, grouped by category. Hidden field isn't
- * offered: the renderer neither shows it nor collects or submits a value yet.
- * Blocks of that type already in a form still open, save and delete.
+ * The slash-menu block catalog, grouped by category. Two types aren't offered:
+ * Hidden field, which the renderer neither shows nor collects or submits a
+ * value for yet, and Multi-select, which does what Checkboxes does (no longer
+ * offered from 4 Nov 2026). Blocks of either type already in a form still
+ * open, save and delete, and a Multi-select still renders and submits.
  */
 export const CATALOG: CatalogGroup[] = [
   {
@@ -37,7 +39,6 @@ export const CATALOG: CatalogGroup[] = [
       { type: "choice", keywords: "multiple radio" },
       { type: "checkbox" },
       { type: "dropdown", keywords: "select" },
-      { type: "multiselect", keywords: "tags multiple" },
       { type: "number" },
       { type: "email" },
       { type: "phone", keywords: "mobile" },

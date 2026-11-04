@@ -20,6 +20,7 @@ const validators = EXAMPLE_VALIDATORS["own-validator"] as FieldValidator[];
 const submit = (answers: Record<string, string | undefined>) => {
   const body = {
     idempotencyKey: "demo-key-1",
+    formVersionId: schema.formVersionId,
     submittedAt: "2026-11-03T09:15:00.000Z",
     answers: Object.fromEntries(Object.entries(answers).map(([id, value]) => [id, value === undefined ? { state: "empty" } : { state: "answered", value }])),
   };

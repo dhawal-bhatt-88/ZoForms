@@ -1,5 +1,5 @@
 {
-  "package": "@zoworkhq/forms 0.28.0",
+  "package": "@zoworkhq/forms 0.28.1",
   "types": [
     {
       "name": "AnswerValue",

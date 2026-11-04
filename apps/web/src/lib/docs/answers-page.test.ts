@@ -70,6 +70,7 @@ describe("the rules on the answers page", () => {
     const id = firstQuestion(short.blocks)!.id;
     const result = prepareSubmission(short, {
       idempotencyKey: "demo-key-1",
+      formVersionId: short.formVersionId,
       submittedAt: "2026-10-30T09:15:00.000Z",
       answers: { [id]: { state: "empty", value: "left over", note: "extra" } },
     });

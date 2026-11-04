@@ -155,7 +155,7 @@ describe("the errors on the prepareSubmission page", () => {
     ranking: answered(["a", "b"]),
     grid: answered({ r1: { c1: "a" } }),
   };
-  const when = { idempotencyKey: "k", submittedAt: "2026-10-30T09:15:00.000Z" };
+  const when = { idempotencyKey: "k", formVersionId: "v", submittedAt: "2026-10-30T09:15:00.000Z" };
   const run = (answers: Record<string, unknown>) => prepareSubmission(form, { ...when, answers: { ...complete, ...answers } });
   const messages = (result: ReturnType<typeof run>) => (result.ok ? [] : result.errors.map((e) => e.message));
 
@@ -204,8 +204,13 @@ describe("the errors on the prepareSubmission page", () => {
       const result = prepareSubmission(form, body);
       return result.ok ? [] : result.errors;
     };
-    const shown = [...of(null), ...of({ submittedAt: when.submittedAt, answers: complete }), ...of({ idempotencyKey: "k", answers: complete })];
-    expect(shown.map((e) => [e.blockId, e.path])).toEqual([["", []], ["", []], ["", []]]);
+    const shown = [
+      ...of(null),
+      ...of({ ...when, idempotencyKey: undefined, answers: complete }),
+      ...of({ ...when, submittedAt: undefined, answers: complete }),
+      ...of({ ...when, formVersionId: undefined, answers: complete }),
+    ];
+    expect(shown.map((e) => [e.blockId, e.path])).toEqual([["", []], ["", []], ["", []], ["", []]]);
     for (const error of shown) expect(page.body).toContain(`\`${error.message}\``);
   });
 
@@ -240,8 +245,15 @@ describe("the errors on the prepareSubmission page", () => {
   it("says what it says about the stored version", () => {
     const form2 = { ...form, formVersionId: "new" } as FormSchema;
     const result = prepareSubmission(form2, { ...when, formId: "f", formVersionId: "old", answers: complete });
-    expect(result).toMatchObject({ ok: true, versionMismatch: true, submission: { formVersionId: "new" } });
-    expect(prepareSubmission(form, { ...when, answers: complete })).toMatchObject({ ok: true, versionMismatch: true });
+    expect(result).toMatchObject({ ok: true, versionMismatch: true, submission: { formVersionId: "new", answeredFormVersionId: "old" } });
+    // A body without a formId is still accepted, as another version; one without a formVersionId isn't.
+    expect(prepareSubmission(form, { ...when, answers: complete })).toMatchObject({ ok: true, versionMismatch: true, submission: { answeredFormVersionId: "v" } });
+    for (const formVersionId of [undefined, "", "  ", 3, "x".repeat(257)]) {
+      expect(prepareSubmission(form, { ...when, formId: "f", formVersionId, answers: complete }), String(formVersionId)).toMatchObject({ ok: false });
+    }
+    // The schema's own version is accepted whatever its length.
+    const long = { ...form, formVersionId: "x".repeat(300) } as FormSchema;
+    expect(prepareSubmission(long, { ...when, formId: "f", formVersionId: long.formVersionId, answers: complete })).toMatchObject({ ok: true, versionMismatch: false });
   });
 });
 

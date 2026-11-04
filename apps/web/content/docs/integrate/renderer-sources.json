@@ -1,6 +1,6 @@
 {
-  "package": "@zoworkhq/forms 0.28.0",
-  "readme": "0ed12d53546955803a82a9a45f401c381df3b8c2a5a46b1d1ee7ed6f0bf3081f",
-  "groupsAndPagesContract": "efe27e5e96e3299fec78ab79b8a1837411dd5f6aee38d3ed210d47c75e3bcbda",
-  "draftsContract": "9b7b378840207a3bec1cf191a052d8797c44f3b93866aeae5135406317da2ff3"
+  "package": "@zoworkhq/forms 0.28.1",
+  "readme": "c37b212e4d04fe7bc5f0c94386e1a0195c3d371834621546ed814f2719fc49b1",
+  "groupsAndPagesContract": "a7a48db098499eb17502e510de6b78a612911928b35d74ef7b3e5c4508a9329a",
+  "draftsContract": "a7964ebf287e7537f1af0aa00910e9d0a75922aeedeff58ff93f9122ce476a9c"
 }

@@ -88,10 +88,13 @@ A failed result is `{ ok: false, errors }`, and has no scores.
 From the form file you passed, never from the body.
 </Field>
 <Field name="formVersionId">
-From the form file you passed, never from the body, even when `versionMismatch` is `true`. A stored submission doesn't say which version the respondent filled in. [TODO: changing in 0.28.1]
+From the form file you passed, never from the body, even when `versionMismatch` is `true`. The version the respondent filled in is `answeredFormVersionId`.
 </Field>
 <Field name="schemaVersion">
 From the form file, or `1` when it has none.
+</Field>
+<Field name="answeredFormVersionId">
+The body's `formVersionId`, exactly as sent: the version the respondent filled in. Always there. It differs from `formVersionId` only when `versionMismatch` is `true`.
 </Field>
 <Field name="idempotencyKey">
 From the body, checked. Dedupe on it: store each key once, and answer a repeat with a 2xx.
@@ -157,6 +160,7 @@ Each of these has `blockId: ""` and `path: []`, and comes before any error in th
 | The body isn't an object with an `answers` object | `Invalid submission: the body must be an object with an "answers" object.` |
 | `idempotencyKey` is missing or isn't 1–128 characters of A–Z, a–z, 0–9, `-` and `_` | `Invalid submission: idempotencyKey must be 1–128 characters of A–Z, a–z, 0–9, "-" and "_".` |
 | `submittedAt` is missing or isn't a real ISO-8601 UTC time | `Invalid submission: submittedAt must be an ISO-8601 UTC time such as "2026-10-30T09:15:00.000Z".` |
+| `formVersionId` is missing, blank, or isn't text of 1–256 characters (your file's own is accepted whatever its length) | `Invalid submission: formVersionId must be the version of the form that was filled in: text of 1–256 characters, not blank.` |
 
 ### Returned: the answers
 

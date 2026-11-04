@@ -1,5 +1,5 @@
 {
-  "package": "@zoworkhq/forms 0.28.0",
+  "package": "@zoworkhq/forms 0.28.1",
   "types": [
     {
       "name": "Block",
@@ -200,7 +200,7 @@
           "name": "maxOccurs",
           "type": "number",
           "required": false,
-          "doc": "Whole number ≥ 1 and ≥ minOccurs. Absent means no limit."
+          "doc": "Whole number ≥ 1 and ≥ minOccurs. Absent means at most 1,000 (DEFAULT_MAX_OCCURS)."
         },
         {
           "name": "scores",
@@ -220,7 +220,7 @@
       "name": "LeafBlock",
       "file": "types.d.ts",
       "text": "interface LeafBlock {\n    id: string;\n    type: string;\n    label: string;\n    description?: string;\n    content?: string;\n    captions?: string;\n    required?: boolean;\n    completeRequired?: boolean;\n    placeholder?: string;\n    min?: number;\n    max?: number;\n    level?: number;\n    options?: Option[];\n    columns?: Option[];\n    enableWhen?: EnableWhenCondition[];\n    enableBehavior?: 'all' | 'any';\n    enableLogic?: LogicNode;\n}",
-      "doc": "Anything in the tree that is not a container: every question and every presentational block. `type` is a plain string — the registry (not this type) determines whether a given type is actually renderable; an unknown type is a runtime concern (FormRenderer throws), not something enforced at the type level.",
+      "doc": "Anything in the tree that is not a container: every question and every presentational block. `type` is a plain string — the registry (not this type) determines whether a given type is actually renderable. An unknown type is refused at runtime, not at the type level: the integrity check throws in /core, and FormRenderer shows its \"This form can't be shown\" message and calls onRenderError (contract section 7).",
       "members": [
         {
           "name": "id",

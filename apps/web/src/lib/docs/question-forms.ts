@@ -38,7 +38,7 @@ export const firstQuestion = (blocks: readonly Block[]): Block | undefined => {
 export function stores(schema: FormSchema, value: unknown, { id = firstQuestion(schema.blocks)!.id, validators }: { id?: string; validators?: FieldValidator[] } = {}) {
   const result = prepareSubmission(
     schema,
-    { idempotencyKey: "demo-key-1", submittedAt: "2026-10-30T09:15:00.000Z", answers: { [id]: { state: "answered", value } } },
+    { idempotencyKey: "demo-key-1", formVersionId: schema.formVersionId, submittedAt: "2026-10-30T09:15:00.000Z", answers: { [id]: { state: "answered", value } } },
     validators ? { validators } : undefined,
   );
   if (result.ok === false) return { errors: result.errors.map((e) => e.message) };
