@@ -22,6 +22,8 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, "../../..");
 const API = process.env.E2E_API_URL || "http://localhost:4000";
 const CONTENT = path.join(HERE, "../content/docs");
+/** The home page's "See it working" forms: an entry with `home: true` is written here instead. */
+const HOME_CONTENT = path.join(HERE, "../content/home");
 
 const apiRequire = createRequire(path.join(ROOT, "apps/api/package.json"));
 apiRequire("dotenv").config({ path: path.join(ROOT, "apps/api/.env") });
@@ -29,6 +31,9 @@ const { PrismaClient } = apiRequire("@prisma/client");
 
 /** Options with empty codes: the builder generates each from its label at save (contract §13.3). */
 const options = (...labels) => labels.map((label) => ({ code: "", label }));
+/** The same, each option scored by its place: 0, 1, 2 … */
+const scoredOptions = (...labels) => labels.map((label, score) => ({ code: "", label, score }));
+const HOW_OFTEN = ["Not at all", "A few days", "Most days", "Nearly every day"];
 
 const FORMS = [
   {
@@ -426,6 +431,67 @@ const FORMS = [
   },
 ];
 
+// The home page's examples (docs/briefs/BUILDER-BRIEF-REVIEW-FIXES-NOV.md, item 5).
+FORMS.push(
+  // Invented everyday questions, scored to show scoring: not any validated instrument's wording.
+  {
+    file: "check-in.form.json",
+    home: true,
+    title: "Weekly check-in (example)",
+    description: "An invented example to show scoring. It isn't a clinical tool.",
+    blocks: [
+      {
+        id: "check_in",
+        type: "group",
+        label: "Over the past week, how often did you…",
+        scores: [
+          { label: "Check-in total", formulaText: "meals + bedtime + rushed + tasks + company", unanswered: "no-score", showToRespondent: true },
+        ],
+        blocks: [
+          { id: "skipped_meal", name: "meals", type: "choice", label: "Skip a meal?", required: true, options: scoredOptions(...HOW_OFTEN) },
+          { id: "late_bedtime", name: "bedtime", type: "choice", label: "Go to bed later than you planned?", required: true, options: scoredOptions(...HOW_OFTEN) },
+          { id: "felt_rushed", name: "rushed", type: "choice", label: "Feel rushed during the day?", required: true, options: scoredOptions(...HOW_OFTEN) },
+          { id: "put_off_task", name: "tasks", type: "choice", label: "Put off a task you meant to do?", required: true, options: scoredOptions(...HOW_OFTEN) },
+          {
+            id: "less_time_with_others",
+            name: "company",
+            type: "choice",
+            label: "Have less time with friends or family than you wanted?",
+            required: true,
+            options: scoredOptions(...HOW_OFTEN),
+          },
+        ],
+      },
+    ],
+  },
+  {
+    file: "medications.form.json",
+    home: true,
+    title: "Current medications",
+    blocks: [
+      {
+        id: "medications",
+        type: "group",
+        label: "Current medications",
+        repeats: true,
+        repeatLabel: "medication",
+        minOccurs: 1,
+        maxOccurs: 10,
+        blocks: [
+          { id: "medication_name", type: "short", label: "Medication name", required: true },
+          {
+            id: "medication_frequency",
+            type: "choice",
+            label: "How often",
+            required: true,
+            options: options("Once a day", "Twice a day", "More than twice a day", "Only when needed"),
+          },
+        ],
+      },
+    ],
+  },
+);
+
 // Only the files named on the command line, if any, so building a new example
 // leaves the others' files (and their form ids) as they are.
 const wanted = process.argv.slice(2);
@@ -460,8 +526,9 @@ try {
       ...(form.drafts ? { drafts: form.drafts } : {}),
     });
     const artifact = await call("GET", `/v1/forms/${id}/artifact`, token);
-    fs.writeFileSync(path.join(CONTENT, form.file), artifact);
-    console.log(`wrote content/docs/${form.file}`);
+    fs.mkdirSync(form.home ? HOME_CONTENT : CONTENT, { recursive: true });
+    fs.writeFileSync(path.join(form.home ? HOME_CONTENT : CONTENT, form.file), artifact);
+    console.log(`wrote content/${form.home ? "home" : "docs"}/${form.file}`);
   }
 } finally {
   // The account's organization (and with it the forms), then the account.

@@ -1,9 +1,14 @@
+import path from "node:path";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Calculator, FileStack, GitBranch, Layers, ListChecks, Save, Tags } from "lucide-react";
+import { ArrowRight, Calculator, FileStack, GitBranch, Layers, ListChecks, Lock, Package, Save, Tags } from "lucide-react";
+import type { FormSchema } from "@zoworkhq/zoforms/core";
 import { HeroVisual } from "@/components/home/hero-visual";
+import { SeeItWorking, type HomeExample } from "@/components/home/see-it-working";
 import { SignedInRedirect } from "@/components/signed-in-redirect";
 import { buttonClasses } from "@/components/ui";
+import { readExampleForm, readJson } from "@/lib/docs/content";
+import { rendererStyles } from "@/lib/docs/renderer";
 
 const TITLE = "ZoForms: clinical forms that run in your app";
 const DESCRIPTION =
@@ -27,6 +32,60 @@ export const metadata: Metadata = {
  * numbers, logos or quotes; every capability named is in the builder and the
  * renderer today. Check a new claim against the contracts in docs/ first.
  */
+
+/** Why ZoForms, right after the hero: each card links to the docs page that shows it. */
+const USPS = [
+  {
+    Icon: Calculator,
+    title: "Clinical scoring built in",
+    body: "Give options scores and add formulas to groups, several to a group if you need them. Show the results after submit when the author allows it. The browser never sends scores: your server works them out again.",
+    link: { label: "Read scores", href: "/docs/integrate/scores" },
+  },
+  {
+    Icon: GitBranch,
+    title: "Logic for real clinical forms",
+    body: "Show or hide questions with AND and OR logic. Nest groups and repeat them, split a form into pages with a review step, and let people save drafts.",
+    link: { label: "Show a question only when it applies", href: "/docs/build/show-questions-conditionally" },
+  },
+  {
+    Icon: Lock,
+    title: "Answers never touch our servers",
+    body: "The form in your app posts straight to your own endpoint. ZoForms never receives or stores answers.",
+    link: { label: "Where respondents’ data goes", href: "/docs/compliance/data-flow" },
+  },
+  {
+    Icon: Package,
+    title: "Developer-friendly package",
+    body: "One npm package. The same validation and scoring from its /core runs in the browser and on your Node server. Add your own validators, and theme it with --zf-* custom properties.",
+    link: { label: "Quickstart", href: "/docs/integrate/quickstart" },
+  },
+];
+
+/** "See it working": real builder downloads, rendered by the real package. */
+const HOME_FORMS = path.join(process.cwd(), "content", "home");
+function homeExamples(): HomeExample[] {
+  const home = (file: string) => readJson(path.join(HOME_FORMS, file)) as unknown as FormSchema;
+  return [
+    {
+      name: "check-in",
+      title: "Scored check-in",
+      body: "Five invented questions, each option scored from 0 to 3, and a group total the form shows after you submit. An example of scoring, not a clinical tool.",
+      schema: home("check-in.form.json"),
+    },
+    {
+      name: "follow-up-question",
+      title: "Follow-up question",
+      body: "Answer Yes and a required follow-up question appears. Answer No and it goes, and its answer is left out of what is sent.",
+      schema: readExampleForm("examples/follow-up-question", "follow-up-question").schema as unknown as FormSchema,
+    },
+    {
+      name: "medications",
+      title: "Repeating group",
+      body: "Add an entry for each medication, with its name and how often it is taken, and remove any you don’t need.",
+      schema: home("medications.form.json"),
+    },
+  ];
+}
 
 const STEPS = [
   { title: "Build the form", body: "Add questions, groups, pages, logic and scores in the editor." },
@@ -138,6 +197,27 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section aria-labelledby="why-title" className="border-t border-rule">
+        <div className={`${SECTION} py-16 sm:py-20`}>
+          <h2 id="why-title" className="display-sm">
+            Why ZoForms
+          </h2>
+          <ul className="mt-8 grid gap-4 sm:grid-cols-2">
+            {USPS.map(({ Icon, title, body, link }) => (
+              <li key={title} className="surface flex flex-col p-5">
+                <Icon aria-hidden="true" className="h-4 w-4 text-brand-deep" strokeWidth={2} />
+                <h3 className="mt-3 font-semibold">{title}</h3>
+                <p className="body-sm mt-1.5 flex-1 text-graphite">{body}</p>
+                <Link href={link.href} className="link mt-4 inline-flex items-center gap-1.5 self-start text-[0.8125rem] font-medium">
+                  {link.label}
+                  <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
       <section aria-labelledby="how-title" className="border-t border-rule">
         <div className={`${SECTION} py-16 sm:py-20`}>
           <h2 id="how-title" className="display-sm">
@@ -154,6 +234,19 @@ export default function HomePage() {
               </li>
             ))}
           </ol>
+        </div>
+      </section>
+
+      <section aria-labelledby="examples-title" className="border-t border-rule">
+        <div className={`${SECTION} py-16 sm:py-20`}>
+          <h2 id="examples-title" className="display-sm">
+            See it working
+          </h2>
+          <p className="lede mt-3 max-w-[60ch]">
+            Three forms built in ZoForms and rendered here by the real package. Submitting runs in your browser only:
+            nothing is sent anywhere.
+          </p>
+          <SeeItWorking css={rendererStyles()} examples={homeExamples()} />
         </div>
       </section>
 

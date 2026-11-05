@@ -257,7 +257,16 @@ const structure = [];
       // The public home page: no session, and navigation of its own.
       await P.goto(WEB + "/");
       await P.locator("h1").first().waitFor({ timeout: 60000 });
+      // "See it working" loads its three live examples after the page paints; axe scans their shadow roots.
+      await P.locator(".zf-form").nth(2).waitFor({ timeout: 60000 });
       await audit(P, "Public", "home", theme, { nav: true });
+      // The scored check-in submitted: its total under the success message, and Server output open.
+      const checkIn = P.locator("[data-docs-example=check-in]");
+      for (const radio of await checkIn.getByRole("radio", { name: "Most days" }).all()) await radio.check();
+      await checkIn.getByRole("button", { name: "Submit" }).click();
+      await checkIn.locator(".zf-scores").waitFor({ timeout: 15000 });
+      await P.getByRole("tablist", { name: "Example: Scored check-in" }).getByRole("tab", { name: "Server output" }).click();
+      await audit(P, "Public", "home: the check-in submitted, Server output open", theme, { nav: true });
       const auth = [
         ["sign-in", "/login"],
         ["sign-up", "/signup"],

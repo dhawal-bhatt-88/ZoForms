@@ -10,7 +10,7 @@ import { readJson } from "./content";
 
 const PACKAGE_DIR = path.join(process.cwd(), "node_modules", "@zoworkhq", "zoforms");
 
-/** The installed version, e.g. "0.28.1": shown in the docs' top bar. */
+/** The installed version, e.g. "0.29.0": shown in the docs' top bar. */
 export function rendererVersion(): string {
   return (readJson(path.join(PACKAGE_DIR, "package.json")) as { version: string }).version;
 }

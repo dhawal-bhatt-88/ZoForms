@@ -1,0 +1,199 @@
+{
+  "title": "Weekly check-in (example)",
+  "formId": "03c760b0-0002-4167-a019-773b2ba83346",
+  "formVersionId": "27ed92bf-42e5-45eb-ae24-1c9532cdc25b",
+  "schemaVersion": 2,
+  "description": "An invented example to show scoring. It isn't a clinical tool.",
+  "blocks": [
+    {
+      "id": "check_in",
+      "type": "group",
+      "label": "Over the past week, how often did you…",
+      "scores": [
+        {
+          "id": "s_prldeb4h",
+          "label": "Check-in total",
+          "formula": {
+            "op": "+",
+            "args": [
+              {
+                "op": "+",
+                "args": [
+                  {
+                    "op": "+",
+                    "args": [
+                      {
+                        "op": "+",
+                        "args": [
+                          {
+                            "ref": "skipped_meal"
+                          },
+                          {
+                            "ref": "late_bedtime"
+                          }
+                        ]
+                      },
+                      {
+                        "ref": "felt_rushed"
+                      }
+                    ]
+                  },
+                  {
+                    "ref": "put_off_task"
+                  }
+                ]
+              },
+              {
+                "ref": "less_time_with_others"
+              }
+            ]
+          },
+          "unanswered": "no-score",
+          "showToRespondent": true
+        }
+      ],
+      "blocks": [
+        {
+          "id": "skipped_meal",
+          "type": "choice",
+          "label": "Skip a meal?",
+          "required": true,
+          "options": [
+            {
+              "code": "not_at_all",
+              "label": "Not at all",
+              "score": 0
+            },
+            {
+              "code": "a_few_days",
+              "label": "A few days",
+              "score": 1
+            },
+            {
+              "code": "most_days",
+              "label": "Most days",
+              "score": 2
+            },
+            {
+              "code": "nearly_every_day",
+              "label": "Nearly every day",
+              "score": 3
+            }
+          ]
+        },
+        {
+          "id": "late_bedtime",
+          "type": "choice",
+          "label": "Go to bed later than you planned?",
+          "required": true,
+          "options": [
+            {
+              "code": "not_at_all",
+              "label": "Not at all",
+              "score": 0
+            },
+            {
+              "code": "a_few_days",
+              "label": "A few days",
+              "score": 1
+            },
+            {
+              "code": "most_days",
+              "label": "Most days",
+              "score": 2
+            },
+            {
+              "code": "nearly_every_day",
+              "label": "Nearly every day",
+              "score": 3
+            }
+          ]
+        },
+        {
+          "id": "felt_rushed",
+          "type": "choice",
+          "label": "Feel rushed during the day?",
+          "required": true,
+          "options": [
+            {
+              "code": "not_at_all",
+              "label": "Not at all",
+              "score": 0
+            },
+            {
+              "code": "a_few_days",
+              "label": "A few days",
+              "score": 1
+            },
+            {
+              "code": "most_days",
+              "label": "Most days",
+              "score": 2
+            },
+            {
+              "code": "nearly_every_day",
+              "label": "Nearly every day",
+              "score": 3
+            }
+          ]
+        },
+        {
+          "id": "put_off_task",
+          "type": "choice",
+          "label": "Put off a task you meant to do?",
+          "required": true,
+          "options": [
+            {
+              "code": "not_at_all",
+              "label": "Not at all",
+              "score": 0
+            },
+            {
+              "code": "a_few_days",
+              "label": "A few days",
+              "score": 1
+            },
+            {
+              "code": "most_days",
+              "label": "Most days",
+              "score": 2
+            },
+            {
+              "code": "nearly_every_day",
+              "label": "Nearly every day",
+              "score": 3
+            }
+          ]
+        },
+        {
+          "id": "less_time_with_others",
+          "type": "choice",
+          "label": "Have less time with friends or family than you wanted?",
+          "required": true,
+          "options": [
+            {
+              "code": "not_at_all",
+              "label": "Not at all",
+              "score": 0
+            },
+            {
+              "code": "a_few_days",
+              "label": "A few days",
+              "score": 1
+            },
+            {
+              "code": "most_days",
+              "label": "Most days",
+              "score": 2
+            },
+            {
+              "code": "nearly_every_day",
+              "label": "Nearly every day",
+              "score": 3
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

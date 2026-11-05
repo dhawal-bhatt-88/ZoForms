@@ -35,8 +35,17 @@ test.describe("home page", () => {
   test("the sections, in order", async ({ page }) => {
     await page.goto("/");
 
-    expect(await page.locator("main h2").allInnerTexts()).toEqual([
+    // Each section's own heading; the live examples' forms have headings of their own, in shadow roots.
+    const headings = await page.evaluate(() =>
+      [...document.querySelectorAll("main section[aria-labelledby]")]
+        .map((s) => document.getElementById(s.getAttribute("aria-labelledby")!)!)
+        .filter((h) => h.tagName === "H2")
+        .map((h) => h.textContent),
+    );
+    expect(headings).toEqual([
+      "Why ZoForms",
       "How it works",
+      "See it working",
       "Built for clinical forms",
       "Your data stays with you",
       "Accessible forms",
@@ -47,6 +56,95 @@ test.describe("home page", () => {
     const cta = page.getByRole("region", { name: "Build your first form" });
     await expect(cta.getByRole("link", { name: "Get started" })).toHaveAttribute("href", "/signup");
     await expect(cta.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
+  });
+
+  test("Why ZoForms: four cards, in order, each linking to its docs page", async ({ page }) => {
+    await page.goto("/");
+    const why = page.getByRole("region", { name: "Why ZoForms" });
+    expect(await why.getByRole("heading", { level: 3 }).allInnerTexts()).toEqual([
+      "Clinical scoring built in",
+      "Logic for real clinical forms",
+      "Answers never touch our servers",
+      "Developer-friendly package",
+    ]);
+    for (const [name, href] of [
+      ["Read scores", "/docs/integrate/scores"],
+      ["Show a question only when it applies", "/docs/build/show-questions-conditionally"],
+      ["Where respondents’ data goes", "/docs/compliance/data-flow"],
+      ["Quickstart", "/docs/integrate/quickstart"],
+    ]) {
+      await expect(why.getByRole("link", { name })).toHaveAttribute("href", href);
+    }
+  });
+
+  test.describe("See it working", () => {
+    const shimmed = (page: import("@playwright/test").Page) => page.evaluate(() => "__zoworkDocsExampleFetch" in window.fetch);
+
+    test("three live examples, each with Preview and Server output only", async ({ page }) => {
+      await page.goto("/");
+      const section = page.getByRole("region", { name: "See it working" });
+      for (const title of ["Scored check-in", "Follow-up question", "Repeating group"]) {
+        const tabs = section.getByRole("tablist", { name: `Example: ${title}` });
+        // Loaded after the page paints; a fresh dev server compiles the renderer's chunk first.
+        await expect(tabs).toBeVisible({ timeout: 20_000 });
+        expect(await tabs.getByRole("tab").allInnerTexts()).toEqual(["Preview", "Server output"]);
+      }
+      await expect(section.locator(".zf-form")).toHaveCount(3);
+      await expect(section.getByText("An example of scoring, not a clinical tool.")).toBeVisible();
+    });
+
+    test("the check-in shows its total after submit, and Server output comes from prepareSubmission; nothing is sent", async ({ page }) => {
+      const posts: string[] = [];
+      page.on("request", (r) => r.method() === "POST" && posts.push(r.url()));
+      await page.goto("/");
+      const form = page.locator("[data-docs-example=check-in]");
+      await expect(form.locator(".zf-form")).toBeVisible({ timeout: 20_000 });
+      for (const [question, answer] of [
+        ["Skip a meal?", "A few days"],
+        ["Go to bed later than you planned?", "Most days"],
+        ["Feel rushed during the day?", "Nearly every day"],
+        ["Put off a task you meant to do?", "Not at all"],
+        ["Have less time with friends or family than you wanted?", "A few days"],
+      ]) {
+        await form.getByRole("group", { name: question }).getByRole("radio", { name: answer }).check();
+      }
+      await form.getByRole("button", { name: "Submit" }).click();
+      await expect(form.getByText("Form submitted successfully.")).toBeVisible();
+      await expect(form.locator(".zf-scores")).toHaveText("Check-in total: 7");
+
+      await page.getByRole("tablist", { name: "Example: Scored check-in" }).getByRole("tab", { name: "Server output" }).click();
+      const server = JSON.parse((await page.getByRole("region", { name: "prepareSubmission(schema, body)" }).first().textContent()) ?? "");
+      expect(server.ok).toBe(true);
+      expect(server.answers.felt_rushed).toEqual({ state: "answered", value: { code: "nearly_every_day", label: "Nearly every day" } });
+      await expect(page.getByText("Computed in your browser by prepareSubmission").first()).toBeVisible();
+      expect(posts).toEqual([]);
+    });
+
+    test("the repeating group adds and removes entries", async ({ page }) => {
+      await page.goto("/");
+      const form = page.locator("[data-docs-example=medications]");
+      await expect(form.locator(".zf-form")).toBeVisible({ timeout: 20_000 });
+      await expect(form.getByRole("textbox", { name: "Medication name" })).toHaveCount(1);
+      await form.getByRole("button", { name: "Add another medication" }).click();
+      await expect(form.getByRole("textbox", { name: "Medication name" })).toHaveCount(2);
+      await form.getByRole("button", { name: "Remove medication 2" }).click();
+      await expect(form.getByRole("textbox", { name: "Medication name" })).toHaveCount(1);
+    });
+
+    test("the examples load only on the home page, not on the signed-in pages", async ({ page }) => {
+      await page.goto("/");
+      await expect(page.locator(".zf-form")).toHaveCount(3, { timeout: 20_000 });
+      expect(await shimmed(page)).toBe(true);
+
+      await page.addInitScript(() => localStorage.setItem("frame_token", "e2e-token"));
+      // A running API would refuse the stand-in token; without one the app still renders.
+      await page.route("**/v1/**", (route) => route.abort());
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto("/app");
+      await expect(page.getByRole("navigation", { name: "App" })).toBeVisible({ timeout: 20_000 });
+      await expect(page.locator("[data-docs-example]")).toHaveCount(0);
+      expect(await shimmed(page)).toBe(false);
+    });
   });
 
   test("the hero's example: an excerpt, the whole file and the form rendered", async ({ page }) => {
@@ -171,6 +269,8 @@ test.describe("home page accessibility", () => {
         const rendered = page.getByRole("img", { name: /Little interest or pleasure/ });
         await expect(rendered).toHaveCount(1);
         await expect(rendered).toHaveAttribute("src", new RegExp(`phq-2-rendered-${theme}`));
+        // The live examples, which axe scans inside their shadow roots.
+        await expect(page.locator(".zf-form")).toHaveCount(3, { timeout: 20_000 });
         if (width === 375) await page.getByRole("button", { name: "Menu" }).click();
         await page.evaluate(() =>
           Promise.all(

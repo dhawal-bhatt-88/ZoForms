@@ -1,0 +1,49 @@
+{
+  "title": "Current medications",
+  "formId": "891c7407-ee93-4fa7-b770-382f470bc39b",
+  "formVersionId": "c2f02afc-cd1a-460b-b541-1b2241c53937",
+  "schemaVersion": 2,
+  "blocks": [
+    {
+      "id": "medications",
+      "type": "group",
+      "label": "Current medications",
+      "repeats": true,
+      "repeatLabel": "medication",
+      "minOccurs": 1,
+      "maxOccurs": 10,
+      "blocks": [
+        {
+          "id": "medication_name",
+          "type": "short",
+          "label": "Medication name",
+          "required": true
+        },
+        {
+          "id": "medication_frequency",
+          "type": "choice",
+          "label": "How often",
+          "required": true,
+          "options": [
+            {
+              "code": "once_a_day",
+              "label": "Once a day"
+            },
+            {
+              "code": "twice_a_day",
+              "label": "Twice a day"
+            },
+            {
+              "code": "more_than_twice_a_day",
+              "label": "More than twice a day"
+            },
+            {
+              "code": "only_when_needed",
+              "label": "Only when needed"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
