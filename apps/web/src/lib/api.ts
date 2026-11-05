@@ -9,14 +9,19 @@ type User = { id: string; email: string; name: string | null };
 
 /** Also read before paint by HOME_REDIRECT_SCRIPT (lib/home-redirect.ts). */
 export const TOKEN_KEY = "frame_token";
+/** On `<html>` while a token is held: set before paint by HOME_REDIRECT_SCRIPT, and here on signing in and out. */
+export const SIGNED_IN_ATTRIBUTE = "data-signed-in";
 export function getToken() {
   return typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
 }
 function setToken(t: string) {
   localStorage.setItem(TOKEN_KEY, t);
+  document.documentElement.setAttribute(SIGNED_IN_ATTRIBUTE, "");
 }
 export function logout() {
-  if (typeof window !== "undefined") localStorage.removeItem(TOKEN_KEY);
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(TOKEN_KEY);
+  document.documentElement.removeAttribute(SIGNED_IN_ATTRIBUTE);
 }
 
 /** A failed API request. `code` is the API's machine-readable reason, when it sends one. */

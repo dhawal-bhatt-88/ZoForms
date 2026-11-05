@@ -12,8 +12,6 @@ export type DocsFrontmatter = {
   summary: string;
   template: TemplateName;
   badges: string[];
-  /** "builder", "package" or both: shown as "Applies to". */
-  appliesTo: ("builder" | "package")[];
   /** YYYY-MM-DD. */
   updated: string;
   prev: string | null;
@@ -41,14 +39,12 @@ export function parseFrontmatter(raw: string, file: string): { frontmatter: Docs
       ? (data[key] as string | null)
       : fail(`"${key}" must be a /docs URL or null`);
 
-  const known = ["title", "summary", "template", "badges", "appliesTo", "updated", "prev", "next"];
+  const known = ["title", "summary", "template", "badges", "updated", "prev", "next"];
   const extra = Object.keys(data).filter((k) => !known.includes(k));
   if (extra.length) fail(`has unknown keys: ${extra.join(", ")}`);
 
   const template = text("template");
   if (!TEMPLATE_NAMES.includes(template as TemplateName)) fail(`"template" must be one of ${TEMPLATE_NAMES.join(", ")}`);
-  const appliesTo = list("appliesTo");
-  if (!appliesTo.every((a) => a === "builder" || a === "package")) fail(`"appliesTo" may hold only builder and package`);
   const updated = text("updated");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(updated)) fail(`"updated" must be YYYY-MM-DD`);
 
@@ -58,7 +54,6 @@ export function parseFrontmatter(raw: string, file: string): { frontmatter: Docs
       summary: text("summary"),
       template: template as TemplateName,
       badges: list("badges"),
-      appliesTo: appliesTo as DocsFrontmatter["appliesTo"],
       updated,
       prev: link("prev"),
       next: link("next"),

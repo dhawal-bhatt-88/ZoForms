@@ -414,6 +414,11 @@ input:-webkit-autofill:focus {
   }
 }
 
+/* Links for one state of the session only: `data-signed-in` is on <html> while a token is held
+   (lib/home-redirect.ts), set before paint so the wrong one never shows. */
+html[data-signed-in] .signed-out-only,
+html:not([data-signed-in]) .signed-in-only { display: none; }
+
 /* While the editor's settings pane is being resized: the resize cursor everywhere, no text selected,
    and embedded previews (iframes) don't take the pointer. */
 .pane-resizing, .pane-resizing * { cursor: col-resize !important; user-select: none !important; }

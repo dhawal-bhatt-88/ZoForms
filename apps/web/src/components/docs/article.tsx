@@ -12,7 +12,7 @@ import type { MARKDOWN_COMPONENTS } from "@/lib/docs/markdown";
 import { remarkCodeTitles, remarkHeadingIds } from "@/lib/docs/mdast";
 import { markdownFor } from "@/lib/docs/page-markdown";
 import { remarkForDevelopers } from "@/lib/docs/question-values";
-import { rendererStyles, rendererVersion } from "@/lib/docs/renderer";
+import { rendererStyles } from "@/lib/docs/renderer";
 import { TEMPLATES } from "@/lib/docs/templates";
 import { Note, Tip, Warning } from "./callouts";
 import { CodeBlock, MdxPre } from "./code-block";
@@ -145,7 +145,6 @@ function components(page: DocsPage) {
 }
 
 export async function DocsArticle({ page }: { page: DocsPage }) {
-  const version = rendererVersion();
   const markdown = markdownFor(page);
   const { default: Content } = await evaluate(page.body, {
     ...runtime,
@@ -157,7 +156,7 @@ export async function DocsArticle({ page }: { page: DocsPage }) {
   return (
     <div className="min-[1180px]:grid min-[1180px]:grid-cols-[minmax(0,920px)_220px] min-[1180px]:gap-10">
       <article className="min-w-0 max-w-[920px] py-8">
-        <PageHeader slug={page.slug} frontmatter={page.frontmatter} markdown={markdown} version={version} />
+        <PageHeader slug={page.slug} frontmatter={page.frontmatter} markdown={markdown} />
         <div className="body mt-8 text-ink">
           <Content components={components(page) as never} />
         </div>

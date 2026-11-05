@@ -20,8 +20,6 @@ export type MarkdownContext = {
   page: DocsPage;
   /** The site's address, for absolute links. */
   origin: string;
-  /** "0.28.1". */
-  version: string;
   /** An example's form file, by name. */
   exampleForm: (name: string) => Record<string, unknown>;
   /** An API reference page's generated table, when it has one. */
@@ -225,7 +223,7 @@ export function pageMarkdown(ctx: MarkdownContext): string {
   const header: MdNode[] = [
     { type: "heading", depth: 1, children: [text(frontmatter.title)] },
     { type: "blockquote", children: [p(text(frontmatter.summary))] },
-    p(text(appliesToText(frontmatter.appliesTo, ctx.version) + ` Last updated ${frontmatter.updated}.`)),
+    p(text(`Last updated ${frontmatter.updated}.`)),
   ];
   const root = { type: "root", children: [...header, ...convert(ctx.page.tree.children ?? [], ctx)] };
   const out = unified()
@@ -233,13 +231,4 @@ export function pageMarkdown(ctx: MarkdownContext): string {
     .use(remarkGfm)
     .stringify(root as never);
   return String(out);
-}
-
-/** "Applies to: Zowork Forms builder · @zoworkhq/forms 0.28.1 or later." */
-export function appliesToText(appliesTo: readonly string[], version: string): string {
-  const parts = [
-    ...(appliesTo.includes("builder") ? ["Zowork Forms builder"] : []),
-    ...(appliesTo.includes("package") ? [`@zoworkhq/forms ${version} or later`] : []),
-  ];
-  return `Applies to: ${parts.join(" · ")}.`;
 }

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, LayoutTemplate, Menu, Users } from "lucide-react";
+import { BookOpen, LayoutGrid, LayoutTemplate, Menu, Users } from "lucide-react";
 import { Logo } from "@/components/logo";
 
 /**
@@ -29,6 +29,23 @@ const WORKSPACE: Item[] = [
   { href: "/app/templates", label: "Templates", Icon: LayoutTemplate },
   { href: "/app/team", label: "Team", Icon: Users },
 ];
+
+const DOCS: Item = { href: "/docs", label: "Docs", Icon: BookOpen };
+
+function RailLink({ item, active }: { item: Item; active: boolean }) {
+  return (
+    <Link
+      href={item.href}
+      aria-current={active ? "page" : undefined}
+      className={`group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[0.8125rem] transition-colors duration-200 ${
+        active ? "bg-accent-wash font-medium text-brand-deep" : "text-graphite hover:bg-paper-sunk hover:text-ink"
+      }`}
+    >
+      <item.Icon aria-hidden="true" strokeWidth={2} className={`h-3.5 w-3.5 shrink-0 ${active ? "text-brand-deep" : "text-graphite-soft"}`} />
+      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+    </Link>
+  );
+}
 
 /** The longest href the path sits inside, so one item is current, not two. */
 function currentHref(pathname: string, hrefs: readonly string[]): string | undefined {
@@ -115,27 +132,20 @@ export function Rail() {
           <div>
             <p className="eyebrow mb-1.5 px-2.5 text-graphite-soft">Workspace</p>
             <ul className="space-y-0.5">
-              {WORKSPACE.map((item) => {
-                const active = item.href === current;
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      aria-current={active ? "page" : undefined}
-                      className={`group flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-[0.8125rem] transition-colors duration-200 ${
-                        active ? "bg-accent-wash font-medium text-brand-deep" : "text-graphite hover:bg-paper-sunk hover:text-ink"
-                      }`}
-                    >
-                      <item.Icon
-                        aria-hidden="true"
-                        strokeWidth={2}
-                        className={`h-3.5 w-3.5 shrink-0 ${active ? "text-brand-deep" : "text-graphite-soft"}`}
-                      />
-                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                    </Link>
-                  </li>
-                );
-              })}
+              {WORKSPACE.map((item) => (
+                <li key={item.href}>
+                  <RailLink item={item} active={item.href === current} />
+                </li>
+              ))}
+            </ul>
+          </div>
+          {/* The public docs, in the same tab: the same pages a signed-out reader sees. */}
+          <div>
+            <p className="eyebrow mb-1.5 px-2.5 text-graphite-soft">Help</p>
+            <ul className="space-y-0.5">
+              <li>
+                <RailLink item={DOCS} active={false} />
+              </li>
             </ul>
           </div>
         </nav>

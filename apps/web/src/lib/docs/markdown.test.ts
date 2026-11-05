@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { DocsPage } from "./content";
 import { parseFrontmatter } from "./frontmatter";
 import { llmsTxt } from "./llms";
-import { appliesToText, markdownLink, pageMarkdown } from "./markdown";
+import { markdownLink, pageMarkdown } from "./markdown";
 import { headingsOf, parseMdx } from "./mdast";
 
 /** A page from MDX text, as content.ts would load it. */
 function page(body: string, slug = "build/question-types/dropdown", template = "question-type"): DocsPage {
-  const raw = `---\ntitle: T\nsummary: S.\ntemplate: ${template}\nbadges: []\nappliesTo: [package]\nupdated: 2026-10-23\nprev: null\nnext: null\n---\n${body}`;
+  const raw = `---\ntitle: T\nsummary: S.\ntemplate: ${template}\nbadges: []\nupdated: 2026-10-23\nprev: null\nnext: null\n---\n${body}`;
   const { frontmatter, body: b } = parseFrontmatter(raw, "test.mdx");
   const tree = parseMdx(b);
   return { slug, file: "test.mdx", frontmatter, body: b, tree, headings: headingsOf(tree) };
@@ -17,13 +17,12 @@ const md = (body: string, template?: string) =>
   pageMarkdown({
     page: page(body, undefined, template),
     origin: "https://forms.example",
-    version: "0.26.0",
     exampleForm: () => ({ title: "F", blocks: [] }),
   });
 
 describe("a page's Markdown version", () => {
-  it("starts with the title, the summary and Applies to", () => {
-    expect(md("Body.")).toBe("# T\n\n> S.\n\nApplies to: @zoworkhq/forms 0.26.0 or later. Last updated 2026-10-23.\n\nBody.\n");
+  it("starts with the title, the summary and Last updated", () => {
+    expect(md("Body.")).toBe("# T\n\n> S.\n\nLast updated 2026-10-23.\n\nBody.\n");
   });
 
   it("names each callout in words", () => {
@@ -59,13 +58,6 @@ describe("markdownLink", () => {
   });
 });
 
-describe("appliesToText", () => {
-  it("names the builder, the package or both", () => {
-    expect(appliesToText(["builder", "package"], "0.26.0")).toBe("Applies to: Zowork Forms builder · @zoworkhq/forms 0.26.0 or later.");
-    expect(appliesToText(["builder"], "0.26.0")).toBe("Applies to: Zowork Forms builder.");
-  });
-});
-
 describe("headings", () => {
   it("get ids from their text, numbered when repeated", () => {
     const h = headingsOf(parseMdx("## When to use\n\n### `schema`\n\n## When to use"));
@@ -83,7 +75,7 @@ describe("llms.txt", () => {
 
 describe("frontmatter", () => {
   const bad = (yaml: string) => () => parseFrontmatter(`---\n${yaml}\n---\nx`, "bad.mdx");
-  const base = "title: T\nsummary: S\ntemplate: how-to\nbadges: []\nappliesTo: [builder]\nupdated: 2026-10-23\nprev: null\nnext: null";
+  const base = "title: T\nsummary: S\ntemplate: how-to\nbadges: []\nupdated: 2026-10-23\nprev: null\nnext: null";
 
   it("accepts a complete set", () => {
     expect(() => bad(base)()).not.toThrow();

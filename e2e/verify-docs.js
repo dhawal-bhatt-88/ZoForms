@@ -589,8 +589,15 @@ const THEMES = ["light", "dark"];
       await menu.focus();
       await P.keyboard.press("Enter");
       const expanded = await menu.getAttribute("aria-expanded");
-      const link = P.getByRole("navigation", { name: "Docs" }).getByRole("link", { name: "Dropdown" });
-      check("375px: Enter on Docs menu opens it", expanded === "true" && (await link.isVisible()), expanded);
+      const nav = P.getByRole("navigation", { name: "Docs" });
+      const group = nav.getByRole("button", { name: "Question types" });
+      check("375px: Enter on Docs menu opens it", expanded === "true" && (await group.isVisible()), expanded);
+      // On the docs home no group holds the current page, so each starts closed.
+      const link = nav.getByRole("link", { name: "Dropdown" });
+      const closed = (await group.getAttribute("aria-expanded")) === "false" && !(await link.isVisible());
+      await group.focus();
+      await P.keyboard.press("Enter");
+      check("375px: a group in the Docs menu starts closed and Enter opens it", closed && (await link.isVisible()), await group.getAttribute("aria-expanded"));
       await ctx.close();
     }
   } catch (e) {

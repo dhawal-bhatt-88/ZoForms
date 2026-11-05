@@ -19,7 +19,7 @@ const EXAMPLE = "/docs/examples/follow-up-question";
 const FOLLOW_UP_FORM = JSON.parse(
   fs.readFileSync(path.join(__dirname, "../content/docs/examples/follow-up-question.form.json"), "utf8"),
 );
-/** The installed renderer: the top bar and every "Applies to" name it. */
+/** The installed renderer: the top bar names it. */
 const RENDERER_VERSION = JSON.parse(
   fs.readFileSync(path.join(__dirname, "../node_modules/@zoworkhq/forms/package.json"), "utf8"),
 ).version as string;
@@ -54,6 +54,7 @@ test.describe("docs", () => {
     const header = page.getByRole("banner");
     await expect(header.getByText(`@zoworkhq/forms ${RENDERER_VERSION}`)).toBeVisible();
     await expect(header.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
+    await expect(header.getByRole("link", { name: "Open my forms" })).toHaveCount(0);
     await expect(header.getByRole("link", { name: "Release notes" })).toHaveCount(0);
   });
 
@@ -64,7 +65,8 @@ test.describe("docs", () => {
     await expect(page.getByRole("navigation", { name: "Docs" }).getByRole("link", { name: "Dropdown" })).toHaveAttribute("aria-current", "page");
     await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toHaveText(/Docs\s*\/\s*Build forms\s*\/\s*Question types/);
     await expect(page.getByRole("link", { name: "View as Markdown" })).toHaveAttribute("href", "/docs/build/question-types/dropdown.md");
-    await expect(page.getByText(`Applies to: Zowork Forms builder · @zoworkhq/forms ${RENDERER_VERSION} or later.`)).toBeVisible();
+    await expect(page.getByText(/^Last updated /)).toBeVisible();
+    await expect(page.getByText(/Applies to/)).toHaveCount(0);
 
     const toc = page.getByRole("navigation", { name: "On this page" });
     await expect(toc).toBeVisible();
@@ -93,23 +95,96 @@ test.describe("docs", () => {
     await expect(rows.filter({ hasText: "timeoutMs" })).toContainText("30000");
   });
 
-  test("below 760px the side navigation is a menu", async ({ page }) => {
+  test("below 760px the side navigation is a menu, with its groups collapsible inside it", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 800 });
     await page.goto("/docs");
     const menu = page.getByRole("button", { name: "Docs menu" });
-    const link = page.getByRole("navigation", { name: "Docs" }).getByRole("link", { name: "FormRenderer" });
+    const nav = page.getByRole("navigation", { name: "Docs" });
+    const reference = nav.getByRole("button", { name: "Reference" });
+    const link = nav.getByRole("link", { name: "FormRenderer" });
 
     await expect(menu).toHaveAttribute("aria-expanded", "false");
     await expect(link).toBeHidden();
     // As the first test on a fresh dev server, this can click before the page has hydrated, when a click does nothing.
     await expect(async () => {
       if ((await menu.getAttribute("aria-expanded")) === "false") await menu.click();
-      await expect(link).toBeVisible({ timeout: 1000 });
+      await expect(reference).toBeVisible({ timeout: 1000 });
     }).toPass({ timeout: 20_000 });
+    // No page of the docs home's is in a group, so every group starts closed.
+    await expect(reference).toHaveAttribute("aria-expanded", "false");
+    await expect(link).toBeHidden();
+    await reference.press("Enter");
+    await expect(reference).toHaveAttribute("aria-expanded", "true");
     await link.click();
     // A fresh dev server compiles the page on this first visit, which can take longer than the default 5s.
     await expect(page).toHaveURL(/form-renderer$/, { timeout: 20_000 });
     await expect(page.getByRole("button", { name: "Docs menu" })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  test("a group opens and closes, starts open around the current page, and remembers the reader's choice", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/docs/build/question-types/dropdown");
+    const nav = page.getByRole("navigation", { name: "Docs" });
+    const types = nav.getByRole("button", { name: "Question types" });
+    const reference = nav.getByRole("button", { name: "Reference" });
+
+    await expect(types).toHaveAttribute("aria-expanded", "true");
+    await expect(reference).toHaveAttribute("aria-expanded", "false");
+    await expect(nav.getByRole("link", { name: "FormRenderer" })).toBeHidden();
+
+    // Hydration can lag the first paint on a fresh dev server.
+    await expect(async () => {
+      await reference.press("Space");
+      await expect(reference).toHaveAttribute("aria-expanded", "true", { timeout: 1000 });
+    }).toPass({ timeout: 20_000 });
+    await types.click();
+    await expect(types).toHaveAttribute("aria-expanded", "false");
+    await expect(nav.getByRole("link", { name: "Short answer" })).toBeHidden();
+
+    await page.reload();
+    // The current page's group opens again; the reader's other choice holds.
+    await expect(types).toHaveAttribute("aria-expanded", "true");
+    await expect(reference).toHaveAttribute("aria-expanded", "true");
+  });
+
+  test.describe("signed in", () => {
+    // The session is only a token in localStorage: no API is needed to stand for one here.
+    test.beforeEach(async ({ page }) => {
+      await page.addInitScript(() => localStorage.setItem("frame_token", "e2e-token"));
+    });
+
+    test("/docs is the same public page, with Open my forms in place of Sign in", async ({ page, request }) => {
+      await page.goto("/docs");
+      await expect(page).toHaveURL(/\/docs$/);
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("Zowork Forms documentation");
+      await expect(page.getByRole("navigation", { name: "Docs" }).getByRole("link", { name: "Docs home" })).toHaveAttribute("aria-current", "page");
+
+      const header = page.getByRole("banner");
+      await expect(header.getByText(`@zoworkhq/forms ${RENDERER_VERSION}`)).toBeVisible();
+      await expect(header.getByRole("link", { name: "Open my forms" })).toHaveAttribute("href", "/app");
+      await expect(header.getByRole("link", { name: "Sign in" })).toHaveCount(0);
+
+      await page.goto("/docs/build/question-types/dropdown");
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("Dropdown");
+      for (const url of ["/docs.md", "/docs/build/question-types/dropdown.md", "/docs/llms.txt"]) {
+        expect((await request.get(url)).status(), url).toBe(200);
+      }
+    });
+
+    test("the app rail's Docs link opens the docs in the same tab", async ({ page }) => {
+      // A running API would refuse the stand-in token and send the page to sign-in; without one the rail still renders.
+      await page.route("**/v1/**", (route) => route.abort());
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto("/app");
+      const docs = page.getByRole("navigation", { name: "App" }).getByRole("link", { name: "Docs" });
+      await expect(docs).toHaveAttribute("href", "/docs");
+      await expect(docs).not.toHaveAttribute("target", /.*/);
+      await docs.click();
+      // A fresh dev server compiles the page on this first visit, which can take longer than the default 5s.
+      await expect(page).toHaveURL(/\/docs$/, { timeout: 20_000 });
+      expect(page.context().pages()).toHaveLength(1);
+      await expect(page.getByRole("banner").getByRole("link", { name: "Open my forms" })).toBeVisible();
+    });
   });
 
   test("the skip link is the first stop and lands on the page", async ({ page }) => {

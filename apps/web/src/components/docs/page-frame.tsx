@@ -2,7 +2,6 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, FileText } from "lucide-react";
 import { CopyButton, StatusChip, buttonClasses } from "@/components/ui";
 import type { DocsFrontmatter } from "@/lib/docs/frontmatter";
-import { appliesToText } from "@/lib/docs/markdown";
 import type { Heading } from "@/lib/docs/mdast";
 import { docsHref, livePages, markdownHref } from "@/lib/docs/nav";
 import { TEMPLATES } from "@/lib/docs/templates";
@@ -18,21 +17,11 @@ const longDate = (iso: string) =>
   new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
 
 /**
- * Breadcrumb, title, page actions, summary, badges, "Applies to" and "Last
- * updated", in that order on every page. The docs home has no breadcrumb: it
- * would name only itself.
+ * Breadcrumb, title, page actions, summary, badges and "Last updated", in
+ * that order on every page. The docs home has no breadcrumb: it would name
+ * only itself.
  */
-export function PageHeader({
-  slug,
-  frontmatter,
-  markdown,
-  version,
-}: {
-  slug: string;
-  frontmatter: DocsFrontmatter;
-  markdown: string;
-  version: string;
-}) {
+export function PageHeader({ slug, frontmatter, markdown }: { slug: string; frontmatter: DocsFrontmatter; markdown: string }) {
   const trail = livePages().find((p) => p.slug === slug);
   const crumbs = [trail?.section, trail?.group].filter((c): c is string => !!c);
   const badges = [TEMPLATES[frontmatter.template].label, ...frontmatter.badges];
@@ -77,7 +66,7 @@ export function PageHeader({
         ))}
       </ul>
       <p className="body-sm mt-3 text-graphite">
-        {appliesToText(frontmatter.appliesTo, version)} Last updated{" "}
+        Last updated{" "}
         <time dateTime={frontmatter.updated}>{longDate(frontmatter.updated)}</time>.
       </p>
     </div>

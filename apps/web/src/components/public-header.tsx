@@ -18,7 +18,8 @@ import { StatusChip, buttonClasses } from "@/components/ui";
  *
  * The docs' variant (docs brief, "Common layout") spans the full width, names
  * the docs after the logo, and holds search, the package version and Release
- * notes in place of Docs and Get started.
+ * notes in place of Docs and Get started. Signed in, Sign in becomes Open my
+ * forms.
  */
 
 const LINKS = [
@@ -93,9 +94,15 @@ export function PublicHeader({
                   <li className="flex items-center gap-1.5 px-2.5 py-2 text-[0.8125rem] text-graphite sm:py-1.5">
                     Release notes <StatusChip>soon</StatusChip>
                   </li>
-                  <li>
+                  {/* One of the two shows, by the session (globals.css): the docs look the same either way. */}
+                  <li className="signed-out-only">
                     <Link href="/login" className={linkClasses}>
                       Sign in
+                    </Link>
+                  </li>
+                  <li className="signed-in-only">
+                    <Link href="/app" className={linkClasses}>
+                      Open my forms
                     </Link>
                   </li>
                 </>
