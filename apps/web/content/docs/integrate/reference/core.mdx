@@ -1,9 +1,9 @@
 ---
 title: Other /core exports
-summary: The rest of @zoworkhq/forms/core that a host might use. Checking a form file, walking its blocks, visibility, the answers a submission may carry, and the package's limits.
+summary: The rest of @zoworkhq/zoforms/core that a host might use. Checking a form file, walking its blocks, visibility, the answers a submission may carry, and the package's limits.
 template: data-reference
 badges: [Server]
-updated: 2026-11-03
+updated: 2026-11-05
 prev: /docs/integrate/reference/css
 next: /docs/integrate/concepts/answers
 ---
@@ -11,7 +11,7 @@ next: /docs/integrate/concepts/answers
 ## At a glance
 
 ```js check=esm
-import { assertSchemaIntegrity, getSubmittableAnswers, walkBlocks, MAX_FREE_TEXT_LENGTH } from '@zoworkhq/forms/core';
+import { assertSchemaIntegrity, getSubmittableAnswers, walkBlocks, MAX_FREE_TEXT_LENGTH } from '@zoworkhq/zoforms/core';
 ```
 
 - **Most hosts need only `prepareSubmission`.** It already calls everything on this page that it needs. These are for when you want one piece on its own.
@@ -19,7 +19,7 @@ import { assertSchemaIntegrity, getSubmittableAnswers, walkBlocks, MAX_FREE_TEXT
 - **Every function that reads the form's blocks checks the file first,** with `assertSchemaIntegrity`, and throws for a file it refuses. The result is cached per form object, so repeated calls are cheap.
 - **Visibility is root-level only** in `getVisibleBlockIds` and `getDisplayedBlockIds`. Questions inside a repeating group are judged entry by entry, so they aren't in those sets. `getSubmittableAnswers`, `validateSubmission` and `prepareSubmission` handle each entry.
 
-[`prepareSubmission` and `validateSubmission`](/docs/integrate/reference/prepare-submission) and [Read scores](/docs/integrate/scores) cover the main functions. The types `FormRendererProps` and `DraftsOptions` come from `@zoworkhq/forms/react`: see [`FormRenderer`](/docs/integrate/reference/form-renderer).
+[`prepareSubmission` and `validateSubmission`](/docs/integrate/reference/prepare-submission) and [Read scores](/docs/integrate/scores) cover the main functions. The types `FormRendererProps` and `DraftsOptions` come from `@zoworkhq/zoforms/react`: see [`FormRenderer`](/docs/integrate/reference/form-renderer).
 
 ## Checking a form file
 
@@ -34,7 +34,7 @@ Problems that don't stop the form showing, but that its author should know about
 ```js file=check-form.js check=esm run=node
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { assertSchemaIntegrity, getSchemaWarnings } from '@zoworkhq/forms/core';
+import { assertSchemaIntegrity, getSchemaWarnings } from '@zoworkhq/zoforms/core';
 
 const schema = JSON.parse(readFileSync('./intake-form.json', 'utf8'));
 
@@ -83,7 +83,7 @@ A block's `type` alone doesn't narrow `Block` in TypeScript, so use these. `isAn
 ```js file=list-questions.js check=esm run=node
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { isAnswerable, isPaged, walkBlocks } from '@zoworkhq/forms/core';
+import { isAnswerable, isPaged, walkBlocks } from '@zoworkhq/zoforms/core';
 
 const schema = JSON.parse(readFileSync('./intake-form.json', 'utf8'));
 
@@ -119,10 +119,10 @@ What the browser sends, from a set of answers: visible questions only. It drops 
 ```js file=filter-answers.js check=esm run=node
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { getSubmittableAnswers, getVisibleBlockIds } from '@zoworkhq/forms/core';
+import { getSubmittableAnswers, getVisibleBlockIds } from '@zoworkhq/zoforms/core';
 
 const schema = JSON.parse(readFileSync('./intake-form.json', 'utf8'));
-/** @type {import('@zoworkhq/forms/core').Answers} */
+/** @type {import('@zoworkhq/zoforms/core').Answers} */
 const answers = {
   preferred_name: { state: 'answered', value: '  ' },
   sees_therapist: { state: 'answered', value: 'no' },
@@ -162,7 +162,7 @@ What `prepareSubmission` returns in `submission.answers`: the same shape as `Ans
 
 ```js file=limits.js check=esm run=node
 import assert from 'node:assert/strict';
-import { ANSWERABLE_TYPES, COUNTRIES, DEFAULT_MAX_OCCURS, MAX_FREE_TEXT_LENGTH } from '@zoworkhq/forms/core';
+import { ANSWERABLE_TYPES, COUNTRIES, DEFAULT_MAX_OCCURS, MAX_FREE_TEXT_LENGTH } from '@zoworkhq/zoforms/core';
 
 assert.equal(MAX_FREE_TEXT_LENGTH, 20000);
 assert.equal(DEFAULT_MAX_OCCURS, 1000);

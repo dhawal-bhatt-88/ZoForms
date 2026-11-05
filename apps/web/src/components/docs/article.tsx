@@ -3,7 +3,7 @@ import Link from "next/link";
 import { evaluate } from "@mdx-js/mdx";
 import * as runtime from "react/jsx-runtime";
 import remarkGfm from "remark-gfm";
-import type { FormSchema } from "@zoworkhq/forms/core";
+import type { FormSchema } from "@zoworkhq/zoforms/core";
 import { readCss, readExampleForm, readReference, readTypes, type DocsPage } from "@/lib/docs/content";
 import { cssTable, type CssTableName } from "@/lib/docs/css-table";
 import type { Reference, ReferenceType } from "@/lib/docs/reference";

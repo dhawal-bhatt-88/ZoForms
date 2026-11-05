@@ -78,7 +78,7 @@ export const DOCS_NAV: DocsNavSection[] = [
   {
     title: "Integrate forms",
     items: [
-      { title: "How Zowork Forms fits your app", slug: "integrate/overview", status: "live" },
+      { title: "How ZoForms fits your app", slug: "integrate/overview", status: "live" },
       { title: "Quickstart", slug: "integrate/quickstart", status: "live" },
       { title: "Build an intake page in Next.js", slug: "integrate/tutorial-nextjs", status: "live" },
       {

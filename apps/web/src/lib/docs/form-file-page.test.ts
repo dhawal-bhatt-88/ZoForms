@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { KNOWN_TYPES } from "@zoworkhq/forms/core";
+import { KNOWN_TYPES } from "@zoworkhq/zoforms/core";
 import { CONTENT_DIR, getPage } from "./content";
 import { textOf, walk } from "./mdast";
 

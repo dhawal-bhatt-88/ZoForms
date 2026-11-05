@@ -3,7 +3,7 @@ title: Add your own validation
 summary: Your own checks on any question, written as functions in your code, run in the browser and again on your server.
 template: how-to
 badges: [React, Server]
-updated: 2026-11-04
+updated: 2026-11-05
 prev: /docs/integrate/validate-and-store
 next: /docs/integrate/sign-in
 ---
@@ -54,8 +54,8 @@ export const validators = [
 ### 2. Pass them to the form
 
 ```jsx file=src/IntakePage.jsx check=browser run=browser
-import { FormRenderer } from '@zoworkhq/forms/react';
-import '@zoworkhq/forms/styles.css';
+import { FormRenderer } from '@zoworkhq/zoforms/react';
+import '@zoworkhq/zoforms/styles.css';
 import schema from './intake-form.json';
 import { validators } from '../validators.js';
 
@@ -76,7 +76,7 @@ The browser's checks are only a convenience: anyone can post straight to your en
 ```js file=server.js check=esm run=server route=/api/submit rejects=preferred_name
 import { readFileSync } from 'node:fs';
 import express from 'express';
-import { prepareSubmission } from '@zoworkhq/forms/core';
+import { prepareSubmission } from '@zoworkhq/zoforms/core';
 import { alreadyStored, store } from './store.js';
 import { validators } from './validators.js';
 
@@ -116,7 +116,7 @@ export async function store(submission) {
 Annotate the array with `FieldValidator[]`. `value` is then `unknown`, so check its type before treating it as text: the built-in checks have already made sure it has the question's shape.
 
 ```ts file=validators.ts check=esm in=typescript
-import type { FieldValidator } from '@zoworkhq/forms/core';
+import type { FieldValidator } from '@zoworkhq/zoforms/core';
 
 export const validators: FieldValidator[] = [
   {
@@ -132,7 +132,7 @@ export const validators: FieldValidator[] = [
 `answers` holds the other visible, answered questions that pass their own checks. Dates are `"YYYY-MM-DD"`, so they compare as strings.
 
 ```js check=esm
-/** @type {import('@zoworkhq/forms/core').FieldValidator} */
+/** @type {import('@zoworkhq/zoforms/core').FieldValidator} */
 export const dischargeAfterAdmission = {
   field: 'discharged',
   validate: ({ value, answers }) =>

@@ -3,7 +3,7 @@ title: CSS classes and custom properties
 summary: Every class the form uses, every --zf- custom property with its defaults, and the data attributes your page can set around the form.
 template: data-reference
 badges: [CSS]
-updated: 2026-11-03
+updated: 2026-11-05
 prev: /docs/integrate/reference/form-file
 next: /docs/integrate/reference/core
 ---
@@ -11,13 +11,13 @@ next: /docs/integrate/reference/core
 ## At a glance
 
 ```js check=browser
-import '@zoworkhq/forms/styles.css';
+import '@zoworkhq/zoforms/styles.css';
 ```
 
 - **The stylesheet is optional.** Import it once, from your app's code. Without it the form is plain HTML with these classes.
 - **Every public class, data attribute and custom property starts with `zf-`.** Properties that start with `--_zf-` are the stylesheet's own and not for you to set.
 - **Every rule is wrapped in `:where()`,** so it has no specificity, and any plain rule of yours wins without `!important`.
-- **`classNames`,** exported from `@zoworkhq/forms/react`, lists every class below.
+- **`classNames`,** exported from `@zoworkhq/zoforms/react`, lists every class below.
 
 [Style the form](/docs/integrate/styling) shows how to use them.
 

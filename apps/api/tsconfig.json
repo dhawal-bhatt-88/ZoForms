@@ -14,8 +14,8 @@
     "strictNullChecks": true,
     "outDir": "./dist",
     "baseUrl": "./",
-    // @zoworkhq/forms publishes /core through `exports`, which "node" resolution can't read.
-    "paths": { "@zoworkhq/forms/core": ["node_modules/@zoworkhq/forms/dist/core/index.d.ts"] }
+    // @zoworkhq/zoforms publishes /core through `exports`, which "node" resolution can't read.
+    "paths": { "@zoworkhq/zoforms/core": ["node_modules/@zoworkhq/zoforms/dist/core/index.d.ts"] }
   },
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist", "src/**/*.test.ts"]

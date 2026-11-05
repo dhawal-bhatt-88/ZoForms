@@ -3,7 +3,7 @@ title: FormRenderer
 summary: The React component that renders a form file, validates it and posts the answers to your endpoint.
 template: api-reference
 badges: [React]
-updated: 2026-11-04
+updated: 2026-11-05
 prev: /docs/integrate/styling
 next: /docs/integrate/reference/prepare-submission
 ---
@@ -11,14 +11,14 @@ next: /docs/integrate/reference/prepare-submission
 ## Import
 
 ```jsx check=browser
-import { FormRenderer } from '@zoworkhq/forms/react';
-import '@zoworkhq/forms/styles.css';
+import { FormRenderer } from '@zoworkhq/zoforms/react';
+import '@zoworkhq/zoforms/styles.css';
 ```
 
 The stylesheet is optional. Every rule in it has no specificity, so any rule of your own wins without `!important`.
 
 ```jsx check=browser run=browser
-import { FormRenderer } from '@zoworkhq/forms/react';
+import { FormRenderer } from '@zoworkhq/zoforms/react';
 import schema from './intake-form.json';
 
 export function IntakeForm() {
@@ -26,7 +26,7 @@ export function IntakeForm() {
 }
 ```
 
-Your own TypeScript needs a cast on a schema imported from JSON that has conditions, pages, a `drafts` mode or a `navigation.progressStyle`: `schema as FormSchema`, with `FormSchema` from `@zoworkhq/forms/core`. Cast every schema, so a form that gains one keeps compiling.
+Your own TypeScript needs a cast on a schema imported from JSON that has conditions, pages, a `drafts` mode or a `navigation.progressStyle`: `schema as FormSchema`, with `FormSchema` from `@zoworkhq/zoforms/core`. Cast every schema, so a form that gains one keeps compiling.
 
 ## Props at a glance
 

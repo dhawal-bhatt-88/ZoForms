@@ -2,25 +2,25 @@ import { Injectable, OnModuleInit } from "@nestjs/common";
 import { existsSync, readFileSync } from "fs";
 import { dirname, join } from "path";
 import { pathToFileURL } from "url";
-import type * as Core from "@zoworkhq/forms/core";
+import type * as Core from "@zoworkhq/zoforms/core";
 
 /** What the renderer runs on a form file before it shows it. */
 type MountChecks = Pick<typeof Core, "assertSchemaIntegrity" | "resolveNavigation" | "resolveDrafts">;
 
 /**
- * Where `@zoworkhq/forms/core` is installed for this package: the same tarball
+ * Where `@zoworkhq/zoforms/core` is installed for this package: the same tarball
  * as the web app's (vendor/, checked by renderer-version.test.ts). Found by
  * Node's own lookup paths, so it doesn't depend on the working directory.
  */
 export function rendererCoreFile(): string {
-  for (const dir of require.resolve.paths("@zoworkhq/forms") ?? []) {
-    const manifest = join(dir, "@zoworkhq", "forms", "package.json");
+  for (const dir of require.resolve.paths("@zoworkhq/zoforms") ?? []) {
+    const manifest = join(dir, "@zoworkhq", "zoforms", "package.json");
     if (existsSync(manifest)) {
       const pkg = JSON.parse(readFileSync(manifest, "utf8")) as { exports: { "./core": { import: { default: string } } } };
       return join(dirname(manifest), pkg.exports["./core"].import.default);
     }
   }
-  throw new Error("@zoworkhq/forms isn't installed for the API.");
+  throw new Error("@zoworkhq/zoforms isn't installed for the API.");
 }
 
 // /core has an ES module entry and a CommonJS one, and rendererCoreFile() names
@@ -36,7 +36,7 @@ export async function loadRendererCore(): Promise<MountChecks> {
 
 /**
  * The renderer's own checks, run on a built form file before Download hands it
- * out: the ones `@zoworkhq/forms/react` runs as it mounts the form. Loaded once
+ * out: the ones `@zoworkhq/zoforms/react` runs as it mounts the form. Loaded once
  * at start-up; the API doesn't start without them.
  */
 @Injectable()

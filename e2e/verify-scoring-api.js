@@ -4,7 +4,7 @@
 // a tree sent without text; score ids filled and kept; question names generated
 // at save from labels; the 300-term limit (text and tree), with a 300-term
 // formula nested 5 groups deep downloaded and checked by the external app's
-// installed @zoworkhq/forms (assertSchemaIntegrity, calculateScores); every
+// installed @zoworkhq/zoforms (assertSchemaIntegrity, calculateScores); every
 // save-time rejection with its message (naming the group and the score, or the
 // question); the downloaded artifact (scores and option scores, no names or
 // formula text); group templates; restoring a version.
@@ -208,12 +208,12 @@ const noFormulaKey = (blocks) => (blocks ?? []).every((b) =>
       let deepArtifact;
       try { deepArtifact = JSON.parse(dl.text); } catch (e) { check("…the download is JSON", false, e.message); }
       let core;
-      try { core = await import(pathToFileURL(RENDERER_CORE).href); } catch (e) { check("…the external app's @zoworkhq/forms loads", false, e.message); }
+      try { core = await import(pathToFileURL(RENDERER_CORE).href); } catch (e) { check("…the external app's @zoworkhq/zoforms loads", false, e.message); }
       if (deepArtifact && core) {
         const version = require(path.join(path.dirname(RENDERER_CORE), "../../package.json")).version;
         // Scores need 0.23.0 or later. Only the core is called here, with no class names, so not the zf- minimum.
         const [maj, min] = version.split(".").map(Number);
-        check("…checked with the external app's @zoworkhq/forms, 0.23.0 or later", maj > 0 || min >= 23, version);
+        check("…checked with the external app's @zoworkhq/zoforms, 0.23.0 or later", maj > 0 || min >= 23, version);
         let integrity = null;
         try { core.assertSchemaIntegrity(deepArtifact); } catch (e) { integrity = e.message; }
         check("…assertSchemaIntegrity passes", integrity === null, integrity);

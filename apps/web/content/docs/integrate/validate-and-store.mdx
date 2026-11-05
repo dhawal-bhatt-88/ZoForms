@@ -3,7 +3,7 @@ title: Validate and store submissions on your server
 summary: Check every posted body with prepareSubmission, store result.submission once per key, and decide what to do with a body built against another form version.
 template: how-to
 badges: [Server]
-updated: 2026-11-04
+updated: 2026-11-05
 prev: /docs/integrate/tutorial-nextjs
 next: /docs/integrate/custom-validation
 ---
@@ -59,7 +59,7 @@ export async function store(submission) {
 ```js file=server.js check=esm run=server route=/api/submit limit=1mb
 import { readFileSync } from 'node:fs';
 import express from 'express';
-import { prepareSubmission } from '@zoworkhq/forms/core';
+import { prepareSubmission } from '@zoworkhq/zoforms/core';
 import { alreadyStored, store } from './store.js';
 
 const schema = JSON.parse(readFileSync('./intake-form.json', 'utf8'));
@@ -125,7 +125,7 @@ module.exports = { alreadyStored, store };
 ```js file=server.cjs check=cjs run=server route=/api/submit limit=1mb
 const { readFileSync } = require('node:fs');
 const express = require('express');
-const { prepareSubmission } = require('@zoworkhq/forms/core');
+const { prepareSubmission } = require('@zoworkhq/zoforms/core');
 const { alreadyStored, store } = require('./store.cjs');
 
 const schema = JSON.parse(readFileSync('./intake-form.json', 'utf8'));
@@ -144,7 +144,7 @@ app.post('/api/submit', async (req, res) => {
 app.listen(3000);
 ```
 
-`/react` is ES modules only, so `require('@zoworkhq/forms/react')` fails, as does any import of the bare package name. That matters only to a bundler, never to a server.
+`/react` is ES modules only, so `require('@zoworkhq/zoforms/react')` fails, as does any import of the bare package name. That matters only to a bundler, never to a server.
 
 ## What happens behind the scenes
 
@@ -170,7 +170,7 @@ app.listen(3000);
 
 **A choice question gets "Select a valid option."** The body carries a label, a code in another case, or a `{ code, label }` object where the code belongs. The form sends codes exactly as stored.
 
-**Your server throws `Block "…" has unknown type "…".`** The form file on your server is malformed, or newer than your installed package can read. Re-download it, or update `@zoworkhq/forms`.
+**Your server throws `Block "…" has unknown type "…".`** The form file on your server is malformed, or newer than your installed package can read. Re-download it, or update `@zoworkhq/zoforms`.
 
 **Respondents see "Submission failed" and your server logs a 413.** The body is larger than your server's limit. Raise it in step 2.
 

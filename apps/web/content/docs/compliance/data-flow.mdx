@@ -3,15 +3,15 @@ title: Where respondents' data goes
 summary: The path of a respondent's answers from their browser to your server. What the builder holds, what the package sends and keeps in the browser, and what your app decides.
 template: concept
 badges: []
-updated: 2026-11-03
+updated: 2026-11-05
 prev: /docs/examples/own-validator
 next: null
 ---
 
 ## In short
 
-- The Zowork Forms builder holds forms. It doesn't receive or store respondents' answers. [TODO: legal review]
-- `@zoworkhq/forms` sends answers from the respondent's browser to your endpoint, and makes no other request with them.
+- The ZoForms builder holds forms. It doesn't receive or store respondents' answers. [TODO: legal review]
+- `@zoworkhq/zoforms` sends answers from the respondent's browser to your endpoint, and makes no other request with them.
 - Until the form is sent, the package may keep the answers in the browser, depending on the form's drafts mode.
 - Once they reach your server, where they go is up to your app.
 
@@ -30,7 +30,7 @@ It has no table for answers, and the builder's API has no route that receives th
 
 ## The path of an answer
 
-1. **Your app serves the page.** The form file and the package are part of your app. The form doesn't load either from Zowork.
+1. **Your app serves the page.** The form file and the package are part of your app. The form doesn't load either from ZoForms.
 2. **The respondent fills in the form.** Their answers are in the page's memory. Depending on the drafts mode, a copy is also kept in the tab, an encrypted draft on the device, or a draft on your server. See [What is stored in the browser](/docs/integrate/concepts/browser-storage).
 3. **The respondent submits.** The form sends one `POST`, with the answers as JSON, to the `endpoint` you gave it. This is the only request the package makes with answers in it.
 4. **Your server checks it.** `prepareSubmission` runs on your server and makes no requests of its own. You store `result.submission` wherever your app stores data.
@@ -74,6 +74,6 @@ The package and the builder leave these to you: [TODO: legal review]
 
 ## Related
 
-- [How Zowork Forms fits your app](/docs/integrate/overview): the parts and who runs them.
+- [How ZoForms fits your app](/docs/integrate/overview): the parts and who runs them.
 - [What is stored in the browser](/docs/integrate/concepts/browser-storage): every key, lifetime and deletion.
 - [Validate and store submissions](/docs/integrate/validate-and-store): what your endpoint does with a submission.

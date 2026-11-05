@@ -3,7 +3,7 @@ title: Save progress (drafts)
 summary: Keep a respondent's answers through a refresh, a closed tab or a later visit, in the tab, on the device or on your server, and clear them when someone signs out.
 template: how-to
 badges: [React, Server]
-updated: 2026-11-04
+updated: 2026-11-05
 prev: /docs/integrate/scores
 next: /docs/integrate/shared-devices
 ---
@@ -116,7 +116,7 @@ export function forgetDraftKey() {
 ```
 
 ```jsx file=src/DeviceIntakePage.jsx check=browser run=browser
-import { FormRenderer } from '@zoworkhq/forms/react';
+import { FormRenderer } from '@zoworkhq/zoforms/react';
 import schema from './intake-device.json';
 import { getDraftKey } from './draft-key.js';
 import { useSignedIn } from './signed-in.js';
@@ -187,7 +187,7 @@ export function serverDrafts(scope) {
 ```
 
 ```jsx file=src/ServerIntakePage.jsx check=browser run=browser
-import { FormRenderer } from '@zoworkhq/forms/react';
+import { FormRenderer } from '@zoworkhq/zoforms/react';
 import schema from './intake-server.json';
 import { serverDrafts } from './draft-functions.js';
 import { useSignedIn } from './signed-in.js';
@@ -282,7 +282,7 @@ export async function deleteDraft(scope, formId) {
 ```js file=server.js check=esm run=server route=/api/submit form=intake-server drafts=/api/drafts
 import { readFileSync } from 'node:fs';
 import express from 'express';
-import { prepareSubmission } from '@zoworkhq/forms/core';
+import { prepareSubmission } from '@zoworkhq/zoforms/core';
 import { alreadyStored, store } from './store.js';
 import { deleteDraft, loadDraft, saveDraft } from './draft-store.js';
 
@@ -335,7 +335,7 @@ Call `clearDrafts({ owner })` once the form has gone, for example from your sign
 
 ```jsx file=src/SignedOut.jsx check=browser
 import { useEffect, useState } from 'react';
-import { clearDrafts } from '@zoworkhq/forms/react';
+import { clearDrafts } from '@zoworkhq/zoforms/react';
 import { forgetDraftKey } from './draft-key.js';
 
 export function SignedOut({ userId }) {

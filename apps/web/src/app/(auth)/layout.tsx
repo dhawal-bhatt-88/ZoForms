@@ -34,7 +34,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         </main>
 
         <footer className="relative mx-auto flex w-full max-w-[26rem] flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[0.6875rem] text-graphite-soft">
-          <span>Zowork Forms</span>
+          <span>ZoForms</span>
           <a href="https://zoblocks.design" className="link">
             zoblocks.design
           </a>

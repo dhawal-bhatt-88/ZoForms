@@ -181,12 +181,12 @@ export const MARKDOWN_COMPONENTS: Record<string, Convert> = {
   // The same four stages and caption as the Architecture component.
   Architecture: () => [
     list(true, [
-      item(p(strong("Zowork Forms builder:"), text(" you build the form."))),
+      item(p(strong("ZoForms builder:"), text(" you build the form."))),
       item(p(strong("JSON form file:"), text(" you download it."))),
-      item(p({ type: "inlineCode", value: "@zoworkhq/forms" }, text(" in your app: renders the file."))),
+      item(p({ type: "inlineCode", value: "@zoworkhq/zoforms" }, text(" in your app: renders the file."))),
       item(p(strong("Your API:"), text(" receives the answers."))),
     ]),
-    p(text("Nothing a person types into the form reaches Zowork Forms: your app posts the answers to your own API.")),
+    p(text("Nothing a person types into the form reaches ZoForms: your app posts the answers to your own API.")),
   ],
 };
 

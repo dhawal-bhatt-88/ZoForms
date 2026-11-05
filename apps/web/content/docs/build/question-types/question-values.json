@@ -164,7 +164,7 @@
     "unanswered": "With no country chosen",
     "example": "Canada",
     "stored": "Canada",
-    "storedNote": "The name must be one of `COUNTRIES`, exported from `@zoworkhq/forms/core`.",
+    "storedNote": "The name must be one of `COUNTRIES`, exported from `@zoworkhq/zoforms/core`.",
     "conditionAnswer": "The condition's `answer` is a country's name, exactly as in `COUNTRIES`.",
     "scoring": null,
     "validator": null

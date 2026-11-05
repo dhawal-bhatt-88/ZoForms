@@ -3,7 +3,7 @@ title: Answers and their states
 summary: How every answer is sent and stored. Answered or empty, the empty-answer rule, answers to hidden questions, and the value each type of question gives.
 template: concept
 badges: []
-updated: 2026-11-04
+updated: 2026-11-05
 prev: /docs/integrate/reference/core
 next: /docs/integrate/concepts/browser-storage
 ---
@@ -17,7 +17,7 @@ Each entry in `answers` is keyed by the question's id, and is one of two shapes:
 
 Only visible questions are there. A question hidden by a condition, and anything that isn't a question, such as a group, a page or a text block, has no entry. A repeating group is a list of objects like `answers`, one per entry.
 
-In TypeScript, from `@zoworkhq/forms/core`:
+In TypeScript, from `@zoworkhq/zoforms/core`:
 
 <Signature of="BlockValue" />
 

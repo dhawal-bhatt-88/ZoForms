@@ -34,7 +34,7 @@ describe("a page's Markdown version", () => {
     const question = md('<LiveExample form="f" />');
     expect(question).toContain('```json\n{\n  "title": "F",');
     expect(question).not.toContain("```jsx");
-    expect(md('<LiveExample form="f" />', "example")).toContain("import { FormRenderer } from '@zoworkhq/forms/react';");
+    expect(md('<LiveExample form="f" />', "example")).toContain("import { FormRenderer } from '@zoworkhq/zoforms/react';");
   });
 
   it("points links to other docs pages at their Markdown versions", () => {
@@ -68,7 +68,7 @@ describe("headings", () => {
 describe("llms.txt", () => {
   it("lists each page's Markdown version with its summary", () => {
     const text = llmsTxt([page("x", "examples/follow-up-question", "example")], "https://forms.example");
-    expect(text.startsWith("# Zowork Forms\n\n> ")).toBe(true);
+    expect(text.startsWith("# ZoForms\n\n> ")).toBe(true);
     expect(text).toContain("## Examples\n\n- [T](https://forms.example/docs/examples/follow-up-question.md): S.\n");
   });
 });

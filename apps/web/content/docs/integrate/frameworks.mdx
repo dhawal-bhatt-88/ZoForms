@@ -3,7 +3,7 @@ title: Use it with your framework
 summary: Vite, the Next.js App Router, CommonJS servers, TypeScript, and React 18 and 19.
 template: how-to
 badges: [React, Server]
-updated: 2026-11-04
+updated: 2026-11-05
 prev: /docs/integrate/handle-errors
 next: /docs/integrate/content-security-policy
 ---
@@ -41,7 +41,7 @@ If your app is served under a sub-path, pass Vite's `import.meta.env.BASE_URL` a
 
 ```tsx file=app/layout.tsx check=browser
 import type { ReactNode } from 'react';
-import '@zoworkhq/forms/styles.css';
+import '@zoworkhq/zoforms/styles.css';
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
@@ -53,8 +53,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
 ```
 
 ```tsx file=app/intake/page.tsx check=browser
-import { FormRenderer } from '@zoworkhq/forms/react';
-import type { FormSchema } from '@zoworkhq/forms/core';
+import { FormRenderer } from '@zoworkhq/zoforms/react';
+import type { FormSchema } from '@zoworkhq/zoforms/core';
 import schema from './intake-form.json';
 
 export default function IntakePage() {
@@ -70,8 +70,8 @@ export default function IntakePage() {
 A route handler receives it:
 
 ```ts file=app/api/submit/route.ts check=browser run=handler route=/api/submit
-import { prepareSubmission } from '@zoworkhq/forms/core';
-import type { FormSchema } from '@zoworkhq/forms/core';
+import { prepareSubmission } from '@zoworkhq/zoforms/core';
+import type { FormSchema } from '@zoworkhq/zoforms/core';
 import schema from '../../intake/intake-form.json';
 import { alreadyStored, store } from '../../../lib/store';
 
@@ -86,7 +86,7 @@ export async function POST(request: Request) {
 ```
 
 ```ts file=lib/store.ts check=browser stub=store
-import type { StoredSubmission } from '@zoworkhq/forms/core';
+import type { StoredSubmission } from '@zoworkhq/zoforms/core';
 
 // Stands in for your storage, and loses everything when the server stops.
 const submissions = new Map<string, StoredSubmission>();
@@ -105,8 +105,8 @@ export async function store(submission: StoredSubmission) {
 ```tsx file=app/intake/intake-form.tsx check=browser run=browser
 'use client';
 
-import { FormRenderer } from '@zoworkhq/forms/react';
-import type { FormSchema } from '@zoworkhq/forms/core';
+import { FormRenderer } from '@zoworkhq/zoforms/react';
+import type { FormSchema } from '@zoworkhq/zoforms/core';
 import schema from './intake-form.json';
 
 export function IntakeForm() {
@@ -131,22 +131,22 @@ A form file the form refuses shows the form's message on your server too, and th
 `/core` works from `require`:
 
 ```js check=cjs run=node
-const { prepareSubmission } = require('@zoworkhq/forms/core');
+const { prepareSubmission } = require('@zoworkhq/zoforms/core');
 
 console.log(typeof prepareSubmission);
 ```
 
-`/react` is ES modules only, for bundlers. `require('@zoworkhq/forms/react')` fails, as does any import of the bare package name. [Validate and store submissions](/docs/integrate/validate-and-store) has a whole CommonJS server.
+`/react` is ES modules only, for bundlers. `require('@zoworkhq/zoforms/react')` fails, as does any import of the bare package name. [Validate and store submissions](/docs/integrate/validate-and-store) has a whole CommonJS server.
 
 ### TypeScript
 
-Types ship with the package. `FormSchema` and the rest come from `@zoworkhq/forms/core`, `FormRendererProps` and `DraftsOptions` from `@zoworkhq/forms/react`.
+Types ship with the package. `FormSchema` and the rest come from `@zoworkhq/zoforms/core`, `FormRendererProps` and `DraftsOptions` from `@zoworkhq/zoforms/react`.
 
 - Use `moduleResolution` `bundler`, `node16` or `nodenext`. The older `node` setting doesn't read the package's entry points.
 - A form file imported from JSON needs a cast when it has conditions (an `enableWhen` operator or `enableBehavior`), pages, a `drafts` mode or a `navigation.progressStyle`. TypeScript reads their strings as `string`, not the exact values `FormSchema` allows. Other files type-check without one, but cast every file anyway, so a form that gains a page or a condition keeps compiling. The cast is safe: the form checks the file when it renders.
 
 ```ts check=browser
-import type { FormSchema } from '@zoworkhq/forms/core';
+import type { FormSchema } from '@zoworkhq/zoforms/core';
 import data from './intake-form.json';
 
 export const schema = data as FormSchema;
@@ -158,13 +158,13 @@ The package's peers are `react` and `react-dom` `^18.0.0 || ^19.0.0`. The Quicks
 
 ## What happens behind the scenes
 
-- The package has three entry points: `@zoworkhq/forms/react`, `@zoworkhq/forms/core` and `@zoworkhq/forms/styles.css`. There is no bare `@zoworkhq/forms` import.
+- The package has three entry points: `@zoworkhq/zoforms/react`, `@zoworkhq/zoforms/core` and `@zoworkhq/zoforms/styles.css`. There is no bare `@zoworkhq/zoforms` import.
 - `/core` has an `import` and a `require` build, so Node picks the right one. `/react` has only the first.
 - On a server, `/core` needs no React and no DOM.
 
 ## Troubleshooting
 
-**TypeScript can't find `@zoworkhq/forms/core`.** Your `moduleResolution` is `node`. Change it to `bundler`, `node16` or `nodenext`.
+**TypeScript can't find `@zoworkhq/zoforms/core`.** Your `moduleResolution` is `node`. Change it to `bundler`, `node16` or `nodenext`.
 
 **TypeScript says your form file isn't assignable to `FormSchema`.** Cast it, as above.
 

@@ -10,7 +10,7 @@
 // once per grid, editing rows, every save rejection the editor can produce (its
 // inline message is the API's text), a grid inside a repeating group, and the
 // downloaded artifact's exact §14.1 shape. With E2E_EXTERNAL_APP_URL set, the
-// download is rendered in the test app (@zoworkhq/forms 0.25.0 or later): the §14.5 layout
+// download is rendered in the test app (@zoworkhq/zoforms 0.25.0 or later): the §14.5 layout
 // (the table in its own named, focusable region, a table at the app's width and
 // either side of the 34rem container breakpoint, cards below it), a required
 // column blocks submit, a filled grid submits, and the stored record is checked.
@@ -482,7 +482,7 @@ const NOTE = "Changing a code after the form is in use will not match answers al
     check("download: no block-level required on a grid; schemaVersion 2", art.blocks.flatMap((b) => [b, ...(b.blocks ?? [])]).filter((b) => b.type === "grid").every((b) => !("required" in b) && !("completeRequired" in b)) && art.schemaVersion === 2);
     saveArtifact(ARTIFACT, raw);
 
-    // ---------- render with @zoworkhq/forms (optional) ----------
+    // ---------- render with @zoworkhq/zoforms (optional) ----------
     if (!EXTERNAL_APP) {
       console.log("  SKIP  render in the external test app (set E2E_EXTERNAL_APP_URL and E2E_EXTERNAL_FORMS_DIR to run it)");
     } else if (!process.env.E2E_EXTERNAL_FORMS_DIR || !fs.existsSync(path.join(process.env.E2E_EXTERNAL_FORMS_DIR, ARTIFACT))) {
@@ -490,7 +490,7 @@ const NOTE = "Changing a code after the form is in use will not match answers al
     } else {
       // The layout checks read the renderer's zf- class names and container name.
       const version = rendererVersion();
-      check(`render: the test app has @zoworkhq/forms ${ZF_RENDERER} or later (zf- names)`, atLeast(version, ZF_RENDERER), version);
+      check(`render: the test app has @zoworkhq/zoforms ${ZF_RENDERER} or later (zf- names)`, atLeast(version, ZF_RENDERER), version);
       await sleep(1500); // let the app's dev server see the new file
       // Opens the download in the test app, in a panel `width` pixels wide (the app's ?width=) or
       // at its default width, and shows the grid: it appears once the question its condition uses

@@ -24,7 +24,7 @@ const EnvSchema = z.object({
   PUBLIC_TENANT_URL: z.string().url().default("http://localhost:3000"),
   // Resend transactional email. Without a key, emails are logged and skipped.
   RESEND_API_KEY: z.string().optional(),
-  MAIL_FROM: z.string().default("Zowork Forms <onboarding@resend.dev>"),
+  MAIL_FROM: z.string().default("ZoForms <onboarding@resend.dev>"),
   // Google sign-in — verifies the ID token audience. Without it, the /google
   // endpoint rejects and the web login hides the Google button.
   GOOGLE_CLIENT_ID: z.string().optional(),

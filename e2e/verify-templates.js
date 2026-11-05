@@ -346,10 +346,10 @@ const HEALTH = {
       check("render: E2E_EXTERNAL_FORMS_DIR is set, so the app has this run's artifact", false, "set E2E_EXTERNAL_FORMS_DIR to the test app's src/forms");
     } else {
       // Condition ids and enableLogic need 0.20.0 or later.
-      const installed = path.join(process.env.E2E_EXTERNAL_FORMS_DIR, "..", "..", "node_modules", "@zoworkhq", "forms", "package.json");
+      const installed = path.join(process.env.E2E_EXTERNAL_FORMS_DIR, "..", "..", "node_modules", "@zoworkhq", "zoforms", "package.json");
       const version = fs.existsSync(installed) ? JSON.parse(fs.readFileSync(installed, "utf8")).version : "not installed";
       const [maj, min] = version.split(".").map(Number);
-      check("render: the test app has @zoworkhq/forms 0.20.0 or later", maj > 0 || min >= 20, version);
+      check("render: the test app has @zoworkhq/zoforms 0.20.0 or later", maj > 0 || min >= 20, version);
       await sleep(1500); // let the app's dev server see the new file
       const R = await ctx.newPage();
       R.on("pageerror", (e) => check("render: no page errors", false, e.message));

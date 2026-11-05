@@ -10,7 +10,7 @@ test.describe("home page", () => {
     await page.goto("/");
 
     await expect(page).toHaveURL(/\/$/);
-    await expect(page).toHaveTitle("Zowork Forms: clinical forms that run in your app");
+    await expect(page).toHaveTitle("ZoForms: clinical forms that run in your app");
     await expect(page.getByRole("heading", { level: 1 })).toHaveText("Clinical forms, built here, running in your app");
 
     const nav = page.getByRole("navigation", { name: "Main" });
@@ -24,7 +24,7 @@ test.describe("home page", () => {
   test("`/` carries its Open Graph data", async ({ page }) => {
     await page.goto("/");
 
-    await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", "Zowork Forms: clinical forms that run in your app");
+    await expect(page.locator('meta[property="og:title"]')).toHaveAttribute("content", "ZoForms: clinical forms that run in your app");
     await expect(page.locator('meta[property="og:description"]')).toHaveAttribute("content", /behavioral health teams/);
     const image = await page.locator('meta[property="og:image"]').getAttribute("content");
     expect(image).toMatch(/\/opengraph-image/);
@@ -67,7 +67,7 @@ test.describe("home page", () => {
 
   test("a question in the FAQ opens to its answer", async ({ page }) => {
     await page.goto("/");
-    const answer = page.getByText("Wherever your app sends them. Zowork Forms never sees them.");
+    const answer = page.getByText("Wherever your app sends them. ZoForms never sees them.");
 
     await expect(answer).toBeHidden();
     await page.getByText("Where are the answers stored?").click();
@@ -114,7 +114,7 @@ test.describe("home page", () => {
     await page.addInitScript(() => localStorage.setItem("frame_token", "smoke-test"));
     await page.goto("/login");
     // The logo is a client-side link: the pre-paint script doesn't run again.
-    await page.getByRole("link", { name: "Zowork Forms home" }).click();
+    await page.getByRole("link", { name: "ZoForms home" }).click();
 
     await expect(page).toHaveURL(/\/app$/);
   });

@@ -5,7 +5,7 @@
 //
 // It uses the network for Vite and React only, as npm create vite and npm install
 // fetch them. Everything else is local: the vendored tarball stands in for
-// `npm install @zoworkhq/forms` until the package is on npm, and Express,
+// `npm install @zoworkhq/zoforms` until the package is on npm, and Express,
 // Tailwind, and for the Next.js tutorial Next.js, React and TypeScript, are
 // linked from apps/web.
 //
@@ -22,8 +22,8 @@ const { ROOT, OUT, launchBrowser } = require("./_setup");
 const WEB = path.join(ROOT, "apps/web");
 const DOCS = path.join(WEB, "content/docs");
 const DIR = path.join(OUT, "dev-docs");
-// The package the web app installs: "file:../../vendor/zoworkhq-forms-<version>.tgz".
-const TARBALL = path.resolve(WEB, JSON.parse(fs.readFileSync(path.join(WEB, "package.json"), "utf8")).dependencies["@zoworkhq/forms"].replace(/^file:/, ""));
+// The package the web app installs: "file:../../vendor/zoworkhq-zoforms-<version>.tgz".
+const TARBALL = path.resolve(WEB, JSON.parse(fs.readFileSync(path.join(WEB, "package.json"), "utf8")).dependencies["@zoworkhq/zoforms"].replace(/^file:/, ""));
 fs.mkdirSync(DIR, { recursive: true });
 
 const results = [];
@@ -112,7 +112,7 @@ async function quickstart(tmp, browser) {
       const posted = [];
       P.on("pageerror", (e) => problems.push(e.message));
       P.on("console", (m) => {
-        if (m.type() === "error" || (m.type() === "warning" && m.text().includes("@zoworkhq/forms"))) problems.push(m.text());
+        if (m.type() === "error" || (m.type() === "warning" && m.text().includes("@zoworkhq/zoforms"))) problems.push(m.text());
       });
       P.on("request", (r) => {
         if (r.url().endsWith("/api/submit")) posted.push(JSON.parse(r.postData()));
@@ -226,7 +226,7 @@ async function drafts(app, browser) {
     path.join(app, "src/main.jsx"),
     `import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import '@zoworkhq/forms/styles.css';
+import '@zoworkhq/zoforms/styles.css';
 import { DeviceIntakePage } from './DeviceIntakePage.jsx';
 import { ServerIntakePage } from './ServerIntakePage.jsx';
 import { SignedOut } from './SignedOut.jsx';
@@ -254,7 +254,7 @@ createRoot(document.getElementById('root')).render(<StrictMode>{(pages[location.
     const watch = (P) => {
       P.on("pageerror", (e) => problems.push(e.message));
       P.on("console", (m) => {
-        if (m.type() === "error" || (m.type() === "warning" && m.text().includes("@zoworkhq/forms"))) problems.push(m.text());
+        if (m.type() === "error" || (m.type() === "warning" && m.text().includes("@zoworkhq/zoforms"))) problems.push(m.text());
       });
       return P;
     };
@@ -272,7 +272,7 @@ createRoot(document.getElementById('root')).render(<StrictMode>{(pages[location.
       P.evaluate(
         () =>
           new Promise((resolve, reject) => {
-            const open = indexedDB.open("zoworkhq-forms-drafts");
+            const open = indexedDB.open("zoworkhq-zoforms-drafts");
             open.onerror = () => reject(open.error);
             open.onsuccess = () => {
               const db = open.result;
@@ -293,7 +293,7 @@ createRoot(document.getElementById('root')).render(<StrictMode>{(pages[location.
             };
           }),
       );
-    const tabEntries = (P) => P.evaluate(() => Object.fromEntries(Object.keys(sessionStorage).filter((k) => k.startsWith("@zoworkhq/forms:")).map((k) => [k, JSON.parse(sessionStorage.getItem(k))])));
+    const tabEntries = (P) => P.evaluate(() => Object.fromEntries(Object.keys(sessionStorage).filter((k) => k.startsWith("@zoworkhq/zoforms:")).map((k) => [k, JSON.parse(sessionStorage.getItem(k))])));
 
     // On this device.
     {
@@ -310,7 +310,7 @@ createRoot(document.getElementById('root')).render(<StrictMode>{(pages[location.
       const before = Date.now();
       const db = await database(P);
       const [record] = db.records;
-      check("device mode: one IndexedDB database zoworkhq-forms-drafts, store drafts, indexes on scopeHash and ownerHash", db.stores.join() === "drafts" && db.indexes.slice().sort().join() === "ownerHash,scopeHash" && db.records.length === 1, JSON.stringify({ stores: db.stores, indexes: db.indexes, n: db.records.length }));
+      check("device mode: one IndexedDB database zoworkhq-zoforms-drafts, store drafts, indexes on scopeHash and ownerHash", db.stores.join() === "drafts" && db.indexes.slice().sort().join() === "ownerHash,scopeHash" && db.records.length === 1, JSON.stringify({ stores: db.stores, indexes: db.indexes, n: db.records.length }));
       // The device draft's table: the tab copy's has a third column.
       const fieldTable = tableOf("integrate/concepts/browser-storage", ["Field", "What it holds"]).map((r) => r[0]);
       check("its record has the fields the browser-storage page lists", JSON.stringify(Object.keys(record ?? {}).sort()) === JSON.stringify(fieldTable.sort()), `${Object.keys(record ?? {})} vs ${fieldTable}`);
@@ -331,7 +331,7 @@ createRoot(document.getElementById('root')).render(<StrictMode>{(pages[location.
       check("it opens with the user's key, as the whole draft, hidden answer included", draft.formId === deviceForm.formId && draft.formVersionId === deviceForm.formVersionId && draft.answers.therapist_name?.value === "Dr. Demo" && typeof draft.savedAt === "string", JSON.stringify(draft));
 
       const tab = await tabEntries(P);
-      const tabKey = `@zoworkhq/forms:${deviceForm.formId}:${deviceForm.formVersionId}:${sha256(scope)}`;
+      const tabKey = `@zoworkhq/zoforms:${deviceForm.formId}:${deviceForm.formVersionId}:${sha256(scope)}`;
       check("the tab's copy is keyed by the scope's hash, holds the hidden answer, and has no startedAt or address", Object.keys(tab).join() === tabKey && tab[tabKey].answers.therapist_name?.value === "Dr. Demo" && tab[tabKey].ownerHash === sha256("user-demo-1") && !("startedAt" in tab[tabKey]) && !("address" in tab[tabKey]), JSON.stringify(tab));
       await P.screenshot({ path: path.join(DIR, "drafts-device-form.png"), fullPage: true });
 
@@ -446,8 +446,8 @@ async function styling(app, browser) {
     path.join(app, "src/main.jsx"),
     `import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { FormRenderer } from '@zoworkhq/forms/react';
-import '@zoworkhq/forms/styles.css';
+import { FormRenderer } from '@zoworkhq/zoforms/react';
+import '@zoworkhq/zoforms/styles.css';
 import './index.css';
 import schema from './intake-server.json';
 
@@ -648,7 +648,7 @@ async function nextjsIn(tmp, browser) {
   );
   check(
     "nextjs: building the static page with a refused form file succeeds, and the build's output has the reason",
-    built.log.includes("@zoworkhq/forms: this form can't be shown.") && built.log.includes("Upgrade @zoworkhq/forms to render it."),
+    built.log.includes("@zoworkhq/zoforms: this form can't be shown.") && built.log.includes("Upgrade @zoworkhq/zoforms to render it."),
     built.log.slice(-1500),
   );
 
@@ -682,7 +682,7 @@ async function nextjsIn(tmp, browser) {
       P.on("console", (m) => {
         if (m.text().startsWith("The intake form could not be shown")) stacks.push(m.args()[2]?.jsonValue().catch(() => "?"));
         if (m.text().startsWith("Failed to load resource")) return;
-        if (m.type() === "error" || (m.type() === "warning" && m.text().includes("@zoworkhq/forms"))) problems.push(m.text());
+        if (m.type() === "error" || (m.type() === "warning" && m.text().includes("@zoworkhq/zoforms"))) problems.push(m.text());
       });
       // A new app has a favicon; this one, made by hand, doesn't.
       P.on("response", (r) => r.status() >= 400 && !r.url().endsWith("/favicon.ico") && problems.push(`${r.status()} ${r.url()}`));
@@ -698,7 +698,7 @@ async function nextjsIn(tmp, browser) {
       await P.getByRole("radio", { name: "Video" }).check();
       await P.getByRole("radio", { name: "No", exact: true }).check();
     };
-    const tabKey = (scope) => `@zoworkhq/forms:${form.formId}:${form.formVersionId}:${sha256(scope)}`;
+    const tabKey = (scope) => `@zoworkhq/zoforms:${form.formId}:${form.formVersionId}:${sha256(scope)}`;
 
     {
       const { context, P, problems, posted } = await open("/intake");
@@ -779,7 +779,7 @@ async function nextjsIn(tmp, browser) {
 
     // A form file the form refuses: the message on the server and in the browser, a 200, and onRenderError once, in the browser.
     const MESSAGE = /This form can(?:'|&#x27;|&#39;)t be shown right now\. Please try again later\./;
-    const ours = (p) => p.includes("The intake form could not be shown") || p.includes("@zoworkhq/forms: this form can't be shown.");
+    const ours = (p) => p.includes("The intake form could not be shown") || p.includes("@zoworkhq/zoforms: this form can't be shown.");
     for (const route of ["/broken-static", "/broken", "/broken-suspense"]) {
       const response = await fetch(`${base}${route}`);
       const html = await response.text();
@@ -798,7 +798,7 @@ async function nextjsIn(tmp, browser) {
       check(`nextjs: in the browser, ${route} has no other error, hydration included`, problems.filter((p) => !ours(p)).length === 0, problems.join(" | "));
       await context.close();
     }
-    check("nextjs: the server logged the reason", server.log.includes("@zoworkhq/forms: this form can't be shown.") && server.log.includes("Upgrade @zoworkhq/forms to render it."));
+    check("nextjs: the server logged the reason", server.log.includes("@zoworkhq/zoforms: this form can't be shown.") && server.log.includes("Upgrade @zoworkhq/zoforms to render it."));
   } finally {
     server.child.kill();
   }

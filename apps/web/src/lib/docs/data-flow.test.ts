@@ -11,7 +11,7 @@ import { getPage } from "./content";
  */
 
 const ROOT = path.join(process.cwd(), "..", "..");
-const DIST = path.join(process.cwd(), "node_modules", "@zoworkhq", "forms", "dist");
+const DIST = path.join(process.cwd(), "node_modules", "@zoworkhq", "zoforms", "dist");
 const page = getPage("compliance/data-flow")!;
 const says = (text: string) => expect(page.body.replace(/\s+/g, " ")).toContain(text);
 

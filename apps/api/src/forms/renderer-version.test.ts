@@ -11,15 +11,15 @@ const manifest = (app: string) => JSON.parse(readFileSync(join(__dirname, "../..
 const IDS = { formId: "00000000-0000-4000-8000-000000000001", formVersionId: "00000000-0000-4000-8000-000000000002" };
 
 describe("the API's renderer is the web app's", () => {
-  it("both install @zoworkhq/forms from the same vendored tarball", () => {
-    const api = manifest("api").dependencies["@zoworkhq/forms"];
-    expect(api).toMatch(/^file:\.\.\/\.\.\/vendor\/zoworkhq-forms-\d+\.\d+\.\d+\.tgz$/);
-    expect(api).toBe(manifest("web").dependencies["@zoworkhq/forms"]);
+  it("both install @zoworkhq/zoforms from the same vendored tarball", () => {
+    const api = manifest("api").dependencies["@zoworkhq/zoforms"];
+    expect(api).toMatch(/^file:\.\.\/\.\.\/vendor\/zoworkhq-zoforms-\d+\.\d+\.\d+\.tgz$/);
+    expect(api).toBe(manifest("web").dependencies["@zoworkhq/zoforms"]);
   });
 
   it("the installed /core is that version", () => {
     const pkg = JSON.parse(readFileSync(join(rendererCoreFile(), "../../../package.json"), "utf8"));
-    expect(`file:../../vendor/zoworkhq-forms-${pkg.version}.tgz`).toBe(manifest("api").dependencies["@zoworkhq/forms"]);
+    expect(`file:../../vendor/zoworkhq-zoforms-${pkg.version}.tgz`).toBe(manifest("api").dependencies["@zoworkhq/zoforms"]);
   });
 
   it("the save rules use the renderer's default maximum number of entries", async () => {

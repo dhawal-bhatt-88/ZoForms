@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { prepareSubmission } from "@zoworkhq/forms/core";
+import { prepareSubmission } from "@zoworkhq/zoforms/core";
 import { CONTENT_DIR, getPage } from "./content";
 import { textOf, walk, type MdNode } from "./mdast";
 import { firstQuestion, looseForm as formFor, stores } from "./question-forms";

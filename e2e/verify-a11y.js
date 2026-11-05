@@ -104,7 +104,7 @@ const DOCS_PAGES = [
   ["Repeating groups", "/docs/build/structure/repeating-groups"],
   ["Pages, progress and review", "/docs/build/structure/pages"],
   ["Show a question only when it applies", "/docs/build/show-questions-conditionally"],
-  ["How Zowork Forms fits your app", "/docs/integrate/overview"],
+  ["How ZoForms fits your app", "/docs/integrate/overview"],
   ["Quickstart", "/docs/integrate/quickstart"],
   ["Build an intake page in Next.js", "/docs/integrate/tutorial-nextjs"],
   ["Validate and store submissions", "/docs/integrate/validate-and-store"],

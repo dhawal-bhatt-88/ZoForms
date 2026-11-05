@@ -3,7 +3,7 @@ title: What is stored in the browser
 summary: Every key the package writes in the respondent's browser, what is in it, how long it lasts and what deletes it, for each drafts mode.
 template: concept
 badges: []
-updated: 2026-11-04
+updated: 2026-11-05
 prev: /docs/integrate/concepts/answers
 next: /docs/examples/follow-up-question
 ---
@@ -21,6 +21,10 @@ The package keeps a respondent's progress in two places in the browser: a copy i
 
 It sets no cookies and writes nothing to `localStorage`. [Save progress (drafts)](/docs/integrate/drafts) says how to choose and set up a mode.
 
+<Note>
+The names on this page are from 0.29.0, when the package was renamed. Progress saved by an earlier version, under `@zoworkhq/forms:` keys or in the `zoworkhq-forms-drafts` database, isn't carried over: the package doesn't read, move or delete it. Drafts you store on your server are unaffected; only their tab copy's key changed.
+</Note>
+
 ## The tab's copy
 
 Every mode but `off` keeps one, so a refresh never depends on the network or a key.
@@ -29,8 +33,8 @@ Every mode but `off` keeps one, so a refresh never depends on the network or a k
 
 | The form has | Key |
 |---|---|
-| No `scope` | `@zoworkhq/forms:{formId}:{formVersionId}` |
-| A `scope`, in any mode | `@zoworkhq/forms:{formId}:{formVersionId}:{scopeHash}` |
+| No `scope` | `@zoworkhq/zoforms:{formId}:{formVersionId}` |
+| A `scope`, in any mode | `@zoworkhq/zoforms:{formId}:{formVersionId}:{scopeHash}` |
 
 `{scopeHash}` is the hex SHA-256 of the `scope`, so a different user or client in the same tab never gets the copy.
 
@@ -65,7 +69,7 @@ Every mode but `off` keeps one, so a refresh never depends on the network or a k
 
 Device mode only.
 
-**Where.** The IndexedDB database `zoworkhq-forms-drafts`, in its object store `drafts`, with indexes on `scopeHash` and `ownerHash` so `clearDrafts` can find every draft for a scope or owner.
+**Where.** The IndexedDB database `zoworkhq-zoforms-drafts`, in its object store `drafts`, with indexes on `scopeHash` and `ownerHash` so `clearDrafts` can find every draft for a scope or owner.
 
 **Key.** One record per scope and form: the hex SHA-256 of the `scope`, the character U+0000, and the `formId`.
 

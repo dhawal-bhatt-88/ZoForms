@@ -54,7 +54,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         <p className="body-sm mt-2 text-graphite">
           {isSignup
             ? "Build forms with logic and scoring, then download them for your app."
-            : "Log in to your Zowork Forms workspace."}
+            : "Log in to your ZoForms workspace."}
         </p>
 
         {signedOut && (
@@ -141,7 +141,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           </>
         ) : (
           <>
-            New to Zowork Forms?{" "}
+            New to ZoForms?{" "}
             <Link href="/signup" className="link font-medium">
               Create an account
             </Link>

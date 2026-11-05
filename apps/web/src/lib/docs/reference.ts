@@ -43,7 +43,7 @@ export type ReferenceType = {
 
 export type TypeReference = { package: string; types: ReferenceType[] };
 
-const PACKAGE_DIR = path.join(process.cwd(), "node_modules", "@zoworkhq", "forms");
+const PACKAGE_DIR = path.join(process.cwd(), "node_modules", "@zoworkhq", "zoforms");
 
 /** Doc comment text without the comment markers. */
 function docOf(node: ts.Node, text: string): string | null {
@@ -72,7 +72,7 @@ function destructuredDefaults(js: string, fn: string): Map<string, string> {
   return out;
 }
 
-const packageName = (dir: string) => `@zoworkhq/forms ${JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8")).version as string}`;
+const packageName = (dir: string) => `@zoworkhq/zoforms ${JSON.parse(fs.readFileSync(path.join(dir, "package.json"), "utf8")).version as string}`;
 
 export function formRendererReference(dir = PACKAGE_DIR): Reference {
   const dtsPath = path.join(dir, "dist", "react", "index.d.ts");
@@ -165,7 +165,7 @@ export function typeReference(names: readonly string[], dir = PACKAGE_DIR): Type
         members: membersOf(node, file, text),
       };
     }
-    throw new Error(`@zoworkhq/forms declares no "${name}"`);
+    throw new Error(`@zoworkhq/zoforms declares no "${name}"`);
   };
   return { package: packageName(dir), types: [...new Set(names)].sort().map(find) };
 }

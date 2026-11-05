@@ -3,7 +3,7 @@ title: prepareSubmission and validateSubmission
 summary: Check a posted body on your server against the form file, and get back the submission to store.
 template: function-reference
 badges: [Server]
-updated: 2026-11-04
+updated: 2026-11-05
 prev: /docs/integrate/reference/form-renderer
 next: /docs/integrate/reference/clear-drafts
 ---
@@ -11,13 +11,13 @@ next: /docs/integrate/reference/clear-drafts
 ## Import
 
 ```js check=esm
-import { prepareSubmission, validateSubmission } from '@zoworkhq/forms/core';
+import { prepareSubmission, validateSubmission } from '@zoworkhq/zoforms/core';
 ```
 
 Or, in CommonJS:
 
 ```js check=cjs run=node
-const { prepareSubmission, validateSubmission } = require('@zoworkhq/forms/core');
+const { prepareSubmission, validateSubmission } = require('@zoworkhq/zoforms/core');
 ```
 
 `/core` needs no React. On a server it needs Node 20 or later.
@@ -203,7 +203,7 @@ Answer these with a 500, not a 422, and fix the cause. No request can make them 
 | Situation | What is thrown |
 |---|---|
 | The form file is malformed: an unknown type, a bad condition, or a text value that isn't text | An `Error` naming the block, such as `Block "a" has unknown type "nope".` |
-| The form file's `schemaVersion` is newer than this package supports | `This form uses schemaVersion 3, which this version of @zoworkhq/forms does not support (it supports 1 and 2). Upgrade @zoworkhq/forms to render it.` |
+| The form file's `schemaVersion` is newer than this package supports | `This form uses schemaVersion 3, which this version of @zoworkhq/zoforms does not support (it supports 1 and 2). Upgrade @zoworkhq/zoforms to render it.` |
 | `validators` isn't an array, or an entry isn't `{ field, validate }`, or `field` isn't an answerable question | A `TypeError` naming the entry |
 | `validateSubmission` is given a `pageId` the form doesn't have | `Cannot validate page "x": this form has no page with that id.` |
 

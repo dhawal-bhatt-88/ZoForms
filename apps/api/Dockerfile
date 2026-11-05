@@ -18,7 +18,7 @@ COPY apps/admin/package.json ./apps/admin/package.json
 COPY apps/api/package.json ./apps/api/package.json
 COPY packages/form-schema/package.json ./packages/form-schema/package.json
 COPY packages/ui/package.json ./packages/ui/package.json
-# The lockfile covers every workspace, and the web app's @zoworkhq/forms is this committed tarball.
+# The lockfile covers every workspace, and the web app's @zoworkhq/zoforms is this committed tarball.
 COPY vendor ./vendor
 # --ignore-scripts: the api postinstall (prisma generate) needs the schema,
 # which isn't copied yet — we run generate explicitly in the build stage.

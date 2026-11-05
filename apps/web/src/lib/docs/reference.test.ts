@@ -2,9 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import ts from "typescript";
-import * as core from "@zoworkhq/forms/core";
-import * as react from "@zoworkhq/forms/react";
-import { prepareSubmission, type FormSchema } from "@zoworkhq/forms/core";
+import * as core from "@zoworkhq/zoforms/core";
+import * as react from "@zoworkhq/zoforms/react";
+import { prepareSubmission, type FormSchema } from "@zoworkhq/zoforms/core";
 import { CONTENT_DIR, getLivePages, getPage, readCss, readReference, readTypes } from "./content";
 import { attributesOf, textOf, walk } from "./mdast";
 import { livePages } from "./nav";
@@ -72,7 +72,7 @@ describe.each(getLivePages().filter((p) => shownOn(p.slug).length > 0).map((p) =
 
 describe("the package's exports", () => {
   const ledger = JSON.parse(fs.readFileSync(path.join(CONTENT_DIR, "integrate", "reference", "core-exports.json"), "utf8")) as Record<string, Record<string, string>>;
-  const dist = path.join(process.cwd(), "node_modules", "@zoworkhq", "forms", "dist");
+  const dist = path.join(process.cwd(), "node_modules", "@zoworkhq", "zoforms", "dist");
   /** Every name an entry point's .d.ts exports. */
   const exportsOf = (entry: string) => {
     const full = path.join(dist, entry, "index.d.ts");
@@ -272,7 +272,7 @@ describe("the CSS reference", () => {
   });
 
   it("has every public custom property the stylesheet reads, and only those", () => {
-    const css = fs.readFileSync(path.join(process.cwd(), "node_modules", "@zoworkhq", "forms", "dist", "styles.css"), "utf8");
+    const css = fs.readFileSync(path.join(process.cwd(), "node_modules", "@zoworkhq", "zoforms", "dist", "styles.css"), "utf8");
     const used = [...new Set([...css.matchAll(/var\((--zf-[\w-]+)/g)].map((m) => m[1]))].sort();
     expect(fresh.properties.map((p) => p.name).sort()).toEqual(used);
   });

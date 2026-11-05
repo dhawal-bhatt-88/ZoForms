@@ -5,7 +5,7 @@
 // logic text opening clean, the delete dialogs' wording for mixed logic, the
 // refusal guards, and every invalid condition through the API. With
 // E2E_EXTERNAL_APP_URL set, a download using `1 OR (2 AND 3)` is rendered with
-// @zoworkhq/forms 0.20.0 or later, and shown, hidden and submitted as the logic says.
+// @zoworkhq/zoforms 0.20.0 or later, and shown, hidden and submitted as the logic says.
 const fs = require("fs");
 const path = require("path");
 const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, opts, noIds, hasIds } = require("./_setup");
@@ -450,7 +450,7 @@ const yes = (question, id) => ({ ...(id ? { id } : {}), question, operator: "=",
       text.includes(`The conditions 'Show when ${A}', 'Show when ${B}', 'Show when ${C}' (combined as "1 OR (2") will no longer apply to this question.`), text);
     await dialog.getByRole("button", { name: "Cancel" }).click();
 
-    // ================= render with @zoworkhq/forms (optional) =================
+    // ================= render with @zoworkhq/zoforms (optional) =================
     const renderId = await create("Builder logic");
     await putTo(renderId, { title: "Builder logic", blocks: [
       yesNo("smokes", "Smokes?"), yesNo("drinks", "Drinks?"), yesNo("minor", "Under 18?"),
@@ -472,11 +472,11 @@ const yes = (question, id) => ({ ...(id ? { id } : {}), question, operator: "=",
     } else {
       // Condition ids and enableLogic need 0.20.0 or later. Anything older: say so and don't render.
       const appRoot = path.join(process.env.E2E_EXTERNAL_FORMS_DIR, "..", "..");
-      const installed = path.join(appRoot, "node_modules", "@zoworkhq", "forms", "package.json");
+      const installed = path.join(appRoot, "node_modules", "@zoworkhq", "zoforms", "package.json");
       const version = fs.existsSync(installed) ? JSON.parse(fs.readFileSync(installed, "utf8")).version : "not installed";
       const [maj, min] = version.split(".").map(Number);
       const recent = maj > 0 || min >= 20;
-      check("render: the test app has @zoworkhq/forms 0.20.0 or later", recent, version);
+      check("render: the test app has @zoworkhq/zoforms 0.20.0 or later", recent, version);
       if (recent) {
         // Restart the test app's API: it runs under `node --watch`, which restarts on a change to its entry file.
         const server = path.join(appRoot, "server", "index.mjs");

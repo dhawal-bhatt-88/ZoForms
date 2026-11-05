@@ -260,13 +260,13 @@ export const Door = ({ title, href, children }: Children & { title: string; href
 );
 
 const STAGES = [
-  { label: "Zowork Forms builder", body: "You build the form." },
+  { label: "ZoForms builder", body: "You build the form." },
   { label: "JSON form file", body: "You download it." },
-  { label: "@zoworkhq/forms in your app", body: "Renders the file.", mono: true },
+  { label: "@zoworkhq/zoforms in your app", body: "Renders the file.", mono: true },
   { label: "Your API", body: "Receives the answers." },
 ];
 
-/** Builder → form file → @zoworkhq/forms in your app → your API, as an ordered list. */
+/** Builder → form file → @zoworkhq/zoforms in your app → your API, as an ordered list. */
 export const Architecture = () => (
   <figure className="my-8">
     <ol className="grid gap-3 min-[900px]:grid-cols-4">
@@ -285,7 +285,7 @@ export const Architecture = () => (
       ))}
     </ol>
     <figcaption className="body-sm mt-3 text-graphite">
-      Nothing a person types into the form reaches Zowork Forms: your app posts the answers to your own API.
+      Nothing a person types into the form reaches ZoForms: your app posts the answers to your own API.
     </figcaption>
   </figure>
 );

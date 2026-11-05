@@ -9,7 +9,7 @@
 // is covered by the unit tests and verify-scoring-api.js (decision C).
 //
 // With E2E_EXTERNAL_APP_URL set, the download is rendered in the external test
-// app (?form=builder-scoring, @zoworkhq/forms 0.25.0 or later), filled in and submitted;
+// app (?form=builder-scoring, @zoworkhq/zoforms 0.25.0 or later), filled in and submitted;
 // the scores shown after submit and the test app API's derived.scores are
 // checked against the expected values, with one score left without a value
 // because a question it uses is unanswered ("No score").
@@ -289,7 +289,7 @@ const moodTemplate = {
       const appRoot = path.join(process.env.E2E_EXTERNAL_FORMS_DIR, "..", "..");
       // Scores need 0.23.0, and the checks below read the renderer's zf- class names.
       const version = rendererVersion();
-      check(`render: the test app has @zoworkhq/forms ${ZF_RENDERER} or later (zf- names)`, atLeast(version, ZF_RENDERER), version);
+      check(`render: the test app has @zoworkhq/zoforms ${ZF_RENDERER} or later (zf- names)`, atLeast(version, ZF_RENDERER), version);
       await sleep(1500); // let the app's dev server see the new file
       const R = await ctx.newPage();
       R.on("pageerror", (e) => check("render: no page errors", false, e.message));

@@ -4,8 +4,8 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import postcss from "postcss";
 import { beforeAll, describe, expect, it } from "vitest";
-import { prepareSubmission, type FormSchema } from "@zoworkhq/forms/core";
-import { classNames } from "@zoworkhq/forms/react";
+import { prepareSubmission, type FormSchema } from "@zoworkhq/zoforms/core";
+import { classNames } from "@zoworkhq/zoforms/react";
 import { compileExamples, examplesOf, fenceProblem, FORM_FILES, isDeveloperPage, pageFolder, writeProject, type CodeExample } from "./code-examples";
 import { getLivePages } from "./content";
 
@@ -26,7 +26,7 @@ const COMMANDS = new Set([
   "npm create vite@latest intake-app -- --template react",
   "cd intake-app",
   "npm install",
-  "npm install @zoworkhq/forms",
+  "npm install @zoworkhq/zoforms",
   "npm install express@4",
   "node server.js",
   "npm run dev",
@@ -101,14 +101,14 @@ const broken = (check: CodeExample["check"], lang: string, code: string, file: s
 describe("the compile check itself", () => {
   // Passing means nothing unless a wrong example fails, in each kind of block.
   it.each([
-    ["a missing argument, in ES modules", broken("esm", "js", "import { prepareSubmission } from '@zoworkhq/forms/core';\nprepareSubmission();", "a.js")],
-    ["an export that doesn't exist, in CommonJS", broken("cjs", "js", "const { nope } = require('@zoworkhq/forms/core');\nconsole.log(nope);", "b.cjs")],
-    ["a validator's value used without checking it, once typed", broken("esm", "js", "/** @type {import('@zoworkhq/forms/core').FieldValidator[]} */\nexport const v = [{ field: 'a', validate: ({ value }) => value.length }];", "c.js")],
-    ["a strict TypeScript error", broken("esm", "ts", "import { prepareSubmission } from '@zoworkhq/forms/core';\nconst r = prepareSubmission({} as never, {});\nexport const s: string = r.ok;", "d.ts")],
+    ["a missing argument, in ES modules", broken("esm", "js", "import { prepareSubmission } from '@zoworkhq/zoforms/core';\nprepareSubmission();", "a.js")],
+    ["an export that doesn't exist, in CommonJS", broken("cjs", "js", "const { nope } = require('@zoworkhq/zoforms/core');\nconsole.log(nope);", "b.cjs")],
+    ["a validator's value used without checking it, once typed", broken("esm", "js", "/** @type {import('@zoworkhq/zoforms/core').FieldValidator[]} */\nexport const v = [{ field: 'a', validate: ({ value }) => value.length }];", "c.js")],
+    ["a strict TypeScript error", broken("esm", "ts", "import { prepareSubmission } from '@zoworkhq/zoforms/core';\nconst r = prepareSubmission({} as never, {});\nexport const s: string = r.ok;", "d.ts")],
     ["a prop that doesn't exist", broken("fragment", "jsx", '<FormRenderer schema={schema} endpoints="/x" />', "e.tsx")],
     ["a name outside the prelude", broken("fragment", "jsx", "<FormRenderer schema={schema} endpoint={missing} />", "f.tsx")],
-    ["a bare import of the package", broken("browser", "jsx", "import x from '@zoworkhq/forms';\nexport default x;", "g.jsx")],
-    ["a form file without its cast, in TypeScript", broken("browser", "tsx", "import { FormRenderer } from '@zoworkhq/forms/react';\nimport schema from './intake-form.json';\nexport const A = () => <FormRenderer schema={schema} endpoint=\"/x\" />;", "h.tsx")],
+    ["a bare import of the package", broken("browser", "jsx", "import x from '@zoworkhq/zoforms';\nexport default x;", "g.jsx")],
+    ["a form file without its cast, in TypeScript", broken("browser", "tsx", "import { FormRenderer } from '@zoworkhq/zoforms/react';\nimport schema from './intake-form.json';\nexport const A = () => <FormRenderer schema={schema} endpoint=\"/x\" />;", "h.tsx")],
   ])("fails on %s", { timeout: 60_000 }, (_, example) => {
     writeProject(example.page, [example]);
     expect(compileExamples([example]).errors).not.toEqual([]);
@@ -116,13 +116,13 @@ describe("the compile check itself", () => {
 
   it("accepts, without a cast, a form file with no condition, page, drafts mode or progress style", { timeout: 60_000 }, () => {
     // The cast rule the pages give (renderer 0.28.1): visit-feedback has questions, a group and scores only.
-    const example = broken("browser", "tsx", "import { FormRenderer } from '@zoworkhq/forms/react';\nimport schema from './visit-feedback.json';\nexport const A = () => <FormRenderer schema={schema} endpoint=\"/x\" />;", "src/FeedbackNoCast.tsx");
+    const example = broken("browser", "tsx", "import { FormRenderer } from '@zoworkhq/zoforms/react';\nimport schema from './visit-feedback.json';\nexport const A = () => <FormRenderer schema={schema} endpoint=\"/x\" />;", "src/FeedbackNoCast.tsx");
     writeProject(example.page, [example]);
     expect(compileExamples([example]).errors).toEqual([]);
   });
 
   it("accepts the same form file with its cast", { timeout: 60_000 }, () => {
-    const example = broken("browser", "tsx", "import { FormRenderer } from '@zoworkhq/forms/react';\nimport type { FormSchema } from '@zoworkhq/forms/core';\nimport data from './intake-form.json';\nexport const A = () => <FormRenderer schema={data as FormSchema} endpoint=\"/x\" />;", "src/IntakeCast.tsx");
+    const example = broken("browser", "tsx", "import { FormRenderer } from '@zoworkhq/zoforms/react';\nimport type { FormSchema } from '@zoworkhq/zoforms/core';\nimport data from './intake-form.json';\nexport const A = () => <FormRenderer schema={data as FormSchema} endpoint=\"/x\" />;", "src/IntakeCast.tsx");
     writeProject(example.page, [example]);
     expect(compileExamples([example]).errors).toEqual([]);
   });
@@ -149,8 +149,8 @@ describe("the developer pages' code", () => {
   });
 
   it("imports only the package's three entry points", () => {
-    const imported = examples.flatMap((e) => [...e.code.matchAll(/(?:from|import|require\()\s*['"](@zoworkhq\/forms[^'"]*)['"]/g)].map((m) => m[1]));
-    expect(new Set(imported)).toEqual(new Set(["@zoworkhq/forms/react", "@zoworkhq/forms/core", "@zoworkhq/forms/styles.css"]));
+    const imported = examples.flatMap((e) => [...e.code.matchAll(/(?:from|import|require\()\s*['"](@zoworkhq\/zoforms[^'"]*)['"]/g)].map((m) => m[1]));
+    expect(new Set(imported)).toEqual(new Set(["@zoworkhq/zoforms/react", "@zoworkhq/zoforms/core", "@zoworkhq/zoforms/styles.css"]));
   });
 
   it("tells readers to run only known commands", () => {
@@ -181,7 +181,7 @@ describe("the developer pages' code", () => {
 
   it("names only real classes and custom properties in CSS", () => {
     const known = new Set<string>(Object.values(classNames));
-    const css = fs.readFileSync(path.join(process.cwd(), "node_modules", "@zoworkhq", "forms", "dist", "styles.css"), "utf8");
+    const css = fs.readFileSync(path.join(process.cwd(), "node_modules", "@zoworkhq", "zoforms", "dist", "styles.css"), "utf8");
     for (const example of examples.filter((e) => e.lang === "css")) {
       postcss.parse(example.code);
       for (const [, name] of example.code.matchAll(/\.(zf-[a-z0-9-]+)/g)) expect(known, example.page).toContain(name);

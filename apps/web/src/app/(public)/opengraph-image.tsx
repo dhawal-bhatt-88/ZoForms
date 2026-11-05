@@ -7,7 +7,7 @@ import { ImageResponse } from "next/og";
  * (paper, ink, graphite, brand); the mark is ZoBlocksMark in components/logo.tsx.
  */
 
-export const alt = "Zowork Forms: clinical forms that run in your app";
+export const alt = "ZoForms: clinical forms that run in your app";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -32,7 +32,7 @@ export default function OpengraphImage() {
             <rect x="2.5" y="3" width="9.5" height="10" rx="2" fill="none" stroke="#08110f" strokeWidth="2" />
             <rect x="16" y="3" width="9.5" height="10" rx="2" fill="none" stroke="#08110f" strokeWidth="2" />
           </svg>
-          <div style={{ fontSize: 72, fontWeight: 600, letterSpacing: "-0.02em" }}>Zowork Forms</div>
+          <div style={{ fontSize: 72, fontWeight: 600, letterSpacing: "-0.02em" }}>ZoForms</div>
         </div>
         <div style={{ marginTop: 40, fontSize: 40, lineHeight: 1.3, color: "#5a6b67", maxWidth: 900 }}>
           Clinical forms, built here, running in your app.

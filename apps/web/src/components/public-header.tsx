@@ -89,7 +89,7 @@ export function PublicHeader({
             <ul className="flex flex-col gap-1 sm:flex-row sm:items-center">
               {docs ? (
                 <>
-                  <li className="px-2.5 py-2 font-mono text-[0.75rem] text-graphite sm:py-1.5">@zoworkhq/forms {docs.version}</li>
+                  <li className="px-2.5 py-2 font-mono text-[0.75rem] text-graphite sm:py-1.5">@zoworkhq/zoforms {docs.version}</li>
                   {/* No page yet (docs brief, decision 9): plain text, marked "soon", as in the footer. */}
                   <li className="flex items-center gap-1.5 px-2.5 py-2 text-[0.8125rem] text-graphite sm:py-1.5">
                     Release notes <StatusChip>soon</StatusChip>

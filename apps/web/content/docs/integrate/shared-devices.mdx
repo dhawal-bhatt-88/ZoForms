@@ -3,7 +3,7 @@ title: Shared devices and kiosks
 summary: A tablet in a waiting room or a shared workstation. What each drafts mode leaves in the browser, the settings to use, and what no setting can prevent.
 template: how-to
 badges: [React]
-updated: 2026-11-03
+updated: 2026-11-05
 prev: /docs/integrate/drafts
 next: /docs/integrate/styling
 ---
@@ -47,7 +47,7 @@ Nobody signs in on a kiosk, so nothing can tell one respondent from the next. Tu
 
 ```jsx file=src/KioskIntake.jsx check=browser run=browser
 import { useState } from 'react';
-import { FormRenderer } from '@zoworkhq/forms/react';
+import { FormRenderer } from '@zoworkhq/zoforms/react';
 import schema from './intake-form.json';
 
 export function KioskIntake() {

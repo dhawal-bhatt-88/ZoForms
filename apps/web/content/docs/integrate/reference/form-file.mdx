@@ -3,7 +3,7 @@ title: The form file
 summary: What the builder's Download gives you, from its ids and schemaVersion to its blocks, with the type for each part.
 template: data-reference
 badges: [JSON]
-updated: 2026-11-04
+updated: 2026-11-05
 prev: /docs/integrate/reference/posted-body
 next: /docs/integrate/reference/css
 ---
@@ -12,7 +12,7 @@ next: /docs/integrate/reference/css
 
 - **Download in the builder gives one JSON file** for the form's latest saved version, named from its title and version number, such as `client-intake-v3.json`.
 - **You pass it to both sides:** to `FormRenderer` as `schema`, and to `prepareSubmission` on your server.
-- **Its type is `FormSchema`,** from `@zoworkhq/forms/core`. In TypeScript, cast a file imported from JSON: see [Use it with your framework](/docs/integrate/frameworks) for when it's needed.
+- **Its type is `FormSchema`,** from `@zoworkhq/zoforms/core`. In TypeScript, cast a file imported from JSON: see [Use it with your framework](/docs/integrate/frameworks) for when it's needed.
 - **The form checks the file when it renders,** and `prepareSubmission` checks it too. The builder won't download a version the form would refuse.
 
 ## An example

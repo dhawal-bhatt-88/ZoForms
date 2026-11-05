@@ -58,6 +58,6 @@ describe("the invite email, with the audit's hostile organisation name", () => {
     expect(email.html).not.toContain("<img");
     expect(email.html).toContain("Join &lt;img src=x onerror=alert(1)&gt;");
     expect(email.html).toContain("You&#39;ve been invited as <strong>Editor</strong>. Accept to get started.");
-    expect(email.subject).toBe(`You're invited to ${HOSTILE}'s team on Zowork Forms`);
+    expect(email.subject).toBe(`You're invited to ${HOSTILE}'s team on ZoForms`);
   });
 });

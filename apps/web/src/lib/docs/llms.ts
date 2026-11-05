@@ -13,9 +13,9 @@ export function llmsTxt(pages: readonly DocsPage[], origin: string): string {
     sections.set(section, [...(sections.get(section) ?? []), page]);
   }
   const lines = [
-    "# Zowork Forms",
+    "# ZoForms",
     "",
-    "> Build clinical forms with logic and scoring in the Zowork Forms builder, then render them in your own app with @zoworkhq/forms. Answers go to your own API.",
+    "> Build clinical forms with logic and scoring in the ZoForms builder, then render them in your own app with @zoworkhq/zoforms. Answers go to your own API.",
     "",
     "Every page below is the Markdown version of a page at /docs.",
   ];

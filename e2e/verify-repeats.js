@@ -1,6 +1,6 @@
 // Repeating groups (contract §12): every save rule through the API, the editor's Repeats
 // toggle, fields, inline errors, badge, source picker and dependency guards, the artifact,
-// and — when E2E_EXTERNAL_APP_URL is set — rendering the download with @zoworkhq/forms.
+// and — when E2E_EXTERNAL_APP_URL is set — rendering the download with @zoworkhq/zoforms.
 const fs = require("fs");
 const path = require("path");
 const { OUT, API, WEB, PrismaClient, launchBrowser, saveArtifact, opts, noIds, ZF_RENDERER, rendererVersion, atLeast } = require("./_setup");
@@ -422,7 +422,7 @@ const seed = () => ({
     } else {
       // The steps below find repeats, their entries and Add by the renderer's zf- class names.
       const version = rendererVersion();
-      check(`render: the test app has @zoworkhq/forms ${ZF_RENDERER} or later (zf- names)`, atLeast(version, ZF_RENDERER), version);
+      check(`render: the test app has @zoworkhq/zoforms ${ZF_RENDERER} or later (zf- names)`, atLeast(version, ZF_RENDERER), version);
       await sleep(1500); // let the app's dev server see the new file
       const R = await ctx.newPage();
       R.on("pageerror", (e) => check("render: no page errors", false, e.message));

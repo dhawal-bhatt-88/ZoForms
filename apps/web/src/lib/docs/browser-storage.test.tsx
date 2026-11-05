@@ -5,8 +5,8 @@ import path from "node:path";
 import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { FormRenderer, clearDrafts, type DraftsOptions } from "@zoworkhq/forms/react";
-import type { FormSchema } from "@zoworkhq/forms/core";
+import { FormRenderer, clearDrafts, type DraftsOptions } from "@zoworkhq/zoforms/react";
+import type { FormSchema } from "@zoworkhq/zoforms/core";
 import { CONTENT_DIR, getPage } from "./content";
 import { textOf, walk, type MdNode } from "./mdast";
 
@@ -26,7 +26,7 @@ const sha256 = (text: string) => createHash("sha256").update(text, "utf8").diges
 
 const SCOPE = "user-demo-1:client-demo-1";
 const OWNER = "user-demo-1";
-const PREFIX = "@zoworkhq/forms:";
+const PREFIX = "@zoworkhq/zoforms:";
 
 const page = getPage(SLUG)!;
 /** A table on the page, by its first header cell, as rows of cell text. */

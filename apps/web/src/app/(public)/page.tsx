@@ -5,16 +5,16 @@ import { HeroVisual } from "@/components/home/hero-visual";
 import { SignedInRedirect } from "@/components/signed-in-redirect";
 import { buttonClasses } from "@/components/ui";
 
-const TITLE = "Zowork Forms: clinical forms that run in your app";
+const TITLE = "ZoForms: clinical forms that run in your app";
 const DESCRIPTION =
-  "A form builder for behavioral health teams. Build forms with logic and scoring, download them, and render them in your own app with @zoworkhq/forms.";
+  "A form builder for behavioral health teams. Build forms with logic and scoring, download them, and render them in your own app with @zoworkhq/zoforms.";
 
 export const metadata: Metadata = {
   title: { absolute: TITLE },
   description: DESCRIPTION,
   alternates: { canonical: "/" },
   // The image is opengraph-image.tsx beside this file.
-  openGraph: { type: "website", url: "/", siteName: "Zowork Forms", title: TITLE, description: DESCRIPTION },
+  openGraph: { type: "website", url: "/", siteName: "ZoForms", title: TITLE, description: DESCRIPTION },
 };
 
 /*
@@ -35,7 +35,7 @@ const STEPS = [
     title: "Render it in your app",
     body: (
       <>
-        Pass the file to <code className="font-mono text-[0.8125rem]">@zoworkhq/forms</code>. Answers post straight to
+        Pass the file to <code className="font-mono text-[0.8125rem]">@zoworkhq/zoforms</code>. Answers post straight to
         your own endpoint.
       </>
     ),
@@ -86,7 +86,7 @@ const ACCESSIBILITY = [
 const FAQ = [
   {
     q: "Where are the answers stored?",
-    a: "Wherever your app sends them. Zowork Forms never sees them.",
+    a: "Wherever your app sends them. ZoForms never sees them.",
   },
   {
     q: "Which frameworks does it work with?",
@@ -94,7 +94,7 @@ const FAQ = [
   },
   {
     q: "What does a developer need to do?",
-    a: "Install @zoworkhq/forms, render the form file, and write the endpoint that receives the answers. The Quickstart in the docs shows each step.",
+    a: "Install @zoworkhq/zoforms, render the form file, and write the endpoint that receives the answers. The Quickstart in the docs shows each step.",
   },
   {
     q: "How do changes reach a live form?",
@@ -127,7 +127,7 @@ export default function HomePage() {
           Clinical forms, built here, running in your app
         </h1>
         <p className="lede mt-5 max-w-[60ch]">
-          Zowork Forms is a form builder for behavioral health teams. You design the form; it runs inside your own
+          ZoForms is a form builder for behavioral health teams. You design the form; it runs inside your own
           application, and the answers go to your own server.
         </p>
         <div className="mt-8">
@@ -182,7 +182,7 @@ export default function HomePage() {
               Your data stays with you
             </h2>
             <p className="body mt-4 text-graphite">
-              The form runs in your app and posts answers to your endpoint. Zowork Forms never receives or stores them.
+              The form runs in your app and posts answers to your endpoint. ZoForms never receives or stores them.
             </p>
             <p className="body mt-3 text-graphite">
               On your server, the same package can check the answers again and recalculate the scores, so you never
@@ -195,7 +195,7 @@ export default function HomePage() {
               <dd className="body-sm mt-1 text-graphite">The answers people give, and the scores worked out from them.</dd>
             </div>
             <div>
-              <dt className="font-semibold">In Zowork Forms</dt>
+              <dt className="font-semibold">In ZoForms</dt>
               <dd className="body-sm mt-1 text-graphite">The forms you build, their versions and your team’s accounts.</dd>
             </div>
           </dl>
@@ -208,7 +208,7 @@ export default function HomePage() {
             Accessible forms
           </h2>
           <p className="lede mt-3 max-w-[60ch]">
-            What a form rendered by <span className="font-mono text-[0.9em]">@zoworkhq/forms</span> does for people who
+            What a form rendered by <span className="font-mono text-[0.9em]">@zoworkhq/zoforms</span> does for people who
             use assistive technology:
           </p>
           <ul className="body mt-6 max-w-[64ch] list-disc space-y-2 pl-5 text-graphite marker:text-brand-deep">

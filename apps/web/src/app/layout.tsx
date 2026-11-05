@@ -31,8 +31,8 @@ export const metadata: Metadata = {
   // settled, so it's a build-time variable; the home page is built static.
   metadataBase: new URL(process.env.NEXT_PUBLIC_WEB_URL || "http://localhost:3000"),
   title: {
-    default: "Zowork Forms",
-    template: "%s · Zowork Forms",
+    default: "ZoForms",
+    template: "%s · ZoForms",
   },
   description:
     "Build clinical forms with logic and scoring, then download them for your app.",

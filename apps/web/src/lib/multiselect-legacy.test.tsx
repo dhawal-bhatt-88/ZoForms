@@ -2,8 +2,8 @@
 import { createElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { FormRenderer } from "@zoworkhq/forms/react";
-import { assertSchemaIntegrity, prepareSubmission, type FormSchema } from "@zoworkhq/forms/core";
+import { FormRenderer } from "@zoworkhq/zoforms/react";
+import { assertSchemaIntegrity, prepareSubmission, type FormSchema } from "@zoworkhq/zoforms/core";
 import { buildArtifact } from "@formbuilder/form-schema";
 
 /*

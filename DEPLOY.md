@@ -1,4 +1,4 @@
-# Deploying Zowork Forms to a single EC2 host
+# Deploying ZoForms to a single EC2 host
 
 > **⚠️ Not deployed, and not to be deployed yet.** The builder has never been deployed. Before it is, decide a default rate limit for the API's signed-in routes: today only the credential routes (sign-up, login, Google, password reset, verification, invite accept) are throttled. The [clean-up plan](docs/BUILDER-CLEANUP-PLAN.md#before-any-deployment) tracks this. Until then, the Deploy workflow runs only when started by hand, and nobody should start it.
 
@@ -13,7 +13,7 @@ This describes the intended setup once that's done: a lean, dev-grade deployment
 | `web` | 3000 | The builder (Next.js standalone) |
 | `admin` | 3002 | The admin console (Next.js standalone) |
 
-That's all. The builder hosts no form pages and stores no uploads, so there's no public form route, no file volume and no cache or queue. Respondents never reach this host: the client's app renders the downloaded artifact with `@zoworkhq/forms` and receives the submissions itself.
+That's all. The builder hosts no form pages and stores no uploads, so there's no public form route, no file volume and no cache or queue. Respondents never reach this host: the client's app renders the downloaded artifact with `@zoworkhq/zoforms` and receives the submissions itself.
 
 ```
                        ┌────────────────── GitHub Actions ──────────────────┐

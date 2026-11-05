@@ -218,7 +218,7 @@ export class FormsService {
    * The export artifact for the form's current version. A pure read: it writes
    * nothing, so downloading can never create or alter a version. Refused (422
    * FORM_INVALID, naming the problem) if the renderer wouldn't show the file:
-   * the checks are the renderer's own, from the same @zoworkhq/forms as the web app.
+   * the checks are the renderer's own, from the same @zoworkhq/zoforms as the web app.
    */
   async getArtifact(user: AuthUser, id: string) {
     const form = await this.get(user, id);

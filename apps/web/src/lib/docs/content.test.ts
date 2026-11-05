@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertSchemaIntegrity, type FormSchema } from "@zoworkhq/forms/core";
+import { assertSchemaIntegrity, type FormSchema } from "@zoworkhq/zoforms/core";
 import { getLivePages, pageFiles, readExampleForm } from "./content";
 import { MARKDOWN_COMPONENTS } from "./markdown";
 import { markdownFor } from "./page-markdown";

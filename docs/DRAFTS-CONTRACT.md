@@ -1,6 +1,6 @@
 # Drafts — Contract
 
-Status: agreed 29 Sep 2026; amended 29 Sep 2026 after renderer Checkpoint 0; amended 5 Oct 2026 for repeating groups (§5, §8); amended 15 Oct 2026 for the package rename (§3, §5); amended 30 Oct 2026 for hashing without Web Crypto (§4, §5), the failed-save notice (§4, §6) and `clearDrafts` rejecting when it can't clear (§3, §8); amended 30 Oct 2026 for shared devices: the `off` mode, `scope` and `owner` in session mode, the session-mode tab copy and when it restores (§2, §3, §5, §6, §7, §8, §9); amended 30 Oct 2026 so Start over moves focus to the start of the form (§7); amended 4 Nov 2026 for `clearDrafts` rejecting with a `TypeError` (§3) and the sweep of a form's other versions in the tab, matching its `formId` exactly (§5, §8). Shared by the builder repo and the `@zoworkhq/forms` renderer repo.
+Status: agreed 29 Sep 2026; amended 29 Sep 2026 after renderer Checkpoint 0; amended 5 Oct 2026 for repeating groups (§5, §8); amended 15 Oct 2026 for the package rename (§3, §5); amended 30 Oct 2026 for hashing without Web Crypto (§4, §5), the failed-save notice (§4, §6) and `clearDrafts` rejecting when it can't clear (§3, §8); amended 30 Oct 2026 for shared devices: the `off` mode, `scope` and `owner` in session mode, the session-mode tab copy and when it restores (§2, §3, §5, §6, §7, §8, §9); amended 30 Oct 2026 so Start over moves focus to the start of the form (§7); amended 4 Nov 2026 for `clearDrafts` rejecting with a `TypeError` (§3) and the sweep of a form's other versions in the tab, matching its `formId` exactly (§5, §8); amended 5 Nov 2026 for the package rename to `@zoworkhq/zoforms` and its storage names (§3, §5, §8). Shared by the builder repo and the `@zoworkhq/zoforms` renderer repo.
 Change it here first, then in both repos.
 
 ## 1. Purpose
@@ -44,7 +44,7 @@ drafts?: { mode: "session" | "device" | "server" }   // default "session"
 
 type DraftRef = { scope: string; formId: string };
 
-// Exported from @zoworkhq/forms/react, for the host to call, e.g. on logout:
+// Exported from @zoworkhq/zoforms/react, for the host to call, e.g. on logout:
 clearDrafts(options?: { scope?: string; owner?: string }): Promise<void>
 //   { owner }  -> every draft recorded with that owner, across all scopes and forms (the normal logout call)
 //   { scope }  -> every draft for that scope, across all forms
@@ -107,7 +107,7 @@ type DraftAnswers = Record<string, BlockValue | DraftAnswers[]>;
 ```
 
 ### Device storage format
-- IndexedDB database `zoworkhq-forms-drafts`, one record per `(scope, formId)`.
+- IndexedDB database `zoworkhq-zoforms-drafts`, one record per `(scope, formId)`.
 - Record key: hex SHA-256 of `scope` + a separator character that can't appear in the hash input ambiguously (e.g. U+0000) + `formId`.
 - Record value: `{ scopeHash, ownerHash?, iv, ciphertext, expiresAt }`, with indexes on `scopeHash` and `ownerHash` (each a hex SHA-256 of `scope` / `owner`), so `clearDrafts` can find every matching draft across forms. `ownerHash` is present only when the host supplied `owner`.
 - `ciphertext` is the AES-GCM encryption of the whole `Draft` with a fresh 96-bit IV per save. `expiresAt` stays in clear so expired records can be swept without a key.
@@ -115,7 +115,7 @@ type DraftAnswers = Record<string, BlockValue | DraftAnswers[]>;
 
 ### The tab's copy (every mode but `off`)
 Every mode keeps a copy of the fill in the tab's `sessionStorage`, so a refresh never depends on the network or the key (§6, §7).
-- Key: `@zoworkhq/forms:{formId}:{formVersionId}`, followed by `:{scopeHash}` whenever the host gave a `scope`, in any mode. A different user or patient in the same tab never receives it.
+- Key: `@zoworkhq/zoforms:{formId}:{formVersionId}`, followed by `:{scopeHash}` whenever the host gave a `scope`, in any mode. A different user or patient in the same tab never receives it.
 - Value: `answers`, `idempotencyKey`, and on paged forms `currentPageId`, `visitedPageIds` and `onReview`; `ownerHash` whenever the host gave an `owner`, so `clearDrafts({ owner })` can find it.
 - **Session mode** (including a fallback to session, §4: whenever the form keeps no device or server draft):
   - `answers` holds **visible answers only**. Answers to questions hidden by conditions, and hidden repeating groups, stay in the open form's memory, so showing the question again brings its answer back, but they are not written. Whether there is anything worth keeping (§8) is judged on what is written.
@@ -200,7 +200,7 @@ A draft is deleted on:
   - With no options it removes every tab entry the package wrote in this tab, scoped or not, and the whole device database. `{ scope }` and `{ owner }` remove the matching ones, in session mode too. An unscoped entry has no scope or owner, so only the no-options call removes it.
   - It clears storage, not a form on screen: a form still mounted keeps its answers in memory and writes them again at its next save. Between respondents, call it once the form has unmounted, or remount the form after it.
   - It works without Web Crypto (§5, hashes). Where IndexedDB or `sessionStorage` doesn't exist at all, nothing can have been stored there, so there is nothing to clear.
-  - It **rejects** with a `ClearDraftsError` (exported from `@zoworkhq/forms/react`) when it can't delete what it was asked to: a `sessionStorage` call that throws, or an IndexedDB delete that fails or is blocked. The error's `failed` lists which (`"sessionStorage"`, `"indexedDB"`) and its `cause` holds the first underlying error. It never resolves without having cleared.
+  - It **rejects** with a `ClearDraftsError` (exported from `@zoworkhq/zoforms/react`) when it can't delete what it was asked to: a `sessionStorage` call that throws, or an IndexedDB delete that fails or is blocked. The error's `failed` lists which (`"sessionStorage"`, `"indexedDB"`) and its `cause` holds the first underlying error. It never resolves without having cleared.
 
 ## 9. Known limits (v1)
 

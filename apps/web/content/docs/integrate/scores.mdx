@@ -3,7 +3,7 @@ title: Read scores
 summary: Scores are calculated on your server by prepareSubmission, from the form file and the checked answers. What you get, what can be null, and what respondents see.
 template: how-to
 badges: [Server]
-updated: 2026-11-04
+updated: 2026-11-05
 prev: /docs/integrate/form-versions
 next: /docs/integrate/drafts
 ---
@@ -36,7 +36,7 @@ The author chose to show a score to the respondent after they submit.
 ```js file=server.js check=esm run=server route=/api/feedback form=visit-feedback
 import { readFileSync } from 'node:fs';
 import express from 'express';
-import { prepareSubmission } from '@zoworkhq/forms/core';
+import { prepareSubmission } from '@zoworkhq/zoforms/core';
 import { alreadyStored, store } from './store.js';
 
 const schema = JSON.parse(readFileSync('./visit-feedback.json', 'utf8'));
@@ -180,7 +180,7 @@ A `ref` is the block id of a question in the group. Number, linear scale and rat
 
 <Signature of="calculateScores" />
 
-It's the function `prepareSubmission` uses, exported from `@zoworkhq/forms/core`. Call it only on answers that passed `validateSubmission`, in the shape the browser posts.
+It's the function `prepareSubmission` uses, exported from `@zoworkhq/zoforms/core`. Call it only on answers that passed `validateSubmission`, in the shape the browser posts.
 
 ```js check=statements
 const errors = validateSubmission(schema, {});

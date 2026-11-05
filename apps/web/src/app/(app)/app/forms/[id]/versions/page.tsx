@@ -132,7 +132,7 @@ export default function VersionsPage() {
               empty={
                 <EmptyState
                   title="No versions yet"
-                  body="Every time you save, Zowork Forms keeps a restorable version here."
+                  body="Every time you save, ZoForms keeps a restorable version here."
                   actions={
                     <Link href={`/app/forms/${fid}/edit`} className={buttonClasses({ variant: "primary", size: "sm" })}>
                       Open the editor

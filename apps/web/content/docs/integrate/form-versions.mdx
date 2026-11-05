@@ -3,7 +3,7 @@ title: Update to a new form version
 summary: Put a new download in your app, and know what happens to tabs left open, saved progress and submissions built against the old version.
 template: how-to
 badges: [Server]
-updated: 2026-11-04
+updated: 2026-11-05
 prev: /docs/integrate/media
 next: /docs/integrate/scores
 ---
@@ -47,7 +47,7 @@ Keep each version's file, and check a body against the one it was built from. A 
 
 ```js file=versions.js check=esm
 import { readdirSync, readFileSync } from 'node:fs';
-import { prepareSubmission } from '@zoworkhq/forms/core';
+import { prepareSubmission } from '@zoworkhq/zoforms/core';
 
 // Every version you still accept: one download each, in ./forms.
 const versions = new Map(

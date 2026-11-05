@@ -1,6 +1,6 @@
-# Zowork Forms
+# ZoForms
 
-**Zowork Forms is a design-time form builder.** Authors build forms with groups, pages, conditional logic, scoring and coded options, save versions, and download each version as a JSON artifact. The `@zoworkhq/forms` renderer turns that artifact into a working form inside the client's own app, and the client's app receives the submissions.
+**ZoForms is a design-time form builder.** Authors build forms with groups, pages, conditional logic, scoring and coded options, save versions, and download each version as a JSON artifact. The `@zoworkhq/zoforms` renderer turns that artifact into a working form inside the client's own app, and the client's app receives the submissions.
 
 > 🔒 **Private / confidential:** internal project. Don't distribute publicly.
 
@@ -16,7 +16,7 @@ It isn't a form host. Nothing a respondent does reaches it:
 - no submissions, responses or analytics;
 - no file uploads.
 
-The client's app renders the form with `@zoworkhq/forms` and posts the answers to its own endpoint.
+The client's app renders the form with `@zoworkhq/zoforms` and posts the answers to its own endpoint.
 
 ## The artifact
 
@@ -61,11 +61,11 @@ formbuilder/
 ├─ e2e/               # Builder end-to-end suites (plain Node + Playwright)
 ├─ deploy/            # Production compose file and env example (see DEPLOY.md)
 ├─ docs/              # Contracts, the clean-up audit and plan, briefs
-├─ vendor/            # zoworkhq-forms-<version>.tgz: @zoworkhq/forms for the docs' live examples
+├─ vendor/            # zoworkhq-zoforms-<version>.tgz: @zoworkhq/zoforms for the docs' live examples
 └─ docker-compose.yml # Local Postgres 16
 ```
 
-**The renderer in the docs.** `@zoworkhq/forms` isn't on a registry, so `apps/web` installs the tarball in `vendor/` (every Dockerfile copies that folder before `pnpm install`). To upgrade it, put the new `npm pack` output in `vendor/`, delete the old one, point `apps/web/package.json` at it with forward slashes, and run `pnpm install`. The docs' live examples render real downloads: with the API running, `node apps/web/scripts/docs-example-forms.mjs` builds each example form through the API and rewrites its `.form.json`.
+**The renderer in the docs.** `@zoworkhq/zoforms` isn't on a registry, so `apps/web` installs the tarball in `vendor/` (every Dockerfile copies that folder before `pnpm install`). To upgrade it, put the new `npm pack` output in `vendor/`, delete the old one, point `apps/web/package.json` at it with forward slashes, and run `pnpm install`. The docs' live examples render real downloads: with the API running, `node apps/web/scripts/docs-example-forms.mjs` builds each example form through the API and rewrites its `.form.json`.
 
 ## Local setup
 
@@ -125,7 +125,7 @@ Or use `pnpm db:studio`. Then sign in at http://localhost:3002 with the same ema
 | `CORS_ORIGINS` | | Extra origins allowed by CORS, comma-separated. Localhost, the API's own host and the two origins above are always allowed. |
 | `JWT_SECRET` | ✅ in production | Signs auth tokens. Use a long random string: in production, at least 32 characters and not an example value. |
 | `RESEND_API_KEY` | | Sends email through Resend. Without it, emails are logged and not sent, so accounts made with a password can't verify their email, invite teammates or reset a password. |
-| `MAIL_FROM` | | The sender (default `Zowork Forms <onboarding@resend.dev>`) |
+| `MAIL_FROM` | | The sender (default `ZoForms <onboarding@resend.dev>`) |
 | `GOOGLE_CLIENT_ID` | | Turns on Google sign-in: the OAuth client id the API checks tokens against |
 | `RETURN_EMAIL_LINKS_FOR_TESTS` | | Test only. `true` puts verification and password-reset links in API responses. The API refuses to start with it on in production. |
 
@@ -184,7 +184,7 @@ node e2e/run-all.js grid scoring    # suites whose file name contains these word
 node e2e/verify-versions.js         # one suite, with its full output
 ```
 
-Some suites also check the artifact in the external test app that has `@zoworkhq/forms` installed:
+Some suites also check the artifact in the external test app that has `@zoworkhq/zoforms` installed:
 - `E2E_EXTERNAL_APP_DIR` (default `D:/ZoworkProjects/external-test-app`): where `verify-renderer-types.js` and `verify-scoring-api.js` find the installed renderer. The app doesn't need to be running.
 - `E2E_EXTERNAL_FORMS_DIR`: also copy each downloaded artifact into the test app's forms folder, e.g. `D:\ZoworkProjects\external-test-app\src\forms`.
 - `E2E_EXTERNAL_APP_URL`: also render those downloads in the running test app and submit them, e.g. `http://localhost:5173/external-test-app/`. It needs `E2E_EXTERNAL_FORMS_DIR` as well.

@@ -21,7 +21,7 @@ export * from "./formula";
  * The form schema — the single source of truth for what a form *is*.
  *
  * The builder writes this, the API validates it, and the download built from
- * it is what the `@zoworkhq/forms` renderer reads. It is stored as JSONB in
+ * it is what the `@zoworkhq/zoforms` renderer reads. It is stored as JSONB in
  * `FormVersion.schema`. Keep this the keystone: everything that touches a
  * form's structure imports from here.
  */
@@ -61,7 +61,7 @@ export const BlockType = z.enum([
 ]);
 export type BlockType = z.infer<typeof BlockType>;
 
-/* ---------- conditional logic (enableWhen) — the @zoworkhq/forms contract ---------- */
+/* ---------- conditional logic (enableWhen) — the @zoworkhq/zoforms contract ---------- */
 
 export const ConditionOperator = z.enum(["exists", "=", "!=", ">", "<", ">=", "<=", "contains"]);
 export type ConditionOperator = z.infer<typeof ConditionOperator>;
@@ -861,7 +861,7 @@ export function sameContent(a: unknown, b: unknown): boolean {
  * Both identity fields are REQUIRED here, so an artifact cannot be produced
  * without them — `FormsService.getArtifact` (served by
  * `GET /v1/forms/:id/artifact`) parses through this, which is what guarantees
- * consumers (@zoworkhq/forms) always receive them.
+ * consumers (@zoworkhq/zoforms) always receive them.
  *
  * They live here rather than on `FormSchema` because `FormSchema` describes
  * stored, editable form *content*, which legitimately has no identity yet
@@ -1450,7 +1450,7 @@ export const NUMERIC_SOURCE_TYPES: readonly AnyBlockType[] = ["number", "scale",
 const ORDERING: readonly ConditionOperator[] = [">", "<", ">=", "<="];
 
 /**
- * The countries a country question offers. This MUST match the @zoworkhq/forms
+ * The countries a country question offers. This MUST match the @zoworkhq/zoforms
  * renderer's country list exactly — same strings, same order — because a
  * condition on a country question is matched against these values.
  */

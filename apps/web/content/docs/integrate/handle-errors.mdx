@@ -3,7 +3,7 @@ title: Handle errors
 summary: What respondents see and what your app is told when a form can't be shown, a submit fails or progress can't be saved, in the browser and on your server.
 template: how-to
 badges: [React, Server]
-updated: 2026-11-04
+updated: 2026-11-05
 prev: /docs/integrate/sign-in
 next: /docs/integrate/frameworks
 ---
@@ -51,7 +51,7 @@ Decide which faults are the request's and which are yours.
 - These errors don't reach an error boundary of yours. `onRenderError` is the way to hear about them.
 - Where your server renders the page, as Next.js does, a form file the form refuses shows the same message there, and the rest of your page renders as usual: no error page and no 500. Your server logs the reason once per render; `onRenderError` is called only in the browser. [Build an intake page in Next.js](/docs/integrate/tutorial-nextjs#5-put-the-form-in-a-client-component) shows it.
 - The form is shown as soon as `schema`, `endpoint` and `validators` all pass. No new React `key` is needed.
-- A form that can't be shown is often a newer `schemaVersion` than your package supports. The reason then says so: `This form uses schemaVersion 3, which this version of @zoworkhq/forms does not support (it supports 1 and 2). Upgrade @zoworkhq/forms to render it.`
+- A form that can't be shown is often a newer `schemaVersion` than your package supports. The reason then says so: `This form uses schemaVersion 3, which this version of @zoworkhq/zoforms does not support (it supports 1 and 2). Upgrade @zoworkhq/zoforms to render it.`
 
 ### 3. Report a failed submit
 

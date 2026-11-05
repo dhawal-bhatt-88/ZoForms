@@ -1,14 +1,15 @@
 import Image from "next/image";
 
 /*
- * A form built in Zowork Forms, twice: part of its download, and the same form
- * as @zoworkhq/forms renders it. Both are real.
+ * A form built in ZoForms, twice: part of its download, and the same form
+ * as @zoworkhq/zoforms renders it. Both are real.
  *
  * - public/home/phq-2.json is the artifact the builder's API returned for the
  *   form (GET /v1/forms/:id/artifact). The excerpt below is that file's text,
  *   shortened where it says "…", with the group's opening brackets and the
  *   formula's arguments on fewer lines.
- * - The screenshots are that file rendered by @zoworkhq/forms 0.27.0 in the
+ * - The screenshots are that file rendered by the renderer at 0.27.0, then
+ *   named @zoworkhq/forms (renamed @zoworkhq/zoforms in 0.29.0), in the
  *   external test app, light and dark, with the host page in the renderer's
  *   own surface and text colours. They show the group heading and the first
  *   question, the part the excerpt covers.
@@ -71,7 +72,7 @@ export function HeroVisual() {
         <div className="surface flex flex-col">
           <div className="border-b border-rule px-4 py-3">
             <p className="text-[0.75rem] text-ink">
-              Rendered by <span className="font-mono">@zoworkhq/forms</span>
+              Rendered by <span className="font-mono">@zoworkhq/zoforms</span>
             </p>
           </div>
           <div className="flex flex-1 items-start justify-center p-4">
@@ -81,7 +82,7 @@ export function HeroVisual() {
         </div>
       </div>
       <figcaption className="body-sm mt-3 text-graphite">
-        A two-question form built in Zowork Forms: part of the file it downloads as, and the same file rendered in an app.
+        A two-question form built in ZoForms: part of the file it downloads as, and the same file rendered in an app.
         PHQ-2 questions developed by Drs. Robert L. Spitzer, Janet B.W. Williams, Kurt Kroenke and colleagues, with an
         educational grant from Pfizer Inc.
       </figcaption>

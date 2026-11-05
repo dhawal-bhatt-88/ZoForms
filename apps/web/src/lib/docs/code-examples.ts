@@ -112,8 +112,8 @@ export function fenceProblem(example: CodeExample): string | null {
  * real stand-ins for what a reader's app would have.
  */
 export const fragmentPrelude = `
-import { FormRenderer, clearDrafts, ClearDraftsError, type DraftsOptions } from '@zoworkhq/forms/react';
-import { calculateScores, prepareSubmission, validateSubmission, type FieldValidator, type FormSchema } from '@zoworkhq/forms/core';
+import { FormRenderer, clearDrafts, ClearDraftsError, type DraftsOptions } from '@zoworkhq/zoforms/react';
+import { calculateScores, prepareSubmission, validateSubmission, type FieldValidator, type FormSchema } from '@zoworkhq/zoforms/core';
 import data from './intake-form.json';
 
 const schema = data as FormSchema;
@@ -188,7 +188,7 @@ function formFileTargets(examples: readonly CodeExample[]): Map<string, FormTarg
 }
 
 /** JavaScript has no cast, so JS blocks see the form file as a FormSchema. TypeScript blocks import the real file and need theirs. */
-const FORM_FILE_TYPES = `import type { FormSchema } from '@zoworkhq/forms/core';\ndeclare const schema: FormSchema;\nexport default schema;\n`;
+const FORM_FILE_TYPES = `import type { FormSchema } from '@zoworkhq/zoforms/core';\ndeclare const schema: FormSchema;\nexport default schema;\n`;
 
 /**
  * Every block on disk, one folder per page, ready to compile and run. Returns

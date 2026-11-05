@@ -1,15 +1,15 @@
 import Link from "next/link";
 
 /*
- * The wordmark: the ZoBlocks mark, "Zowork" in the display face, and "Forms"
- * as the small mono label, the way the ZoBlocks console reads "ZoBlocks APP".
+ * The wordmark: the ZoBlocks mark and "ZoForms", one word in the display face,
+ * set the way ZoBlocks sets its own name, so the two read as one family.
  *
  * Ported from github.com/zoworkhq/zoblocks at 9aaefe0: the mark is
  * `ZoBlocksMark` in apps/app/src/components/Rail.tsx, verbatim, and the lockup
  * is the one in that file and apps/app/src/app/(auth)/layout.tsx. The tab icons
  * (app/icon.svg, favicon.ico, apple-icon.png) are that app's files, copied.
  *
- * Reusing the ZoBlocks mark is the family signal. If Zowork Forms gets a mark
+ * Reusing the ZoBlocks mark is the family signal. If ZoForms gets a mark
  * of its own, only this file and the tab icons change.
  */
 
@@ -26,12 +26,10 @@ export function ZoBlocksMark({ className = "h-4 w-7" }: { className?: string }) 
 
 export function Logo({ href = "/" }: { href?: string }) {
   return (
-    <Link href={href} aria-label="Zowork Forms home" className="group inline-flex items-center gap-2.5 text-ink">
+    <Link href={href} aria-label="ZoForms home" className="group inline-flex items-center gap-2.5 text-ink">
       <ZoBlocksMark className="h-4 w-7 transition-transform duration-500 ease-out-expo group-hover:rotate-180" />
-      {/* The space is part of the visible text, "Zowork Forms", which the
-          name has to contain (WCAG 2.5.3); the gap is drawn by `gap-2.5`. */}
-      <span className="font-display text-[0.9375rem] font-semibold tracking-[-0.02em]">Zowork</span>{" "}
-      <span className="eyebrow text-graphite-soft">Forms</span>
+      {/* The visible text, "ZoForms", is in the link's name (WCAG 2.5.3). */}
+      <span className="font-display text-[0.9375rem] font-semibold tracking-[-0.02em]">ZoForms</span>
     </Link>
   );
 }

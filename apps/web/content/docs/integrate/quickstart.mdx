@@ -3,7 +3,7 @@ title: "Quickstart: render a form and receive answers"
 summary: Put a form file in a Vite and React app, receive the answers on a small Node server, and store them. About 10 minutes.
 template: tutorial
 badges: []
-updated: 2026-11-03
+updated: 2026-11-05
 prev: /docs/integrate/overview
 next: /docs/integrate/tutorial-nextjs
 ---
@@ -35,7 +35,7 @@ npm install
 ### 1. Install the package
 
 ```sh
-npm install @zoworkhq/forms
+npm install @zoworkhq/zoforms
 ```
 
 The server in this quickstart uses Express. Any server works the same way.
@@ -53,8 +53,8 @@ Copy the file to `src/intake-form.json`. The code below uses that name.
 Create the page. `FormRenderer` shows the form's questions, not its title, so your page shows the title and the description, and owns the `h1`.
 
 ```jsx file=src/IntakePage.jsx check=browser run=browser
-import { FormRenderer } from '@zoworkhq/forms/react';
-import '@zoworkhq/forms/styles.css';
+import { FormRenderer } from '@zoworkhq/zoforms/react';
+import '@zoworkhq/zoforms/styles.css';
 import schema from './intake-form.json';
 
 export function IntakePage() {
@@ -119,7 +119,7 @@ Create `server.js`, in the project's top folder.
 ```js file=server.js check=esm run=server route=/api/submit
 import { readFileSync } from 'node:fs';
 import express from 'express';
-import { prepareSubmission } from '@zoworkhq/forms/core';
+import { prepareSubmission } from '@zoworkhq/zoforms/core';
 import { alreadyStored, store } from './store.js';
 
 const schema = JSON.parse(readFileSync('./src/intake-form.json', 'utf8'));

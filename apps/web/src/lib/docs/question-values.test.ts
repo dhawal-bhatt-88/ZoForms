@@ -12,7 +12,7 @@ import {
   type Block,
   type FieldValidator,
   type FormSchema,
-} from "@zoworkhq/forms/core";
+} from "@zoworkhq/zoforms/core";
 import { SOURCE_OPERATORS } from "@formbuilder/form-schema";
 import { compileExamples, writeProject, type CodeExample } from "./code-examples";
 import { CONTENT_DIR, getPage } from "./content";

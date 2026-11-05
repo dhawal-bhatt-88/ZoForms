@@ -3,8 +3,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { RotateCcw } from "lucide-react";
-import { FormRenderer } from "@zoworkhq/forms/react";
-import { prepareSubmission, type FormSchema } from "@zoworkhq/forms/core";
+import { FormRenderer } from "@zoworkhq/zoforms/react";
+import { prepareSubmission, type FormSchema } from "@zoworkhq/zoforms/core";
 import { Button, segmentClasses, segmentTrackClasses } from "@/components/ui";
 import { EXAMPLE_ENDPOINT_PREFIX, registerExampleEndpoint } from "@/lib/docs/example-fetch";
 import type { ExampleTab } from "@/lib/docs/templates";
@@ -13,7 +13,7 @@ import { EXAMPLE_VALIDATORS } from "./example-validators";
 import { Tabs, type TabSpec } from "./tabs";
 
 /**
- * A live example: the real @zoworkhq/forms rendering a real form file, with
+ * A live example: the real @zoworkhq/zoforms rendering a real form file, with
  * tabs that show what it is and what it does. Nothing on the tabs is written
  * by hand:
  *   - Schema is the form file itself.
@@ -48,7 +48,7 @@ export function LiveExample({
   /** For the tab list's name: "Example: Follow-up question". */
   title: string;
   schema: FormSchema;
-  /** @zoworkhq/forms/styles.css. */
+  /** @zoworkhq/zoforms/styles.css. */
   css: string;
   tabs: readonly ExampleTab[];
   density: boolean;
@@ -199,7 +199,7 @@ export function LiveExample({
           <>
             <p className="body-sm text-graphite">
               Computed in your browser by <code className="font-mono">prepareSubmission</code> from{" "}
-              <code className="font-mono">@zoworkhq/forms/core</code>, the same function your server runs on that body.
+              <code className="font-mono">@zoworkhq/zoforms/core</code>, the same function your server runs on that body.
               Store <code className="font-mono">submission</code>, never the request body.
             </p>
             <CodeBlock

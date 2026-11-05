@@ -6,7 +6,7 @@
 // Checkboxes does the same). Both still save and render: they are in the form
 // below. A paged form with one block of each type is saved
 // and downloaded through the API, and the download passes the external test
-// app's installed @zoworkhq/forms (`KNOWN_TYPES`, `assertSchemaIntegrity`).
+// app's installed @zoworkhq/zoforms (`KNOWN_TYPES`, `assertSchemaIntegrity`).
 const fs = require("fs");
 const path = require("path");
 const { pathToFileURL } = require("url");
@@ -50,10 +50,10 @@ const CONTENT = {
 
     // ---------- the renderer ----------
     let core;
-    try { core = await import(pathToFileURL(RENDERER_CORE).href); } catch (e) { check("the external app's @zoworkhq/forms loads", false, `${RENDERER_CORE}: ${e.message}`); }
+    try { core = await import(pathToFileURL(RENDERER_CORE).href); } catch (e) { check("the external app's @zoworkhq/zoforms loads", false, `${RENDERER_CORE}: ${e.message}`); }
     if (core) {
       const version = require(path.join(path.dirname(RENDERER_CORE), "../../package.json")).version;
-      check(`the external app's @zoworkhq/forms loads (${version})`, true);
+      check(`the external app's @zoworkhq/zoforms loads (${version})`, true);
       const unknown = ALL_TYPES.filter((t) => !core.KNOWN_TYPES.has(t));
       check(`every builder type (${ALL_TYPES.length}) is in the renderer's KNOWN_TYPES`, unknown.length === 0, `unknown to the renderer: ${unknown.join(", ")}`);
     }

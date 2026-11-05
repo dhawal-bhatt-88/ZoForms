@@ -7,7 +7,7 @@ import { expect, test, type Page } from "@playwright/test";
  * The public docs at /docs (docs/briefs/BUILDER-BRIEF-DOCS.md). They need no
  * API and no session.
  *
- * The live example renders @zoworkhq/forms inside an open shadow root, so the
+ * The live example renders @zoworkhq/zoforms inside an open shadow root, so the
  * tests that matter most here check the form still works as a form there:
  * labels and descriptions resolve, the error summary takes focus and its links
  * move it, axe reaches inside, and the stand-in endpoint exists only while an
@@ -21,7 +21,7 @@ const FOLLOW_UP_FORM = JSON.parse(
 );
 /** The installed renderer: the top bar names it. */
 const RENDERER_VERSION = JSON.parse(
-  fs.readFileSync(path.join(__dirname, "../node_modules/@zoworkhq/forms/package.json"), "utf8"),
+  fs.readFileSync(path.join(__dirname, "../node_modules/@zoworkhq/zoforms/package.json"), "utf8"),
 ).version as string;
 const WCAG = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
 
@@ -44,15 +44,15 @@ test.describe("docs", () => {
   test("/docs is public and shows the two ways in, with its navigation", async ({ page }) => {
     await page.goto("/docs");
 
-    await expect(page).toHaveTitle("Zowork Forms documentation · Zowork Forms");
-    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Zowork Forms documentation");
+    await expect(page).toHaveTitle("ZoForms documentation · ZoForms");
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("ZoForms documentation");
     await expect(page.getByRole("link", { name: /I build forms/ })).toHaveAttribute("href", "/docs/build/question-types/dropdown");
     await expect(page.getByRole("link", { name: /I integrate forms/ })).toHaveAttribute("href", "/docs/integrate/overview");
 
     const nav = page.getByRole("navigation", { name: "Docs" });
     await expect(nav.getByRole("link", { name: "Docs home" })).toHaveAttribute("aria-current", "page");
     const header = page.getByRole("banner");
-    await expect(header.getByText(`@zoworkhq/forms ${RENDERER_VERSION}`)).toBeVisible();
+    await expect(header.getByText(`@zoworkhq/zoforms ${RENDERER_VERSION}`)).toBeVisible();
     await expect(header.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
     await expect(header.getByRole("link", { name: "Open my forms" })).toHaveCount(0);
     await expect(header.getByRole("link", { name: "Release notes" })).toHaveCount(0);
@@ -156,11 +156,11 @@ test.describe("docs", () => {
     test("/docs is the same public page, with Open my forms in place of Sign in", async ({ page, request }) => {
       await page.goto("/docs");
       await expect(page).toHaveURL(/\/docs$/);
-      await expect(page.getByRole("heading", { level: 1 })).toHaveText("Zowork Forms documentation");
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText("ZoForms documentation");
       await expect(page.getByRole("navigation", { name: "Docs" }).getByRole("link", { name: "Docs home" })).toHaveAttribute("aria-current", "page");
 
       const header = page.getByRole("banner");
-      await expect(header.getByText(`@zoworkhq/forms ${RENDERER_VERSION}`)).toBeVisible();
+      await expect(header.getByText(`@zoworkhq/zoforms ${RENDERER_VERSION}`)).toBeVisible();
       await expect(header.getByRole("link", { name: "Open my forms" })).toHaveAttribute("href", "/app");
       await expect(header.getByRole("link", { name: "Sign in" })).toHaveCount(0);
 
@@ -307,7 +307,7 @@ test.describe("docs", () => {
     });
 
     test("nothing stays in the tab: no prompt on coming back, and a refresh starts a new form", async ({ page }) => {
-      const stored = () => page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.startsWith("@zoworkhq/forms:")));
+      const stored = () => page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.startsWith("@zoworkhq/zoforms:")));
       await page.goto(EXAMPLE);
       await page.getByRole("radio", { name: "Yes" }).check();
       await page.getByRole("textbox", { name: "Therapist's name" }).fill("Dr. Rivera");

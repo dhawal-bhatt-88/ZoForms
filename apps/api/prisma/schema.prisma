@@ -1,4 +1,4 @@
-// Prisma schema for the Zowork Forms builder: users and sign-in tokens;
+// Prisma schema for the ZoForms builder: users and sign-in tokens;
 // organisations, members, invites and workspaces; forms with their append-only
 // versions; templates; and the admin audit log. Form and template content is
 // JSONB in the shape @formbuilder/form-schema defines. Change the schema with a

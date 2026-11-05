@@ -1,4 +1,4 @@
-import type { FieldValidator } from "@zoworkhq/forms/core";
+import type { FieldValidator } from "@zoworkhq/zoforms/core";
 import { validators as ownValidator } from "../../../content/docs/examples/own-validator.validators.js";
 
 /**

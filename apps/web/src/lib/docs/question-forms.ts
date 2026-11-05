@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { isAnswerable, prepareSubmission, type Block, type FieldValidator, type FormSchema } from "@zoworkhq/forms/core";
+import { isAnswerable, prepareSubmission, type Block, type FieldValidator, type FormSchema } from "@zoworkhq/zoforms/core";
 import { CONTENT_DIR } from "./content";
 
 /*

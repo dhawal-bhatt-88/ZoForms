@@ -3,7 +3,7 @@ title: Style the form
 summary: Your brand's colours and font, the dark theme, density, and how the form's stylesheet meets your page's CSS, including resets and your own heading styles.
 template: how-to
 badges: [CSS]
-updated: 2026-11-03
+updated: 2026-11-05
 prev: /docs/integrate/shared-devices
 next: /docs/integrate/reference/form-renderer
 ---
@@ -24,7 +24,7 @@ A CSS reset such as Tailwind's, or heading styles of your own, without hiding pa
 
 ## Before you start
 
-- A form rendered with `FormRenderer`, and the stylesheet imported once: `import '@zoworkhq/forms/styles.css'`. See the [Quickstart](/docs/integrate/quickstart). The stylesheet is optional: without it, the form is plain HTML.
+- A form rendered with `FormRenderer`, and the stylesheet imported once: `import '@zoworkhq/zoforms/styles.css'`. See the [Quickstart](/docs/integrate/quickstart). The stylesheet is optional: without it, the form is plain HTML.
 - Every class, data attribute and custom property is listed in [CSS classes and custom properties](/docs/integrate/reference/css).
 
 ## Steps
@@ -133,7 +133,7 @@ h1, h2 { color: inherit; }
 
 ### 7. Make a CSS reset and the form agree
 
-A reset that isn't in a CSS layer beats the stylesheet, because the stylesheet's rules have no specificity. Text fields lose their borders and buttons their backgrounds. A development build warns once per page when it sees this, in the console: `@zoworkhq/forms: this form's controls have no border, so a CSS reset is probably overriding the package's stylesheet. Tailwind's preflight is the usual cause: see "Styling with CSS resets" in the README. If the borderless look is intended, ignore this.`
+A reset that isn't in a CSS layer beats the stylesheet, because the stylesheet's rules have no specificity. Text fields lose their borders and buttons their backgrounds. A development build warns once per page when it sees this, in the console: `@zoworkhq/zoforms: this form's controls have no border, so a CSS reset is probably overriding the package's stylesheet. Tailwind's preflight is the usual cause: see "Styling with CSS resets" in the README. If the borderless look is intended, ignore this.`
 
 **Tailwind 3:** put its reset in a CSS layer, in the file with your `@tailwind` directives. Rules outside a layer beat rules inside one, so the stylesheet wins, and the reset still applies to the rest of your page:
 

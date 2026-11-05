@@ -3,7 +3,7 @@ title: Send the submission with your app's sign-in
 summary: Send cookies or a token with the form's request, check them on your server, and handle success, failure and time limits.
 template: how-to
 badges: [React, Server]
-updated: 2026-11-04
+updated: 2026-11-05
 prev: /docs/integrate/custom-validation
 next: /docs/integrate/handle-errors
 ---
@@ -43,7 +43,7 @@ export async function getAccessToken() {
 ```
 
 ```jsx file=IntakePage.jsx check=browser run=browser
-import { FormRenderer } from '@zoworkhq/forms/react';
+import { FormRenderer } from '@zoworkhq/zoforms/react';
 import schema from './intake-form.json';
 import { getAccessToken } from './auth-client.js';
 
@@ -76,7 +76,7 @@ export async function userFromToken(token) {
 ```js file=server.js check=esm run=server route=/api/submit auth=demo-token
 import { readFileSync } from 'node:fs';
 import express from 'express';
-import { prepareSubmission } from '@zoworkhq/forms/core';
+import { prepareSubmission } from '@zoworkhq/zoforms/core';
 import { userFromToken } from './auth.js';
 import { alreadyStored, store } from './store.js';
 

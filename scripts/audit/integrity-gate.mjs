@@ -1,7 +1,7 @@
 // Release audit, area 5, final gate: would the renderer mount what the builder
 // saves? For every form version and template in the local database, every system
 // template file, and every schema fixture in the repo, this builds the artifact as
-// Download does (buildArtifact) and runs the checks @zoworkhq/forms/react runs at
+// Download does (buildArtifact) and runs the checks @zoworkhq/zoforms/react runs at
 // mount, from the vendored /core: assertSchemaIntegrity, resolveNavigation and
 // resolveDrafts. getSchemaWarnings is reported but isn't a refusal.
 //
@@ -16,8 +16,8 @@ import path from "path";
 const require = createRequire(import.meta.url);
 const { ROOT, prisma, check, note, run } = require("./_lib.js");
 const schema = require(path.join(ROOT, "packages/form-schema/dist/index.js"));
-const core = await import(pathToFileURL(path.join(ROOT, "apps/web/node_modules/@zoworkhq/forms/dist/core/index.js")).href);
-const corePkg = JSON.parse(fs.readFileSync(path.join(ROOT, "apps/web/node_modules/@zoworkhq/forms/package.json"), "utf8"));
+const core = await import(pathToFileURL(path.join(ROOT, "apps/web/node_modules/@zoworkhq/zoforms/dist/core/index.js")).href);
+const corePkg = JSON.parse(fs.readFileSync(path.join(ROOT, "apps/web/node_modules/@zoworkhq/zoforms/package.json"), "utf8"));
 
 const ALL_VERSIONS = process.argv.includes("--all-versions");
 const ID = { formId: "00000000-0000-4000-8000-000000000001", formVersionId: "00000000-0000-4000-8000-000000000002" };

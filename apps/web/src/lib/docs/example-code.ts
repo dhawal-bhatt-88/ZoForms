@@ -30,8 +30,8 @@ export function formExcerpt(schema: Record<string, unknown>, blockId: string, fi
 export function exampleReactCode(name: string, withValidators = false): string {
   const component = name.replace(/(^|-)(\w)/g, (_, __, c: string) => c.toUpperCase());
   return [
-    "import { FormRenderer } from '@zoworkhq/forms/react';",
-    "import '@zoworkhq/forms/styles.css';",
+    "import { FormRenderer } from '@zoworkhq/zoforms/react';",
+    "import '@zoworkhq/zoforms/styles.css';",
     `import schema from './${name}.json';`,
     ...(withValidators ? ["import { validators } from './validators.js';"] : []),
     "",

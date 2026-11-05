@@ -3,12 +3,12 @@ import path from "node:path";
 import { readJson } from "./content";
 
 /*
- * The installed @zoworkhq/forms (vendor/zoworkhq-forms-<version>.tgz), read on
+ * The installed @zoworkhq/zoforms (vendor/zoworkhq-zoforms-<version>.tgz), read on
  * the server at build time. Neither file is in the package's `exports`, so they
  * are read from disk rather than imported.
  */
 
-const PACKAGE_DIR = path.join(process.cwd(), "node_modules", "@zoworkhq", "forms");
+const PACKAGE_DIR = path.join(process.cwd(), "node_modules", "@zoworkhq", "zoforms");
 
 /** The installed version, e.g. "0.28.1": shown in the docs' top bar. */
 export function rendererVersion(): string {

@@ -57,7 +57,7 @@ export default function AdminShell({
           <span className="grid h-8 w-8 place-items-center rounded-[9px] bg-ink text-white shadow-sm">
             <ShieldCheck className="h-[18px] w-[18px]" />
           </span>
-          <span className="text-[15px] font-semibold tracking-tight">Zowork Forms</span>
+          <span className="text-[15px] font-semibold tracking-tight">ZoForms</span>
           <span className="rounded-md bg-accent-weak px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-accent-2">
             Admin
           </span>

@@ -3,7 +3,7 @@ title: Build an intake page in Next.js
 summary: A signed-in intake page in a Next.js App Router app, and a route handler that checks each submission with prepareSubmission and stores it once.
 template: tutorial
 badges: []
-updated: 2026-11-04
+updated: 2026-11-05
 prev: /docs/integrate/quickstart
 next: /docs/integrate/validate-and-store
 ---
@@ -31,7 +31,7 @@ When you finish:
 ### 1. Install the package
 
 ```sh
-npm install @zoworkhq/forms
+npm install @zoworkhq/zoforms
 ```
 
 ### 2. Put the form file in your app
@@ -44,7 +44,7 @@ Import it once, in the root layout, `app/layout.tsx`. A layout with nothing else
 
 ```tsx file=app/layout.tsx check=browser
 import type { ReactNode } from 'react';
-import '@zoworkhq/forms/styles.css';
+import '@zoworkhq/zoforms/styles.css';
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
@@ -78,8 +78,8 @@ export async function getSignedInUser(): Promise<User | null> {
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { FormRenderer } from '@zoworkhq/forms/react';
-import type { FormSchema } from '@zoworkhq/forms/core';
+import { FormRenderer } from '@zoworkhq/zoforms/react';
+import type { FormSchema } from '@zoworkhq/zoforms/core';
 import schema from './intake-form.json';
 
 export function IntakeForm({ userId }: { userId: string }) {
@@ -153,7 +153,7 @@ export default function ThankYouPage() {
 Create `lib/store.ts`. These two functions stand in for your own storage, and they lose everything when the server stops. Replace them when you're ready.
 
 ```ts file=lib/store.ts check=browser stub=store
-import type { StoredSubmission } from '@zoworkhq/forms/core';
+import type { StoredSubmission } from '@zoworkhq/zoforms/core';
 
 const submissions = new Map<string, { submission: StoredSubmission; userId: string }>();
 
@@ -171,8 +171,8 @@ export async function store(submission: StoredSubmission, userId: string) {
 Create `app/api/submit/route.ts`. The form posts to `/api/submit` on the page's own origin, so the browser sends your app's cookies with it, and the handler can read the user the same way the page does.
 
 ```ts file=app/api/submit/route.ts check=browser run=handler route=/api/submit
-import { prepareSubmission } from '@zoworkhq/forms/core';
-import type { FormSchema } from '@zoworkhq/forms/core';
+import { prepareSubmission } from '@zoworkhq/zoforms/core';
+import type { FormSchema } from '@zoworkhq/zoforms/core';
 import schema from '../../intake/intake-form.json';
 import { getSignedInUser } from '../../../lib/session';
 import { alreadyStored, store } from '../../../lib/store';
@@ -211,7 +211,7 @@ Open `http://localhost:3000/intake`, or the address Next.js prints.
 
 **Next.js says functions can't be passed to client components.** The form is in a server component. Keep it in `app/intake/intake-form.tsx`, with `'use client'` as its first line.
 
-**"This form can't be shown right now. Please try again later."** The form refused the file. Your `onRenderError` gets the reason, in the browser's console here, and your server logs it too, after `@zoworkhq/forms: this form can't be shown.`, in the terminal running Next.js or in `next build`'s output. In a development build it also shows under the message. Often the file isn't a download from the builder, or was edited by hand. See step 5.
+**"This form can't be shown right now. Please try again later."** The form refused the file. Your `onRenderError` gets the reason, in the browser's console here, and your server logs it too, after `@zoworkhq/zoforms: this form can't be shown.`, in the terminal running Next.js or in `next build`'s output. In a development build it also shows under the message. Often the file isn't a download from the builder, or was edited by hand. See step 5.
 
 **"Submission failed. Your answers have been kept — please try again."** The browser got no 2xx from your route handler. Check the terminal running Next.js. A 401 means `getSignedInUser` found no user.
 

@@ -25,14 +25,15 @@ import { cssReference, typeReference } from "./reference";
  *   DOCS_WRITE_REFERENCE=1 pnpm --filter web exec vitest run src/lib/docs/readme-sync.test.ts
  */
 
-const PACKAGE_DIR = path.join(process.cwd(), "node_modules", "@zoworkhq", "forms");
+const PACKAGE_DIR = path.join(process.cwd(), "node_modules", "@zoworkhq", "zoforms");
 const REPO_DOCS = path.join(process.cwd(), "..", "..", "docs");
 const PIN = path.join(CONTENT_DIR, "integrate", "renderer-sources.json");
 
 const sha256 = (text: string) => createHash("sha256").update(text.replace(/\r\n/g, "\n")).digest("hex");
 const read = (full: string) => fs.readFileSync(full, "utf8");
 
-const readme = read(path.join(PACKAGE_DIR, "README.md"));
+// Line endings aren't content: the 0.29.0 tarball's README was packed with CRLF.
+const readme = read(path.join(PACKAGE_DIR, "README.md")).replace(/\r\n/g, "\n");
 const manifest = JSON.parse(read(path.join(PACKAGE_DIR, "package.json"))) as {
   version: string;
   engines: { node: string };
@@ -61,7 +62,7 @@ function codeAfter(heading: string): string {
 
 describe("the sources the developer pages were read against", () => {
   const fresh = {
-    package: `@zoworkhq/forms ${manifest.version}`,
+    package: `@zoworkhq/zoforms ${manifest.version}`,
     readme: sha256(readme),
     groupsAndPagesContract: sha256(read(path.join(REPO_DOCS, "GROUPS-AND-PAGES-CONTRACT.md"))),
     draftsContract: sha256(read(path.join(REPO_DOCS, "DRAFTS-CONTRACT.md"))),
@@ -144,7 +145,7 @@ describe("the overview and the package", () => {
 
   it("name the three entry points the package exports", () => {
     expect(Object.keys(manifest.exports).sort()).toEqual(["./core", "./react", "./styles.css"]);
-    for (const entry of Object.keys(manifest.exports)) expect(page.body).toContain(`@zoworkhq/forms/${entry.slice(2)}`);
+    for (const entry of Object.keys(manifest.exports)) expect(page.body).toContain(`@zoworkhq/zoforms/${entry.slice(2)}`);
   });
 
   it("state the same requirements", () => {
