@@ -20,7 +20,7 @@
     "@formbuilder/form-schema": "workspace:*",
     "@formbuilder/ui": "workspace:*",
     "@mdx-js/mdx": "3.1.0",
-    "@zoworkhq/zoforms": "file:../../vendor/zoworkhq-zoforms-0.29.0.tgz",
+    "@zoworkhq/zoforms": "file:../../vendor/zoworkhq-zoforms-0.29.1.tgz",
     "lucide-react": "^1.23.0",
     "next": "15.5.28",
     "react": "^18.3.1",

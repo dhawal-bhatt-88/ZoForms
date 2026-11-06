@@ -1,5 +1,5 @@
 {
-  "package": "@zoworkhq/zoforms 0.29.0",
+  "package": "@zoworkhq/zoforms 0.29.1",
   "source": "dist/react/index.d.ts (interface FormRendererProps) and dist/react/index.js (defaults)",
   "props": [
     {

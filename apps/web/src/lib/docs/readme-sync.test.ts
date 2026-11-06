@@ -32,8 +32,7 @@ const PIN = path.join(CONTENT_DIR, "integrate", "renderer-sources.json");
 const sha256 = (text: string) => createHash("sha256").update(text.replace(/\r\n/g, "\n")).digest("hex");
 const read = (full: string) => fs.readFileSync(full, "utf8");
 
-// Line endings aren't content: the 0.29.0 tarball's README was packed with CRLF.
-const readme = read(path.join(PACKAGE_DIR, "README.md")).replace(/\r\n/g, "\n");
+const readme = read(path.join(PACKAGE_DIR, "README.md"));
 const manifest = JSON.parse(read(path.join(PACKAGE_DIR, "package.json"))) as {
   version: string;
   engines: { node: string };

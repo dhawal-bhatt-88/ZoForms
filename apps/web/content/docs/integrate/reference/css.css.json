@@ -1,5 +1,5 @@
 {
-  "package": "@zoworkhq/zoforms 0.29.0",
+  "package": "@zoworkhq/zoforms 0.29.1",
   "source": "dist/react/index.d.ts (classNames), dist/styles.css (defaults and hooks), README.md (each property's table and use)",
   "classes": [
     {
