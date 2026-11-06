@@ -1,2 +1,16 @@
-docs/GROUPS-AND-PAGES-CONTRACT.md text eol=lf
-docs/DRAFTS-CONTRACT.md text eol=lf
+# Every text file is LF, in the repo and on disk, on every OS.
+* text=auto eol=lf
+
+# Binary: never converted.
+*.tgz   binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.pdf   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
