@@ -33,7 +33,9 @@ import {
   Plus,
   Search,
   SlidersHorizontal,
+  Redo2,
   Trash2,
+  Undo2,
   X,
 } from "lucide-react";
 import {
@@ -168,6 +170,7 @@ import {
   type MoveTarget,
 } from "@/lib/tree-dnd";
 import { DOCS_LINKS } from "@/lib/docs-links";
+import { describeChange, UndoHistory } from "@/lib/undo-history";
 import { inspectorHeading, logicNoun, TEXT_ONLY_TYPES, textFieldEdit } from "@/lib/inspector";
 import { CATALOG_BLOCK_COUNT, catalogLabel, matchCatalog, type CatalogItem } from "@/lib/block-catalog";
 import { parseCount, repeatBadgeText, repeatPreviewText } from "@/lib/repeat-settings";
@@ -1555,6 +1558,24 @@ function editorContent(s: Partial<FormSchema> | undefined, fallbackTitle: string
 }
 
 /**
+ * A field the author types in: a textarea, or any input that isn't a tick box,
+ * a slider or a button. Typing in one is one undo step, and while focus is in
+ * one the undo shortcuts are the browser's own.
+ */
+function isTypingField(el: unknown): el is HTMLInputElement | HTMLTextAreaElement {
+  if (el instanceof HTMLTextAreaElement) return true;
+  return el instanceof HTMLInputElement && !["checkbox", "radio", "range", "button", "submit", "reset", "file", "color"].includes(el.type);
+}
+
+/** The form, and what the editor remembers beside it, at one moment: what an undo step puts back. */
+type EditorSnapshot = {
+  schema: FormSchema;
+  newQuestions: Set<string>;
+  nameOrigins: Map<string, string>;
+  codeOrigins: Map<string, string>;
+};
+
+/**
  * The form editor. With `templateId` it edits a template instead ("template
  * mode"): the same canvas, inspector, save rules, Save and Cancel, but Save
  * writes to the template, and what only applies to a form — Download — isn't
@@ -1586,6 +1607,37 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   const toast = useToast();
 
   const [schema, setSchema] = useState<FormSchema | null>(null);
+  /*
+   * Undo and redo (lib/undo-history): whole-content snapshots. `settled` is the
+   * form as of the last edit, with the editor's notes on it (`newQuestions`,
+   * `nameOrigins`, `codeOrigins`) as they were then: the state the next edit
+   * starts from, and so what undoing that edit puts back. Every edit has passed
+   * its guards before it gets here, so undo only ever returns to a form the
+   * editor already allowed.
+   */
+  const settled = useRef<EditorSnapshot | null>(null);
+  const [history] = useState(() => new UndoHistory<EditorSnapshot>((a, b) => a.schema === b.schema || sameContent(a.schema, b.schema)));
+  // The stacks live outside React's state: this redraws the buttons when they change.
+  const [, setHistoryChanges] = useState(0);
+  const historyChanged = () => setHistoryChanges((n) => n + 1);
+  // The element losing focus, while its blur handlers run: what they change belongs to its typing step.
+  const leavingField = useRef<EventTarget | null>(null);
+  /** Put `next` in the editor as the state edits now start from. Not an undo step. */
+  const put = (next: FormSchema) => {
+    settled.current = {
+      schema: next,
+      newQuestions: new Set(newQuestions.current),
+      nameOrigins: new Map(nameOrigins.current),
+      codeOrigins: new Map(codeOrigins.current),
+    };
+    setSchema(next);
+  };
+  /** Load, Cancel and "Load the latest version": a different form to start from, with no way back. */
+  const putAfresh = (next: FormSchema) => {
+    history.clear();
+    put(next);
+    historyChanged();
+  };
   // The latest saved version's content: the baseline for dirty-state and Cancel.
   const [saved, setSaved] = useState<FormSchema | null>(null);
   // That version's number: every form save sends it, so a save from a tab that is behind is refused (409).
@@ -1641,7 +1693,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         .then((t) => {
           const latest = templateContent(t);
           setTemplate({ name: t.name, kind: t.kind, version: t.version, scope: t.scope });
-          setSchema(latest);
+          putAfresh(latest);
           setSaved(latest);
           setSelectedId(latest.blocks[0]?.id ?? null);
         })
@@ -1652,7 +1704,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
       .then((f) => {
         const s = f.versions[0]?.schema;
         const latest = editorContent(s, f.title);
-        setSchema(latest);
+        putAfresh(latest);
         setSaved(latest);
         setBaseVersion(f.versions[0]?.version ?? null);
         setSelectedId(s?.blocks?.[0]?.id ?? null);
@@ -1664,7 +1716,8 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   async function saveFormFrom(sent: FormSchema, from: number) {
     const r = await saveSchema(id, sent, from);
     setSaved(r.schema);
-    setSchema((s) => (s === sent ? r.schema : s));
+    // What was stored takes the place of what was sent; the history is kept, so Undo still steps back from here.
+    if (settled.current?.schema === sent) put(r.schema);
     setBaseVersion(r.version);
     saveAnnouncement.announce("Changes saved.");
   }
@@ -1673,7 +1726,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   async function loadLatest() {
     const f = await getForm(id);
     const latest = editorContent(f.versions[0]?.schema, f.title);
-    setSchema(latest);
+    putAfresh(latest);
     setSaved(latest);
     setBaseVersion(f.versions[0]?.version ?? null);
     setNotice(null);
@@ -1709,6 +1762,8 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   const saveAnnouncement = useSaveAnnouncement(dirty);
   // Cancel and Save, blocked for one reason, say it once.
   const saveReasonId = useId();
+  const undoReasonId = useId();
+  const redoReasonId = useId();
   // The Cancel confirmation is open.
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   // A menu item that leaves the editor, held while there are unsaved changes: where it goes if confirmed.
@@ -1752,7 +1807,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         return;
       }
       setSaved(stored);
-      setSchema((s) => (s === sent ? stored : s));
+      if (settled.current?.schema === sent) put(stored);
       saveAnnouncement.announce("Changes saved.");
     } catch (e) {
       if (e instanceof ApiError && e.code === "NO_CHANGES") {
@@ -1760,7 +1815,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         // the codes the saved version has — the same rule, applied here.
         const filled = FormSchema.parse(sent);
         setSaved(filled);
-        setSchema((s) => (s === sent ? filled : s));
+        if (settled.current?.schema === sent) put(filled);
         saveAnnouncement.announce("Changes saved.");
       } else if (e instanceof ApiError && e.code === "VERSION_CONFLICT" && templateId === undefined && baseVersion !== null && e.latestVersion) {
         // Nothing was saved, and the edits are kept: the author chooses what happens to them.
@@ -1784,7 +1839,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   /** Cancel, confirmed: back to the latest saved version. */
   function discardChanges() {
     if (!saved) return;
-    setSchema(saved);
+    putAfresh(saved);
     setNotice(null);
     saveAnnouncement.announce("Changes discarded.");
   }
@@ -1800,8 +1855,106 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     }
   }
 
-  const patch = (fn: (s: FormSchema) => FormSchema) =>
-    setSchema((s) => (s ? fn(s) : s));
+  /**
+   * Every edit to the form's content comes through here, after its guards. It
+   * is one undo step, unless it is typing in a field (or what leaving that
+   * field generates), which joins that field's step. `what` names the step
+   * where the change alone can't (an import, a template), and `about` the block
+   * it was done to where that isn't the selected one (a card's Move down).
+   */
+  const patch = (fn: (s: FormSchema) => FormSchema, { what, about }: { what?: string; about?: string } = {}) => {
+    const before = settled.current;
+    if (!before) return;
+    const next = fn(before.schema);
+    if (next === before.schema) return;
+    if (!readOnly) {
+      // A field that was removed while focused never said it was left.
+      const open = history.openField;
+      if (open instanceof Element && !open.isConnected) history.closeField(before);
+      const focused = leavingField.current ?? document.activeElement;
+      history.record(before, { field: isTypingField(focused) ? focused : null, selected: about ?? selectedId, what });
+      historyChanged();
+    }
+    put(next);
+  };
+
+  /** Undo the newest step, or redo the one last undone: the form, and the editor's notes on it, as they were. */
+  function stepHistory(direction: "undo" | "redo") {
+    const current = settled.current;
+    if (readOnly || !current) return;
+    const step = direction === "undo" ? history.undo(current) : history.redo();
+    if (!step || !step.after) return;
+    const target = direction === "undo" ? step.before : step.after;
+    newQuestions.current = new Set(target.newQuestions);
+    nameOrigins.current = new Map(target.nameOrigins);
+    codeOrigins.current = new Map(target.codeOrigins);
+    settled.current = target;
+    setSchema(target.schema);
+    // What was said about the form as it was no longer holds.
+    setNotice(null);
+    setNameStatus(null);
+    setCodeStatus(null);
+    const change = describeChange(step.before.schema, step.after.schema, step.selected);
+    // The block the step was about, selected and in view; its page or group if the block isn't in this state.
+    const present = (bid: string | null) => (bid !== null && findBlock(target.schema.blocks, bid) ? bid : null);
+    const show = present(change.focus) ?? present(change.fallback);
+    if (show) {
+      expand(...findBlock(target.schema.blocks, show)!.ancestors.map((a) => a.id));
+      setSelectedId(show);
+      // After the expanded groups have rendered.
+      setTimeout(() => {
+        const escaped = show.replace(/["\\]/g, "\\$&");
+        document
+          .querySelector(`[data-block-id="${escaped}"], [data-page-box="${escaped}"]`)
+          ?.scrollIntoView({ block: "center", behavior: "smooth" });
+      }, 50);
+    } else {
+      setSelectedId((cur) => present(cur));
+    }
+    say(`${direction === "undo" ? "Undone" : "Redone"}: ${step.what ?? change.what}.`);
+    historyChanged();
+  }
+  const stepHistoryNow = useRef(stepHistory);
+  stepHistoryNow.current = stepHistory;
+
+  // Ctrl+Z, Ctrl+Shift+Z and Ctrl+Y (Cmd on a Mac). In a text field they are the
+  // browser's own undo of the typing there; with a dialog or menu open they wait.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const key = e.key.toLowerCase();
+      const direction = key === "z" ? (e.shiftKey ? "redo" : "undo") : key === "y" && !e.shiftKey ? "redo" : null;
+      if (!direction) return;
+      if (isTypingField(e.target) || (e.target instanceof HTMLElement && e.target.isContentEditable)) return;
+      if (document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"]')) return;
+      e.preventDefault();
+      stepHistoryNow.current(direction);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // A typing step ends when its field is left, once the field's own blur handlers have
+  // run: they are React's, on the root, so `document` hears the event before them
+  // (capture) and after them (bubble). A name or code they generate is in the step.
+  useEffect(() => {
+    const leaving = (e: FocusEvent) => {
+      leavingField.current = e.target;
+    };
+    const left = (e: FocusEvent) => {
+      leavingField.current = null;
+      if (history.openField !== e.target || !settled.current) return;
+      history.closeField(settled.current);
+      historyChanged();
+    };
+    document.addEventListener("focusout", leaving, true);
+    document.addEventListener("focusout", left);
+    return () => {
+      document.removeEventListener("focusout", leaving, true);
+      document.removeEventListener("focusout", left);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const openMenu = (anchor?: HTMLElement | null, target: MoveTarget | null = null) => {
     menuOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -1911,7 +2064,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     if (refuseStructureEdit(structureBreaks(schema.blocks, next), `insert "${t.name}" there`)) return;
     // Inside a scored group, a copy's clashing names get suffixes and its own formulas follow (contract §17.9).
     const named = namesAfterInsert(schema.blocks, next, group, { skip: newQuestions.current });
-    patch((s) => ({ ...s, blocks: named }));
+    patch((s) => ({ ...s, blocks: named }), { what: `insert template '${t.name}'` });
     if (as === "group" && picking.parentId) expand(picking.parentId);
     setSelectedId(group.id);
     toast.show({ tone: "pass", title: `Inserted a copy of "${t.name}".` });
@@ -2095,8 +2248,8 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     const block = schema ? findBlock(schema.blocks, bid)?.block : undefined;
     return block ? [...optionListAt(block, ref)] : [];
   };
-  const setList = (bid: string, ref: OptionListRef, options: Option[]) =>
-    patch((s) => ({ ...s, blocks: updateBlockInTree(s.blocks, bid, (b) => withOptionList(b, ref, options)) }));
+  const setList = (bid: string, ref: OptionListRef, options: Option[], what?: string) =>
+    patch((s) => ({ ...s, blocks: updateBlockInTree(s.blocks, bid, (b) => withOptionList(b, ref, options)) }), { what });
   const forgetOrigins = (bid: string) => {
     for (const key of [...codeOrigins.current.keys()]) if (key.startsWith(`${bid}|`)) codeOrigins.current.delete(key);
   };
@@ -2241,7 +2394,8 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
       return;
     }
     forgetOrigins(bid);
-    setList(bid, ref, next);
+    const into = findBlock(schema.blocks, bid)?.block;
+    setList(bid, ref, next, `import ${plural} into '${into ? blockName(into) : ""}'`);
     setCodeStatus({
       blockId: bid,
       ref,
@@ -2459,7 +2613,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
     // formulas that meant it follow (contract §17.9); questions newly in reach get names.
     const moved = new Set(walkBlocks([moving]).map((e) => e.block.id));
     const { blocks: resolved, renamed } = resolveNameClashes(schema.blocks, next, moved);
-    patch((s) => ({ ...s, blocks: withNames(resolved) }));
+    patch((s) => ({ ...s, blocks: withNames(resolved) }), { about: bid });
     say(`Moved "${blockName(moving)}"${how}.`);
     if (renamed.length) {
       notify({
@@ -2681,6 +2835,15 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         ? "You have view access, so changes here can't be saved."
         : null;
 
+  // What Undo and Redo would do next: their tooltips, and null when there is nothing.
+  const undoStep = readOnly ? undefined : history.nextUndo;
+  const undoWhat = undoStep ? (undoStep.what ?? describeChange(undoStep.before.schema, schema, undoStep.selected).what) : null;
+  const redoStep = readOnly ? undefined : history.nextRedo;
+  const redoWhat = redoStep?.after ? (redoStep.what ?? describeChange(redoStep.before.schema, redoStep.after.schema, redoStep.selected).what) : null;
+  const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
+  const UNDO_KEYS = mac ? "⌘Z" : "Ctrl+Z";
+  const REDO_KEYS = mac ? "⇧⌘Z" : "Ctrl+Y";
+
   const selectedEntry = selectedId ? findBlock(schema.blocks, selectedId) : undefined;
   const selected = selectedEntry?.block ?? null;
   // The same rule and message as the save (displayBlockProblem in form-schema).
@@ -2886,6 +3049,37 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
         )}
 
         <div className="ml-auto flex flex-none items-center gap-2">
+          {/* Nothing to undo on a screen that can't be saved. Blocked rather than
+              disabled when there is no step, so focus stays on the button that
+              undid the last one. */}
+          {!readOnly && (
+            <div role="group" aria-label="Undo and redo" className="flex flex-none items-center gap-1">
+              <Button
+                size="icon"
+                onClick={() => stepHistory("undo")}
+                aria-label="Undo"
+                aria-keyshortcuts="Control+Z Meta+Z"
+                title={undoWhat ? `Undo: ${undoWhat} (${UNDO_KEYS})` : undefined}
+                reasonId={undoWhat ? undefined : undoReasonId}
+                data-history="undo"
+              >
+                <Undo2 aria-hidden="true" className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                onClick={() => stepHistory("redo")}
+                aria-label="Redo"
+                aria-keyshortcuts="Control+Y Control+Shift+Z Meta+Shift+Z"
+                title={redoWhat ? `Redo: ${redoWhat} (${REDO_KEYS})` : undefined}
+                reasonId={redoWhat ? undefined : redoReasonId}
+                data-history="redo"
+              >
+                <Redo2 aria-hidden="true" className="h-4 w-4" />
+              </Button>
+              {!undoWhat && <span id={undoReasonId} className="sr-only">Nothing to undo</span>}
+              {!redoWhat && <span id={redoReasonId} className="sr-only">Nothing to redo</span>}
+            </div>
+          )}
           {/* From 1024px: everything in the bar. Below it, Form settings, Download,
               the theme and the form's actions move into one ⋯ menu, so Save, Cancel
               and the save state stay on screen (restyle 4). */}

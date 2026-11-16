@@ -1,0 +1,81 @@
+---
+title: Save, undo and versions
+summary: Save your work, take back a change one step at a time, discard everything since the last save, or go back to an earlier saved version.
+template: how-to
+badges: [Editor]
+updated: 2026-11-16
+prev: /docs/build/show-questions-conditionally
+next: /docs/integrate/overview
+---
+
+## When you'd use this
+
+<UseCases>
+<UseCase title="A change you didn't mean">
+You deleted the wrong question, or moved one to the wrong group, and want it back as it was.
+</UseCase>
+<UseCase title="An experiment that didn't work out">
+You tried a different structure and want the form as it was when you last saved.
+</UseCase>
+<UseCase title="Yesterday's form">
+A version you saved earlier was right, and you want to edit from it again or send its file to a developer.
+</UseCase>
+</UseCases>
+
+## Before you start
+
+- Nothing is saved until you select **Save**. The top bar says **Unsaved changes** or **All changes saved**.
+- Undo, Save and Cancel need edit access. With view access the editor opens "View only", and has none of them.
+
+## Steps
+
+### 1. Save
+
+Select **Save** in the top bar. Every save keeps a new version of the form, and **Download** always gives the latest saved version, never unsaved changes.
+
+### 2. Undo a change, and redo it
+
+Select **Undo** in the top bar, or press Ctrl+Z (Cmd+Z on a Mac). Each press takes back one change: a question added, deleted or moved, a setting, an option, a condition, a score, or the form's title. The question the change was made to is selected and scrolled into view.
+
+Select **Redo**, or press Ctrl+Y or Ctrl+Shift+Z (Cmd+Shift+Z on a Mac), to put back what you undid.
+
+Hover over either button to see what it will undo or redo, such as "Undo: delete question 'Address'".
+
+<Note>
+While you are typing in a text field, Ctrl+Z is the field's own undo and takes back typing in that field only. Select **Undo** in the top bar, or click outside the field first, to undo changes to the form.
+</Note>
+
+### 3. Discard everything since the last save
+
+Select **Cancel**, then **Discard changes**. The form goes back to the latest saved version.
+
+### 4. Go back to an earlier version
+
+Select **Version history** in the editor's **More form actions** menu, or in the form's **More actions** menu on My forms. Select **Restore** beside the version you want, and confirm. Its content is saved as a new version and opens in the editor. Every version in between is kept.
+
+### 5. Download an earlier version
+
+On the same page, select **Download** beside a version. Only the 10 most recent versions can be downloaded.
+
+## What happens behind the scenes
+
+- **All the typing in one field is one step.** The step ends when you leave the field, and includes anything the builder fills in as you leave, such as an option's code or a question's name.
+- **A new change after an undo clears Redo.** What you undid can no longer be put back.
+- **The last 100 steps are kept.** Older ones can no longer be undone.
+- **Saving keeps the steps.** You can undo past a save. The form then has unsaved changes again, and nothing changes in the saved version until you save.
+- **Cancel and Restore clear them, and so does reloading the page.** The steps are kept in the open tab only.
+- **Undo only returns to a form the builder already allowed.** It never leaves a condition or a score pointing at something that isn't there.
+
+## Troubleshooting
+
+**Undo is greyed out.** There is nothing to undo: the form was just opened or reloaded, or you selected Cancel or restored a version.
+
+**Ctrl+Z took back typing, not the last change to the form.** The cursor was in a text field. Select **Undo** in the top bar.
+
+**Redo is greyed out after undoing.** You made a new change after the undo, which clears Redo.
+
+**A version has no Download.** It is older than the 10 most recent versions. Restore it, which saves it as a new version, then download that.
+
+## More about building forms
+
+<Series />

@@ -73,6 +73,7 @@ export const DOCS_NAV: DocsNavSection[] = [
         ],
       },
       { title: "Show a question only when it applies", slug: "build/show-questions-conditionally", status: "live" },
+      { title: "Save, undo and versions", slug: "build/save-undo-versions", status: "live" },
     ],
   },
   {

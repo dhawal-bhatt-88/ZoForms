@@ -91,17 +91,21 @@ export default function VersionsPage() {
       header: <span className="sr-only">Actions</span>,
       width: "17rem",
       cell: (v) => (
-        <span className="flex flex-wrap items-start gap-2">
-          <Button
-            size="sm"
-            onClick={() => setRestoring(v)}
-            // Restoring the current version would only duplicate it; the API refuses that (409).
-            reason={v.id === current?.id ? "This is the current version." : undefined}
-            aria-label={`Restore v${v.version}`}
-          >
-            <RotateCcw aria-hidden="true" className="h-3.5 w-3.5" />
-            Restore
-          </Button>
+        // Restore's column is as wide as the button, so Download lines up down the table; the
+        // current version's reason is wider, and runs on beneath both.
+        <span className="grid grid-cols-[5.5rem_auto] items-start justify-start gap-2">
+          <span className="w-max">
+            <Button
+              size="sm"
+              onClick={() => setRestoring(v)}
+              // Restoring the current version would only duplicate it; the API refuses that (409).
+              reason={v.id === current?.id ? "This is the current version." : undefined}
+              aria-label={`Restore v${v.version}`}
+            >
+              <RotateCcw aria-hidden="true" className="h-3.5 w-3.5" />
+              Restore
+            </Button>
+          </span>
           {v.downloadable && (
             <Button
               size="sm"

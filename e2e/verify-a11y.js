@@ -104,6 +104,7 @@ const DOCS_PAGES = [
   ["Repeating groups", "/docs/build/structure/repeating-groups"],
   ["Pages, progress and review", "/docs/build/structure/pages"],
   ["Show a question only when it applies", "/docs/build/show-questions-conditionally"],
+  ["Save, undo and versions", "/docs/build/save-undo-versions"],
   ["How ZoForms fits your app", "/docs/integrate/overview"],
   ["Quickstart", "/docs/integrate/quickstart"],
   ["Build an intake page in Next.js", "/docs/integrate/tutorial-nextjs"],
@@ -479,6 +480,13 @@ const structure = [];
       const { ctx, P } = await open({ token: A, theme });
       await openEditor(P, form.id);
       await audit(P, "Editor", "a form with pages, groups, scores, a grid and conditions", theme);
+      // Undo and Redo, each available: a change made, then undone.
+      await P.getByRole("textbox", { name: "Form description" }).fill("Changed, to have something to undo");
+      await P.getByRole("button", { name: "Undo", exact: true }).click();
+      await audit(P, "Editor", "Redo available, after an undo", theme);
+      await P.getByRole("button", { name: "Redo", exact: true }).click();
+      await audit(P, "Editor", "Undo available, after a change", theme);
+      await P.getByRole("button", { name: "Undo", exact: true }).click();
       await select(P, "deep");
       await audit(P, "Editor", "a question with conditions selected", theme);
       await select(P, "sc");

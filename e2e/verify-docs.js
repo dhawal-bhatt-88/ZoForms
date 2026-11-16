@@ -51,6 +51,7 @@ const PAGES = [
   ...["layout-blocks", "image", "video", "audio"].map((n) => [n, `/docs/build/layout-and-media/${n}`]),
   ...["groups", "repeating-groups", "pages"].map((n) => [n, `/docs/build/structure/${n}`]),
   ["show-questions-conditionally", "/docs/build/show-questions-conditionally"],
+  ["save-undo-versions", "/docs/build/save-undo-versions"],
   ...DEVELOPER_PAGES,
   ["follow-up-question", "/docs/examples/follow-up-question"],
   ["own-validator", "/docs/examples/own-validator"],
