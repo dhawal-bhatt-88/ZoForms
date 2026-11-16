@@ -6,6 +6,7 @@ import {
   UnprocessableEntityException,
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
+import type { ZodError } from "zod";
 import {
   buildArtifact,
   draftsProblem,
@@ -27,6 +28,9 @@ import { RendererCore } from "./renderer-core";
 
 /** Versions are append-only, so a form's current version is its highest `version`. */
 const LATEST_VERSION = { orderBy: { version: "desc" }, take: 1 } as const;
+
+/** How many of a form's most recent versions can be downloaded: the latest and the nine before it. */
+export const DOWNLOADABLE_VERSIONS = 10;
 
 /** A save that started from a version that isn't the latest any more, or lost a race to another save. */
 function versionConflict(latestVersion: number | undefined) {
@@ -141,11 +145,13 @@ export class FormsService {
 
   async listVersions(user: AuthUser, id: string) {
     await this.assertOwned(user, id);
-    return this.prisma.formVersion.findMany({
+    const versions = await this.prisma.formVersion.findMany({
       where: { formId: id },
       orderBy: { version: "desc" },
       select: { id: true, version: true, label: true, createdAt: true },
     });
+    // Newest first, so the downloadable ones are the first few: the page shows Download on these.
+    return versions.map((v, i) => ({ ...v, downloadable: i < DOWNLOADABLE_VERSIONS }));
   }
 
   /** Restore by appending an old version's content as a new version; no row is modified. */
@@ -224,14 +230,53 @@ export class FormsService {
     const form = await this.get(user, id);
     const current = form.versions[0];
     if (!current) throw new NotFoundException("Form has no saved version");
+    return this.artifactOf(form.id, current);
+  }
+
+  /**
+   * The export artifact for one of the form's most recent versions, built and
+   * checked exactly as the current version's is, and as pure a read. A version
+   * older than those is refused (422 VERSION_TOO_OLD). So is one the renderer
+   * wouldn't show, such as one saved before a later format change (422
+   * FORM_INVALID): it is never patched to fit.
+   */
+  async getVersionArtifact(user: AuthUser, id: string, versionId: string) {
+    const form = await this.get(user, id);
+    const source = await this.prisma.formVersion.findFirst({
+      where: { id: versionId, formId: form.id },
+      select: { id: true, version: true, schema: true },
+    });
+    if (!source) throw new NotFoundException("Version not found");
+    const newer = await this.prisma.formVersion.count({ where: { formId: form.id, version: { gt: source.version } } });
+    if (newer >= DOWNLOADABLE_VERSIONS) {
+      throw new UnprocessableEntityException({
+        message: `Only the ${DOWNLOADABLE_VERSIONS} most recent versions can be downloaded.`,
+        code: "VERSION_TOO_OLD",
+      });
+    }
+    return this.artifactOf(form.id, source);
+  }
+
+  private artifactOf(formId: string, version: { id: string; version: number; schema: Prisma.JsonValue }) {
     // Identity, schema format and navigation are stamped by buildArtifact, never
     // stored in or read from the schema itself.
-    const artifact = buildArtifact(current.schema, { formId: form.id, formVersionId: current.id });
+    let artifact: ReturnType<typeof buildArtifact>;
+    try {
+      artifact = buildArtifact(version.schema, { formId, formVersionId: version.id });
+    } catch (e) {
+      // Content today's format can't read: an old version, saved before a format change.
+      // By name: the schema package's zod needn't be the module this file would import.
+      if (!(e instanceof Error && e.name === "ZodError")) throw e;
+      throw new UnprocessableEntityException({
+        message: `This version can't be downloaded: ${describeSchemaError(version.schema, e as ZodError)}`,
+        code: "FORM_INVALID",
+      });
+    }
     const problem = this.renderer.mountProblem(artifact);
     if (problem) {
       throw new UnprocessableEntityException({ message: `The renderer would refuse this form: ${problem}`, code: "FORM_INVALID" });
     }
-    return { fileName: downloadFileName(artifact.title, current.version), artifact };
+    return { fileName: downloadFileName(artifact.title, version.version), artifact };
   }
 
   async duplicate(user: AuthUser, id: string) {

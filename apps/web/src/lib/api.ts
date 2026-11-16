@@ -296,12 +296,13 @@ export function saveSchema(id: string, schema: FormSchema, baseVersion: number) 
 }
 
 /**
- * Download the form's latest *saved* version as a JSON file. Read-only: never
- * saves and never includes unsaved editor changes.
+ * Download the form's latest *saved* version as a JSON file, or with
+ * `versionId` that saved version (one of the most recent: `FormVersion.downloadable`).
+ * Read-only: never saves and never includes unsaved editor changes. Returns
+ * the file name it was saved as.
  */
-/** Downloads the latest saved version's artifact and returns the file name it was saved as. */
-export async function downloadArtifact(id: string): Promise<string> {
-  const res = await apiFetch(`/v1/forms/${id}/artifact`);
+export async function downloadArtifact(id: string, versionId?: string): Promise<string> {
+  const res = await apiFetch(versionId ? `/v1/forms/${id}/versions/${versionId}/artifact` : `/v1/forms/${id}/artifact`);
   const disposition = res.headers.get("Content-Disposition") ?? "";
   const fileName = /filename="([^"]+)"/.exec(disposition)?.[1] ?? "form.json";
   const url = URL.createObjectURL(await res.blob());
@@ -369,6 +370,8 @@ export type FormVersion = {
   version: number;
   label: string | null;
   createdAt: string;
+  /** One of the most recent versions, which are the ones that can be downloaded. */
+  downloadable: boolean;
 };
 export function listVersions(id: string) {
   return req<FormVersion[]>(`/v1/forms/${id}/versions`);

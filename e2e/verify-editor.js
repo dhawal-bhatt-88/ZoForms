@@ -167,6 +167,15 @@ async function waitFor(url) {
     await page2.goto(`${WEB}/app/forms/${form.id}/versions`);
     await page2.getByText("Saved versions").waitFor();
     check("versions copy updated", (await page2.getByText(/Published snapshots|publish/i).count()) === 0);
+    const v1Row = await prisma.formVersion.findFirst({ where: { formId: form.id, version: 1 } });
+    const rowsBeforeDownload = await rows();
+    const [vdl] = await Promise.all([page2.waitForEvent("download"), page2.getByRole("button", { name: "Download v1", exact: true }).click()]);
+    const older = JSON.parse(fs.readFileSync(await vdl.path(), "utf8"));
+    check("versions page Download -> that version's artifact, named for it",
+      older.formId === form.id && older.formVersionId === v1Row.id && /-v1\.json$/.test(vdl.suggestedFilename()), vdl.suggestedFilename());
+    await page2.getByRole("status").filter({ hasText: "Downloaded v1." }).waitFor();
+    check("versions page says which versions can be downloaded", (await page2.getByText("Only the 10 most recent versions can be downloaded.").count()) === 1);
+    check("…and it says so, and creates no version", (await rows()) === rowsBeforeDownload);
     const restoreBtns = page2.getByRole("button", { name: "Restore" });
     check("restore disabled on current version", await restoreBtns.nth(0).isDisabled());
     const before = await rows();

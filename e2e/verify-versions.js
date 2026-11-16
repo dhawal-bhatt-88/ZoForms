@@ -121,6 +121,64 @@ const Y = { title: "Verify", blocks: [{ id: "b_x1", type: "short", label: "Full 
     check("download serves the latest version", latest.formVersionId === newest.id && latest.title === newest.schema.title
       && JSON.stringify(latest.blocks) === JSON.stringify(newest.schema.blocks), `${latest.formVersionId} vs ${newest.id}`);
 
+    // ---------- downloading a chosen version ----------
+    const listed = await versions();
+    check("every listed version says whether it can be downloaded", listed.every((v) => v.downloadable === true), JSON.stringify(listed.map((v) => [v.version, v.downloadable])));
+    const rowsBefore = JSON.stringify(await prisma.formVersion.findMany({ where: { formId: form.id }, orderBy: { version: "asc" } }));
+    const dv2 = await call("GET", `/v1/forms/${form.id}/versions/${v2Before.id}/artifact`, A);
+    check("version download -> 200, application/json", dv2.status === 200 && (dv2.headers.get("content-type") || "").startsWith("application/json"), `${dv2.status} ${dv2.text.slice(0, 120)}`);
+    check("version download is named from that version's title and number",
+      dv2.headers.get("content-disposition") === `attachment; filename="verify-v2.json"`, dv2.headers.get("content-disposition"));
+    check("version download carries that version's id and content", dv2.json?.formId === form.id && dv2.json?.formVersionId === v2Before.id && dv2.json?.blocks[0].label === "Name");
+    check("version download is the file the form's own download gave for it", dv2.text === d1.text);
+    const dLatest = await call("GET", `/v1/forms/${form.id}/versions/${newest.id}/artifact`, A);
+    check("the latest version's download is the form's own download, byte for byte", dLatest.text === (await call("GET", `/v1/forms/${form.id}/artifact`, A)).text);
+    check("version downloads write nothing", JSON.stringify(await prisma.formVersion.findMany({ where: { formId: form.id }, orderBy: { version: "asc" } })) === rowsBefore);
+    let vr = await call("GET", `/v1/forms/${form.id}/versions/${v2Before.id}/artifact`, null);
+    check("version download unauthenticated -> 401", vr.status === 401, `${vr.status}`);
+    vr = await call("GET", `/v1/forms/${form.id}/versions/${v2Before.id}/artifact`, B);
+    check("version download cross-org -> 404", vr.status === 404, `${vr.status}`);
+    vr = await call("GET", `/v1/forms/${form.id}/versions/00000000-0000-4000-8000-000000000000/artifact`, A);
+    check("version download, unknown version -> 404 \"Version not found\"", vr.status === 404 && vr.json?.message === "Version not found", `${vr.status} ${vr.text}`);
+
+    // Only the 10 most recent: a form with 12 versions.
+    const long = (await call("POST", "/v1/forms", A, { title: "PHQ-9" })).json;
+    for (let n = 2; n <= 12; n++) {
+      const s = await call("PUT", `/v1/forms/${long.id}/schema`, A, { title: "PHQ-9", blocks: [{ id: "b_x1", type: "short", label: `As of v${n}`, required: false }] });
+      if (s.status !== 200) throw new Error(`save v${n}: ${s.status} ${s.text}`);
+    }
+    vr = await call("GET", `/v1/forms/${long.id}/versions/${v2Before.id}/artifact`, A);
+    check("another form's version id through this form -> 404", vr.status === 404, `${vr.status}`);
+    const longListed = (await call("GET", `/v1/forms/${long.id}/versions`, A)).json;
+    check("12 versions: v12 to v3 downloadable, v2 and v1 not",
+      longListed.map((v) => `${v.version}${v.downloadable ? "+" : "-"}`).join(" ") === "12+ 11+ 10+ 9+ 8+ 7+ 6+ 5+ 4+ 3+ 2- 1-",
+      longListed.map((v) => `${v.version}${v.downloadable ? "+" : "-"}`).join(" "));
+    const byNumber = (n) => longListed.find((v) => v.version === n);
+    vr = await call("GET", `/v1/forms/${long.id}/versions/${byNumber(3).id}/artifact`, A);
+    check("the tenth most recent (v3) downloads as phq-9-v3.json, with v3's content",
+      vr.status === 200 && vr.headers.get("content-disposition") === `attachment; filename="phq-9-v3.json"` && vr.json.formVersionId === byNumber(3).id && vr.json.blocks[0].label === "As of v3",
+      `${vr.status} ${vr.headers.get("content-disposition")}`);
+    for (const n of [2, 1]) {
+      vr = await call("GET", `/v1/forms/${long.id}/versions/${byNumber(n).id}/artifact`, A);
+      check(`v${n}, outside the 10 most recent -> 422 VERSION_TOO_OLD with the message, and no file`,
+        vr.status === 422 && vr.json?.code === "VERSION_TOO_OLD" && vr.json?.message === "Only the 10 most recent versions can be downloaded." && !vr.headers.get("content-disposition") && !vr.text.includes("As of"),
+        `${vr.status} ${vr.text}`);
+    }
+
+    // A version today's format can't read (as if saved before a format change): refused, never patched.
+    const aged = (await call("POST", "/v1/forms", A, { title: "Aged" })).json;
+    const unreadable = { title: "Aged", blocks: [{ id: "b_old", type: "choice", label: "Mood", required: false, options: ["Low", "High"] }] };
+    const oldRow = await prisma.formVersion.create({ data: { formId: aged.id, version: 2, schema: unreadable } });
+    const agedSave = await call("PUT", `/v1/forms/${aged.id}/schema`, A, { title: "Aged", blocks: X.blocks });
+    check("setup: a save on top of the old version -> version 3", agedSave.status === 200 && agedSave.json.version === 3, `${agedSave.status} ${agedSave.text}`);
+    vr = await call("GET", `/v1/forms/${aged.id}/versions/${oldRow.id}/artifact`, A);
+    check("a version today's format can't read -> 422 FORM_INVALID naming the problem, and no file",
+      vr.status === 422 && vr.json?.code === "FORM_INVALID" && /^This version can't be downloaded: .+/.test(vr.json?.message ?? "") && !vr.headers.get("content-disposition"),
+      `${vr.status} ${vr.text}`);
+    check("…and the old version is as it was", JSON.stringify((await prisma.formVersion.findUnique({ where: { id: oldRow.id } })).schema) === JSON.stringify(oldRow.schema));
+    vr = await call("GET", `/v1/forms/${aged.id}/versions/${agedSave.json.versionId}/artifact`, A);
+    check("…while the version saved after it downloads", vr.status === 200 && vr.json.formVersionId === agedSave.json.versionId, `${vr.status}`);
+
     // Download names: lower case, runs of anything but a–z 0–9 as "-", trimmed, then -v<version>
     const named = async (title) => {
       const f = (await call("POST", "/v1/forms", A, { title: "Naming" })).json;

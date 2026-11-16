@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, PenLine, RotateCcw } from "lucide-react";
+import { ChevronLeft, Download, PenLine, RotateCcw } from "lucide-react";
 import {
   Button,
   buttonClasses,
@@ -16,12 +16,13 @@ import {
   useToast,
   type Column,
 } from "@/components/ui";
-import { getForm, listVersions, restoreVersion, type FormVersion } from "@/lib/api";
+import { downloadArtifact, getForm, listVersions, restoreVersion, type FormVersion } from "@/lib/api";
 
 /**
  * A form's saved versions, newest first. Restoring one saves its content as a
  * new version and opens the editor on it; it asks first, and the outcome is a
- * toast (the (app) layout's provider carries it into the editor).
+ * toast (the (app) layout's provider carries it into the editor). The most
+ * recent versions can each be downloaded: the API says which (`downloadable`).
  */
 export default function VersionsPage() {
   const params = useParams();
@@ -33,6 +34,8 @@ export default function VersionsPage() {
   const [versions, setVersions] = useState<FormVersion[]>([]);
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
   const [restoring, setRestoring] = useState<FormVersion | null>(null);
+  // The version whose download is in flight.
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   async function load() {
     try {
@@ -49,6 +52,18 @@ export default function VersionsPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fid]);
+
+  async function onDownload(v: FormVersion) {
+    setDownloadingId(v.id);
+    try {
+      const fileName = await downloadArtifact(fid, v.id);
+      toast.show({ tone: "pass", title: `Downloaded v${v.version}.`, detail: fileName });
+    } catch (e) {
+      toast.show({ tone: "fail", title: `Couldn't download v${v.version}.`, detail: (e as Error).message });
+    } finally {
+      setDownloadingId(null);
+    }
+  }
 
   const current = versions[0];
   const columns: Column<FormVersion>[] = [
@@ -74,18 +89,31 @@ export default function VersionsPage() {
     {
       key: "actions",
       header: <span className="sr-only">Actions</span>,
-      width: "13rem",
+      width: "17rem",
       cell: (v) => (
-        <Button
-          size="sm"
-          onClick={() => setRestoring(v)}
-          // Restoring the current version would only duplicate it; the API refuses that (409).
-          reason={v.id === current?.id ? "This is the current version." : undefined}
-          aria-label={`Restore v${v.version}`}
-        >
-          <RotateCcw aria-hidden="true" className="h-3.5 w-3.5" />
-          Restore
-        </Button>
+        <span className="flex flex-wrap items-start gap-2">
+          <Button
+            size="sm"
+            onClick={() => setRestoring(v)}
+            // Restoring the current version would only duplicate it; the API refuses that (409).
+            reason={v.id === current?.id ? "This is the current version." : undefined}
+            aria-label={`Restore v${v.version}`}
+          >
+            <RotateCcw aria-hidden="true" className="h-3.5 w-3.5" />
+            Restore
+          </Button>
+          {v.downloadable && (
+            <Button
+              size="sm"
+              onClick={() => onDownload(v)}
+              pending={downloadingId === v.id}
+              aria-label={`Download v${v.version}`}
+            >
+              <Download aria-hidden="true" className="h-3.5 w-3.5" />
+              Download
+            </Button>
+          )}
+        </span>
       ),
     },
   ];
@@ -123,7 +151,10 @@ export default function VersionsPage() {
             <h2 id="versions-heading" className="mb-1 font-display text-[0.9375rem] font-semibold tracking-[-0.008em]">
               Saved versions
             </h2>
-            <p className="body-sm mb-4 text-graphite">Every save keeps a version. Restoring one saves its content as a new version.</p>
+            <p className="body-sm mb-4 text-graphite">
+              Every save keeps a version. Restoring one saves its content as a new version. Only the 10 most recent versions can be
+              downloaded.
+            </p>
             <DataTable
               caption={`Versions of ${title || "this form"}`}
               columns={columns}

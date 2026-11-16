@@ -83,7 +83,12 @@ const MISSING = "00000000-0000-4000-8000-000000000000";
     check("B: download A's artifact → 404, as for an unknown id", sameAsUnknown(r, await call("GET", `/v1/forms/${MISSING}/artifact`, B)), short(r));
     check("…and none of A's content in the reply", !r.text.includes("secret"));
 
-    // ---------- versions: see, restore ----------
+    // ---------- versions: see, download, restore ----------
+    r = await call("GET", `/v1/forms/${form.id}/versions/${latest.id}/artifact`, B);
+    check("B: download a version of A's form → 404, as for an unknown id", sameAsUnknown(r, await call("GET", `/v1/forms/${MISSING}/versions/${latest.id}/artifact`, B)), short(r));
+    check("…and none of A's content in the reply", !r.text.includes("secret"));
+    r = await call("GET", `/v1/forms/${bForm.id}/versions/${latest.id}/artifact`, B);
+    check("B: download A's version id through B's own form → 404, with none of A's content", r.status === 404 && !r.text.includes("secret"), short(r));
     r = await call("GET", `/v1/forms/${form.id}/versions`, B);
     check("B: list A's versions → 404, as for an unknown id", sameAsUnknown(r, await call("GET", `/v1/forms/${MISSING}/versions`, B)), short(r));
     r = await call("POST", `/v1/forms/${form.id}/versions/${aVersions[0].id}/restore`, B);

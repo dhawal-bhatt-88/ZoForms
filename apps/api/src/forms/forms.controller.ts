@@ -58,7 +58,10 @@ export class FormsController {
     @Param("id") id: string,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const { fileName, artifact } = await this.forms.getArtifact(user, id);
+    return this.sendArtifact(res, await this.forms.getArtifact(user, id));
+  }
+
+  private sendArtifact(res: Response, { fileName, artifact }: { fileName: string; artifact: unknown }) {
     res.setHeader("Content-Type", "application/json");
     res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
     return `${JSON.stringify(artifact, null, 2)}\n`;
@@ -67,6 +70,17 @@ export class FormsController {
   @Get(":id/versions")
   versions(@CurrentUser() user: AuthUser, @Param("id") id: string) {
     return this.forms.listVersions(user, id);
+  }
+
+  /** Download one of the most recent versions as a schema artifact. Read-only. */
+  @Get(":id/versions/:versionId/artifact")
+  async versionArtifact(
+    @CurrentUser() user: AuthUser,
+    @Param("id") id: string,
+    @Param("versionId") versionId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.sendArtifact(res, await this.forms.getVersionArtifact(user, id, versionId));
   }
 
   @Post(":id/versions/:versionId/restore")
