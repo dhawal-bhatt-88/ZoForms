@@ -19,14 +19,18 @@ Platform admins can currently sign in to the builder as a client user from the a
 - The API endpoint(s) that start impersonation and the code that mints impersonation tokens.
 - Any impersonation banner, "stop impersonating" control or similar in the web app.
 - Guard and token code that exists only for impersonation (`impersonatedBy` handling, the rule refusing impersonation tokens on the admin console, the self/admin/suspended-user refusals).
-- Impersonation checks in the e2e suites (`verify-access-api.js` and any other), their README rows, and any docs or help text that mention it.
+- Impersonation checks in the e2e suites (`verify-access-api.js` and any other) and the release-audit script, their README rows, and any docs or help text that mention it.
+- **Past audit log entries.** A forward Prisma migration deletes every `AuditLog` row with action `user.impersonated` or `user.impersonation_refused`. Their wording and icon come off the admin console's audit page; no wording is added for `user.impersonation_refused`.
+- `NEXT_PUBLIC_TENANT_URL` everywhere: the admin console's code, Dockerfile and env example, `deploy.yml`, README and DEPLOY.
 
 **Keep:**
-- **Past audit log entries.** Records of earlier impersonations stay as written. If a database column exists only for impersonation, CP0 says whether it holds history; don't drop a column that would delete audit history (decision 1).
 - Every other admin console tenant tool: tenants, users, audit, forms list.
 - Every tenancy check and its e2e coverage.
+- Dated audit reports, the cleanup docs and past briefs, as written.
 
-**Tokens already issued:** after removal, any token carrying an `impersonatedBy` claim is refused with 401, so a token minted before the change can't keep working. Keep that one check, with a comment saying why.
+**Tokens already issued:** no check is kept for them. There is no `impersonatedBy` handling anywhere, no guard rule and no test for it; a token minted before the change expires within its hour.
+
+**At CP1, report** a case-insensitive repo-wide search for `impersonat`, excluding `.git`, `node_modules`, `dist`, `.next`, past briefs, dated audit reports and the cleanup docs. It must return nothing.
 
 ---
 
@@ -60,15 +64,16 @@ Today the only ways back are Cancel (discard everything since the last save) and
 - **Cancel** and **Restore** clear the history. A page reload loses it (in memory only).
 - **Viewers** (read-only editor) get no undo or redo.
 - **Undo can't produce a broken form.** It returns the editor to an earlier state that already passed the editor's guards, so the guards needn't run again. CP0 proposes the approach (whole-content snapshots versus recorded commands) based on how the editor state is held today, and says why.
-- Update the author guide with a short Undo section.
+- Add a "Save, undo and versions" page under Build forms in the docs, with a short Undo section.
 
 ---
 
-## Decisions for Dhawal (CP0 lists them again with recommendations)
+## Decisions (made after CP0)
 
-1. **Impersonation columns:** keep any audit-history column even if nothing writes it any more (recommended), or drop it.
-2. **"10 versions":** the latest plus the 9 before it (recommended), or the 10 before the latest.
-3. **Undo approach:** snapshots or commands, from CP0's findings.
+1. **Impersonation history:** no column exists only for impersonation. The audit rows are deleted by migration, and no check for old tokens is kept.
+2. **"10 versions":** the latest plus the 9 before it. A version outside them is refused with 422 `VERSION_TOO_OLD`, and the versions list says which rows are `downloadable`.
+3. **Undo approach:** whole-content snapshots. Typing is grouped per field, including the field's leave handlers. Announcements read "Undone: *action*." and "Redone: *action*."; the buttons are named Undo and Redo, with the next step as their tooltip.
+4. **Stray file:** the untracked `s -- e2e` file in the repo root is deleted.
 
 ## Rules
 
