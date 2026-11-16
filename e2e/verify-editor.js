@@ -148,6 +148,15 @@ async function waitFor(url) {
     await leave.getByRole("button", { name: "Cancel", exact: true }).click();
     await sleep(500);
     check("dismiss keeps you in the editor", page.url().endsWith("/edit") && (await leave.count()) === 0);
+    // The menu's Version history leaves the editor too, so it asks the same question.
+    const moreActions = (p) => p.getByRole("button", { name: "More form actions" }).filter({ visible: true });
+    await moreActions(page).click();
+    await page.getByRole("menuitem", { name: "Version history" }).click();
+    await leave.waitFor();
+    check("Version history from the editor while dirty asks to confirm", (await leave.innerText()).includes("Your unsaved changes will be lost."), await leave.innerText());
+    await leave.getByRole("button", { name: "Cancel", exact: true }).click();
+    await sleep(500);
+    check("…and dismissing keeps you in the editor, edits and all", page.url().endsWith("/edit") && (await leave.count()) === 0 && (await desc.inputValue()) === "Hello!?", page.url());
 
     let unloadType = "";
     page.once("dialog", (d) => { unloadType = d.type(); d.dismiss(); });
@@ -164,8 +173,11 @@ async function waitFor(url) {
     check("dashboard Download -> latest saved artifact", dash.formId === form.id && dash.formVersionId === (await latestId()) && dl.suggestedFilename() === `ui-verify-v${await latestVersion()}.json`, dl.suggestedFilename());
 
     // --- versions page: copy, current disabled, restore creates version + editor shows it ---
-    await page2.goto(`${WEB}/app/forms/${form.id}/versions`);
-    await page2.getByText("Saved versions").waitFor();
+    await page2.getByRole("button", { name: /^More actions for "/ }).first().click();
+    await page2.getByRole("menuitem", { name: "Version history" }).click();
+    await page2.waitForURL(`**/app/forms/${form.id}/versions`);
+    await page2.getByRole("button", { name: "Restore v1", exact: true }).waitFor();
+    check("My forms: More actions > Version history opens the form's versions", (await page2.getByRole("heading", { name: "Saved versions" }).count()) === 1);
     check("versions copy updated", (await page2.getByText(/Published snapshots|publish/i).count()) === 0);
     const v1Row = await prisma.formVersion.findFirst({ where: { formId: form.id, version: 1 } });
     const rowsBeforeDownload = await rows();
@@ -186,6 +198,26 @@ async function waitFor(url) {
     const top = await prisma.formVersion.findFirst({ where: { formId: form.id }, orderBy: { version: "desc" } });
     check("restore created a new version", (await rows()) === before + 1 && top.label === "Restored from v1", top.label);
     check("editor shows restored version", (await page2.getByPlaceholder("Add a description…").inputValue()) === "");
+
+    // --- Version history from the editor: straight there when saved, asked first when not ---
+    await moreActions(page2).click();
+    await page2.getByRole("menuitem", { name: "Version history" }).click();
+    await page2.waitForURL(`**/app/forms/${form.id}/versions`);
+    check("Version history from the editor with nothing unsaved goes straight there", (await page2.getByRole("alertdialog").count()) === 0);
+    await page2.getByRole("link", { name: "Edit form" }).click();
+    await page2.waitForURL(`**/app/forms/${form.id}/edit`);
+    const desc2 = page2.getByPlaceholder("Add a description…");
+    await desc2.click(); await desc2.pressSequentially("Unsaved", { delay: 30 });
+    await page2.getByText("Unsaved changes").first().waitFor();
+    const rowsBeforeLeaving = await rows();
+    await moreActions(page2).click();
+    await page2.getByRole("menuitem", { name: "Version history" }).click();
+    const leave2 = page2.getByRole("alertdialog", { name: "Leave without saving?" });
+    await leave2.waitFor();
+    await leave2.getByRole("button", { name: "Leave without saving" }).click();
+    await page2.waitForURL(`**/app/forms/${form.id}/versions`);
+    await page2.getByRole("button", { name: "Restore v1", exact: true }).waitFor();
+    check("confirming leaves for the versions page, and the unsaved edit made no version", (await rows()) === rowsBeforeLeaving);
   } catch (e) {
     check("script ran without error", false, e.stack);
   } finally {

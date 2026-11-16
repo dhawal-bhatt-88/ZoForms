@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   DndContext,
@@ -28,6 +28,7 @@ import {
   ExternalLink,
   FileText,
   GripVertical,
+  History,
   LayoutTemplate,
   Plus,
   Search,
@@ -1562,6 +1563,7 @@ function editorContent(s: Partial<FormSchema> | undefined, fallbackTitle: string
  */
 export default function FormEditor({ templateId }: { templateId?: string }) {
   const params = useParams();
+  const router = useRouter();
   // A form's id; in template mode the route's id is the template's, and isn't used as a form's.
   const id = String(params.id);
   const templateMode = templateId !== undefined;
@@ -1709,6 +1711,12 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
   const saveReasonId = useId();
   // The Cancel confirmation is open.
   const [confirmingCancel, setConfirmingCancel] = useState(false);
+  // A menu item that leaves the editor, held while there are unsaved changes: where it goes if confirmed.
+  const [leavingTo, setLeavingTo] = useState<string | null>(null);
+  /** Leave for `href`, asking first while there are unsaved changes, as `LeaveLink` does for a link. */
+  const leaveFor = (href: string) => (dirty ? setLeavingTo(href) : router.push(href));
+  // The form's saved versions. A menu action, not a link, so the unsaved-changes question can hold it.
+  const versionHistory = { label: "Version history", icon: History, onSelect: () => leaveFor(`/app/forms/${id}/versions`) };
   // A grid column's type change waiting for the author's answer (it would remove the column's options).
   const [typeChange, setTypeChange] = useState<{ blockId: string; index: number; type: GridColumnType; warning: string } | null>(null);
 
@@ -2895,15 +2903,17 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                 <Download aria-hidden="true" className="h-3.5 w-3.5" />
                 Download
               </Button>
-              {canEdit && (
-                <div className="hidden lg:block">
-                  <MenuButton
-                    label="More form actions"
-                    className={buttonClasses({ size: "sm", className: "px-2" })}
-                    items={[{ label: "Save form as template…", icon: LayoutTemplate, onSelect: () => setSavingAsTemplate({ kind: "form" }) }]}
-                  />
-                </div>
-              )}
+              <div className="hidden lg:block">
+                <MenuButton
+                  label="More form actions"
+                  className={buttonClasses({ size: "sm", className: "px-2" })}
+                  items={[
+                    versionHistory,
+                    // Viewers aren't offered "Save as template".
+                    ...(canEdit ? [{ label: "Save form as template…", icon: LayoutTemplate, onSelect: () => setSavingAsTemplate({ kind: "form" }) }] : []),
+                  ]}
+                />
+              </div>
             </>
           )}
           <div className="lg:hidden">
@@ -2921,6 +2931,7 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
                   ? []
                   : [
                       { label: downloading ? "Downloading…" : "Download", icon: Download, onSelect: onDownload },
+                      versionHistory,
                       ...(canEdit ? [{ label: "Save form as template…", icon: LayoutTemplate, onSelect: () => setSavingAsTemplate({ kind: "form" }) }] : []),
                       "separator" as const,
                     ]),
@@ -2996,6 +3007,16 @@ export default function FormEditor({ templateId }: { templateId?: string }) {
           confirmLabel="Discard changes"
           onConfirm={async () => discardChanges()}
           onClose={() => setConfirmingCancel(false)}
+        />
+      )}
+      {leavingTo && (
+        // LeaveLink's question, for a menu item that leaves.
+        <ConfirmDialog
+          title="Leave without saving?"
+          consequence="Your unsaved changes will be lost. This can't be undone."
+          confirmLabel="Leave without saving"
+          onConfirm={async () => router.push(leavingTo)}
+          onClose={() => setLeavingTo(null)}
         />
       )}
       {typeChange && (

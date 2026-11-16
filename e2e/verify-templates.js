@@ -331,8 +331,13 @@ const HEALTH = {
     await vp.locator('[data-block-id="b_group001"]').waitFor();
     await vp.waitForLoadState("networkidle");
     await vp.locator('[data-block-id="b_group001"]').hover();
+    // The form's menu is there for Version history, which a viewer may open; Save as template isn't in it.
+    const noGroupMenu = (await vp.getByRole("button", { name: /^More actions for group/ }).count()) === 0;
+    await vp.getByRole("button", { name: "More form actions" }).filter({ visible: true }).click();
+    const formItems = await vp.getByRole("menuitem").allInnerTexts();
+    await vp.keyboard.press("Escape");
     check("viewer, editor: no Save as template, for a group or the form",
-      (await vp.getByRole("button", { name: /^More actions for group/ }).count()) === 0 && (await vp.getByRole("button", { name: "More form actions" }).count()) === 0);
+      noGroupMenu && formItems.includes("Version history") && !formItems.some((t) => /template/i.test(t)), formItems.join(" | "));
     await vp.goto(`${WEB}/app/templates/${tpl.id}/edit`);
     await vp.getByRole("heading", { name: "Template: Smoking details" }).waitFor();
     await vp.waitForLoadState("networkidle");

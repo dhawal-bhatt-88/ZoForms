@@ -25,7 +25,7 @@ Respondents have drafts saved on their device or your server.
 ## Before you start
 
 - The new download. Every saved version has its own `formVersionId`, and **Download** in the editor and on My forms gives the latest saved version.
-- An earlier version, if you need one. On the form's Version history page, at `/app/forms/<form id>/versions` in the builder, each of the 10 most recent versions has its own **Download**, and the file is named after the form and that version, such as `client-intake-v3.json`. Older versions can be restored but not downloaded.
+- An earlier version, if you need one. Select **Version history** in the form's **More actions** menu on My forms, or in the editor's menu. There, each of the 10 most recent versions has its own **Download**, and the file is named after the form and that version, such as `client-intake-v3.json`. Older versions can be restored but not downloaded.
 
 ## Steps
 
@@ -44,7 +44,7 @@ A tab opened before your deploy still runs the old version, and posts its `formV
 
 ### 3. Accept the old version for a while, if you need to
 
-Keep each version's file, and check a body against the one it was built from. A file you no longer have can be downloaded again from the form's Version history page, while it is one of the 10 most recent versions. A body from a version you no longer keep falls back to the newest.
+Keep each version's file, and check a body against the one it was built from. A file you no longer have can be downloaded again from **Version history**, while it is one of the 10 most recent versions. A body from a version you no longer keep falls back to the newest.
 
 ```js file=versions.js check=esm
 import { readdirSync, readFileSync } from 'node:fs';

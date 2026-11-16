@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Copy, Download, FileText, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Copy, Download, FileText, History, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import AppShell from "@/components/app-shell";
 import { MenuButton, type MenuItem } from "@/components/menu-button";
 import { NewFormDialog } from "@/components/templates/new-form-dialog";
@@ -249,17 +249,21 @@ function FormCard({
 }) {
   const href = `/app/forms/${f.id}/edit`;
   const open = canEdit ? "Edit" : "Open";
+  // The form's saved versions: restore one, or download one of the most recent.
+  const history: MenuItem = { label: "Version history", icon: History, href: `/app/forms/${f.id}/versions` };
   const items: MenuItem[] = canEdit
     ? [
         { label: "Edit", icon: Pencil, href },
         { label: "Duplicate", icon: Copy, onSelect: onDuplicate },
         { label: "Download", icon: Download, onSelect: onDownload },
+        history,
         "separator",
         { label: "Delete…", icon: Trash2, onSelect: onDelete, danger: true },
       ]
     : [
         { label: "Open", icon: FileText, href },
         { label: "Download", icon: Download, onSelect: onDownload },
+        history,
       ];
 
   return (
