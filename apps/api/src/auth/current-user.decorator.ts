@@ -8,8 +8,6 @@ export type AuthUser = {
   orgId: string;
   workspaceId: string;
   role: Role;
-  /** Set on a token an admin made to act as this user. */
-  impersonatedBy?: string;
 };
 
 export const CurrentUser = createParamDecorator(

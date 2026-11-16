@@ -22,9 +22,7 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 # ---- build ----
 FROM deps AS build
 ARG NEXT_PUBLIC_API_URL=http://localhost:4000
-ARG NEXT_PUBLIC_TENANT_URL=http://localhost:3000
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_TENANT_URL=$NEXT_PUBLIC_TENANT_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY tsconfig.base.json ./
 COPY packages/ui ./packages/ui

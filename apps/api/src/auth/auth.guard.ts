@@ -77,7 +77,6 @@ export class AuthGuard implements CanActivate {
       orgId: claims.orgId,
       workspaceId: claims.workspaceId,
       role: row.role,
-      ...(claims.impersonatedBy ? { impersonatedBy: claims.impersonatedBy } : {}),
     };
     req.user = user;
     return true;

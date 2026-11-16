@@ -83,7 +83,7 @@ model AuditLog {
   id         String   @id @default(uuid())
   actorId    String // admin user id
   actorEmail String
-  action     String // e.g. org.suspended, user.suspended, user.impersonated
+  action     String // e.g. org.suspended, user.suspended, form.deleted
   targetType String? // org | user | form
   targetId   String?
   meta       Json?

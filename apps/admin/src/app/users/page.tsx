@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, LogIn, MoreHorizontal, Search, ShieldCheck, Trash2 } from "lucide-react";
+import { Loader2, MoreHorizontal, Search, ShieldCheck, Trash2 } from "lucide-react";
 import AdminShell from "@/components/admin-shell";
 import {
   deleteUser,
-  impersonate,
   listUsers,
-  TENANT_URL,
   updateUser,
   type UserRow,
 } from "@/lib/api";
@@ -31,16 +29,6 @@ export default function UsersPage() {
     }, 200);
     return () => clearTimeout(t);
   }, [q]);
-
-  async function onImpersonate(u: UserRow) {
-    setMenu(null);
-    try {
-      const { token } = await impersonate(u.id);
-      window.open(`${TENANT_URL}/impersonate?token=${encodeURIComponent(token)}`, "_blank");
-    } catch (e) {
-      alert((e as Error).message);
-    }
-  }
 
   async function onToggleStatus(u: UserRow) {
     setMenu(null);
@@ -143,12 +131,6 @@ export default function UsersPage() {
                         <>
                           <div className="fixed inset-0 z-20" onClick={() => setMenu(null)} />
                           <div className="absolute right-0 top-8 z-30 w-44 overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-pop">
-                            <button
-                              onClick={() => onImpersonate(u)}
-                              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13.5px] font-medium text-ink-2 hover:bg-surface-2 hover:text-ink"
-                            >
-                              <LogIn className="h-4 w-4" /> Impersonate
-                            </button>
                             <button
                               onClick={() => onToggleStatus(u)}
                               className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13.5px] font-medium text-ink-2 hover:bg-surface-2 hover:text-ink"

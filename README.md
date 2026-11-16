@@ -9,7 +9,7 @@
 It is:
 - the **builder** (web app): forms, templates, versions, the artifact download, team and invites;
 - the **API** that stores forms and applies every save rule;
-- an **admin console** for operators: tenants, users, impersonation, the audit log and the forms list.
+- an **admin console** for operators: tenants, users, the audit log and the forms list.
 
 It isn't a form host. Nothing a respondent does reaches it:
 - no public form pages and no embeds;
@@ -142,7 +142,6 @@ Or use `pnpm db:studio`. Then sign in at http://localhost:3002 with the same ema
 | Variable | Description |
 | --- | --- |
 | `NEXT_PUBLIC_API_URL` | The API's origin (default `http://localhost:4000`) |
-| `NEXT_PUBLIC_TENANT_URL` | The builder's origin, used for impersonation (default `http://localhost:3000`) |
 
 `NEXT_PUBLIC_*` values are built into the Next.js apps, so change them before building. Production uses [`deploy/.env.prod.example`](deploy/.env.prod.example): see [`DEPLOY.md`](DEPLOY.md).
 

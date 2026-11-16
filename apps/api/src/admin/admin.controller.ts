@@ -7,7 +7,6 @@ import {
   Get,
   Param,
   Patch,
-  Post,
   Query,
   UseGuards,
 } from "@nestjs/common";
@@ -64,11 +63,6 @@ export class AdminController {
   @Delete("users/:id")
   deleteUser(@CurrentAdmin() actor: AdminActor, @Param("id") id: string) {
     return this.admin.deleteUser(actor, id);
-  }
-
-  @Post("users/:id/impersonate")
-  impersonate(@CurrentAdmin() actor: AdminActor, @Param("id") id: string) {
-    return this.admin.impersonate(actor, id);
   }
 
   @Get("forms")

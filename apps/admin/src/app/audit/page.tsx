@@ -5,7 +5,6 @@ import {
   Ban,
   Building2,
   Loader2,
-  LogIn,
   ShieldCheck,
   Trash2,
   UserCog,
@@ -15,7 +14,6 @@ import { listAudit, type AuditEntry } from "@/lib/api";
 
 function iconFor(action: string) {
   if (action.startsWith("org")) return Building2;
-  if (action.includes("impersonat")) return LogIn;
   if (action.includes("deleted")) return Trash2;
   if (action.includes("admin")) return ShieldCheck;
   if (action.startsWith("form")) return Ban;
@@ -33,8 +31,6 @@ function describe(e: AuditEntry): string {
       return "suspended a user";
     case "user.reactivated":
       return "reactivated a user";
-    case "user.impersonated":
-      return `impersonated ${m.email}`;
     case "user.deleted":
       return `deleted user ${m.email}`;
     case "user.granted_admin":

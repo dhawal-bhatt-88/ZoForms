@@ -11,8 +11,7 @@ import { tokenRevoked } from "../auth/auth.guard";
 
 /**
  * Allows only authenticated platform admins (User.isAdmin), signed in as
- * themselves: an impersonation token is refused, and so is a token older than
- * the admin's sessionsValidFrom.
+ * themselves: a token older than the admin's sessionsValidFrom is refused.
  */
 @Injectable()
 export class AdminGuard implements CanActivate {
@@ -25,7 +24,7 @@ export class AdminGuard implements CanActivate {
     const req = ctx.switchToHttp().getRequest();
     const header: string | undefined = req.headers?.authorization;
     if (!header || !header.startsWith("Bearer ")) throw new UnauthorizedException();
-    let payload: { sub: string; iat?: number; issuedAtMs?: number; impersonatedBy?: string };
+    let payload: { sub: string; iat?: number; issuedAtMs?: number };
     try {
       payload = this.jwt.verify(header.slice(7));
     } catch {
@@ -36,7 +35,7 @@ export class AdminGuard implements CanActivate {
       select: { id: true, email: true, isAdmin: true, status: true, sessionsValidFrom: true },
     });
     if (user && tokenRevoked(payload, user.sessionsValidFrom)) throw new UnauthorizedException();
-    if (!user || !user.isAdmin || user.status !== "active" || payload.impersonatedBy) {
+    if (!user || !user.isAdmin || user.status !== "active") {
       throw new ForbiddenException("Admin access required");
     }
     req.admin = { id: user.id, email: user.email, isAdmin: user.isAdmin, status: user.status };

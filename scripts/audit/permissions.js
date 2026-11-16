@@ -4,8 +4,7 @@
 //   form, template and team write route, and the admin routes.
 // - Membership changes after sign-in: a lowered role, a removed member.
 // - Suspension: a suspended user, and a member of a suspended organisation.
-// - Platform admin: AuditLog rows for impersonation, deletes and suspensions, and
-//   impersonating another platform admin, yourself, or a suspended user.
+// - Platform admin: AuditLog rows for deletes and suspensions.
 //
 // Usage: node scripts/audit/permissions.js   (API on AUDIT_API_URL, default :4100)
 const { call, signup, emailFor, decode, check, note, run, short, prisma, PASSWORD, markVerified } = require("./_lib");
@@ -98,7 +97,7 @@ run("Permissions", async () => {
   const adminRoutes = [
     ["GET", "/v1/admin/overview"], ["GET", "/v1/admin/orgs"], ["GET", `/v1/admin/orgs/${someId}`],
     ["PATCH", `/v1/admin/orgs/${someId}`], ["GET", "/v1/admin/users"], ["PATCH", `/v1/admin/users/${someId}`],
-    ["DELETE", `/v1/admin/users/${someId}`], ["POST", `/v1/admin/users/${someId}/impersonate`],
+    ["DELETE", `/v1/admin/users/${someId}`],
     ["GET", "/v1/admin/forms"], ["DELETE", `/v1/admin/forms/${someId}`], ["GET", "/v1/admin/audit"],
   ];
   const adminStatuses = [];
@@ -144,8 +143,6 @@ run("Permissions", async () => {
   // ---------- platform admin ----------
   const pa = await signup("platform-admin");
   await prisma.user.update({ where: { id: pa.id }, data: { isAdmin: true } });
-  const pa2 = await signup("platform-admin-2");
-  await prisma.user.update({ where: { id: pa2.id }, data: { isAdmin: true } });
 
   // Suspended user.
   const sus = await addMember(T, "suspended", "EDITOR");
@@ -170,9 +167,6 @@ run("Permissions", async () => {
   await call("PATCH", `/v1/admin/orgs/${decode(T).orgId}`, pa.token, { status: "active" });
 
   // Audit rows: who did it.
-  const imp = await call("POST", `/v1/admin/users/${editor.id}/impersonate`, pa.token);
-  check("admin impersonates a user", ok(imp), short(imp));
-  note("impersonation token claims", JSON.stringify({ ...decode(imp.json.token), iat: "…", exp: `iat + ${decode(imp.json.token).exp - decode(imp.json.token).iat}s` }));
   const doomedForm = (await call("POST", "/v1/forms", T, { title: "Admin will delete" })).json;
   r = await call("DELETE", `/v1/admin/forms/${doomedForm.id}`, pa.token);
   check("admin deletes a form", ok(r), short(r));
@@ -180,32 +174,9 @@ run("Permissions", async () => {
   r = await call("DELETE", `/v1/admin/users/${doomedUser.id}`, pa.token);
   check("admin deletes a user", ok(r), short(r));
   const rows = await prisma.auditLog.findMany({ where: { actorId: pa.id }, orderBy: { createdAt: "asc" } });
-  const want = ["user.suspended", "org.suspended", "org.reactivated", "user.impersonated", "form.deleted", "user.deleted"];
+  const want = ["user.suspended", "org.suspended", "org.reactivated", "form.deleted", "user.deleted"];
   for (const action of want) {
     const row = rows.find((x) => x.action === action);
     check(`AuditLog has ${action} with the admin's id and email`, row && row.actorId === pa.id && row.actorEmail === pa.email, row ? JSON.stringify({ action: row.action, actorEmail: row.actorEmail, targetType: row.targetType, targetId: row.targetId, meta: row.meta }) : "no row");
   }
-
-  // Impersonating another platform admin, then acting as them in the admin console.
-  r = await call("POST", `/v1/admin/users/${pa2.id}/impersonate`, pa.token);
-  check("P2: admin impersonates another platform admin → refused (403)", r.status === 403, short(r));
-  r = await call("POST", `/v1/admin/users/${pa.id}/impersonate`, pa.token);
-  check("P2: admin impersonates themselves → refused (403)", r.status === 403, short(r));
-  const refusals = await prisma.auditLog.findMany({ where: { actorId: pa.id, action: "user.impersonation_refused" } });
-  check("P2: both refusals are in the audit log under the real admin", refusals.length === 2 && refusals.every((x) => x.actorEmail === pa.email), JSON.stringify(refusals.map((x) => x.meta)));
-  const asUser = (await call("POST", `/v1/admin/users/${editor.id}/impersonate`, pa.token)).json?.token;
-  r = await call("GET", "/v1/admin/overview", asUser);
-  check("P2: an impersonation token on the admin console → refused", !ok(r), short(r));
-  if (ok(r)) {
-    const asPa2 = r.json.token;
-    const ov = await call("GET", "/v1/admin/overview", asPa2);
-    note("…the impersonation token on the admin console", short(ov));
-    const victim2 = (await call("POST", "/v1/forms", T, { title: "Deleted while impersonating" })).json;
-    const del = await call("DELETE", `/v1/admin/forms/${victim2.id}`, asPa2);
-    const row = await prisma.auditLog.findFirst({ where: { action: "form.deleted", targetId: victim2.id } });
-    note("…a form deleted with it is logged as", `${del.status}; actor ${row ? `${row.actorEmail} (${row.actorId === pa2.id ? "the impersonated admin" : row.actorId === pa.id ? "the real admin" : "?"})` : "no row"}; meta ${JSON.stringify(row?.meta)}`);
-  }
-  // Impersonating someone who is suspended.
-  r = await call("POST", `/v1/admin/users/${sus.id}/impersonate`, pa.token);
-  check("P2: admin impersonates a suspended user → refused", !ok(r), short(r));
 });

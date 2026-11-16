@@ -1,9 +1,9 @@
 // Sign-in and access through the API (release fixes, CP1): no reset or verify
 // link in any response; every signed-in request checks the membership, the user
 // and the organisation, with the role read fresh; a password reset revokes older
-// tokens, admin and impersonation tokens included; an unverified account can't
+// tokens, admin tokens included; an unverified account can't
 // invite; one organisation per account; sign-in refusals for a suspended user or
-// organisation and for no organisation; impersonation limits. API only.
+// organisation and for no organisation. API only.
 //
 // Google sign-in claiming an unverified account needs Google's verifier stubbed,
 // so it is in scripts/audit/sessions.js, which drives the API's services in-process.
@@ -143,17 +143,10 @@ const q = (id, label) => ({ id, type: "short", label, required: false });
     check("the token the reset returned works", ok(await call("GET", "/v1/forms", after)));
     check("signing in with the new password works", ok(await login(R.email, "New-pass-456!")));
 
-    // Platform admin tokens, and impersonation tokens.
+    // Platform admin tokens.
     const PA = await signup("admin", "Admin");
     await prisma.user.update({ where: { id: PA.id }, data: { isAdmin: true } });
     check("setup: admin console as the admin (200)", ok(await call("GET", "/v1/admin/overview", PA.token)));
-    const imp = await call("POST", `/v1/admin/users/${R.id}/impersonate`, PA.token);
-    check("setup: the admin impersonates a user (201)", imp.status === 201, show(imp));
-    check("setup: the impersonation token works", ok(await call("GET", "/v1/forms", imp.json?.token)));
-    await call("POST", "/v1/auth/forgot-password", null, { email: R.email });
-    await call("POST", "/v1/auth/reset-password", null, { token: await resetToken(R.email), password: "Newer-pass-789!" });
-    r = await call("GET", "/v1/forms", imp.json?.token);
-    check("the impersonated user resets their password: the impersonation token → 401", r.status === 401, show(r));
     await call("POST", "/v1/auth/forgot-password", null, { email: PA.email });
     r = await call("POST", "/v1/auth/reset-password", null, { token: await resetToken(PA.email), password: "Admin-new-123!" });
     const paNew = r.json?.token;
@@ -203,27 +196,6 @@ const q = (id, label) => ({ id, type: "short", label, required: false });
     const picks = new Set();
     for (let i = 0; i < 5; i++) picks.add(decode((await login(X.email)).json.token).orgId);
     check("a user with two memberships (from before the rule) always signs in to the older one", picks.size === 1 && picks.has(decode(X.token).orgId), [...picks].join(", "));
-
-    // ---------- 7. impersonation limits ----------
-    const PA2 = await signup("admin-2", "Admin 2");
-    await prisma.user.update({ where: { id: PA2.id }, data: { isAdmin: true } });
-    r = await call("POST", `/v1/admin/users/${PA.id}/impersonate`, paNew);
-    check("an admin impersonates themselves → 403 \"You can't impersonate yourself.\"", r.status === 403 && r.json?.message === "You can't impersonate yourself.", show(r));
-    r = await call("POST", `/v1/admin/users/${PA2.id}/impersonate`, paNew);
-    check("an admin impersonates another platform admin → 403 \"Platform admins can't be impersonated.\"", r.status === 403 && r.json?.message === "Platform admins can't be impersonated.", show(r));
-    const refused = await prisma.auditLog.findMany({ where: { actorId: PA.id, action: "user.impersonation_refused" }, orderBy: { createdAt: "asc" } });
-    check("both refusals are in the audit log, with the admin, the target and the reason",
-      refused.length === 2 && refused[0].targetId === PA.id && refused[0].meta?.reason === "self" && refused[1].targetId === PA2.id && refused[1].meta?.reason === "admin" && refused.every((x) => x.actorEmail === PA.email),
-      JSON.stringify(refused.map((x) => [x.targetId, x.meta])));
-    await prisma.user.update({ where: { id: sus.id }, data: { status: "suspended" } });
-    r = await call("POST", `/v1/admin/users/${sus.id}/impersonate`, paNew);
-    check("impersonating a suspended user → 400 with a message", r.status === 400 && r.json?.message === "This user is suspended. Reactivate them before impersonating.", show(r));
-    await prisma.user.update({ where: { id: sus.id }, data: { status: "active" } });
-    // An impersonation token never works on the admin console, even if its user becomes an admin.
-    const imp2 = await call("POST", `/v1/admin/users/${sus.id}/impersonate`, paNew);
-    await prisma.user.update({ where: { id: sus.id }, data: { isAdmin: true } });
-    r = await call("GET", "/v1/admin/overview", imp2.json?.token);
-    check("an impersonation token on the admin console → 403, even for a user who is now an admin", r.status === 403, show(r));
   } catch (e) {
     check("script ran without error", false, e.stack);
   } finally {

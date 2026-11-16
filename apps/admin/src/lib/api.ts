@@ -1,5 +1,4 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-export const TENANT_URL = process.env.NEXT_PUBLIC_TENANT_URL || "http://localhost:3000";
 
 const TOKEN_KEY = "frame_admin_token";
 export function getToken() {
@@ -132,10 +131,6 @@ export const listUsers = (q = "") => req<UserRow[]>(`/v1/admin/users${q ? `?q=${
 export const updateUser = (id: string, body: { status?: string; isAdmin?: boolean }) =>
   req<UserRow>(`/v1/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(body) });
 export const deleteUser = (id: string) => req<{ ok: boolean }>(`/v1/admin/users/${id}`, { method: "DELETE" });
-export const impersonate = (id: string) =>
-  req<{ token: string; user: { id: string; email: string } }>(`/v1/admin/users/${id}/impersonate`, {
-    method: "POST",
-  });
 export const listForms = (q = "") => req<AdminForm[]>(`/v1/admin/forms${q ? `?q=${encodeURIComponent(q)}` : ""}`);
 export const deleteForm = (id: string) => req<{ ok: boolean }>(`/v1/admin/forms/${id}`, { method: "DELETE" });
 export const listAudit = () => req<AuditEntry[]>("/v1/admin/audit");
